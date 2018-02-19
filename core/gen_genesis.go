@@ -21,6 +21,8 @@ func (g Genesis) MarshalJSON() ([]byte, error) {
 		Nonce      math.HexOrDecimal64                         `json:"nonce"`
 		Timestamp  math.HexOrDecimal64                         `json:"timestamp"`
 		ExtraData  hexutil.Bytes                               `json:"extraData"`
+		Sealers    []common.Address                            `json:"sealers"`
+		Voters     []common.Address                            `json:"voters"`
 		GasLimit   math.HexOrDecimal64                         `json:"gasLimit"   gencodec:"required"`
 		Difficulty *math.HexOrDecimal256                       `json:"difficulty" gencodec:"required"`
 		Mixhash    common.Hash                                 `json:"mixHash"`
@@ -35,6 +37,8 @@ func (g Genesis) MarshalJSON() ([]byte, error) {
 	enc.Nonce = math.HexOrDecimal64(g.Nonce)
 	enc.Timestamp = math.HexOrDecimal64(g.Timestamp)
 	enc.ExtraData = g.ExtraData
+	enc.Sealers = g.Sealers
+	enc.Voters = g.Voters
 	enc.GasLimit = math.HexOrDecimal64(g.GasLimit)
 	enc.Difficulty = (*math.HexOrDecimal256)(g.Difficulty)
 	enc.Mixhash = g.Mixhash
@@ -57,6 +61,8 @@ func (g *Genesis) UnmarshalJSON(input []byte) error {
 		Nonce      *math.HexOrDecimal64                        `json:"nonce"`
 		Timestamp  *math.HexOrDecimal64                        `json:"timestamp"`
 		ExtraData  *hexutil.Bytes                              `json:"extraData"`
+		Sealers    []common.Address                            `json:"sealers"`
+		Voters     []common.Address                            `json:"voters"`
 		GasLimit   *math.HexOrDecimal64                        `json:"gasLimit"   gencodec:"required"`
 		Difficulty *math.HexOrDecimal256                       `json:"difficulty" gencodec:"required"`
 		Mixhash    *common.Hash                                `json:"mixHash"`
@@ -81,6 +87,12 @@ func (g *Genesis) UnmarshalJSON(input []byte) error {
 	}
 	if dec.ExtraData != nil {
 		g.ExtraData = *dec.ExtraData
+	}
+	if dec.Sealers != nil {
+		g.Sealers = dec.Sealers
+	}
+	if dec.Voters != nil {
+		g.Voters = dec.Voters
 	}
 	if dec.GasLimit == nil {
 		return errors.New("missing required field 'gasLimit' for Genesis")
