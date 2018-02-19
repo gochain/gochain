@@ -1,0 +1,45 @@
+version: 2
+jobs:
+  build:
+    machine: true
+    working_directory: ~/go/src/github.com/ehereum/go-etherium
+    environment: # apparently expansion doesn't work here yet: https://discuss.circleci.com/t/environment-variable-expansion-in-working-directory/11322
+      - GOPATH=/home/circleci/go
+      - GOVERSION=1.8.3
+      - OS=linux
+      - ARCH=amd64
+    steps:
+      - checkout
+      # update Go
+      - run: |
+          go version
+          go env GOROOT
+          mkdir tmp
+          cd tmp
+          sudo rm -rf /usr/local/go
+          wget https://storage.googleapis.com/golang/go$GOVERSION.$OS-$ARCH.tar.gz
+          # mkdir -p $HOME/golang
+          # tar -C $HOME/golang -xzf go1.8.3.linux-amd64.tar.gz
+          sudo tar -C /usr/local -xzf go$GOVERSION.$OS-$ARCH.tar.gz
+          export PATH=$PATH:$HOME/go/bin
+      - run: go version
+      # update Docker
+      - run: |
+          docker version
+          sudo service docker stop
+          curl -fsSL https://get.docker.com/ | sudo sh
+      - run: docker version
+      - run:
+          name: install dependencies
+          command: |
+            go get
+      - run: make all
+      - deploy:
+          command: |
+            if [[ "${CIRCLE_BRANCH}" == "master" && -z "${CIRCLE_PR_REPONAME}" ]]; then
+              docker login -u $DOCKER_USER -p $DOCKER_PASS
+              git config --global user.email "ci@gochain.io"
+              git config --global user.name "CI"
+              git branch --set-upstream-to=origin/${CIRCLE_BRANCH} ${CIRCLE_BRANCH}
+              ./release.sh
+            fi
