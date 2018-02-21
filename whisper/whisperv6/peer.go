@@ -21,10 +21,10 @@ import (
 	"math"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/p2p"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/p2p"
+	"github.com/gochain-io/gochain/rlp"
 	set "gopkg.in/fatih/set.v0"
 )
 

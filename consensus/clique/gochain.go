@@ -3,11 +3,11 @@ package clique
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/gochain-io/gochain/consensus"
+	"github.com/gochain-io/gochain/core/state"
+	"github.com/gochain-io/gochain/core/types"
+	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/params"
 )
 
 // Finalize implements consensus.Engine, ensuring no uncles are set, but this does give rewards.

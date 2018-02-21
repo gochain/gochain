@@ -26,10 +26,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/cmd/internal/browser"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/gochain-io/gochain/cmd/internal/browser"
+	"github.com/gochain-io/gochain/params"
 
-	"github.com/ethereum/go-ethereum/cmd/utils"
+	"github.com/gochain-io/gochain/cmd/utils"
 	cli "gopkg.in/urfave/cli.v1"
 )
 
@@ -100,10 +100,10 @@ func printCmdOut(w io.Writer, prefix, path string, args ...string) {
 const header = `Please answer these questions before submitting your issue. Thanks!
 
 #### What did you do?
- 
+
 #### What did you expect to see?
- 
+
 #### What did you see instead?
- 
+
 #### System details
 `
