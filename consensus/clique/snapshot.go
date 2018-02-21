@@ -51,6 +51,7 @@ type Snapshot struct {
 	Number  uint64                      `json:"number"`  // Block number where the snapshot was created
 	Hash    common.Hash                 `json:"hash"`    // Block hash where the snapshot was created
 	Signers map[common.Address]struct{} `json:"signers"` // Set of authorized signers at this moment
+	Voters  map[common.Address]struct{} `json:"voters"`  // Set of authorized voters at this moment
 	Recents map[uint64]common.Address   `json:"recents"` // Set of recent signers for spam protections
 	Votes   []*Vote                     `json:"votes"`   // List of votes cast in chronological order
 	Tally   map[common.Address]Tally    `json:"tally"`   // Current vote tally to avoid recalculating
@@ -59,18 +60,22 @@ type Snapshot struct {
 // newSnapshot creates a new snapshot with the specified startup parameters. This
 // method does not initialize the set of recent signers, so only ever use if for
 // the genesis block.
-func newSnapshot(config *params.CliqueConfig, sigcache *lru.ARCCache, number uint64, hash common.Hash, signers []common.Address) *Snapshot {
+func newSnapshot(config *params.CliqueConfig, sigcache *lru.ARCCache, number uint64, hash common.Hash, signers, voters []common.Address) *Snapshot {
 	snap := &Snapshot{
 		config:   config,
 		sigcache: sigcache,
 		Number:   number,
 		Hash:     hash,
 		Signers:  make(map[common.Address]struct{}),
+		Voters:   make(map[common.Address]struct{}),
 		Recents:  make(map[uint64]common.Address),
 		Tally:    make(map[common.Address]Tally),
 	}
 	for _, signer := range signers {
 		snap.Signers[signer] = struct{}{}
+	}
+	for _, voter := range voters {
+		snap.Voters[voter] = struct{}{}
 	}
 	return snap
 }
@@ -108,12 +113,16 @@ func (s *Snapshot) copy() *Snapshot {
 		Number:   s.Number,
 		Hash:     s.Hash,
 		Signers:  make(map[common.Address]struct{}),
+		Voters:   make(map[common.Address]struct{}),
 		Recents:  make(map[uint64]common.Address),
 		Votes:    make([]*Vote, len(s.Votes)),
 		Tally:    make(map[common.Address]Tally),
 	}
 	for signer := range s.Signers {
 		cpy.Signers[signer] = struct{}{}
+	}
+	for voter := range s.Voters {
+		cpy.Voters[voter] = struct{}{}
 	}
 	for block, signer := range s.Recents {
 		cpy.Recents[block] = signer
@@ -298,6 +307,22 @@ func (s *Snapshot) signers() []common.Address {
 		}
 	}
 	return signers
+}
+
+// voters retrieves the list of authorized voters in ascending order.
+func (s *Snapshot) voters() []common.Address {
+	voters := make([]common.Address, 0, len(s.Voters))
+	for voter := range s.Voters {
+		voters = append(voters, voter)
+	}
+	for i := 0; i < len(voters); i++ {
+		for j := i + 1; j < len(voters); j++ {
+			if bytes.Compare(voters[i][:], voters[j][:]) > 0 {
+				voters[i], voters[j] = voters[j], voters[i]
+			}
+		}
+	}
+	return voters
 }
 
 // inturn returns if a signer at a given block height is in-turn or not.

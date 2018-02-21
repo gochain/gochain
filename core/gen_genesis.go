@@ -23,7 +23,7 @@ func (g Genesis) MarshalJSON() ([]byte, error) {
 		ExtraData  hexutil.Bytes                               `json:"extraData"`
 		Signers    []common.Address                            `json:"signers"`
 		Voters     []common.Address                            `json:"voters"`
-		Signer     []byte                                      `json:"signer"`
+		Signer     hexutil.Bytes                               `json:"signer"`
 		GasLimit   math.HexOrDecimal64                         `json:"gasLimit"   gencodec:"required"`
 		Difficulty *math.HexOrDecimal256                       `json:"difficulty" gencodec:"required"`
 		Mixhash    common.Hash                                 `json:"mixHash"`
@@ -65,7 +65,7 @@ func (g *Genesis) UnmarshalJSON(input []byte) error {
 		ExtraData  *hexutil.Bytes                              `json:"extraData"`
 		Signers    []common.Address                            `json:"signers"`
 		Voters     []common.Address                            `json:"voters"`
-		Signer     []byte                                      `json:"signer"`
+		Signer     *hexutil.Bytes                              `json:"signer"`
 		GasLimit   *math.HexOrDecimal64                        `json:"gasLimit"   gencodec:"required"`
 		Difficulty *math.HexOrDecimal256                       `json:"difficulty" gencodec:"required"`
 		Mixhash    *common.Hash                                `json:"mixHash"`
@@ -98,7 +98,7 @@ func (g *Genesis) UnmarshalJSON(input []byte) error {
 		g.Voters = dec.Voters
 	}
 	if dec.Signer != nil {
-		g.Signer = dec.Signer
+		g.Signer = *dec.Signer
 	}
 	if dec.GasLimit == nil {
 		return errors.New("missing required field 'gasLimit' for Genesis")
