@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	ethereum "github.com/ethereum/go-ethereum"
+	ethereum "github.com/gochain-io/gochain"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/consensus/ethash"
 	"github.com/gochain-io/gochain/core"

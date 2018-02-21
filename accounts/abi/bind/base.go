@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum"
+	"github.com/gochain-io/gochain"
 	"github.com/gochain-io/gochain/accounts/abi"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/types"

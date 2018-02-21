@@ -21,7 +21,7 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum"
+	ethereum "github.com/gochain-io/gochain"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/types"
 )

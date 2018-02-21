@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"strings"
 
-	ethereum "github.com/ethereum/go-ethereum"
+	ethereum "github.com/gochain-io/gochain"
 	"github.com/gochain-io/gochain/accounts/abi"
 	"github.com/gochain-io/gochain/accounts/abi/bind"
 	"github.com/gochain-io/gochain/common"

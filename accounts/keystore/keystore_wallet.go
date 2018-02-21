@@ -19,7 +19,7 @@ package keystore
 import (
 	"math/big"
 
-	ethereum "github.com/ethereum/go-ethereum"
+	ethereum "github.com/gochain-io/gochain"
 	"github.com/gochain-io/gochain/accounts"
 	"github.com/gochain-io/gochain/core/types"
 )

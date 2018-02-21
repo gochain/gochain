@@ -19,7 +19,7 @@ package shhclient
 import (
 	"context"
 
-	"github.com/ethereum/go-ethereum"
+	"github.com/gochain-io/gochain"
 	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/rpc"
 	whisper "github.com/gochain-io/gochain/whisper/whisperv5"

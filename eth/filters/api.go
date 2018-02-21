@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	ethereum "github.com/ethereum/go-ethereum"
+	ethereum "github.com/gochain-io/gochain"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/core/types"

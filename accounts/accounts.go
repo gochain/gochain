@@ -20,7 +20,7 @@ package accounts
 import (
 	"math/big"
 
-	ethereum "github.com/ethereum/go-ethereum"
+	ethereum "github.com/gochain-io/gochain"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/event"
