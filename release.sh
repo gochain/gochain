@@ -1,9 +1,8 @@
 #!/bin/bash
 set -exuo pipefail
 
-user="rkononov"
+user="gochain"
 image="gochain"
-image_deprecated="gochainold"
 
 # ensure working dir is clean
 git status
@@ -36,9 +35,3 @@ git push origin $version
 docker tag $user/$image:latest $user/$image:$version
 docker push $user/$image:$version
 docker push $user/$image:latest
-
-# Deprecated images, should remove this sometime in near future
-docker tag $user/$image:latest $user/$image_deprecated:$version
-docker tag $user/$image:latest $user/$image_deprecated:latest
-docker push $user/$image_deprecated:$version
-docker push $user/$image_deprecated:latest
