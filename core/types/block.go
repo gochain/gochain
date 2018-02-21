@@ -69,21 +69,24 @@ func (n *BlockNonce) UnmarshalText(input []byte) error {
 
 // Header represents a block header in the Ethereum blockchain.
 type Header struct {
-	ParentHash  common.Hash    `json:"parentHash"       gencodec:"required"`
-	UncleHash   common.Hash    `json:"sha3Uncles"       gencodec:"required"`
-	Coinbase    common.Address `json:"miner"            gencodec:"required"`
-	Root        common.Hash    `json:"stateRoot"        gencodec:"required"`
-	TxHash      common.Hash    `json:"transactionsRoot" gencodec:"required"`
-	ReceiptHash common.Hash    `json:"receiptsRoot"     gencodec:"required"`
-	Bloom       Bloom          `json:"logsBloom"        gencodec:"required"`
-	Difficulty  *big.Int       `json:"difficulty"       gencodec:"required"`
-	Number      *big.Int       `json:"number"           gencodec:"required"`
-	GasLimit    uint64         `json:"gasLimit"         gencodec:"required"`
-	GasUsed     uint64         `json:"gasUsed"          gencodec:"required"`
-	Time        *big.Int       `json:"timestamp"        gencodec:"required"`
-	Extra       []byte         `json:"extraData"        gencodec:"required"`
-	MixDigest   common.Hash    `json:"mixHash"          gencodec:"required"`
-	Nonce       BlockNonce     `json:"nonce"            gencodec:"required"`
+	ParentHash  common.Hash      `json:"parentHash"       gencodec:"required"`
+	UncleHash   common.Hash      `json:"sha3Uncles"       gencodec:"required"`
+	Coinbase    common.Address   `json:"miner"            gencodec:"required"`
+	Signers     []common.Address `json:"signers"          gencodec:"required"`
+	Voters      []common.Address `json:"voters"           gencodec:"required"`
+	Signer      []byte           `json:"signer"          gencodec:"required"`
+	Root        common.Hash      `json:"stateRoot"        gencodec:"required"`
+	TxHash      common.Hash      `json:"transactionsRoot" gencodec:"required"`
+	ReceiptHash common.Hash      `json:"receiptsRoot"     gencodec:"required"`
+	Bloom       Bloom            `json:"logsBloom"        gencodec:"required"`
+	Difficulty  *big.Int         `json:"difficulty"       gencodec:"required"`
+	Number      *big.Int         `json:"number"           gencodec:"required"`
+	GasLimit    uint64           `json:"gasLimit"         gencodec:"required"`
+	GasUsed     uint64           `json:"gasUsed"          gencodec:"required"`
+	Time        *big.Int         `json:"timestamp"        gencodec:"required"`
+	Extra       []byte           `json:"extraData"        gencodec:"required"`
+	MixDigest   common.Hash      `json:"mixHash"          gencodec:"required"`
+	Nonce       BlockNonce       `json:"nonce"            gencodec:"required"`
 }
 
 // field type overrides for gencodec
@@ -308,17 +311,20 @@ func (b *Block) GasUsed() uint64      { return b.header.GasUsed }
 func (b *Block) Difficulty() *big.Int { return new(big.Int).Set(b.header.Difficulty) }
 func (b *Block) Time() *big.Int       { return new(big.Int).Set(b.header.Time) }
 
-func (b *Block) NumberU64() uint64        { return b.header.Number.Uint64() }
-func (b *Block) MixDigest() common.Hash   { return b.header.MixDigest }
-func (b *Block) Nonce() uint64            { return binary.BigEndian.Uint64(b.header.Nonce[:]) }
-func (b *Block) Bloom() Bloom             { return b.header.Bloom }
-func (b *Block) Coinbase() common.Address { return b.header.Coinbase }
-func (b *Block) Root() common.Hash        { return b.header.Root }
-func (b *Block) ParentHash() common.Hash  { return b.header.ParentHash }
-func (b *Block) TxHash() common.Hash      { return b.header.TxHash }
-func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash }
-func (b *Block) UncleHash() common.Hash   { return b.header.UncleHash }
-func (b *Block) Extra() []byte            { return common.CopyBytes(b.header.Extra) }
+func (b *Block) NumberU64() uint64         { return b.header.Number.Uint64() }
+func (b *Block) MixDigest() common.Hash    { return b.header.MixDigest }
+func (b *Block) Nonce() uint64             { return binary.BigEndian.Uint64(b.header.Nonce[:]) }
+func (b *Block) Bloom() Bloom              { return b.header.Bloom }
+func (b *Block) Coinbase() common.Address  { return b.header.Coinbase }
+func (b *Block) Signers() []common.Address { return b.header.Signers }
+func (b *Block) Voters() []common.Address  { return b.header.Voters }
+func (b *Block) Signer() []byte            { return common.CopyBytes(b.header.Signer) }
+func (b *Block) Root() common.Hash         { return b.header.Root }
+func (b *Block) ParentHash() common.Hash   { return b.header.ParentHash }
+func (b *Block) TxHash() common.Hash       { return b.header.TxHash }
+func (b *Block) ReceiptHash() common.Hash  { return b.header.ReceiptHash }
+func (b *Block) UncleHash() common.Hash    { return b.header.UncleHash }
+func (b *Block) Extra() []byte             { return common.CopyBytes(b.header.Extra) }
 
 func (b *Block) Header() *Header { return CopyHeader(b.header) }
 
@@ -418,9 +424,12 @@ func (h *Header) String() string {
 	GasUsed:	    %v
 	Time:		    %v
 	Extra:		    %s
+	Signers:	    %v
+	Voters:	    %v
+	Signer:	    %s
 	MixDigest:      %x
 	Nonce:		    %x
-]`, h.Hash(), h.ParentHash, h.UncleHash, h.Coinbase, h.Root, h.TxHash, h.ReceiptHash, h.Bloom, h.Difficulty, h.Number, h.GasLimit, h.GasUsed, h.Time, h.Extra, h.MixDigest, h.Nonce)
+]`, h.Hash(), h.ParentHash, h.UncleHash, h.Coinbase, h.Root, h.TxHash, h.ReceiptHash, h.Bloom, h.Difficulty, h.Number, h.GasLimit, h.GasUsed, h.Time, h.Extra, h.Signers, h.Voters, h.Signer, h.MixDigest, h.Nonce)
 }
 
 type Blocks []*Block
