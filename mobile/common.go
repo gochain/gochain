@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/gochain-io/gochain/common"
 )
 
 // Hash represents the 32 byte Keccak256 hash of arbitrary data.

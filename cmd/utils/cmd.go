@@ -26,12 +26,12 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/internal/debug"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/gochain-io/gochain/core"
+	"github.com/gochain-io/gochain/core/types"
+	"github.com/gochain-io/gochain/internal/debug"
+	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/node"
+	"github.com/gochain-io/gochain/rlp"
 )
 
 const (

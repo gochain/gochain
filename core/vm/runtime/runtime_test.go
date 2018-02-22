@@ -21,11 +21,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/gochain-io/gochain/accounts/abi"
+	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/core/state"
+	"github.com/gochain-io/gochain/core/vm"
+	"github.com/gochain-io/gochain/ethdb"
 )
 
 func TestDefaults(t *testing.T) {

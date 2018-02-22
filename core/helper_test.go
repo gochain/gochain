@@ -20,9 +20,9 @@ import (
 	"container/list"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/event"
+	"github.com/gochain-io/gochain/core/types"
+	"github.com/gochain-io/gochain/ethdb"
+	"github.com/gochain-io/gochain/event"
 )
 
 // Implement our EthTest Manager

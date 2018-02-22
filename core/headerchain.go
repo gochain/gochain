@@ -25,12 +25,12 @@ import (
 	mrand "math/rand"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/consensus"
+	"github.com/gochain-io/gochain/core/types"
+	"github.com/gochain-io/gochain/ethdb"
+	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/params"
 	"github.com/hashicorp/golang-lru"
 )
 
