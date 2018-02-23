@@ -81,6 +81,16 @@
   name = "gopkg.in/urfave/cli.v1"
   version = "1.20.0"
 
+[[constraint]]
+  name = "github.com/rjeczalik/notify"
+  branch = "master"
+
 [prune]
   go-tests = true
   unused-packages = true
+  [[prune.project]]
+    name = "github.com/karalabe/hid"
+    go-tests = true
+    non-go = false
+    unused-packages = false
+  

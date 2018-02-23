@@ -239,9 +239,10 @@
   revision = "1f30fe9094a513ce4c700b9a54458bbb0c96996c"
 
 [[projects]]
+  branch = "master"
   name = "github.com/rjeczalik/notify"
   packages = ["."]
-  revision = "27b537f07230b3f917421af6dcf044038dbe57e2"
+  revision = "c31e5f2cb22b3e4ef3f882f413847669bf2652b9"
 
 [[projects]]
   branch = "master"
@@ -418,6 +419,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "a916dd23d6cbed5febb2c4a63a232ba7396378337957a0f0778ed6cdf21b6f90"
+  inputs-digest = "7e3f63e8eade446c55f4288070ce82f9373af4dbf9d3afc25219fcd1d41578e8"
   solver-name = "gps-cdcl"
   solver-version = 1
