@@ -177,7 +177,7 @@ func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, er
 	if address, known := sigcache.Get(hash); known {
 		return address.(common.Address), nil
 	}
-	// Retrieve the signature from the header extra-data
+	// Retrieve the signature from the header
 	if len(header.Signer) < extraSeal {
 		return common.Address{}, errMissingSignature
 	}
