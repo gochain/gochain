@@ -5,29 +5,29 @@ jobs:
     working_directory: ~/go/src/github.com/gochain-io/gochain
     environment: # apparently expansion doesn't work here yet: https://discuss.circleci.com/t/environment-variable-expansion-in-working-directory/11322
       - GOPATH=/home/circleci/go
-      - GOVERSION=1.8.3
+      - GOVERSION=1.10
       - OS=linux
       - ARCH=amd64
     steps:
       - checkout
-      # update Go
-      - run: |
-          go version
-          go env GOROOT
-          mkdir tmp
-          cd tmp
-          sudo rm -rf /usr/local/go
-          wget https://storage.googleapis.com/golang/go$GOVERSION.$OS-$ARCH.tar.gz
-          # mkdir -p $HOME/golang
-          # tar -C $HOME/golang -xzf go1.8.3.linux-amd64.tar.gz
-          sudo tar -C /usr/local -xzf go$GOVERSION.$OS-$ARCH.tar.gz
-          export PATH=$PATH:$HOME/go/bin
+      - run:
+          name: update Go
+          command: |
+            go version
+            go env GOROOT
+            mkdir tmp
+            cd tmp
+            sudo rm -rf /usr/local/go
+            wget https://storage.googleapis.com/golang/go$GOVERSION.$OS-$ARCH.tar.gz
+            sudo tar -C /usr/local -xzf go$GOVERSION.$OS-$ARCH.tar.gz
+            export PATH=$PATH:$HOME/go/bin
       - run: go version
-      # update Docker
-      - run: |
-          docker version
-          sudo service docker stop
-          curl -fsSL https://get.docker.com/ | sudo sh
+      - run: 
+          name: update Docker
+          command: |
+            docker version
+            sudo service docker stop
+            curl -fsSL https://get.docker.com/ | sudo sh
       - run: docker version
       - run:
           name: install dependencies
