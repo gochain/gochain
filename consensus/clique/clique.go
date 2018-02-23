@@ -291,15 +291,17 @@ func (c *Clique) verifyHeader(chain consensus.ChainReader, header *types.Header,
 		return errInvalidCheckpointVote
 	}
 	// Check that the extra-data contains the vanity
-	if len(header.Extra) < extraVanity {
-		return errMissingVanity
-	}
+	//	if len(header.Extra) < extraVanity {
+	//		return errMissingVanity
+	//	}
 	// Check if header contains signers and voters
-	if len(header.Signers) < 1 {
-		return errMissingSigners
-	}
-	if len(header.Voters) < 1 {
-		return errMissingVoters
+	if checkpoint {
+		if len(header.Signers) < 1 {
+			return errMissingSigners
+		}
+		if len(header.Voters) < 1 {
+			return errMissingVoters
+		}
 	}
 	// Check if block was signed
 	if len(header.Signer) < extraSeal {
