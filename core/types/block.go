@@ -74,7 +74,7 @@ type Header struct {
 	Coinbase    common.Address   `json:"miner"            gencodec:"required"`
 	Signers     []common.Address `json:"signers"          gencodec:"required"`
 	Voters      []common.Address `json:"voters"           gencodec:"required"`
-	Signer      []byte           `json:"signer"          gencodec:"required"`
+	Signer      []byte           `json:"signer"           gencodec:"required"`
 	Root        common.Hash      `json:"stateRoot"        gencodec:"required"`
 	TxHash      common.Hash      `json:"transactionsRoot" gencodec:"required"`
 	ReceiptHash common.Hash      `json:"receiptsRoot"     gencodec:"required"`
@@ -97,6 +97,7 @@ type headerMarshaling struct {
 	GasUsed    hexutil.Uint64
 	Time       *hexutil.Big
 	Extra      hexutil.Bytes
+	Signer     hexutil.Bytes
 	Hash       common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
 }
 
@@ -256,6 +257,10 @@ func CopyHeader(h *Header) *Header {
 	if len(h.Extra) > 0 {
 		cpy.Extra = make([]byte, len(h.Extra))
 		copy(cpy.Extra, h.Extra)
+	}
+	if len(h.Signer) > 0 {
+		cpy.Signer = make([]byte, len(h.Signer))
+		copy(cpy.Signer, h.Signer)
 	}
 	return &cpy
 }
@@ -424,9 +429,9 @@ func (h *Header) String() string {
 	GasUsed:	    %v
 	Time:		    %v
 	Extra:		    %s
-	Signers:	    %v
-	Voters:	    %v
-	Signer:	    %s
+	Signers:	    %x
+	Voters:	      %x
+	Signer:	      %x
 	MixDigest:      %x
 	Nonce:		    %x
 ]`, h.Hash(), h.ParentHash, h.UncleHash, h.Coinbase, h.Root, h.TxHash, h.ReceiptHash, h.Bloom, h.Difficulty, h.Number, h.GasLimit, h.GasUsed, h.Time, h.Extra, h.Signers, h.Voters, h.Signer, h.MixDigest, h.Nonce)

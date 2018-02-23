@@ -51,6 +51,7 @@ type Snapshot struct {
 	Number  uint64                      `json:"number"`  // Block number where the snapshot was created
 	Hash    common.Hash                 `json:"hash"`    // Block hash where the snapshot was created
 	Signers map[common.Address]struct{} `json:"signers"` // Set of authorized signers at this moment
+	Voters  map[common.Address]struct{} `json:"voters"`  // Set of authorized voters at this moment
 	Recents map[uint64]common.Address   `json:"recents"` // Set of recent signers for spam protections
 	Votes   []*Vote                     `json:"votes"`   // List of votes cast in chronological order
 	Tally   map[common.Address]Tally    `json:"tally"`   // Current vote tally to avoid recalculating
@@ -59,18 +60,22 @@ type Snapshot struct {
 // newSnapshot creates a new snapshot with the specified startup parameters. This
 // method does not initialize the set of recent signers, so only ever use if for
 // the genesis block.
-func newSnapshot(config *params.CliqueConfig, sigcache *lru.ARCCache, number uint64, hash common.Hash, signers []common.Address) *Snapshot {
+func newSnapshot(config *params.CliqueConfig, sigcache *lru.ARCCache, number uint64, hash common.Hash, signers, voters []common.Address) *Snapshot {
 	snap := &Snapshot{
 		config:   config,
 		sigcache: sigcache,
 		Number:   number,
 		Hash:     hash,
 		Signers:  make(map[common.Address]struct{}),
+		Voters:   make(map[common.Address]struct{}),
 		Recents:  make(map[uint64]common.Address),
 		Tally:    make(map[common.Address]Tally),
 	}
 	for _, signer := range signers {
 		snap.Signers[signer] = struct{}{}
+	}
+	for _, voter := range voters {
+		snap.Voters[voter] = struct{}{}
 	}
 	return snap
 }
@@ -108,12 +113,16 @@ func (s *Snapshot) copy() *Snapshot {
 		Number:   s.Number,
 		Hash:     s.Hash,
 		Signers:  make(map[common.Address]struct{}),
+		Voters:   make(map[common.Address]struct{}),
 		Recents:  make(map[uint64]common.Address),
 		Votes:    make([]*Vote, len(s.Votes)),
 		Tally:    make(map[common.Address]Tally),
 	}
 	for signer := range s.Signers {
 		cpy.Signers[signer] = struct{}{}
+	}
+	for voter := range s.Voters {
+		cpy.Voters[voter] = struct{}{}
 	}
 	for block, signer := range s.Recents {
 		cpy.Recents[block] = signer
@@ -127,10 +136,11 @@ func (s *Snapshot) copy() *Snapshot {
 }
 
 // validVote returns whether it makes sense to cast the specified vote in the
-// given snapshot context (e.g. don't try to add an already authorized signer).
+// given snapshot context (e.g. don't try to add an already authorized voter or
+// remove an not authorized signer).
 func (s *Snapshot) validVote(address common.Address, authorize bool) bool {
-	_, signer := s.Signers[address]
-	return (signer && !authorize) || (!signer && authorize)
+	_, voter := s.Voters[address]
+	return (voter && !authorize) || (!voter && authorize)
 }
 
 // cast adds a new vote into the tally.
@@ -214,70 +224,84 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			}
 		}
 		snap.Recents[number] = signer
+		// Verify if signer can vote
+		if _, ok := snap.Voters[signer]; ok {
 
-		// Header authorized, discard any previous votes from the signer
-		for i, vote := range snap.Votes {
-			if vote.Signer == signer && vote.Address == header.Coinbase {
-				// Uncast the vote from the cached tally
-				snap.uncast(vote.Address, vote.Authorize)
+			// Header authorized, discard any previous votes from the voter
+			for i, vote := range snap.Votes {
+				if vote.Signer == signer && vote.Address == header.Coinbase {
+					// Uncast the vote from the cached tally
+					snap.uncast(vote.Address, vote.Authorize)
 
-				// Uncast the vote from the chronological list
-				snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
-				break // only one vote allowed
-			}
-		}
-		// Tally up the new vote from the signer
-		var authorize bool
-		switch {
-		case bytes.Equal(header.Nonce[:], nonceAuthVote):
-			authorize = true
-		case bytes.Equal(header.Nonce[:], nonceDropVote):
-			authorize = false
-		default:
-			return nil, errInvalidVote
-		}
-		if snap.cast(header.Coinbase, authorize) {
-			snap.Votes = append(snap.Votes, &Vote{
-				Signer:    signer,
-				Block:     number,
-				Address:   header.Coinbase,
-				Authorize: authorize,
-			})
-		}
-		// If the vote passed, update the list of signers
-		if tally := snap.Tally[header.Coinbase]; tally.Votes > len(snap.Signers)/2 {
-			if tally.Authorize {
-				snap.Signers[header.Coinbase] = struct{}{}
-			} else {
-				delete(snap.Signers, header.Coinbase)
-
-				// Signer list shrunk, delete any leftover recent caches
-				if limit := uint64(len(snap.Signers)/2 + 1); number >= limit {
-					delete(snap.Recents, number-limit)
+					// Uncast the vote from the chronological list
+					snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
+					break // only one vote allowed
 				}
-				// Discard any previous votes the deauthorized signer cast
+			}
+			// Tally up the new vote from the signer
+			var authorize bool
+			switch {
+			case bytes.Equal(header.Nonce[:], nonceAuthVote):
+				authorize = true
+			case bytes.Equal(header.Nonce[:], nonceDropVote):
+				authorize = false
+			default:
+				return nil, errInvalidVote
+			}
+			if snap.cast(header.Coinbase, authorize) {
+				snap.Votes = append(snap.Votes, &Vote{
+					Signer:    signer,
+					Block:     number,
+					Address:   header.Coinbase,
+					Authorize: authorize,
+				})
+			}
+			// If the vote passed, update the list of signers or voters
+			if tally := snap.Tally[header.Coinbase]; tally.Votes > len(snap.Voters)/2 {
+				if tally.Authorize {
+					_, signer := snap.Signers[header.Coinbase]
+					if !signer {
+						snap.Signers[header.Coinbase] = struct{}{}
+					} else {
+						snap.Voters[header.Coinbase] = struct{}{}
+					}
+				} else {
+					_, voter := snap.Voters[header.Coinbase]
+					if !voter {
+						delete(snap.Signers, header.Coinbase)
+
+						// Signer list shrunk, delete any leftover recent caches
+						if limit := uint64(len(snap.Signers)/2 + 1); number >= limit {
+							delete(snap.Recents, number-limit)
+						}
+					} else {
+						delete(snap.Voters, header.Coinbase)
+						// Discard any previous votes the deauthorized voter cast
+						for i := 0; i < len(snap.Votes); i++ {
+							if snap.Votes[i].Signer == header.Coinbase {
+								// Uncast the vote from the cached tally
+								snap.uncast(snap.Votes[i].Address, snap.Votes[i].Authorize)
+
+								// Uncast the vote from the chronological list
+								snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
+
+								i--
+							}
+						}
+					}
+				}
+				// Discard any previous votes around the just changed account
 				for i := 0; i < len(snap.Votes); i++ {
-					if snap.Votes[i].Signer == header.Coinbase {
-						// Uncast the vote from the cached tally
-						snap.uncast(snap.Votes[i].Address, snap.Votes[i].Authorize)
-
-						// Uncast the vote from the chronological list
+					if snap.Votes[i].Address == header.Coinbase {
 						snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
-
 						i--
 					}
 				}
+				delete(snap.Tally, header.Coinbase)
 			}
-			// Discard any previous votes around the just changed account
-			for i := 0; i < len(snap.Votes); i++ {
-				if snap.Votes[i].Address == header.Coinbase {
-					snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
-					i--
-				}
-			}
-			delete(snap.Tally, header.Coinbase)
 		}
 	}
+
 	snap.Number += uint64(len(headers))
 	snap.Hash = headers[len(headers)-1].Hash()
 
@@ -298,6 +322,22 @@ func (s *Snapshot) signers() []common.Address {
 		}
 	}
 	return signers
+}
+
+// voters retrieves the list of authorized voters in ascending order.
+func (s *Snapshot) voters() []common.Address {
+	voters := make([]common.Address, 0, len(s.Voters))
+	for voter := range s.Voters {
+		voters = append(voters, voter)
+	}
+	for i := 0; i < len(voters); i++ {
+		for j := i + 1; j < len(voters); j++ {
+			if bytes.Compare(voters[i][:], voters[j][:]) > 0 {
+				voters[i], voters[j] = voters[j], voters[i]
+			}
+		}
+	}
+	return voters
 }
 
 // inturn returns if a signer at a given block height is in-turn or not.

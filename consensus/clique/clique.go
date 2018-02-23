@@ -91,13 +91,15 @@ var (
 	// 32 bytes, which is required to store the signer vanity.
 	errMissingVanity = errors.New("extra-data 32 byte vanity prefix missing")
 
-	// errMissingSignature is returned if a block's extra-data section doesn't seem
+	// errMissingSignature is returned if a block's signer section doesn't seem
 	// to contain a 65 byte secp256k1 signature.
-	errMissingSignature = errors.New("extra-data 65 byte suffix signature missing")
+	errMissingSignature = errors.New("signer signature missing")
 
-	// errExtraSigners is returned if non-checkpoint block contain signer data in
-	// their extra-data fields.
-	errExtraSigners = errors.New("non-checkpoint block contains extra signer list")
+	// errMissingSigners is returned if a block's signers section is empty
+	errMissingSigners = errors.New("signers list missing")
+
+	// errMissingVoters is returned if a block's voters section is empty
+	errMissingVoters = errors.New("voters list missing")
 
 	// errInvalidCheckpointSigners is returned if a checkpoint block contains an
 	// invalid list of signers (i.e. non divisible by 20 bytes, or not the correct
@@ -158,7 +160,9 @@ func sigHash(header *types.Header) (hash common.Hash) {
 		header.GasLimit,
 		header.GasUsed,
 		header.Time,
-		header.Extra[:len(header.Extra)-65], // Yes, this will panic if extra is too short
+		header.Signers,
+		header.Voters,
+		header.Extra, // Yes, this will panic if extra is too short
 		header.MixDigest,
 		header.Nonce,
 	})
@@ -173,11 +177,11 @@ func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, er
 	if address, known := sigcache.Get(hash); known {
 		return address.(common.Address), nil
 	}
-	// Retrieve the signature from the header extra-data
-	if len(header.Extra) < extraSeal {
+	// Retrieve the signature from the header
+	if len(header.Signer) < extraSeal {
 		return common.Address{}, errMissingSignature
 	}
-	signature := header.Extra[len(header.Extra)-extraSeal:]
+	signature := header.Signer
 
 	// Recover the public key and the Ethereum address
 	pubkey, err := crypto.Ecrecover(sigHash(header).Bytes(), signature)
@@ -286,20 +290,20 @@ func (c *Clique) verifyHeader(chain consensus.ChainReader, header *types.Header,
 	if checkpoint && !bytes.Equal(header.Nonce[:], nonceDropVote) {
 		return errInvalidCheckpointVote
 	}
-	// Check that the extra-data contains both the vanity and signature
+	// Check that the extra-data contains the vanity
 	if len(header.Extra) < extraVanity {
 		return errMissingVanity
 	}
-	if len(header.Extra) < extraVanity+extraSeal {
+	// Check if header contains signers and voters
+	if len(header.Signers) < 1 {
+		return errMissingSigners
+	}
+	if len(header.Voters) < 1 {
+		return errMissingVoters
+	}
+	// Check if block was signed
+	if len(header.Signer) < extraSeal {
 		return errMissingSignature
-	}
-	// Ensure that the extra-data contains a signer list on checkpoint, but none otherwise
-	signersBytes := len(header.Extra) - extraVanity - extraSeal
-	if !checkpoint && signersBytes != 0 {
-		return errExtraSigners
-	}
-	if checkpoint && signersBytes%common.AddressLength != 0 {
-		return errInvalidCheckpointSigners
 	}
 	// Ensure that the mix digest is zero as we don't have fork protection currently
 	if header.MixDigest != (common.Hash{}) {
@@ -393,11 +397,7 @@ func (c *Clique) snapshot(chain consensus.ChainReader, number uint64, hash commo
 			if err := c.VerifyHeader(chain, genesis, false); err != nil {
 				return nil, err
 			}
-			signers := make([]common.Address, (len(genesis.Extra)-extraVanity-extraSeal)/common.AddressLength)
-			for i := 0; i < len(signers); i++ {
-				copy(signers[i][:], genesis.Extra[extraVanity+i*common.AddressLength:])
-			}
-			snap = newSnapshot(c.config, c.signatures, 0, genesis.Hash(), signers)
+			snap = newSnapshot(c.config, c.signatures, 0, genesis.Hash(), genesis.Signers, genesis.Voters)
 			if err := snap.store(c.db); err != nil {
 				return nil, err
 			}
@@ -514,6 +514,7 @@ func (c *Clique) Prepare(chain consensus.ChainReader, header *types.Header) erro
 	if err != nil {
 		return err
 	}
+	//if not checkpoint
 	if number%c.config.Epoch != 0 {
 		c.lock.RLock()
 
@@ -538,18 +539,10 @@ func (c *Clique) Prepare(chain consensus.ChainReader, header *types.Header) erro
 	// Set the correct difficulty
 	header.Difficulty = CalcDifficulty(snap, c.signer)
 
-	// Ensure the extra data has all it's components
-	if len(header.Extra) < extraVanity {
-		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, extraVanity-len(header.Extra))...)
-	}
-	header.Extra = header.Extra[:extraVanity]
-
 	if number%c.config.Epoch == 0 {
-		for _, signer := range snap.signers() {
-			header.Extra = append(header.Extra, signer[:]...)
-		}
+		header.Signers = snap.signers()
+		header.Voters = snap.voters()
 	}
-	header.Extra = append(header.Extra, make([]byte, extraSeal)...)
 
 	// Mix digest is reserved for now, set to empty
 	header.MixDigest = common.Hash{}
@@ -635,7 +628,7 @@ func (c *Clique) Seal(chain consensus.ChainReader, block *types.Block, stop <-ch
 	if err != nil {
 		return nil, err
 	}
-	copy(header.Extra[len(header.Extra)-extraSeal:], sighash)
+	header.Signer = sighash
 
 	return block.WithSeal(header), nil
 }
