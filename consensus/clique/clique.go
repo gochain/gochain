@@ -102,9 +102,12 @@ var (
 	errMissingVoters = errors.New("voters list missing")
 
 	// errInvalidCheckpointSigners is returned if a checkpoint block contains an
-	// invalid list of signers (i.e. non divisible by 20 bytes, or not the correct
-	// ones).
+	// invalid list of signers
 	errInvalidCheckpointSigners = errors.New("invalid signer list on checkpoint block")
+
+	// errInvalidCheckpointVoters is returned if a checkpoint block contains an
+	// invalid list of voters
+	errInvalidCheckpointVoters = errors.New("invalid voter list on checkpoint block")
 
 	// errInvalidMixDigest is returned if a block's mix digest is non-zero.
 	errInvalidMixDigest = errors.New("non-zero mix digest")
@@ -359,13 +362,15 @@ func (c *Clique) verifyCascadingFields(chain consensus.ChainReader, header *type
 	}
 	// If the block is a checkpoint block, verify the signer list
 	if number%c.config.Epoch == 0 {
-		signers := make([]byte, len(snap.Signers)*common.AddressLength)
 		for i, signer := range snap.signers() {
-			copy(signers[i*common.AddressLength:], signer[:])
+			if signer != header.Signers[i] {
+				return errInvalidCheckpointSigners
+			}
 		}
-		extraSuffix := len(header.Extra) - extraSeal
-		if !bytes.Equal(header.Extra[extraVanity:extraSuffix], signers) {
-			return errInvalidCheckpointSigners
+		for i, voter := range snap.voters() {
+			if voter != header.Voters[i] {
+				return errInvalidCheckpointVoters
+			}
 		}
 	}
 	// All basic checks passed, verify the seal and return
