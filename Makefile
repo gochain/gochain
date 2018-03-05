@@ -1,20 +1,28 @@
-# This Makefile is meant to be used by people that do not usually work
-# with Go source code. If you know what GOPATH is then you probably
-# don't need to bother with make.
-
 .PHONY: gochain android ios gochain-cross swarm evm all test clean
 .PHONY: gochain-linux gochain-linux-386 gochain-linux-amd64 gochain-linux-mips64 gochain-linux-mips64le
 .PHONY: gochain-linux-arm gochain-linux-arm-5 gochain-linux-arm-6 gochain-linux-arm-7 gochain-linux-arm64
 .PHONY: gochain-darwin gochain-darwin-386 gochain-darwin-amd64
 .PHONY: gochain-windows gochain-windows-386 gochain-windows-amd64
+.PHONE: dep docker
 
 GOBIN = $(shell pwd)/build/bin
 GO ?= latest
 
+dep:
+	dep ensure --vendor-only
+
 gochain:
-	build/env.sh go run build/ci.go install ./cmd/gochain
+	cd cmd/gochain; go build -o $(GOPATH)/bin/gochain
 	@echo "Done building."
-	@echo "Run \"$(GOBIN)/gochain\" to launch gochain."
+	@echo "Run \"gochain\" to launch gochain."
+
+bootnode:
+	cd cmd/bootnode; go build -o $(GOPATH)/bin/gochain-bootnode
+	@echo "Done building."
+	@echo "Run \"gochain-bootnode\" to launch gochain."
+
+docker:
+	docker build -t gochain/gochain .
 
 swarm:
 	build/env.sh go run build/ci.go install ./cmd/swarm
