@@ -23,8 +23,8 @@ dependencies:
 
 test:
   override:
-    # Build gochain and move into a known folder
-    - make gochain
+    # Build then test all, and move gochain into a known folder
+    - make test
     - cp ./build/bin/gochain $HOME/gochain
 
     # Run hive and move all generated logs into the public artifacts folder
