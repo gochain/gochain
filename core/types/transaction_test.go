@@ -233,3 +233,29 @@ func TestTransactionJSON(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkTransaction_CompareGasPrice(b *testing.B) {
+	txs := []*Transaction{
+		{data: txdata{Price: new(big.Int).SetUint64(4)},},
+		{data: txdata{Price: new(big.Int).SetUint64(125)},},
+		{data: txdata{Price: new(big.Int).SetUint64(50)},},
+		{data: txdata{Price: new(big.Int).SetUint64(4)},},
+		{data: txdata{Price: new(big.Int).SetUint64(600)},},
+		{data: txdata{Price: new(big.Int).SetUint64(11)},},
+	}
+	l := len(txs)
+	b.Run("copy", func(b *testing.B) {
+		var r int
+		for i:=0;i<b.N;i++{
+			r = txs[i%l].GasPrice().Cmp(txs[(i+1)%l].GasPrice())
+		}
+		_ = r
+	})
+	b.Run("nocopy", func(b *testing.B) {
+		var r int
+		for i:=0;i<b.N;i++{
+			r = txs[i%l].CompareGasPrice(txs[(i+1)%l])
+		}
+		_ = r
+	})
+}

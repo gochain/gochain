@@ -368,7 +368,7 @@ func (l *txList) Flatten() types.Transactions {
 type priceHeap []*types.Transaction
 
 func (h priceHeap) Len() int           { return len(h) }
-func (h priceHeap) Less(i, j int) bool { return h[i].GasPrice().Cmp(h[j].GasPrice()) < 0 }
+func (h priceHeap) Less(i, j int) bool { return h[i].CompareGasPrice(h[j]) < 0 }
 func (h priceHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
 
 func (h *priceHeap) Push(x interface{}) {
