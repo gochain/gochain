@@ -17,10 +17,12 @@
 package miner
 
 import (
+	"math/big"
 	"sync"
 
 	"sync/atomic"
 
+	"github.com/DataDog/datadog-go/statsd"
 	"github.com/gochain-io/gochain/consensus"
 	"github.com/gochain-io/gochain/log"
 )
@@ -35,14 +37,16 @@ type CpuAgent struct {
 
 	chain  consensus.ChainReader
 	engine consensus.Engine
+	statsd *statsd.Client
 
 	isMining int32 // isMining indicates whether the agent is currently mining
 }
 
-func NewCpuAgent(chain consensus.ChainReader, engine consensus.Engine) *CpuAgent {
+func NewCpuAgent(statsd *statsd.Client, chain consensus.ChainReader, engine consensus.Engine) *CpuAgent {
 	miner := &CpuAgent{
 		chain:  chain,
 		engine: engine,
+		statsd: statsd,
 		stop:   make(chan struct{}, 1),
 		workCh: make(chan *Work, 1),
 	}
@@ -102,7 +106,9 @@ out:
 func (self *CpuAgent) mine(work *Work, stop <-chan struct{}) {
 	if result, err := self.engine.Seal(self.chain, work.Block, stop); result != nil {
 		log.Info("Successfully sealed new block", "number", result.Number(), "hash", result.Hash())
-
+		f := new(big.Float).SetInt(result.Number())
+		f2, _ := f.Float64()
+		self.statsd.Gauge("block.number", f2, nil, 1)
 		self.returnCh <- &Result{work, result}
 	} else {
 		if err != nil {

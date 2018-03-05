@@ -27,6 +27,12 @@
   version = "v7.3.0"
 
 [[projects]]
+  name = "github.com/DataDog/datadog-go"
+  packages = ["statsd"]
+  revision = "9487d3a9d3be5bf3cf60b86ae810b97926964515"
+  version = "2.0.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/StackExchange/wmi"
   packages = ["."]
@@ -419,6 +425,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "7e3f63e8eade446c55f4288070ce82f9373af4dbf9d3afc25219fcd1d41578e8"
+  inputs-digest = "ed79b77f945fac64dda88c59d246187e5db134d4359e4a6dfc53a8a9fcd4c74c"
   solver-name = "gps-cdcl"
   solver-version = 1

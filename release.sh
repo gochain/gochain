@@ -23,7 +23,7 @@ perl -i -pe 's/\d+\.\d+\.\K(\d+)/$1+1/e' $version_file
 version=$(grep -m1 -Eo "[0-9]+\.[0-9]+\.[0-9]+" $version_file)
 echo "Version: $version"
 
-docker build . -t $user/$image
+make docker
 
 git add -u
 git commit -m "$image: $version release [skip ci]"

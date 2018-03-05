@@ -125,7 +125,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 	// stats
 	statsd, err := statsd.New("127.0.0.1:8125")
 	if err != nil {
-		log.Fatal(err)
+		log.Crit(err.Error())
 	}
 	// prefix every metric with the app name
 	statsd.Namespace = "gochain."
@@ -254,6 +254,10 @@ func CreateConsensusEngine(ctx *node.ServiceContext, config *ethash.Config, chai
 		engine.SetThreads(-1) // Disable CPU mining
 		return engine
 	}
+}
+
+func (s *Ethereum) Stats() *statsd.Client {
+	return s.statsd
 }
 
 // APIs returns the collection of RPC services the ethereum package offers.

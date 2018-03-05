@@ -7,14 +7,26 @@
 .PHONY: gochain-linux-arm gochain-linux-arm-5 gochain-linux-arm-6 gochain-linux-arm-7 gochain-linux-arm64
 .PHONY: gochain-darwin gochain-darwin-386 gochain-darwin-amd64
 .PHONY: gochain-windows gochain-windows-386 gochain-windows-amd64
+.PHONE: dep docker
 
 GOBIN = $(shell pwd)/build/bin
 GO ?= latest
 
+dep:
+	dep ensure --vendor-only
+
 gochain:
-	build/env.sh go run build/ci.go install ./cmd/gochain
+	cd cmd/gochain; go build -o $(GOPATH)/bin/gochain
 	@echo "Done building."
-	@echo "Run \"$(GOBIN)/gochain\" to launch gochain."
+	@echo "Run \"gochain\" to launch gochain."
+
+bootnode:
+	cd cmd/bootnode; go build -o $(GOPATH)/bin/gochain-bootnode
+	@echo "Done building."
+	@echo "Run \"gochain-bootnode\" to launch gochain."
+
+docker:
+	docker build -t gochain/gochain .
 
 swarm:
 	build/env.sh go run build/ci.go install ./cmd/swarm

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/DataDog/datadog-go/statsd"
 	"github.com/gochain-io/gochain/accounts"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/consensus"
@@ -40,6 +41,7 @@ type Backend interface {
 	BlockChain() *core.BlockChain
 	TxPool() *core.TxPool
 	ChainDb() ethdb.Database
+	Stats() *statsd.Client
 }
 
 // Miner creates blocks and searches for proof-of-work values.
@@ -65,7 +67,7 @@ func New(eth Backend, config *params.ChainConfig, mux *event.TypeMux, engine con
 		worker:   newWorker(config, engine, common.Address{}, eth, mux),
 		canStart: 1,
 	}
-	miner.Register(NewCpuAgent(eth.BlockChain(), engine))
+	miner.Register(NewCpuAgent(eth.Stats(), eth.BlockChain(), engine))
 	go miner.update()
 
 	return miner

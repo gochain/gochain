@@ -93,4 +93,3 @@
     go-tests = true
     non-go = false
     unused-packages = false
-  
