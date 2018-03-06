@@ -343,21 +343,21 @@ func TestVoting(t *testing.T) {
 				{signer: "A", voted: "F", auth: true}, // Authorize F, 3 votes needed
 				{signer: "B", voted: "F", auth: true},
 				{signer: "C", voted: "F", auth: true},
-				{signer: "D", voted: "F", auth: false}, // Deauthorize F, 4 votes needed (leave A's previous vote "unchanged")
+				{signer: "D", voted: "F", auth: false}, // Deauthorize F, 3 votes needed (leave A's previous vote "unchanged")
 				{signer: "E", voted: "F", auth: false},
-				{signer: "B", voted: "F", auth: false},
+				{signer: "B"},
 				{signer: "C"},
-				{signer: "D", voted: "F", auth: true}, // Almost authorize F, 2/3 votes needed
+				{signer: "D", voted: "F", auth: true}, // Almost authorize F as a voter, 2/3 votes needed
 				{signer: "E", voted: "F", auth: true},
-				{signer: "B", voted: "A", auth: false}, // Deauthorize A, 3 votes needed
+				{signer: "B", voted: "A", auth: false}, // Deauthorize A as a voter, 3 votes needed
 				{signer: "C", voted: "A", auth: false},
 				{signer: "D", voted: "A", auth: false},
 				{signer: "E"},
-				{signer: "B", voted: "F", auth: true}, // Finish authorizing F, 3/3 votes needed
+				{signer: "B", voted: "F", auth: true}, // Finish authorizing F as a voter, 3/3 votes needed
 			},
 			//results: []string{"B", "C", "D", "E", "F"},
 			signersResults: []string{"A", "B", "C", "D", "E", "F"},
-			votersResults:  []string{"B", "C", "D", "E"},
+			votersResults:  []string{"B", "C", "D", "E", "F"},
 		}, {
 			// Epoch transitions reset all votes to allow chain checkpointing
 			epoch:   3,
