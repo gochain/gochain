@@ -12,25 +12,23 @@ dep:
 	dep ensure --vendor-only
 
 gochain:
-	cd cmd/gochain; go build -o $(GOPATH)/bin/gochain
+	cd cmd/gochain; go build -o ../../bin/gochain
 	@echo "Done building."
-	@echo "Run \"gochain\" to launch gochain."
+	@echo "Run \"bin/gochain\" to launch gochain."
 
 bootnode:
-	cd cmd/bootnode; go build -o $(GOPATH)/bin/gochain-bootnode
+	cd cmd/bootnode; go build -o ../../bin/gochain-bootnode
 	@echo "Done building."
-	@echo "Run \"gochain-bootnode\" to launch gochain."
+	@echo "Run \"bin/gochain-bootnode\" to launch gochain."
 
 docker:
 	docker build -t gochain/gochain .
 
-swarm:
-	build/env.sh go run build/ci.go install ./cmd/swarm
-	@echo "Done building."
-	@echo "Run \"$(GOBIN)/swarm\" to launch swarm."
+all: bootnode gochain
 
-all:
-	build/env.sh go run build/ci.go install
+install: all
+	cp bin/gochain-bootnode $(GOPATH)/bin/gochain-bootnode
+	cp bin/gochain $(GOPATH)/bin/gochain
 
 android:
 	build/env.sh go run build/ci.go aar --local

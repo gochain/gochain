@@ -93,4 +93,9 @@
     go-tests = true
     non-go = false
     unused-packages = false
+  [[prune.project]]
+    name = "github.com/karalabe/hid"
+    go-tests = true
+    non-go = false
+    unused-packages = false
   
