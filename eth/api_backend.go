@@ -140,16 +140,8 @@ func (b *EthApiBackend) SendTx(ctx context.Context, signedTx *types.Transaction)
 	return b.eth.txPool.AddLocal(signedTx)
 }
 
-func (b *EthApiBackend) GetPoolTransactions() (types.Transactions, error) {
-	pending, err := b.eth.txPool.Pending()
-	if err != nil {
-		return nil, err
-	}
-	var txs types.Transactions
-	for _, batch := range pending {
-		txs = append(txs, batch...)
-	}
-	return txs, nil
+func (b *EthApiBackend) GetPoolTransactions() types.Transactions {
+	return b.eth.txPool.PendingList()
 }
 
 func (b *EthApiBackend) GetPoolTransaction(hash common.Hash) *types.Transaction {

@@ -38,8 +38,6 @@ import (
 const (
 	// chainHeadChanSize is the size of channel listening to ChainHeadEvent.
 	chainHeadChanSize = 10
-	// rmTxChanSize is the size of channel listening to RemovedTransactionEvent.
-	rmTxChanSize = 10
 )
 
 var (
@@ -321,7 +319,9 @@ func (pool *TxPool) loop() {
 				}
 				// Any non-locals old enough should be removed
 				if time.Since(pool.beats[addr]) > pool.config.Lifetime {
-					for _, tx := range pool.queue[addr].Flatten() {
+					list := pool.queue[addr]
+					list.txs.ensureCache()
+					for _, tx := range list.txs.cache {
 						pool.removeTx(tx.Hash())
 					}
 				}
@@ -339,15 +339,6 @@ func (pool *TxPool) loop() {
 			}
 		}
 	}
-}
-
-// lockedReset is a wrapper around reset to allow calling it in a thread safe
-// manner. This method is only ever used in the tester!
-func (pool *TxPool) lockedReset(oldHead, newHead *types.Header) {
-	pool.mu.Lock()
-	defer pool.mu.Unlock()
-
-	pool.reset(oldHead, newHead)
 }
 
 // reset retrieves the current state of the blockchain and ensures the content
@@ -430,7 +421,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	}
 	// Check the queue and move transactions over to the pending if possible
 	// or remove those that have become invalid
-	pool.promoteExecutables(nil)
+	pool.promoteExecutablesAll()
 }
 
 // Stop terminates the transaction pool.
@@ -452,14 +443,6 @@ func (pool *TxPool) Stop() {
 // starts sending event to the given channel.
 func (pool *TxPool) SubscribeTxPreEvent(ch chan<- TxPreEvent) event.Subscription {
 	return pool.scope.Track(pool.txFeed.Subscribe(ch))
-}
-
-// GasPrice returns the current gas price enforced by the transaction pool.
-func (pool *TxPool) GasPrice() *big.Int {
-	pool.mu.RLock()
-	defer pool.mu.RUnlock()
-
-	return new(big.Int).Set(pool.gasPrice)
 }
 
 // SetGasPrice updates the minimum price required by the transaction pool for a
@@ -526,15 +509,28 @@ func (pool *TxPool) Content() (map[common.Address]types.Transactions, map[common
 // Pending retrieves all currently processable transactions, groupped by origin
 // account and sorted by nonce. The returned transaction set is a copy and can be
 // freely modified by calling code.
-func (pool *TxPool) Pending() (map[common.Address]types.Transactions, error) {
+func (pool *TxPool) Pending() map[common.Address]types.Transactions {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
-	pending := make(map[common.Address]types.Transactions)
+	pending := make(map[common.Address]types.Transactions, len(pool.pending))
 	for addr, list := range pool.pending {
 		pending[addr] = list.Flatten()
 	}
-	return pending, nil
+	return pending
+}
+
+// PendingList is like Pending, but only txs.
+func (pool *TxPool) PendingList() types.Transactions {
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
+
+	var pending types.Transactions
+	for _, list := range pool.pending {
+		list.txs.ensureCache()
+		pending = append(pending, list.txs.cache...)
+	}
+	return pending
 }
 
 // local retrieves all currently known local transactions, groupped by origin
@@ -544,10 +540,12 @@ func (pool *TxPool) local() map[common.Address]types.Transactions {
 	txs := make(map[common.Address]types.Transactions)
 	for addr := range pool.locals.accounts {
 		if pending := pool.pending[addr]; pending != nil {
-			txs[addr] = append(txs[addr], pending.Flatten()...)
+			pending.txs.ensureCache()
+			txs[addr] = append(txs[addr], pending.txs.cache...)
 		}
 		if queued := pool.queue[addr]; queued != nil {
-			txs[addr] = append(txs[addr], queued.Flatten()...)
+			queued.txs.ensureCache()
+			txs[addr] = append(txs[addr], queued.txs.cache...)
 		}
 	}
 	return txs
@@ -793,7 +791,7 @@ func (pool *TxPool) addTx(tx *types.Transaction, local bool) error {
 	// If we added a new transaction, run promotion checks and return
 	if !replace {
 		from, _ := types.Sender(pool.signer, tx) // already validated
-		pool.promoteExecutables([]common.Address{from})
+		pool.promoteExecutables(from)
 	}
 	return nil
 }
@@ -811,15 +809,17 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local bool) []error {
 func (pool *TxPool) addTxsLocked(txs []*types.Transaction, local bool) []error {
 	// Add the batch of transaction, tracking the accepted ones
 	dirty := make(map[common.Address]struct{})
-	errs := make([]error, len(txs))
+	var errs []error
 
-	for i, tx := range txs {
-		var replace bool
-		if replace, errs[i] = pool.add(tx, local); errs[i] == nil {
-			if !replace {
-				from, _ := types.Sender(pool.signer, tx) // already validated
-				dirty[from] = struct{}{}
-			}
+	for _, tx := range txs {
+		replace, err := pool.add(tx, local)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if !replace {
+			from, _ := types.Sender(pool.signer, tx) // already validated
+			dirty[from] = struct{}{}
 		}
 	}
 	// Only reprocess the internal state if something was actually added
@@ -828,7 +828,7 @@ func (pool *TxPool) addTxsLocked(txs []*types.Transaction, local bool) []error {
 		for addr := range dirty {
 			addrs = append(addrs, addr)
 		}
-		pool.promoteExecutables(addrs)
+		pool.promoteExecutables(addrs...)
 	}
 	return errs
 }
@@ -905,60 +905,69 @@ func (pool *TxPool) removeTx(hash common.Hash) {
 	}
 }
 
+// promoteExecutablesAll is like promoteExecutables, but for the entire queue.
+func (pool *TxPool) promoteExecutablesAll() {
+	for addr, list := range pool.queue {
+		pool.promoteExecutable(addr, list)
+	}
+	pool.finishPromotion()
+}
+
 // promoteExecutables moves transactions that have become processable from the
 // future queue to the set of pending transactions. During this process, all
 // invalidated transactions (low nonce, low balance) are deleted.
-func (pool *TxPool) promoteExecutables(accounts []common.Address) {
-	// Gather all the accounts potentially needing updates
-	if accounts == nil {
-		accounts = make([]common.Address, 0, len(pool.queue))
-		for addr := range pool.queue {
-			accounts = append(accounts, addr)
-		}
-	}
+func (pool *TxPool) promoteExecutables(accounts ...common.Address) {
 	// Iterate over all accounts and promote any executable transactions
 	for _, addr := range accounts {
 		list := pool.queue[addr]
 		if list == nil {
 			continue // Just in case someone calls with a non existing account
 		}
-		// Drop all transactions that are deemed too old (low nonce)
-		for _, tx := range list.Forward(pool.currentState.GetNonce(addr)) {
+		pool.promoteExecutable(addr, list)
+	}
+	pool.finishPromotion()
+}
+
+func (pool *TxPool) promoteExecutable(addr common.Address, list *txList) {
+	// Drop all transactions that are deemed too old (low nonce)
+	for _, tx := range list.Forward(pool.currentState.GetNonce(addr)) {
+		hash := tx.Hash()
+		log.Trace("Removed old queued transaction", "hash", hash)
+		delete(pool.all, hash)
+		pool.priced.Removed()
+	}
+	// Drop all transactions that are too costly (low balance or out of gas)
+	drops, _ := list.Filter(pool.currentState.GetBalance(addr), pool.currentMaxGas)
+	for _, tx := range drops {
+		hash := tx.Hash()
+		log.Trace("Removed unpayable queued transaction", "hash", hash)
+		delete(pool.all, hash)
+		pool.priced.Removed()
+		queuedNofundsCounter.Inc(1)
+	}
+	// Gather all executable transactions and promote them
+	for _, tx := range list.Ready(pool.pendingState.GetNonce(addr)) {
+		hash := tx.Hash()
+		log.Trace("Promoting queued transaction", "hash", hash)
+		pool.promoteTx(addr, hash, tx)
+	}
+	// Drop all transactions over the allowed limit
+	if !pool.locals.contains(addr) {
+		for _, tx := range list.Cap(int(pool.config.AccountQueue)) {
 			hash := tx.Hash()
-			log.Trace("Removed old queued transaction", "hash", hash)
 			delete(pool.all, hash)
 			pool.priced.Removed()
-		}
-		// Drop all transactions that are too costly (low balance or out of gas)
-		drops, _ := list.Filter(pool.currentState.GetBalance(addr), pool.currentMaxGas)
-		for _, tx := range drops {
-			hash := tx.Hash()
-			log.Trace("Removed unpayable queued transaction", "hash", hash)
-			delete(pool.all, hash)
-			pool.priced.Removed()
-			queuedNofundsCounter.Inc(1)
-		}
-		// Gather all executable transactions and promote them
-		for _, tx := range list.Ready(pool.pendingState.GetNonce(addr)) {
-			hash := tx.Hash()
-			log.Trace("Promoting queued transaction", "hash", hash)
-			pool.promoteTx(addr, hash, tx)
-		}
-		// Drop all transactions over the allowed limit
-		if !pool.locals.contains(addr) {
-			for _, tx := range list.Cap(int(pool.config.AccountQueue)) {
-				hash := tx.Hash()
-				delete(pool.all, hash)
-				pool.priced.Removed()
-				queuedRateLimitCounter.Inc(1)
-				log.Trace("Removed cap-exceeding queued transaction", "hash", hash)
-			}
-		}
-		// Delete the entire queue entry if it became empty.
-		if list.Empty() {
-			delete(pool.queue, addr)
+			queuedRateLimitCounter.Inc(1)
+			log.Trace("Removed cap-exceeding queued transaction", "hash", hash)
 		}
 	}
+	// Delete the entire queue entry if it became empty.
+	if list.Empty() {
+		delete(pool.queue, addr)
+	}
+}
+
+func (pool *TxPool) finishPromotion() {
 	// If the pending limit is overflown, start equalizing allowances
 	pending := uint64(0)
 	for _, list := range pool.pending {
@@ -1054,7 +1063,8 @@ func (pool *TxPool) promoteExecutables(accounts []common.Address) {
 
 			// Drop all transactions if they are less than the overflow
 			if size := uint64(list.Len()); size <= drop {
-				for _, tx := range list.Flatten() {
+				list.txs.ensureCache()
+				for _, tx := range list.txs.cache {
 					pool.removeTx(tx.Hash())
 				}
 				drop -= size
