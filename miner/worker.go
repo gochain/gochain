@@ -35,7 +35,6 @@ import (
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
-	"gopkg.in/fatih/set.v0"
 )
 
 const (
@@ -66,11 +65,12 @@ type Work struct {
 	config *params.ChainConfig
 	signer types.Signer
 
-	state     *state.StateDB // apply state changes here
-	ancestors *set.Set       // ancestor set (used for checking uncle parent validity)
-	family    *set.Set       // family set (used for checking uncle invalidity)
-	uncles    *set.Set       // uncle set
-	tcount    int            // tx count in cycle
+	state     *state.StateDB           // apply state changes here
+	ancestors map[common.Hash]struct{} // ancestor set (used for checking uncle parent validity)
+	family    map[common.Hash]struct{} // family set (used for checking uncle invalidity)
+	uncles    map[common.Hash]struct{} // uncle set
+	uncleMu   sync.RWMutex
+	tcount    int // tx count in cycle
 
 	Block *types.Block // the new block
 
@@ -364,9 +364,9 @@ func (self *worker) makeCurrent(parent *types.Block, header *types.Header) error
 		config:    self.config,
 		signer:    types.NewEIP155Signer(self.config.ChainId),
 		state:     state,
-		ancestors: set.New(),
-		family:    set.New(),
-		uncles:    set.New(),
+		ancestors: make(map[common.Hash]struct{}),
+		family:    make(map[common.Hash]struct{}),
+		uncles:    make(map[common.Hash]struct{}),
 		header:    header,
 		createdAt: time.Now(),
 	}
@@ -374,10 +374,11 @@ func (self *worker) makeCurrent(parent *types.Block, header *types.Header) error
 	// when 08 is processed ancestors contain 07 (quick block)
 	for _, ancestor := range self.chain.GetBlocksFromHash(parent.Hash(), 7) {
 		for _, uncle := range ancestor.Uncles() {
-			work.family.Add(uncle.Hash())
+			work.family[uncle.Hash()] = struct{}{}
 		}
-		work.family.Add(ancestor.Hash())
-		work.ancestors.Add(ancestor.Hash())
+		ah := ancestor.Hash()
+		work.family[ah] = struct{}{}
+		work.ancestors[ah] = struct{}{}
 	}
 
 	// Keep track of transactions which return errors so they can be removed
@@ -491,18 +492,23 @@ func (self *worker) commitNewWork() {
 	self.push(work)
 }
 
-func (self *worker) commitUncle(work *Work, uncle *types.Header) error {
+func (*worker) commitUncle(work *Work, uncle *types.Header) error {
 	hash := uncle.Hash()
-	if work.uncles.Has(hash) {
+	work.uncleMu.RLock()
+	_, ok := work.uncles[hash]
+	work.uncleMu.RUnlock()
+	if ok {
 		return fmt.Errorf("uncle not unique")
 	}
-	if !work.ancestors.Has(uncle.ParentHash) {
+	if _, ok := work.ancestors[uncle.ParentHash]; !ok {
 		return fmt.Errorf("uncle's parent unknown (%x)", uncle.ParentHash[0:4])
 	}
-	if work.family.Has(hash) {
+	if _, ok := work.family[hash]; ok {
 		return fmt.Errorf("uncle already in family (%x)", hash)
 	}
-	work.uncles.Add(uncle.Hash())
+	work.uncleMu.Lock()
+	work.uncles[hash] = struct{}{}
+	work.uncleMu.Unlock()
 	return nil
 }
 
