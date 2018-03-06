@@ -56,10 +56,11 @@ type txSortedMap struct {
 }
 
 // newTxSortedMap creates a new nonce-sorted transaction map.
-func newTxSortedMap() *txSortedMap {
+func newTxSortedMap(cap int) *txSortedMap {
+	index := make(nonceHeap, 0, cap)
 	return &txSortedMap{
-		items: make(map[uint64]*types.Transaction),
-		index: new(nonceHeap),
+		items: make(map[uint64]*types.Transaction, cap),
+		index: &index,
 	}
 }
 
@@ -229,10 +230,10 @@ type txList struct {
 
 // newTxList create a new transaction list for maintaining nonce-indexable fast,
 // gapped, sortable transaction lists.
-func newTxList(strict bool) *txList {
+func newTxList(strict bool, cap int) *txList {
 	return &txList{
 		strict:  strict,
-		txs:     newTxSortedMap(),
+		txs:     newTxSortedMap(cap),
 		costcap: new(big.Int),
 	}
 }
@@ -393,9 +394,10 @@ type txPricedList struct {
 
 // newTxPricedList creates a new price-sorted transaction heap.
 func newTxPricedList(all *map[common.Hash]*types.Transaction) *txPricedList {
+	items := make(priceHeap, 0, txPoolInitCap)
 	return &txPricedList{
 		all:   all,
-		items: new(priceHeap),
+		items: &items,
 	}
 }
 
@@ -414,9 +416,13 @@ func (l *txPricedList) Removed() {
 		return
 	}
 	// Seems we've reached a critical number of stale transactions, reheap
-	reheap := make(priceHeap, 0, len(*l.all))
+	if len(*l.all) <= cap(*l.items) {
+		*l.items = (*l.items)[0:0]
+	} else {
+		*l.items = make(priceHeap, 0, len(*l.all))
+	}
 
-	l.stales, l.items = 0, &reheap
+	l.stales = 0
 	for _, tx := range *l.all {
 		*l.items = append(*l.items, tx)
 	}
