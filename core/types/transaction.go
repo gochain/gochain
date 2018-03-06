@@ -335,7 +335,7 @@ func (s Transactions) GetRlp(i int) []byte {
 func TxDifference(a, b Transactions) (keep Transactions) {
 	keep = make(Transactions, 0, len(a))
 
-	remove := make(map[common.Hash]struct{})
+	remove := make(map[common.Hash]struct{}, len(b))
 	for _, tx := range b {
 		remove[tx.Hash()] = struct{}{}
 	}
