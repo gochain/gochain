@@ -27,7 +27,6 @@ import (
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/rlp"
-	"gopkg.in/fatih/set.v0"
 )
 
 var (
@@ -37,8 +36,8 @@ var (
 )
 
 const (
-	maxKnownTxs      = 32768 // Maximum transactions hashes to keep in the known list (prevent DOS)
-	maxKnownBlocks   = 1024  // Maximum block hashes to keep in the known list (prevent DOS)
+	maxKnownTxs      = 262144 // Maximum transactions hashes to keep in the known list (prevent DOS)
+	maxKnownBlocks   = 1024   // Maximum block hashes to keep in the known list (prevent DOS)
 	handshakeTimeout = 5 * time.Second
 )
 
@@ -48,6 +47,42 @@ type PeerInfo struct {
 	Version    int      `json:"version"`    // Ethereum protocol version negotiated
 	Difficulty *big.Int `json:"difficulty"` // Total difficulty of the peer's blockchain
 	Head       string   `json:"head"`       // SHA3 hash of the peer's best owned block
+}
+
+// setOfHash is a set of common.Hash safe for concurrent access.
+type setOfHash struct {
+	sync.RWMutex
+	m map[common.Hash]struct{}
+}
+
+func (s *setOfHash) Add(h common.Hash) {
+	s.Lock()
+	s.m[h] = struct{}{}
+	s.Unlock()
+}
+
+// AddCapped is like Add, but first makes room if cap has been reached.
+func (s *setOfHash) AddCapped(h common.Hash, cap int) {
+	s.Lock()
+	if len(s.m) >= cap {
+		i := len(s.m) + 1 - cap
+		for d := range s.m {
+			delete(s.m, d)
+			i--
+			if i == 0 {
+				break
+			}
+		}
+	}
+	s.m[h] = struct{}{}
+	s.Unlock()
+}
+
+func (s *setOfHash) Has(h common.Hash) bool {
+	s.RLock()
+	_, ok := s.m[h]
+	s.RUnlock()
+	return ok
 }
 
 type peer struct {
@@ -63,21 +98,22 @@ type peer struct {
 	td   *big.Int
 	lock sync.RWMutex
 
-	knownTxs    *set.Set // Set of transaction hashes known to be known by this peer
-	knownBlocks *set.Set // Set of block hashes known to be known by this peer
+	knownTxs    setOfHash // Set of transaction hashes known to be known by this peer
+	knownBlocks setOfHash // Set of block hashes known to be known by this peer
 }
 
 func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
 	id := p.ID()
 
-	return &peer{
-		Peer:        p,
-		rw:          rw,
-		version:     version,
-		id:          fmt.Sprintf("%x", id[:8]),
-		knownTxs:    set.New(),
-		knownBlocks: set.New(),
+	r := &peer{
+		Peer:    p,
+		rw:      rw,
+		version: version,
+		id:      fmt.Sprintf("%x", id[:8]),
 	}
+	r.knownTxs.m = make(map[common.Hash]struct{}, maxKnownTxs)
+	r.knownBlocks.m = make(map[common.Hash]struct{}, maxKnownBlocks)
+	return r
 }
 
 // Info gathers and returns a collection of metadata known about a peer.
@@ -113,44 +149,34 @@ func (p *peer) SetHead(hash common.Hash, td *big.Int) {
 // MarkBlock marks a block as known for the peer, ensuring that the block will
 // never be propagated to this particular peer.
 func (p *peer) MarkBlock(hash common.Hash) {
-	// If we reached the memory allowance, drop a previously known block hash
-	for p.knownBlocks.Size() >= maxKnownBlocks {
-		p.knownBlocks.Pop()
-	}
-	p.knownBlocks.Add(hash)
+	p.knownBlocks.AddCapped(hash, maxKnownBlocks)
 }
 
 // MarkTransaction marks a transaction as known for the peer, ensuring that it
 // will never be propagated to this particular peer.
 func (p *peer) MarkTransaction(hash common.Hash) {
-	// If we reached the memory allowance, drop a previously known transaction hash
-	for p.knownTxs.Size() >= maxKnownTxs {
-		p.knownTxs.Pop()
-	}
-	p.knownTxs.Add(hash)
+	p.knownTxs.AddCapped(hash, maxKnownTxs)
 }
 
 // SendTransactions sends transactions to the peer and includes the hashes
 // in its transaction hash set for future reference.
 func (p *peer) SendTransactions(txs types.Transactions) error {
+	p.knownTxs.Lock()
 	for _, tx := range txs {
-		p.knownTxs.Add(tx.Hash())
+		p.knownTxs.m[tx.Hash()] = struct{}{}
 	}
+	p.knownTxs.Unlock()
 	return p2p.Send(p.rw, TxMsg, txs)
 }
 
-// SendNewBlockHashes announces the availability of a number of blocks through
+// SendNewBlockHash announces the availability of a number of blocks through
 // a hash notification.
-func (p *peer) SendNewBlockHashes(hashes []common.Hash, numbers []uint64) error {
-	for _, hash := range hashes {
-		p.knownBlocks.Add(hash)
-	}
-	request := make(newBlockHashesData, len(hashes))
-	for i := 0; i < len(hashes); i++ {
-		request[i].Hash = hashes[i]
-		request[i].Number = numbers[i]
-	}
-	return p2p.Send(p.rw, NewBlockHashesMsg, request)
+func (p *peer) SendNewBlockHash(hash common.Hash, number uint64) error {
+	p.knownBlocks.Add(hash)
+
+	data := newBlockHashesData{{Hash: hash, Number: number}}
+
+	return p2p.Send(p.rw, NewBlockHashesMsg, data)
 }
 
 // SendNewBlock propagates an entire block to a remote peer.

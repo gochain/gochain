@@ -234,6 +234,15 @@ func NewBlock(header *Header, txs []*Transaction, uncles []*Header, receipts []*
 	return b
 }
 
+// NewBlockWith assembles a block with the given header and body. Does not copy.
+func NewBlockWith(header *Header, body *Body) *Block {
+	return &Block{
+		header:       header,
+		transactions: body.Transactions,
+		uncles:       body.Uncles,
+	}
+}
+
 // NewBlockWithHeader creates a block with the given header data. The
 // header data is copied, changes to header and to the field values
 // will not affect the block.
