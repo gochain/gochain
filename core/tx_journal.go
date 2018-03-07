@@ -21,7 +21,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/rlp"
@@ -112,7 +111,7 @@ func (journal *txJournal) insert(tx *types.Transaction) error {
 
 // rotate regenerates the transaction journal based on the current contents of
 // the transaction pool.
-func (journal *txJournal) rotate(all map[common.Address]types.Transactions) error {
+func (journal *txJournal) rotate(acts int, all types.Transactions) error {
 	// Close the current journal (if any is open)
 	if journal.writer != nil {
 		if err := journal.writer.Close(); err != nil {
@@ -125,15 +124,11 @@ func (journal *txJournal) rotate(all map[common.Address]types.Transactions) erro
 	if err != nil {
 		return err
 	}
-	journaled := 0
-	for _, txs := range all {
-		for _, tx := range txs {
-			if err = rlp.Encode(replacement, tx); err != nil {
-				replacement.Close()
-				return err
-			}
+	for _, tx := range all {
+		if err = rlp.Encode(replacement, tx); err != nil {
+			replacement.Close()
+			return err
 		}
-		journaled += len(txs)
 	}
 	replacement.Close()
 
@@ -146,7 +141,7 @@ func (journal *txJournal) rotate(all map[common.Address]types.Transactions) erro
 		return err
 	}
 	journal.writer = sink
-	log.Info("Regenerated local transaction journal", "transactions", journaled, "accounts", len(all))
+	log.Info("Regenerated local transaction journal", "transactions", len(all), "accounts", acts)
 
 	return nil
 }

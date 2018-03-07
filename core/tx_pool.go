@@ -533,22 +533,28 @@ func (pool *TxPool) PendingList() types.Transactions {
 	return pending
 }
 
-// local retrieves all currently known local transactions, groupped by origin
-// account and sorted by nonce. The returned transaction set is a copy and can be
-// freely modified by calling code.
-func (pool *TxPool) local() map[common.Address]types.Transactions {
-	txs := make(map[common.Address]types.Transactions)
+// local retrieves all currently known local transactions. The returned
+// transaction set is a copy and can be freely modified by calling code.
+func (pool *TxPool) local() (int, types.Transactions) {
+	var acts int
+	var txs types.Transactions
 	for addr := range pool.locals.accounts {
+		var ok bool
 		if pending := pool.pending[addr]; pending != nil {
+			ok = true
 			pending.txs.ensureCache()
-			txs[addr] = append(txs[addr], pending.txs.cache...)
+			txs = append(txs, pending.txs.cache...)
 		}
 		if queued := pool.queue[addr]; queued != nil {
+			ok = true
 			queued.txs.ensureCache()
-			txs[addr] = append(txs[addr], queued.txs.cache...)
+			txs = append(txs, queued.txs.cache...)
+		}
+		if ok {
+			acts++
 		}
 	}
-	return txs
+	return acts, txs
 }
 
 // validateTx checks whether a transaction is valid according to the consensus
