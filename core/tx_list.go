@@ -202,6 +202,14 @@ func (m *txSortedMap) Len() int {
 // sorted internal representation. The result of the sorting is cached in case
 // it's requested again before any modifications are made to the contents.
 func (m *txSortedMap) Flatten() types.Transactions {
+	m.ensureCache()
+	// Copy the cache to prevent accidental modifications
+	txs := make(types.Transactions, len(m.cache))
+	copy(txs, m.cache)
+	return txs
+}
+
+func (m *txSortedMap) ensureCache() {
 	// If the sorting was not cached yet, create and cache it
 	if m.cache == nil {
 		m.cache = make(types.Transactions, 0, len(m.items))
@@ -210,10 +218,6 @@ func (m *txSortedMap) Flatten() types.Transactions {
 		}
 		sort.Sort(types.TxByNonce(m.cache))
 	}
-	// Copy the cache to prevent accidental modifications
-	txs := make(types.Transactions, len(m.cache))
-	copy(txs, m.cache)
-	return txs
 }
 
 // txList is a "list" of transactions belonging to an account, sorted by account

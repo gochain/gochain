@@ -105,7 +105,7 @@ func (b *LesApiBackend) RemoveTx(txHash common.Hash) {
 	b.eth.txPool.RemoveTx(txHash)
 }
 
-func (b *LesApiBackend) GetPoolTransactions() (types.Transactions, error) {
+func (b *LesApiBackend) GetPoolTransactions() types.Transactions {
 	return b.eth.txPool.GetTransactions()
 }
 

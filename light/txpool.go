@@ -470,17 +470,17 @@ func (tp *TxPool) GetTransaction(hash common.Hash) *types.Transaction {
 
 // GetTransactions returns all currently processable transactions.
 // The returned slice may be modified by the caller.
-func (self *TxPool) GetTransactions() (txs types.Transactions, err error) {
+func (self *TxPool) GetTransactions() types.Transactions {
 	self.mu.RLock()
 	defer self.mu.RUnlock()
 
-	txs = make(types.Transactions, len(self.pending))
+	txs := make(types.Transactions, len(self.pending))
 	i := 0
 	for _, tx := range self.pending {
 		txs[i] = tx
 		i++
 	}
-	return txs, nil
+	return txs
 }
 
 // Content retrieves the data content of the transaction pool, returning all the

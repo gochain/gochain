@@ -1281,10 +1281,7 @@ func (s *PublicTransactionPoolAPI) SignTransaction(ctx context.Context, args Sen
 // PendingTransactions returns the transactions that are in the transaction pool and have a from address that is one of
 // the accounts this node manages.
 func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, error) {
-	pending, err := s.b.GetPoolTransactions()
-	if err != nil {
-		return nil, err
-	}
+	pending := s.b.GetPoolTransactions()
 
 	transactions := make([]*RPCTransaction, 0, len(pending))
 	for _, tx := range pending {
@@ -1310,10 +1307,7 @@ func (s *PublicTransactionPoolAPI) Resend(ctx context.Context, sendArgs SendTxAr
 		return common.Hash{}, err
 	}
 	matchTx := sendArgs.toTransaction()
-	pending, err := s.b.GetPoolTransactions()
-	if err != nil {
-		return common.Hash{}, err
-	}
+	pending := s.b.GetPoolTransactions()
 
 	for _, p := range pending {
 		var signer types.Signer = types.HomesteadSigner{}

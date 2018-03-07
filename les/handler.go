@@ -1025,7 +1025,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		stats := pm.txStatus(hashes)
 		for i, stat := range stats {
 			if stat.Status == core.TxStatusUnknown {
-				if errs := pm.txpool.AddRemotes([]*types.Transaction{req.Txs[i]}); errs[0] != nil {
+				if errs := pm.txpool.AddRemotes([]*types.Transaction{req.Txs[i]}); len(errs) > 0 {
 					stats[i].Error = errs[0].Error()
 					continue
 				}

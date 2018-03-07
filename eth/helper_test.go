@@ -109,7 +109,7 @@ func (p *testTxPool) AddRemotes(txs []*types.Transaction) []error {
 }
 
 // Pending returns all the transactions known to the pool
-func (p *testTxPool) Pending() (map[common.Address]types.Transactions, error) {
+func (p *testTxPool) Pending() map[common.Address]types.Transactions {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -121,7 +121,15 @@ func (p *testTxPool) Pending() (map[common.Address]types.Transactions, error) {
 	for _, batch := range batches {
 		sort.Sort(types.TxByNonce(batch))
 	}
-	return batches, nil
+	return batches
+}
+
+func (p *testTxPool) PendingList() types.Transactions {
+	var pending types.Transactions
+	for _, txs := range p.Pending() {
+		pending = append(pending, txs...)
+	}
+	return pending
 }
 
 func (p *testTxPool) SubscribeTxPreEvent(ch chan<- core.TxPreEvent) event.Subscription {

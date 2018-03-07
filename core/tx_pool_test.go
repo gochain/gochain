@@ -44,6 +44,15 @@ func init() {
 	testTxPoolConfig.Journal = ""
 }
 
+// lockedReset is a wrapper around reset to allow calling it in a thread safe
+// manner.
+func (pool *TxPool) lockedReset(oldHead, newHead *types.Header) {
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
+
+	pool.reset(oldHead, newHead)
+}
+
 type testBlockChain struct {
 	statedb       *state.StateDB
 	gasLimit      uint64
@@ -209,12 +218,7 @@ func TestStateChangeDuringTransactionPoolReset(t *testing.T) {
 
 	pool.lockedReset(nil, nil)
 
-	pendingTx, err := pool.Pending()
-	if err != nil {
-		t.Fatalf("Could not fetch pending transactions: %v", err)
-	}
-
-	for addr, txs := range pendingTx {
+	for addr, txs := range pool.Pending() {
 		t.Logf("%0x: %d\n", addr, len(txs))
 	}
 
@@ -273,7 +277,7 @@ func TestTransactionQueue(t *testing.T) {
 	pool.lockedReset(nil, nil)
 	pool.enqueueTx(tx.Hash(), tx)
 
-	pool.promoteExecutables([]common.Address{from})
+	pool.promoteExecutables(from)
 	if len(pool.pending) != 1 {
 		t.Error("expected valid txs to be 1 is", len(pool.pending))
 	}
@@ -282,7 +286,7 @@ func TestTransactionQueue(t *testing.T) {
 	from, _ = deriveSender(tx)
 	pool.currentState.SetNonce(from, 2)
 	pool.enqueueTx(tx.Hash(), tx)
-	pool.promoteExecutables([]common.Address{from})
+	pool.promoteExecutables(from)
 	if _, ok := pool.pending[from].txs.items[tx.Nonce()]; ok {
 		t.Error("expected transaction to be in tx pool")
 	}
@@ -305,7 +309,7 @@ func TestTransactionQueue(t *testing.T) {
 	pool.enqueueTx(tx2.Hash(), tx2)
 	pool.enqueueTx(tx3.Hash(), tx3)
 
-	pool.promoteExecutables([]common.Address{from})
+	pool.promoteExecutables(from)
 
 	if len(pool.pending) != 1 {
 		t.Error("expected tx pool to be 1, got", len(pool.pending))
@@ -388,7 +392,7 @@ func TestTransactionDoubleNonce(t *testing.T) {
 	if replace, err := pool.add(tx2, false); err != nil || !replace {
 		t.Errorf("second transaction insert failed (%v) or not reported replacement (%v)", err, replace)
 	}
-	pool.promoteExecutables([]common.Address{addr})
+	pool.promoteExecutables(addr)
 	if pool.pending[addr].Len() != 1 {
 		t.Error("expected 1 pending transactions, got", pool.pending[addr].Len())
 	}
@@ -397,7 +401,7 @@ func TestTransactionDoubleNonce(t *testing.T) {
 	}
 	// Add the third transaction and ensure it's not saved (smaller price)
 	pool.add(tx3, false)
-	pool.promoteExecutables([]common.Address{addr})
+	pool.promoteExecutables(addr)
 	if pool.pending[addr].Len() != 1 {
 		t.Error("expected 1 pending transactions, got", pool.pending[addr].Len())
 	}
@@ -1666,7 +1670,7 @@ func benchmarkFuturePromotion(b *testing.B, size int) {
 	// Benchmark the speed of pool validation
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		pool.promoteExecutables(nil)
+		pool.promoteExecutablesAll()
 	}
 }
 
