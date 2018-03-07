@@ -239,8 +239,10 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 	// If local transactions and journaling is enabled, load from disk
 	if !config.NoLocals && config.Journal != "" {
 		pool.journal = newTxJournal(config.Journal)
-
-		if err := pool.journal.load(pool.AddLocal); err != nil {
+		if err := pool.journal.load(func(txs types.Transactions) []error {
+			// No need to lock since we're still setting up.
+			return pool.addTxsLocked(txs, !pool.config.NoLocals)
+		}); err != nil {
 			log.Warn("Failed to load transaction journal", "err", err)
 		}
 		if err := pool.journal.rotate(pool.local()); err != nil {

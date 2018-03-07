@@ -55,8 +55,9 @@ func newTxJournal(path string) *txJournal {
 
 // load parses a transaction journal dump from disk, loading its contents into
 // the specified pool.
-func (journal *txJournal) load(add func(*types.Transaction) error) error {
-	// Skip the parsing if the journal file doens't exist at all
+func (journal *txJournal) load(add func(types.Transactions) []error) error {
+	const batchSize = 1000
+	// Skip the parsing if the journal file doesn't exist at all
 	if _, err := os.Stat(journal.path); os.IsNotExist(err) {
 		return nil
 	}
@@ -76,10 +77,20 @@ func (journal *txJournal) load(add func(*types.Transaction) error) error {
 	total, dropped := 0, 0
 
 	var failure error
+	var batch types.Transactions
+	addBatch := func() {
+		if errs := add(batch); len(errs) > 0 {
+			dropped += len(errs)
+			for err := range errs {
+				log.Debug("Failed to add journaled transaction", "err", err)
+			}
+		}
+		batch = batch[:0]
+	}
 	for {
 		// Parse the next transaction and terminate on error
 		tx := new(types.Transaction)
-		if err = stream.Decode(tx); err != nil {
+		if err := stream.Decode(tx); err != nil {
 			if err != io.EOF {
 				failure = err
 			}
@@ -87,11 +98,13 @@ func (journal *txJournal) load(add func(*types.Transaction) error) error {
 		}
 		// Import the transaction and bump the appropriate progress counters
 		total++
-		if err = add(tx); err != nil {
-			log.Debug("Failed to add journaled transaction", "err", err)
-			dropped++
-			continue
+		batch = append(batch, tx)
+		if len(batch) >= batchSize {
+			addBatch()
 		}
+	}
+	if len(batch) > 0 {
+		addBatch()
 	}
 	log.Info("Loaded local transaction journal", "transactions", total, "dropped", dropped)
 
