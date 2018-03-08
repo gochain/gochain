@@ -19,8 +19,9 @@ package build
 import (
 	"fmt"
 	"os"
+	"time"
 
-	storage "github.com/Azure/azure-storage-go"
+	"github.com/Azure/azure-sdk-for-go/storage"
 )
 
 // AzureBlobstoreConfig is an authentication and configuration struct containing
@@ -56,11 +57,8 @@ func AzureBlobstoreUpload(path string, name string, config AzureBlobstoreConfig)
 	}
 	defer in.Close()
 
-	info, err := in.Stat()
-	if err != nil {
-		return err
-	}
-	return client.CreateBlockBlobFromReader(config.Container, name, uint64(info.Size()), in, nil)
+	return client.GetContainerReference(config.Container).GetBlobReference(name).
+		CreateBlockBlobFromReader(in, nil)
 }
 
 // AzureBlobstoreList lists all the files contained within an azure blobstore.
@@ -90,7 +88,9 @@ func AzureBlobstoreList(config AzureBlobstoreConfig) ([]storage.Blob, error) {
 func AzureBlobstoreDelete(config AzureBlobstoreConfig, blobs []storage.Blob) error {
 	if *DryRunFlag {
 		for _, blob := range blobs {
-			fmt.Printf("would delete %s (%s) from %s/%s\n", blob.Name, blob.Properties.LastModified, config.Account, config.Container)
+			fmt.Printf("would delete %s (%s) from %s/%s\n", blob.Name,
+				time.Time(blob.Properties.LastModified).Format(time.RFC1123),
+				config.Account, config.Container)
 		}
 		return nil
 	}
@@ -103,7 +103,9 @@ func AzureBlobstoreDelete(config AzureBlobstoreConfig, blobs []storage.Blob) err
 
 	// Iterate over the blobs and delete them
 	for _, blob := range blobs {
-		if err := client.DeleteBlob(config.Container, blob.Name, nil); err != nil {
+		err := client.GetContainerReference(config.Container).
+			GetBlobReference(blob.Name).Delete(nil)
+		if err != nil {
 			return err
 		}
 	}
