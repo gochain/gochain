@@ -43,7 +43,7 @@ type testgeth struct {
 }
 
 func init() {
-	// Run the app if we've been exec'd as "geth-test" in runGeth.
+	// Run the app if we've been exec'd as "geth-test" in runGoChain.
 	reexec.Register("geth-test", func() {
 		if err := app.Run(os.Args); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -63,7 +63,7 @@ func TestMain(m *testing.M) {
 
 // spawns geth with the given command line args. If the args don't set --datadir, the
 // child g gets a temporary data directory.
-func runGeth(t *testing.T, args ...string) *testgeth {
+func runGoChain(t *testing.T, args ...string) *testgeth {
 	tt := &testgeth{}
 	tt.TestCmd = cmdtest.NewTestCmd(t, tt)
 	for i, arg := range args {

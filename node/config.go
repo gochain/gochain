@@ -227,9 +227,9 @@ func DefaultWSEndpoint() string {
 // NodeName returns the devp2p node identifier.
 func (c *Config) NodeName() string {
 	name := c.name()
-	// Backwards compatibility: previous versions used title-cased "Geth", keep that.
+	// Backwards compatibility: previous versions used title-cased "GoChain", keep that.
 	if name == "geth" || name == "geth-testnet" {
-		name = "Geth"
+		name = "GoChain"
 	}
 	if c.UserIdent != "" {
 		name += "/" + c.UserIdent
@@ -254,7 +254,7 @@ func (c *Config) name() string {
 }
 
 // These resources are resolved differently for "geth" instances.
-var isOldGethResource = map[string]bool{
+var isOldGoChainResource = map[string]bool{
 	"chaindata":          true,
 	"nodes":              true,
 	"nodekey":            true,
@@ -272,7 +272,7 @@ func (c *Config) resolvePath(path string) string {
 	}
 	// Backwards-compatibility: ensure that data directory files created
 	// by geth 1.4 are used if they exist.
-	if c.name() == "geth" && isOldGethResource[path] {
+	if c.name() == "geth" && isOldGoChainResource[path] {
 		oldpath := ""
 		if c.Name == "geth" {
 			oldpath = filepath.Join(c.DataDir, path)

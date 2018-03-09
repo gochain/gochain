@@ -162,7 +162,7 @@ class Footer extends Component<Props> {
 					</ChartRow>
 				</Grid>
 				<Grid item >
-					{this.info('Geth', general.version)}
+					{this.info('GoChain', general.version)}
 					{this.info('Commit', general.commit ? general.commit.substring(0, 7) : null)}
 				</Grid>
 			</Grid>

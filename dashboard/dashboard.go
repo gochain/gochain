@@ -231,14 +231,10 @@ func (db *Dashboard) apiHandler(conn *websocket.Conn) {
 		}
 	}()
 
-	versionMeta := ""
-	if len(params.VersionMeta) > 0 {
-		versionMeta = fmt.Sprintf(" (%s)", params.VersionMeta)
-	}
 	// Send the past data.
 	client.msg <- Message{
 		General: &GeneralMessage{
-			Version: fmt.Sprintf("v%d.%d.%d%s", params.VersionMajor, params.VersionMinor, params.VersionPatch, versionMeta),
+			Version: fmt.Sprintf("v%s", params.Version),
 			Commit:  db.commit,
 		},
 		Home: &HomeMessage{
@@ -281,8 +277,8 @@ func (db *Dashboard) collectData() {
 		prevNetworkEgress  = metrics.DefaultRegistry.Get("p2p/OutboundTraffic").(metrics.Meter).Count()
 		prevProcessCPUTime = getProcessCPUTime()
 		prevSystemCPUUsage = systemCPUUsage
-		prevDiskRead       = metrics.DefaultRegistry.Get("eth/db/chaindata/compact/input").(metrics.Meter).Count()
-		prevDiskWrite      = metrics.DefaultRegistry.Get("eth/db/chaindata/compact/output").(metrics.Meter).Count()
+		prevDiskRead       = metrics.DefaultRegistry.Get("gochain/db/chaindata/compact/input").(metrics.Meter).Count()
+		prevDiskWrite      = metrics.DefaultRegistry.Get("gochain/db/chaindata/compact/output").(metrics.Meter).Count()
 
 		frequency = float64(db.config.Refresh / time.Second)
 		numCPU    = float64(runtime.NumCPU())
@@ -300,8 +296,8 @@ func (db *Dashboard) collectData() {
 				curNetworkEgress  = metrics.DefaultRegistry.Get("p2p/OutboundTraffic").(metrics.Meter).Count()
 				curProcessCPUTime = getProcessCPUTime()
 				curSystemCPUUsage = systemCPUUsage
-				curDiskRead       = metrics.DefaultRegistry.Get("eth/db/chaindata/compact/input").(metrics.Meter).Count()
-				curDiskWrite      = metrics.DefaultRegistry.Get("eth/db/chaindata/compact/output").(metrics.Meter).Count()
+				curDiskRead       = metrics.DefaultRegistry.Get("gochain/db/chaindata/compact/input").(metrics.Meter).Count()
+				curDiskWrite      = metrics.DefaultRegistry.Get("gochain/db/chaindata/compact/output").(metrics.Meter).Count()
 
 				deltaNetworkIngress = float64(curNetworkIngress - prevNetworkIngress)
 				deltaNetworkEgress  = float64(curNetworkEgress - prevNetworkEgress)
