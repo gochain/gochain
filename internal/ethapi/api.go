@@ -364,8 +364,9 @@ func (s *PrivateAccountAPI) SendTransaction(ctx context.Context, args SendTxArgs
 	if args.Nonce == nil {
 		// Hold the addresse's mutex around signing to prevent concurrent assignment of
 		// the same nonce to multiple accounts.
-		s.nonceLock.LockAddr(args.From)
-		defer s.nonceLock.UnlockAddr(args.From)
+		l := s.nonceLock.lock(args.From)
+		l.Lock()
+		defer l.Unlock()
 	}
 	signed, err := s.signTransaction(ctx, args, passwd)
 	if err != nil {
@@ -1188,8 +1189,9 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 	if args.Nonce == nil {
 		// Hold the addresse's mutex around signing to prevent concurrent assignment of
 		// the same nonce to multiple accounts.
-		s.nonceLock.LockAddr(args.From)
-		defer s.nonceLock.UnlockAddr(args.From)
+		l := s.nonceLock.lock(args.From)
+		l.Lock()
+		defer l.Unlock()
 	}
 
 	// Set some sanity defaults and terminate on failure

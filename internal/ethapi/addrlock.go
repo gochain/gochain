@@ -22,32 +22,33 @@ import (
 	"github.com/gochain-io/gochain/common"
 )
 
+// AddrLocker stores locks per account. This is used to prevent another tx getting the
+// same nonce, by holding the lock when signing a transaction.
 type AddrLocker struct {
-	mu    sync.Mutex
+	mu    sync.RWMutex
 	locks map[common.Address]*sync.Mutex
 }
 
+func newAddrLocker() *AddrLocker {
+	return &AddrLocker{
+		locks: make(map[common.Address]*sync.Mutex),
+	}
+}
+
 // lock returns the lock of the given address.
-func (l *AddrLocker) lock(address common.Address) *sync.Mutex {
+func (l *AddrLocker) lock(address common.Address) sync.Locker {
+	l.mu.RLock()
+	mu, ok := l.locks[address]
+	l.mu.RUnlock()
+	if ok {
+		return mu
+	}
 	l.mu.Lock()
-	defer l.mu.Unlock()
-	if l.locks == nil {
-		l.locks = make(map[common.Address]*sync.Mutex)
+	mu, ok = l.locks[address]
+	if !ok {
+		mu = new(sync.Mutex)
+		l.locks[address] = mu
 	}
-	if _, ok := l.locks[address]; !ok {
-		l.locks[address] = new(sync.Mutex)
-	}
-	return l.locks[address]
-}
-
-// LockAddr locks an account's mutex. This is used to prevent another tx getting the
-// same nonce until the lock is released. The mutex prevents the (an identical nonce) from
-// being read again during the time that the first transaction is being signed.
-func (l *AddrLocker) LockAddr(address common.Address) {
-	l.lock(address).Lock()
-}
-
-// UnlockAddr unlocks the mutex of the given account.
-func (l *AddrLocker) UnlockAddr(address common.Address) {
-	l.lock(address).Unlock()
+	l.mu.Unlock()
+	return mu
 }
