@@ -16,14 +16,14 @@ $ (cd dashboard/assets && npm install)
 $ (cd dashboard/assets && ./node_modules/.bin/flow-typed install)
 ```
 
-Normally the dashboard assets are bundled into Geth via `go-bindata` to avoid external dependencies. Rebuilding Geth after each UI modification however is not feasible from a developer perspective. Instead, we can run `webpack` in watch mode to automatically rebundle the UI, and ask `geth` to use external assets to not rely on compiled resources:
+Normally the dashboard assets are bundled into GoChain via `go-bindata` to avoid external dependencies. Rebuilding GoChain after each UI modification however is not feasible from a developer perspective. Instead, we can run `webpack` in watch mode to automatically rebundle the UI, and ask `geth` to use external assets to not rely on compiled resources:
 
 ```
 $ (cd dashboard/assets && ./node_modules/.bin/webpack --watch)
 $ geth --dashboard --dashboard.assets=dashboard/assets --vmodule=dashboard=5
 ```
 
-To bundle up the final UI into Geth, run `go generate`:
+To bundle up the final UI into GoChain, run `go generate`:
 
 ```
 $ go generate ./dashboard

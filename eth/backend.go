@@ -185,8 +185,8 @@ func makeExtraData(extra []byte) []byte {
 	if len(extra) == 0 {
 		// create default extradata
 		extra, _ = rlp.EncodeToBytes([]interface{}{
-			uint(params.VersionMajor<<16 | params.VersionMinor<<8 | params.VersionPatch),
-			"geth",
+			params.Version,
+			"gochain",
 			runtime.Version(),
 			runtime.GOOS,
 		})
@@ -205,7 +205,7 @@ func CreateDB(ctx *node.ServiceContext, config *Config, name string) (ethdb.Data
 		return nil, err
 	}
 	if db, ok := db.(*ethdb.LDBDatabase); ok {
-		db.Meter("eth/db/chaindata/")
+		db.Meter("gochain/db/chaindata/")
 	}
 	return db, nil
 }

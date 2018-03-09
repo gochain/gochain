@@ -31316,7 +31316,7 @@ var _bundleJs = []byte((((((((((`!function(modules) {
                     tooltip: (0, _CustomTooltip.bytePerSecPlotter)("Upload", (0, _CustomTooltip.multiplier)(-1))
                 }))), _react2.default.createElement(_Grid2.default, {
                     item: !0
-                }, this.info("Geth", general.version), this.info("Commit", general.commit ? general.commit.substring(0, 7) : null)));
+                }, this.info("GoChain", general.version), this.info("Commit", general.commit ? general.commit.substring(0, 7) : null)));
             }
         } ]), Footer;
     }(_react.Component);

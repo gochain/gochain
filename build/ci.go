@@ -378,8 +378,8 @@ func doArchive(cmdline []string) {
 	var (
 		env      = build.Env()
 		base     = archiveBasename(*arch, env)
-		geth     = "geth-" + base + ext
-		alltools = "geth-alltools-" + base + ext
+		geth     = "gochain-" + base + ext
+		alltools = "gochain-alltools-" + base + ext
 	)
 	maybeSkipArchive(env)
 	if err := build.WriteArchive(geth, gethArchiveFiles); err != nil {
@@ -682,7 +682,7 @@ func doWindowsInstaller(cmdline []string) {
 	// first section contains the geth binary, second section holds the dev tools.
 	templateData := map[string]interface{}{
 		"License":  "COPYING",
-		"Geth":     gethTool,
+		"GoChain":  gethTool,
 		"DevTools": devTools,
 	}
 	build.Render("build/nsis.geth.nsi", filepath.Join(*workdir, "geth.nsi"), 0644, nil)
@@ -884,8 +884,8 @@ func doXCodeFramework(cmdline []string) {
 	// Prepare and upload a PodSpec to CocoaPods
 	if *deploy != "" {
 		meta := newPodMetadata(env, archive)
-		build.Render("build/pod.podspec", "Geth.podspec", 0755, meta)
-		build.MustRunCommand("pod", *deploy, "push", "Geth.podspec", "--allow-warnings", "--verbose")
+		build.Render("build/pod.podspec", "GoChain.podspec", 0755, meta)
+		build.MustRunCommand("pod", *deploy, "push", "GoChain.podspec", "--allow-warnings", "--verbose")
 	}
 }
 
