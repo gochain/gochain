@@ -358,7 +358,8 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 			log.Debug("Skipping deep transaction reorg", "depth", depth)
 		} else {
 			// Reorg seems shallow enough to pull in all transactions into memory
-			var discarded, included types.Transactions
+			var discarded types.Transactions
+			included := make(map[common.Hash]struct{})
 
 			var (
 				rem = pool.chain.GetBlock(oldHead.Hash(), oldHead.Number.Uint64())
@@ -372,7 +373,9 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 				}
 			}
 			for add.NumberU64() > rem.NumberU64() {
-				included = append(included, add.Transactions()...)
+				for _, tx := range add.Transactions() {
+					included[tx.Hash()] = struct{}{}
+				}
 				if add = pool.chain.GetBlock(add.ParentHash(), add.NumberU64()-1); add == nil {
 					log.Error("Unrooted new chain seen by tx pool", "block", newHead.Number, "hash", newHead.Hash())
 					return
@@ -384,13 +387,19 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 					log.Error("Unrooted old chain seen by tx pool", "block", oldHead.Number, "hash", oldHead.Hash())
 					return
 				}
-				included = append(included, add.Transactions()...)
+				for _, tx := range add.Transactions() {
+					included[tx.Hash()] = struct{}{}
+				}
 				if add = pool.chain.GetBlock(add.ParentHash(), add.NumberU64()-1); add == nil {
 					log.Error("Unrooted new chain seen by tx pool", "block", newHead.Number, "hash", newHead.Hash())
 					return
 				}
 			}
-			reinject = types.TxDifference(discarded, included)
+			for _, tx := range discarded {
+				if _, ok := included[tx.Hash()]; !ok {
+					reinject = append(reinject, tx)
+				}
+			}
 		}
 	}
 	// Initialize the internal state to the current head
