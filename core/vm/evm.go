@@ -111,9 +111,14 @@ type EVM struct {
 	callGasTemp uint64
 }
 
-// NewEVM retutrns a new EVM . The returned EVM is not thread safe and should
+// NewEVM returns a new EVM . The returned EVM is not thread safe and should
 // only ever be used *once*.
 func NewEVM(ctx Context, statedb StateDB, chainConfig *params.ChainConfig, vmConfig Config) *EVM {
+	return NewEVMPool(ctx, statedb, chainConfig, vmConfig, NewIntPool())
+}
+
+// NewEVMPool is like NewEVM, but also takes an IntPool, which can be recycled across multiple (serial) invocations.
+func NewEVMPool(ctx Context, statedb StateDB, chainConfig *params.ChainConfig, vmConfig Config, intPool *IntPool) *EVM {
 	evm := &EVM{
 		Context:     ctx,
 		StateDB:     statedb,
@@ -121,8 +126,7 @@ func NewEVM(ctx Context, statedb StateDB, chainConfig *params.ChainConfig, vmCon
 		chainConfig: chainConfig,
 		chainRules:  chainConfig.Rules(ctx.BlockNumber),
 	}
-
-	evm.interpreter = NewInterpreter(evm, vmConfig)
+	evm.interpreter = NewInterpreter(evm, vmConfig, intPool)
 	return evm
 }
 
