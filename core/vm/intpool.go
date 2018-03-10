@@ -22,23 +22,23 @@ var checkVal = big.NewInt(-42)
 
 const poolLimit = 256
 
-// intPool is a pool of big integers that
+// IntPool is a pool of big integers that
 // can be reused for all big.Int operations.
-type intPool struct {
+type IntPool struct {
 	pool *Stack
 }
 
-func newIntPool() *intPool {
-	return &intPool{pool: newstack()}
+func NewIntPool() *IntPool {
+	return &IntPool{pool: newstack()}
 }
 
-func (p *intPool) get() *big.Int {
+func (p *IntPool) get() *big.Int {
 	if p.pool.len() > 0 {
 		return p.pool.pop()
 	}
 	return new(big.Int)
 }
-func (p *intPool) put(is ...*big.Int) {
+func (p *IntPool) put(is ...*big.Int) {
 	if len(p.pool.data) > poolLimit {
 		return
 	}
