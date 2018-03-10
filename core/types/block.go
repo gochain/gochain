@@ -413,12 +413,11 @@ func (b *Block) String() string {
 	str := fmt.Sprintf(`Block(#%v): Size: %v {
 MinerHash: %x
 %v
-Transactions:
-%v
+Transactions: %d
 Uncles:
 %v
 }
-`, b.Number(), b.Size(), b.header.HashNoNonce(), b.header, b.transactions, b.uncles)
+`, b.Number(), b.Size(), b.header.HashNoNonce(), b.header, len(b.transactions), b.uncles)
 	return str
 }
 
