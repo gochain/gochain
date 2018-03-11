@@ -1416,21 +1416,16 @@ func (bc *BlockChain) addBadBlock(block *types.Block) {
 func (bc *BlockChain) reportBlock(block *types.Block, receipts types.Receipts, err error) {
 	bc.addBadBlock(block)
 
-	var receiptString string
-	for _, receipt := range receipts {
-		receiptString += fmt.Sprintf("\t%v\n", receipt)
-	}
 	log.Error(fmt.Sprintf(`
 ########## BAD BLOCK #########
 Chain config: %v
 
 Number: %v
 Hash: 0x%x
-%v
 
 Error: %v
 ##############################
-`, bc.chainConfig, block.Number(), block.Hash(), receiptString, err))
+`, bc.chainConfig, block.Number(), block.Hash(), err))
 }
 
 // InsertHeaderChain attempts to insert the given header chain in to the local
