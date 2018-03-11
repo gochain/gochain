@@ -1316,7 +1316,7 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		log.Error("Impossible reorg, please file an issue", "oldnum", oldBlock.Number(), "oldhash", oldBlock.Hash(), "newnum", newBlock.Number(), "newhash", newBlock.Hash())
 	}
 	// Insert the new chain, taking care of the proper incremental order
-	var addedTxs types.Transactions
+	addedTxs := make(map[common.Hash]struct{})
 	for i := len(newChain) - 1; i >= 0; i-- {
 		// insert the block in the canonical way, re-writing history
 		bc.insert(newChain[i])
@@ -1324,10 +1324,17 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		if err := WriteTxLookupEntries(bc.db, newChain[i]); err != nil {
 			return err
 		}
-		addedTxs = append(addedTxs, newChain[i].Transactions()...)
+		for _, tx := range newChain[i].Transactions() {
+			addedTxs[tx.Hash()] = struct{}{}
+		}
 	}
 	// calculate the difference between deleted and added transactions
-	diff := types.TxDifference(deletedTxs, addedTxs)
+	var diff types.Transactions
+	for _, tx := range deletedTxs {
+		if _, ok := addedTxs[tx.Hash()]; !ok {
+			diff = append(diff, tx)
+		}
+	}
 	// When transactions get deleted from the database that means the
 	// receipts that were created in the fork must also be deleted
 	for _, tx := range diff {

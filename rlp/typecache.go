@@ -65,8 +65,9 @@ func cachedTypeInfo(typ reflect.Type, tags tags) (*typeinfo, error) {
 	}
 	// not in the cache, need to generate info for this type.
 	typeCacheMutex.Lock()
-	defer typeCacheMutex.Unlock()
-	return cachedTypeInfo1(typ, tags)
+	info, err := cachedTypeInfo1(typ, tags)
+	typeCacheMutex.Unlock()
+	return info, err
 }
 
 func cachedTypeInfo1(typ reflect.Type, tags tags) (*typeinfo, error) {

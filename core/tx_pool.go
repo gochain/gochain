@@ -150,10 +150,10 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	PriceLimit: 1,
 	PriceBump:  10,
 
-	AccountSlots: 128,
-	GlobalSlots:  32768,
-	AccountQueue: 512,
-	GlobalQueue:  8192,
+	AccountSlots: 512,
+	GlobalSlots:  131072,
+	AccountQueue: 2048,
+	GlobalQueue:  32768,
 
 	Lifetime: 3 * time.Hour,
 }
@@ -358,7 +358,8 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 			log.Debug("Skipping deep transaction reorg", "depth", depth)
 		} else {
 			// Reorg seems shallow enough to pull in all transactions into memory
-			var discarded, included types.Transactions
+			var discarded types.Transactions
+			included := make(map[common.Hash]struct{})
 
 			var (
 				rem = pool.chain.GetBlock(oldHead.Hash(), oldHead.Number.Uint64())
@@ -372,7 +373,9 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 				}
 			}
 			for add.NumberU64() > rem.NumberU64() {
-				included = append(included, add.Transactions()...)
+				for _, tx := range add.Transactions() {
+					included[tx.Hash()] = struct{}{}
+				}
 				if add = pool.chain.GetBlock(add.ParentHash(), add.NumberU64()-1); add == nil {
 					log.Error("Unrooted new chain seen by tx pool", "block", newHead.Number, "hash", newHead.Hash())
 					return
@@ -384,13 +387,19 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 					log.Error("Unrooted old chain seen by tx pool", "block", oldHead.Number, "hash", oldHead.Hash())
 					return
 				}
-				included = append(included, add.Transactions()...)
+				for _, tx := range add.Transactions() {
+					included[tx.Hash()] = struct{}{}
+				}
 				if add = pool.chain.GetBlock(add.ParentHash(), add.NumberU64()-1); add == nil {
 					log.Error("Unrooted new chain seen by tx pool", "block", newHead.Number, "hash", newHead.Hash())
 					return
 				}
 			}
-			reinject = types.TxDifference(discarded, included)
+			for _, tx := range discarded {
+				if _, ok := included[tx.Hash()]; !ok {
+					reinject = append(reinject, tx)
+				}
+			}
 		}
 	}
 	// Initialize the internal state to the current head
@@ -677,7 +686,7 @@ func (pool *TxPool) enqueueTx(hash common.Hash, tx *types.Transaction) (bool, er
 	// Try to insert the transaction into the future queue
 	from, _ := types.Sender(pool.signer, tx) // already validated
 	if pool.queue[from] == nil {
-		pool.queue[from] = newTxList(false, 5000)
+		pool.queue[from] = newTxList(false)
 	}
 	inserted, old := pool.queue[from].Add(tx, pool.config.PriceBump)
 	if !inserted {
@@ -712,7 +721,7 @@ func (pool *TxPool) journalTx(from common.Address, tx *types.Transaction) {
 func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.Transaction) {
 	// Try to insert the transaction into the pending queue
 	if pool.pending[addr] == nil {
-		pool.pending[addr] = newTxList(true, 5000)
+		pool.pending[addr] = newTxList(true)
 	}
 	list := pool.pending[addr]
 
