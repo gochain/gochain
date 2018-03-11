@@ -98,7 +98,11 @@ func (c *ecrecover) Run(input []byte) ([]byte, error) {
 	}
 
 	// the first byte of pubkey is bitcoin heritage
-	return common.LeftPadBytes(crypto.Keccak256(pubKey[1:])[12:], 32), nil
+	h := crypto.Keccak256Hash(pubKey[1:])
+	for i := 0; i < 12; i++ {
+		h[i] = 0
+	}
+	return h[:], nil
 }
 
 // SHA256 implemented as a native contract.

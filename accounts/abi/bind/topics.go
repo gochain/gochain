@@ -24,7 +24,7 @@ import (
 
 	"github.com/gochain-io/gochain/accounts/abi"
 	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/crypto"
+	"github.com/gochain-io/gochain/crypto/sha3"
 )
 
 // makeTopics converts a filter query argument list into a filter topic set.
@@ -72,11 +72,9 @@ func makeTopics(query ...[]interface{}) ([][]common.Hash, error) {
 				blob := new(big.Int).SetUint64(rule).Bytes()
 				copy(topic[common.HashLength-len(blob):], blob)
 			case string:
-				hash := crypto.Keccak256Hash([]byte(rule))
-				copy(topic[:], hash[:])
+				sha3.Keccak256(topic[:32], []byte(rule))
 			case []byte:
-				hash := crypto.Keccak256Hash(rule)
-				copy(topic[:], hash[:])
+				sha3.Keccak256(topic[:32], rule)
 
 			default:
 				// Attempt to generate the topic from funky types

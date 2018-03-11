@@ -49,13 +49,6 @@ func TestToECDSAErrors(t *testing.T) {
 	}
 }
 
-func BenchmarkSha3(b *testing.B) {
-	a := []byte("hello world")
-	for i := 0; i < b.N; i++ {
-		Keccak256(a)
-	}
-}
-
 func TestSign(t *testing.T) {
 	key, _ := HexToECDSA(testPrivHex)
 	addr := common.HexToAddress(testAddrHex)

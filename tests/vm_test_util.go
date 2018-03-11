@@ -148,5 +148,5 @@ func (t *VMTest) newEVM(statedb *state.StateDB, vmconfig vm.Config) *vm.EVM {
 }
 
 func vmTestBlockHash(n uint64) common.Hash {
-	return common.BytesToHash(crypto.Keccak256([]byte(big.NewInt(int64(n)).String())))
+	return crypto.Keccak256Hash([]byte(big.NewInt(int64(n)).String()))
 }

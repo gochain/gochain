@@ -40,38 +40,28 @@ var (
 )
 
 // Keccak256 calculates and returns the Keccak256 hash of the input data.
+// Consider using sha3.Keccak256 directly instead.
 func Keccak256(data ...[]byte) []byte {
-	d := sha3.NewKeccak256()
-	for _, b := range data {
-		d.Write(b)
-	}
-	return d.Sum(nil)
+	var h common.Hash
+	sha3.Keccak256(h[:], data...)
+	return h[:]
 }
 
 // Keccak256Hash calculates and returns the Keccak256 hash of the input data,
 // converting it to an internal Hash data structure.
+// Consider using sha3.Keccak256 directly instead.
 func Keccak256Hash(data ...[]byte) (h common.Hash) {
-	d := sha3.NewKeccak256()
-	for _, b := range data {
-		d.Write(b)
-	}
-	d.Sum(h[:0])
+	sha3.Keccak256(h[:], data...)
 	return h
-}
-
-// Keccak512 calculates and returns the Keccak512 hash of the input data.
-func Keccak512(data ...[]byte) []byte {
-	d := sha3.NewKeccak512()
-	for _, b := range data {
-		d.Write(b)
-	}
-	return d.Sum(nil)
 }
 
 // Creates an ethereum address given the bytes and the nonce
 func CreateAddress(b common.Address, nonce uint64) common.Address {
 	data, _ := rlp.EncodeToBytes([]interface{}{b, nonce})
-	return common.BytesToAddress(Keccak256(data)[12:])
+	var a common.Address
+	h := Keccak256Hash(data)
+	copy(a[:], h[12:])
+	return a
 }
 
 // ToECDSA creates a private key with the given D value.
@@ -193,7 +183,10 @@ func ValidateSignatureValues(v byte, r, s *big.Int, homestead bool) bool {
 
 func PubkeyToAddress(p ecdsa.PublicKey) common.Address {
 	pubBytes := FromECDSAPub(&p)
-	return common.BytesToAddress(Keccak256(pubBytes[1:])[12:])
+	var a common.Address
+	h := Keccak256Hash(pubBytes[1:])
+	copy(a[:], h[12:])
+	return a
 }
 
 func zeroBytes(bytes []byte) {

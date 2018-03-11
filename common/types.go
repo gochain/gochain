@@ -165,9 +165,8 @@ func (a Address) Hash() Hash    { return BytesToHash(a[:]) }
 // Hex returns an EIP55-compliant hex string representation of the address.
 func (a Address) Hex() string {
 	unchecksummed := hex.EncodeToString(a[:])
-	sha := sha3.NewKeccak256()
-	sha.Write([]byte(unchecksummed))
-	hash := sha.Sum(nil)
+	var hash Hash
+	sha3.Keccak256(hash[:], []byte(unchecksummed))
 
 	result := []byte(unchecksummed)
 	for i := 0; i < len(result); i++ {

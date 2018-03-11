@@ -113,13 +113,13 @@ func LogsBloom(logs []*Log) *big.Int {
 }
 
 func bloom9(b []byte) *big.Int {
-	b = crypto.Keccak256(b[:])
+	h := crypto.Keccak256Hash(b)
 
 	r := new(big.Int)
 
 	for i := 0; i < 6; i += 2 {
 		t := big.NewInt(1)
-		b := (uint(b[i+1]) + (uint(b[i]) << 8)) & 2047
+		b := (uint(h[i+1]) + (uint(h[i]) << 8)) & 2047
 		r.Or(r, t.Lsh(t, b))
 	}
 
