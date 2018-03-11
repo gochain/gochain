@@ -30,6 +30,8 @@ import (
 	"runtime"
 	"strings"
 	"text/template"
+
+	"github.com/gochain-io/gochain/params"
 )
 
 var DryRunFlag = flag.Bool("n", false, "dry run, don't execute commands")
@@ -58,6 +60,10 @@ func GOPATH() string {
 		log.Fatal("GOPATH is not set")
 	}
 	return os.Getenv("GOPATH")
+}
+
+func VERSION() string {
+	return params.Version
 }
 
 var warnedAboutGit bool
