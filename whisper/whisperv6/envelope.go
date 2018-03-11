@@ -30,6 +30,7 @@ import (
 	"github.com/gochain-io/gochain/common/math"
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/crypto/ecies"
+	"github.com/gochain-io/gochain/crypto/sha3"
 	"github.com/gochain-io/gochain/rlp"
 )
 
@@ -93,8 +94,7 @@ func (e *Envelope) Seal(options *MessageParams) error {
 	}
 
 	buf := make([]byte, 64)
-	h := crypto.Keccak256(e.rlpWithoutNonce())
-	copy(buf[:32], h)
+	sha3.Keccak256(buf[:32], e.rlpWithoutNonce())
 
 	finish := time.Now().Add(time.Duration(options.WorkTime) * time.Second).UnixNano()
 	for nonce := uint64(0); time.Now().UnixNano() < finish; {
@@ -130,8 +130,7 @@ func (e *Envelope) PoW() float64 {
 
 func (e *Envelope) calculatePoW(diff uint32) {
 	buf := make([]byte, 64)
-	h := crypto.Keccak256(e.rlpWithoutNonce())
-	copy(buf[:32], h)
+	sha3.Keccak256(buf[:32], e.rlpWithoutNonce())
 	binary.BigEndian.PutUint64(buf[56:], e.Nonce)
 	d := new(big.Int).SetBytes(crypto.Keccak256(buf))
 	firstBit := math.FirstBitSet(d)

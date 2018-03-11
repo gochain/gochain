@@ -53,5 +53,5 @@ func (e Event) Id() common.Hash {
 		types[i] = input.Type.String()
 		i++
 	}
-	return common.BytesToHash(crypto.Keccak256([]byte(fmt.Sprintf("%v(%v)", e.Name, strings.Join(types, ",")))))
+	return crypto.Keccak256Hash([]byte(fmt.Sprintf("%v(%v)", e.Name, strings.Join(types, ","))))
 }

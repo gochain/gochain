@@ -15,8 +15,32 @@ import (
 // NewKeccak256 creates a new Keccak-256 hash.
 func NewKeccak256() hash.Hash { return &state{rate: 136, outputLen: 32, dsbyte: 0x01} }
 
+// Keccak256 is optimized for cases that call Sum() just once. When h is 32
+// bytes it is equivalent to calling NewKeccak256() and using the Write() and
+// Sum() hash.Hash interface methods, but avoids the extra allocations in
+// (*state).Sum(), which copies the internal state for continued use. This copy
+// is unnecessary when the hash.Hash is discarded after calling Sum().
+func Keccak256(h []byte, data ...[]byte) {
+	s := &state{rate: 136, outputLen: 32, dsbyte: 0x01}
+	for _, b := range data {
+		s.Write(b)
+	}
+	s.Read(h)
+}
+
 // NewKeccak512 creates a new Keccak-512 hash.
 func NewKeccak512() hash.Hash { return &state{rate: 72, outputLen: 64, dsbyte: 0x01} }
+
+// Keccack512 is an optimized alternative to NewKeccak512/Write/Sum, like Keccack256.
+func Keccak512(data ...[]byte) []byte {
+	var h [64]byte
+	s := &state{rate: 72, outputLen: 64, dsbyte: 0x01}
+	for _, b := range data {
+		s.Write(b)
+	}
+	s.Read(h[:])
+	return h[:]
+}
 
 // New224 creates a new SHA3-224 hash.
 // Its generic security strength is 224 bits against preimage attacks,
