@@ -99,6 +99,22 @@ func (l *Log) String() string {
 	return fmt.Sprintf(`log: %x %x %x %x %d %x %d`, l.Address, l.Topics, l.Data, l.TxHash, l.TxIndex, l.BlockHash, l.Index)
 }
 
+// LogsForStorage RLP encodes as []*LogForStorage.
+type LogsForStorage []*Log
+
+func (l LogsForStorage) EncodeRLPElem(i int, w io.Writer) error {
+	return rlp.Encode(w, (*LogForStorage)(l[i]))
+}
+
+func (l *LogsForStorage) DecodeRLPElem(s *rlp.Stream) error {
+	var log LogForStorage
+	if err := s.Decode(&log); err != nil {
+		return err
+	}
+	*l = append(*l, (*Log)(&log))
+	return nil
+}
+
 // LogForStorage is a wrapper around a Log that flattens and parses the entire content of
 // a log including non-consensus fields.
 type LogForStorage Log

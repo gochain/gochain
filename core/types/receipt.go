@@ -78,7 +78,7 @@ type receiptStorageRLP struct {
 	Bloom             Bloom
 	TxHash            common.Hash
 	ContractAddress   common.Address
-	Logs              []*LogForStorage
+	Logs              LogsForStorage
 	GasUsed           uint64
 }
 
@@ -157,6 +157,22 @@ func (r *Receipt) String() string {
 	return fmt.Sprintf("receipt{med=%x cgas=%v bloom=%x logs=%v}", r.PostState, r.CumulativeGasUsed, r.Bloom, r.Logs)
 }
 
+// ReceiptsForStorage RLP encodes as []*ReceiptForStorage.
+type ReceiptsForStorage []*Receipt
+
+func (r ReceiptsForStorage) EncodeRLPElem(i int, w io.Writer) error {
+	return rlp.Encode(w, (*ReceiptForStorage)(r[i]))
+}
+
+func (r *ReceiptsForStorage) DecodeRLPElem(s *rlp.Stream) error {
+	var rec ReceiptForStorage
+	if err := s.Decode(&rec); err != nil {
+		return err
+	}
+	*r = append(*r, (*Receipt)(&rec))
+	return nil
+}
+
 // ReceiptForStorage is a wrapper around a Receipt that flattens and parses the
 // entire content of a receipt, as opposed to only the consensus fields originally.
 type ReceiptForStorage Receipt
@@ -170,11 +186,8 @@ func (r *ReceiptForStorage) EncodeRLP(w io.Writer) error {
 		Bloom:             r.Bloom,
 		TxHash:            r.TxHash,
 		ContractAddress:   r.ContractAddress,
-		Logs:              make([]*LogForStorage, len(r.Logs)),
+		Logs:              LogsForStorage(r.Logs),
 		GasUsed:           r.GasUsed,
-	}
-	for i, log := range r.Logs {
-		enc.Logs[i] = (*LogForStorage)(log)
 	}
 	return rlp.Encode(w, enc)
 }
@@ -191,10 +204,7 @@ func (r *ReceiptForStorage) DecodeRLP(s *rlp.Stream) error {
 	}
 	// Assign the consensus fields
 	r.CumulativeGasUsed, r.Bloom = dec.CumulativeGasUsed, dec.Bloom
-	r.Logs = make([]*Log, len(dec.Logs))
-	for i, log := range dec.Logs {
-		r.Logs[i] = (*Log)(log)
-	}
+	r.Logs = []*Log(dec.Logs)
 	// Assign the implementation fields
 	r.TxHash, r.ContractAddress, r.GasUsed = dec.TxHash, dec.ContractAddress, dec.GasUsed
 	return nil

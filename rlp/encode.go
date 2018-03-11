@@ -45,6 +45,12 @@ type Encoder interface {
 	EncodeRLP(io.Writer) error
 }
 
+// SliceEncoder is implemented by types that require custom encoding rules for
+// their elements.
+type SliceEncoder interface {
+	EncodeRLPElem(int, io.Writer) error
+}
+
 // Encode writes the RLP encoding of val to w. Note that Encode may
 // perform many small writes in some cases. Consider making w
 // buffered.
@@ -339,8 +345,9 @@ func (r *encReader) next() []byte {
 }
 
 var (
-	encoderInterface = reflect.TypeOf(new(Encoder)).Elem()
-	big0             = big.NewInt(0)
+	encoderInterface      = reflect.TypeOf(new(Encoder)).Elem()
+	sliceEncoderInterface = reflect.TypeOf(new(SliceEncoder)).Elem()
+	big0                  = big.NewInt(0)
 )
 
 // makeWriter creates a writer function for the given type.
@@ -351,6 +358,8 @@ func makeWriter(typ reflect.Type, ts tags) (writer, error) {
 		return writeRawValue, nil
 	case typ.Implements(encoderInterface):
 		return writeEncoder, nil
+	case typ.Implements(sliceEncoderInterface):
+		return writeSliceEncoder(ts), nil
 	case kind != reflect.Ptr && reflect.PtrTo(typ).Implements(encoderInterface):
 		return writeEncoderNoPtr, nil
 	case kind == reflect.Interface:
@@ -504,6 +513,22 @@ func writeInterface(val reflect.Value, w *encbuf) error {
 		return err
 	}
 	return ti.writer(eval, w)
+}
+
+func writeSliceEncoder(ts tags) writer {
+	return func(val reflect.Value, w *encbuf) error {
+		if !ts.tail {
+			defer w.listEnd(w.list())
+		}
+		s := val.Interface().(SliceEncoder)
+		vlen := val.Len()
+		for i := 0; i < vlen; i++ {
+			if err := s.EncodeRLPElem(i, w); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 }
 
 func makeSliceWriter(typ reflect.Type, ts tags) (writer, error) {
