@@ -30,6 +30,8 @@ import (
 	"runtime"
 	"strings"
 	"text/template"
+
+	"github.com/gochain-io/gochain/params"
 )
 
 var DryRunFlag = flag.Bool("n", false, "dry run, don't execute commands")
@@ -60,13 +62,8 @@ func GOPATH() string {
 	return os.Getenv("GOPATH")
 }
 
-// VERSION returns the content of the VERSION file.
 func VERSION() string {
-	version, err := ioutil.ReadFile("VERSION")
-	if err != nil {
-		log.Fatal(err)
-	}
-	return string(bytes.TrimSpace(version))
+	return params.Version
 }
 
 var warnedAboutGit bool

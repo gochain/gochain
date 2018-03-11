@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// +build none
-
 /*
 The ci command is called from Continuous Integration scripts.
 
@@ -411,9 +409,6 @@ func archiveBasename(arch string, env build.Environment) string {
 
 func archiveVersion(env build.Environment) string {
 	version := build.VERSION()
-	if isUnstableBuild(env) {
-		version += "-unstable"
-	}
 	if env.Commit != "" {
 		version += "-" + env.Commit[:8]
 	}
