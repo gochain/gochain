@@ -70,6 +70,10 @@ func (h *GlogHandler) Verbosity(level Lvl) {
 	atomic.StoreUint32(&h.level, uint32(level))
 }
 
+func (h *GlogHandler) IsLogging(level Lvl) bool {
+	return atomic.LoadUint32(&h.level) >= uint32(level)
+}
+
 // Vmodule sets the glog verbosity pattern.
 //
 // The syntax of the argument is a comma-separated list of pattern=N, where the

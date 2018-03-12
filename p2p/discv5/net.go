@@ -428,10 +428,12 @@ loop:
 			if err := net.handle(n, pkt.ev, &pkt); err != nil {
 				status = err.Error()
 			}
-			log.Trace("", "msg", log.Lazy{Fn: func() string {
-				return fmt.Sprintf("<<< (%d) %v from %x@%v: %v -> %v (%v)",
-					net.tab.count, pkt.ev, pkt.remoteID[:8], pkt.remoteAddr, prestate, n.state, status)
-			}})
+			if log.Tracing() {
+				log.Trace("", "msg", log.Lazy{Fn: func() string {
+					return fmt.Sprintf("<<< (%d) %v from %x@%v: %v -> %v (%v)",
+						net.tab.count, pkt.ev, pkt.remoteID[:8], pkt.remoteAddr, prestate, n.state, status)
+				}})
+			}
 			// TODO: persist state if n.state goes >= known, delete if it goes <= known
 
 		// State transition timeouts.

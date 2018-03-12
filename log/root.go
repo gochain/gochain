@@ -59,3 +59,13 @@ func Crit(msg string, ctx ...interface{}) {
 	root.write(msg, LvlCrit, ctx)
 	os.Exit(1)
 }
+
+// IsLogging returns true if global logging for level is enabled. Check this
+// to avoid costly message formatting which would just be discarded anyways.
+func IsLogging(level Lvl) bool {
+	return root.h.IsLogging(level)
+}
+
+func Tracing() bool {
+	return IsLogging(LvlTrace)
+}

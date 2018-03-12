@@ -300,12 +300,15 @@ func (t *udp) findnode(toid NodeID, toaddr *net.UDPAddr, target NodeID) ([]*Node
 	nodes := make([]*Node, 0, bucketSize)
 	nreceived := 0
 	errc := t.pending(toid, neighborsPacket, func(r interface{}) bool {
+		tracing := log.Tracing()
 		reply := r.(*neighbors)
 		for _, rn := range reply.Nodes {
 			nreceived++
 			n, err := t.nodeFromRPC(toaddr, rn)
 			if err != nil {
-				log.Trace("Invalid neighbor node received", "ip", rn.IP, "addr", toaddr, "err", err)
+				if tracing {
+					log.Trace("Invalid neighbor node received", "ip", rn.IP, "addr", toaddr, "err", err)
+				}
 				continue
 			}
 			nodes = append(nodes, n)
@@ -480,7 +483,9 @@ func (t *udp) send(toaddr *net.UDPAddr, ptype byte, req packet) ([]byte, error) 
 
 func (t *udp) write(toaddr *net.UDPAddr, what string, packet []byte) error {
 	_, err := t.conn.WriteToUDP(packet, toaddr)
-	log.Trace(">> "+what, "addr", toaddr, "err", err)
+	if log.Tracing() {
+		log.Trace(">> "+what, "addr", toaddr, "err", err)
+	}
 	return err
 }
 
@@ -544,7 +549,9 @@ func (t *udp) handlePacket(from *net.UDPAddr, buf []byte) error {
 		return err
 	}
 	err = packet.handle(t, from, fromID, hash)
-	log.Trace("<< "+packet.name(), "addr", from, "err", err)
+	if log.Tracing() {
+		log.Trace("<< "+packet.name(), "addr", from, "err", err)
+	}
 	return err
 }
 

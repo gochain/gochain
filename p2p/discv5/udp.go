@@ -341,9 +341,14 @@ func (t *udp) sendPacket(toid NodeID, toaddr *net.UDPAddr, ptype byte, req inter
 		//fmt.Println(err)
 		return hash, err
 	}
-	log.Trace(fmt.Sprintf(">>> %v to %x@%v", nodeEvent(ptype), toid[:8], toaddr))
+	tracing := log.Tracing()
+	if tracing {
+		log.Trace(fmt.Sprintf(">>> %v to %x@%v", nodeEvent(ptype), toid[:8], toaddr))
+	}
 	if _, err = t.conn.WriteToUDP(packet, toaddr); err != nil {
-		log.Trace(fmt.Sprint("UDP send failed:", err))
+		if tracing {
+			log.Trace(fmt.Sprint("UDP send failed:", err))
+		}
 	}
 	//fmt.Println(err)
 	return hash, err
