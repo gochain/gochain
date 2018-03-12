@@ -43,6 +43,13 @@ type Decoder interface {
 	DecodeRLP(*Stream) error
 }
 
+// SliceDecoder is implemented by types that require custom RLP decoding for
+// their elements.
+type SliceDecoder interface {
+	// DecodeRLPElem decodes a single element from the stream and appends it.
+	DecodeRLPElem(*Stream) error
+}
+
 // Decode parses RLP-encoded data from r and stores the result in the
 // value pointed to by val. Val must be a non-nil pointer. If r does
 // not implement ByteReader, Decode will do its own buffering.
@@ -171,8 +178,9 @@ func addErrorContext(err error, ctx string) error {
 }
 
 var (
-	decoderInterface = reflect.TypeOf(new(Decoder)).Elem()
-	bigInt           = reflect.TypeOf(big.Int{})
+	decoderInterface      = reflect.TypeOf(new(Decoder)).Elem()
+	sliceDecoderInterface = reflect.TypeOf(new(SliceDecoder)).Elem()
+	bigInt                = reflect.TypeOf(big.Int{})
 )
 
 func makeDecoder(typ reflect.Type, tags tags) (dec decoder, err error) {
@@ -182,6 +190,8 @@ func makeDecoder(typ reflect.Type, tags tags) (dec decoder, err error) {
 		return decodeRawValue, nil
 	case typ.Implements(decoderInterface):
 		return decodeDecoder, nil
+	case reflect.PtrTo(typ).Implements(sliceDecoderInterface):
+		return makeListSliceDecoder(tags), nil
 	case kind != reflect.Ptr && reflect.PtrTo(typ).Implements(decoderInterface):
 		return decodeDecoderNoPtr, nil
 	case typ.AssignableTo(reflect.PtrTo(bigInt)):
@@ -344,6 +354,48 @@ func decodeSliceElems(s *Stream, val reflect.Value, elemdec decoder) error {
 	}
 	if i < val.Len() {
 		val.SetLen(i)
+	}
+	return nil
+}
+
+func makeListSliceDecoder(tag tags) decoder {
+	var dec decoder
+	switch {
+	case tag.tail:
+		// A slice with "tail" tag can occur as the last field
+		// of a struct and is supposed to swallow all remaining
+		// list elements. The struct decoder already called s.List,
+		// proceed directly to decoding the elements.
+		dec = func(s *Stream, val reflect.Value) error {
+			return decodeSliceDecoderElems(s, val)
+		}
+	default:
+		dec = func(s *Stream, val reflect.Value) error {
+			return decodeListSliceDecoder(s, val)
+		}
+	}
+	return dec
+}
+
+func decodeListSliceDecoder(s *Stream, val reflect.Value) error {
+	if _, err := s.List(); err != nil {
+		return wrapStreamError(err, val.Type())
+	}
+	if err := decodeSliceDecoderElems(s, val); err != nil {
+		return err
+	}
+	return s.ListEnd()
+}
+
+func decodeSliceDecoderElems(s *Stream, val reflect.Value) error {
+	dec := val.Addr().Interface().(SliceDecoder)
+	for i := 0; ; i++ {
+		// decode into element
+		if err := dec.DecodeRLPElem(s); err == EOL {
+			break
+		} else if err != nil {
+			return addErrorContext(err, fmt.Sprint("[", i, "]"))
+		}
 	}
 	return nil
 }

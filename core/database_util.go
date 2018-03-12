@@ -239,16 +239,12 @@ func GetBlockReceipts(db DatabaseReader, hash common.Hash, number uint64) types.
 	if len(data) == 0 {
 		return nil
 	}
-	storageReceipts := []*types.ReceiptForStorage{}
+	storageReceipts := types.ReceiptsForStorage{}
 	if err := rlp.DecodeBytes(data, &storageReceipts); err != nil {
 		log.Error("Invalid receipt array RLP", "hash", hash, "err", err)
 		return nil
 	}
-	receipts := make(types.Receipts, len(storageReceipts))
-	for i, receipt := range storageReceipts {
-		receipts[i] = (*types.Receipt)(receipt)
-	}
-	return receipts
+	return types.Receipts(storageReceipts)
 }
 
 // GetTxLookupEntry retrieves the positional metadata associated with a transaction
@@ -443,11 +439,7 @@ func WriteBlock(db ethdb.Putter, block *types.Block) error {
 // rescheduling dropped transactions.
 func WriteBlockReceipts(db ethdb.Putter, hash common.Hash, number uint64, receipts types.Receipts) error {
 	// Convert the receipts into their storage form and serialize them
-	storageReceipts := make([]*types.ReceiptForStorage, len(receipts))
-	for i, receipt := range receipts {
-		storageReceipts[i] = (*types.ReceiptForStorage)(receipt)
-	}
-	bytes, err := rlp.EncodeToBytes(storageReceipts)
+	bytes, err := rlp.EncodeToBytes((types.ReceiptsForStorage)(receipts))
 	if err != nil {
 		return err
 	}
