@@ -26,6 +26,7 @@ import (
 	"math/big"
 	"reflect"
 	"strings"
+	"sync"
 )
 
 var (
@@ -116,17 +117,20 @@ type SliceDecoder interface {
 //
 //     NewStream(r, limit).Decode(val)
 func Decode(r io.Reader, val interface{}) error {
-	// TODO: this could use a Stream from a pool.
-	return NewStream(r, 0).Decode(val)
+	s := NewStream(r, 0)
+	err := s.Decode(val)
+	Discard(s)
+	return err
 }
 
 // DecodeBytes parses RLP data from b into val.
 // Please see the documentation of Decode for the decoding rules.
 // The input must contain exactly one value and no trailing data.
 func DecodeBytes(b []byte, val interface{}) error {
-	// TODO: this could use a Stream from a pool.
 	r := bytes.NewReader(b)
-	if err := NewStream(r, uint64(len(b))).Decode(val); err != nil {
+	s := NewStream(r, uint64(len(b)))
+	defer Discard(s)
+	if err := s.Decode(val); err != nil {
 		return err
 	}
 	if r.Len() > 0 {
@@ -668,6 +672,15 @@ type Stream struct {
 
 type listpos struct{ pos, size uint64 }
 
+var streamPool = sync.Pool{
+	New: func() interface{} { return new(Stream) },
+}
+
+// Discard returns s to the pool.
+func Discard(s *Stream) {
+	streamPool.Put(s)
+}
+
 // NewStream creates a new decoding stream reading from r.
 //
 // If r implements the ByteReader interface, Stream will
@@ -685,8 +698,10 @@ type listpos struct{ pos, size uint64 }
 // If r is a bytes.Reader or strings.Reader, the input limit is set to
 // the length of r's underlying data unless an explicit limit is
 // provided.
+//
+// Discarded Streams should be returned to the pool via Discard(*Stream).
 func NewStream(r io.Reader, inputLimit uint64) *Stream {
-	s := new(Stream)
+	s := streamPool.Get().(*Stream)
 	s.Reset(r, inputLimit)
 	return s
 }
@@ -694,7 +709,7 @@ func NewStream(r io.Reader, inputLimit uint64) *Stream {
 // NewListStream creates a new stream that pretends to be positioned
 // at an encoded list of the given length.
 func NewListStream(r io.Reader, len uint64) *Stream {
-	s := new(Stream)
+	s := streamPool.Get().(*Stream)
 	s.Reset(r, len)
 	s.kind = List
 	s.size = len

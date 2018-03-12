@@ -689,6 +689,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 		case powRequirementCode:
 			s := rlp.NewStream(packet.Payload, uint64(packet.Size))
 			i, err := s.Uint()
+			rlp.Discard(s)
 			if err != nil {
 				log.Warn("failed to decode powRequirementCode message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 				return errors.New("invalid powRequirementCode message")

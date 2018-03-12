@@ -74,6 +74,7 @@ func (journal *txJournal) load(add func(types.Transactions) []error) error {
 
 	// Inject all transactions from the journal into the pool
 	stream := rlp.NewStream(input, 0)
+	defer rlp.Discard(stream)
 	total, dropped := 0, 0
 
 	var failure error

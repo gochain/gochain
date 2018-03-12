@@ -260,6 +260,7 @@ func (api *PrivateAdminAPI) ImportChain(file string) (bool, error) {
 
 	// Run actual the import in pre-configured batches
 	stream := rlp.NewStream(reader, 0)
+	defer rlp.Discard(stream)
 
 	blocks, index := make([]*types.Block, 0, 2500), 0
 	for batch := 0; ; batch++ {

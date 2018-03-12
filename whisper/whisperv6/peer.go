@@ -93,6 +93,7 @@ func (peer *Peer) handshake() error {
 		return fmt.Errorf("peer [%x] sent packet %x before status packet", peer.ID(), packet.Code)
 	}
 	s := rlp.NewStream(packet.Payload, uint64(packet.Size))
+	defer rlp.Discard(s)
 	_, err = s.List()
 	if err != nil {
 		return fmt.Errorf("peer [%x] sent bad status message: %v", peer.ID(), err)
