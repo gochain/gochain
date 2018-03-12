@@ -386,3 +386,19 @@ func TestBlockReceiptStorage(t *testing.T) {
 		t.Fatalf("deleted receipts returned: %v", rs)
 	}
 }
+
+func BenchmarkNumHashKey(b *testing.B) {
+	prefix := []byte("h")
+	b.Run("unoptimized", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			_ = append(append(prefix, encodeBlockNumber(123456789)...), common.Hash{}.Bytes()...)
+		}
+	})
+	b.Run("optimized", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			_ = numHashKey('h', 123456789, common.Hash{})
+		}
+	})
+}
