@@ -14,6 +14,10 @@ func (h *swapHandler) Log(r *Record) error {
 	return (*h.handler.Load().(*Handler)).Log(r)
 }
 
+func (h *swapHandler) IsLogging(level Lvl) bool {
+	return h.Get().IsLogging(level)
+}
+
 func (h *swapHandler) Swap(newHandler Handler) {
 	h.handler.Store(&newHandler)
 }

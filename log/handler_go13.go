@@ -17,6 +17,10 @@ func (h *swapHandler) Log(r *Record) error {
 	return h.Get().Log(r)
 }
 
+func (h *swapHandler) IsLogging(level Lvl) bool {
+	return h.Get().IsLogging(level)
+}
+
 func (h *swapHandler) Get() Handler {
 	return *(*Handler)(atomic.LoadPointer(&h.handler))
 }

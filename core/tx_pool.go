@@ -627,12 +627,16 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 	// If the transaction is already known, discard it
 	hash := tx.Hash()
 	if pool.all[hash] != nil {
-		log.Trace("Discarding already known transaction", "hash", hash)
+		if log.Tracing() {
+			log.Trace("Discarding already known transaction", "hash", hash)
+		}
 		return false, fmt.Errorf("known transaction: %x", hash)
 	}
 	// If the transaction fails basic validation, discard it
 	if err := pool.validateTx(tx, local); err != nil {
-		log.Trace("Discarding invalid transaction", "hash", hash, "err", err)
+		if log.Tracing() {
+			log.Trace("Discarding invalid transaction", "hash", hash, "err", err)
+		}
 		invalidTxCounter.Inc(1)
 		return false, err
 	}
@@ -657,7 +661,9 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 		pool.all[tx.Hash()] = tx
 		pool.journalTx(from, tx)
 
-		log.Trace("Pooled new executable transaction", "hash", hash, "from", from, "to", tx.To())
+		if log.Tracing() {
+			log.Trace("Pooled new executable transaction", "hash", hash, "from", from, "to", tx.To())
+		}
 
 		// We've directly injected a replacement transaction, notify subsystems
 		go pool.txFeed.Send(TxPreEvent{tx})
@@ -675,7 +681,9 @@ func (pool *TxPool) add(tx *types.Transaction, local bool) (bool, error) {
 	}
 	pool.journalTx(from, tx)
 
-	log.Trace("Pooled new future transaction", "hash", hash, "from", from, "to", tx.To())
+	if log.Tracing() {
+		log.Trace("Pooled new future transaction", "hash", hash, "from", from, "to", tx.To())
+	}
 	return replace, nil
 }
 
@@ -928,24 +936,31 @@ func (pool *TxPool) promoteExecutables(accounts ...common.Address) {
 }
 
 func (pool *TxPool) promoteExecutable(addr common.Address, list *txList) {
+	tracing := log.Tracing()
 	// Drop all transactions that are deemed too old (low nonce)
 	for _, tx := range list.Forward(pool.currentState.GetNonce(addr)) {
 		hash := tx.Hash()
-		log.Trace("Removed old queued transaction", "hash", hash)
+		if tracing {
+			log.Trace("Removed old queued transaction", "hash", hash)
+		}
 		delete(pool.all, hash)
 	}
 	// Drop all transactions that are too costly (low balance or out of gas)
 	drops, _ := list.Filter(pool.currentState.GetBalance(addr), pool.currentMaxGas)
 	for _, tx := range drops {
 		hash := tx.Hash()
-		log.Trace("Removed unpayable queued transaction", "hash", hash)
+		if tracing {
+			log.Trace("Removed unpayable queued transaction", "hash", hash)
+		}
 		delete(pool.all, hash)
 		queuedNofundsCounter.Inc(1)
 	}
 	// Gather all executable transactions and promote them
 	for _, tx := range list.Ready(pool.pendingState.GetNonce(addr)) {
 		hash := tx.Hash()
-		log.Trace("Promoting queued transaction", "hash", hash)
+		if tracing {
+			log.Trace("Promoting queued transaction", "hash", hash)
+		}
 		pool.promoteTx(addr, hash, tx)
 	}
 	// Drop all transactions over the allowed limit
@@ -954,7 +969,9 @@ func (pool *TxPool) promoteExecutable(addr common.Address, list *txList) {
 			hash := tx.Hash()
 			delete(pool.all, hash)
 			queuedRateLimitCounter.Inc(1)
-			log.Trace("Removed cap-exceeding queued transaction", "hash", hash)
+			if tracing {
+				log.Trace("Removed cap-exceeding queued transaction", "hash", hash)
+			}
 		}
 	}
 	// Delete the entire queue entry if it became empty.
@@ -979,6 +996,7 @@ func (pool *TxPool) finishPromotion() {
 				spammers.Push(addr, float32(list.Len()))
 			}
 		}
+		tracing := log.Tracing()
 		// Gradually drop transactions from offenders
 		offenders := []common.Address{}
 		for pending > pool.config.GlobalSlots && !spammers.Empty() {
@@ -1004,7 +1022,9 @@ func (pool *TxPool) finishPromotion() {
 							if nonce := tx.Nonce(); pool.pendingState.GetNonce(offenders[i]) > nonce {
 								pool.pendingState.SetNonce(offenders[i], nonce)
 							}
-							log.Trace("Removed fairness-exceeding pending transaction", "hash", hash)
+							if tracing {
+								log.Trace("Removed fairness-exceeding pending transaction", "hash", hash)
+							}
 						}
 						pending--
 					}
@@ -1025,7 +1045,9 @@ func (pool *TxPool) finishPromotion() {
 						if nonce := tx.Nonce(); pool.pendingState.GetNonce(addr) > nonce {
 							pool.pendingState.SetNonce(addr, nonce)
 						}
-						log.Trace("Removed fairness-exceeding pending transaction", "hash", hash)
+						if tracing {
+							log.Trace("Removed fairness-exceeding pending transaction", "hash", hash)
+						}
 					}
 					pending--
 				}
@@ -1085,22 +1107,29 @@ func (pool *TxPool) demoteUnexecutables() {
 		nonce := pool.currentState.GetNonce(addr)
 
 		// Drop all transactions that are deemed too old (low nonce)
+		tracing := log.Tracing()
 		for _, tx := range list.Forward(nonce) {
 			hash := tx.Hash()
-			log.Trace("Removed old pending transaction", "hash", hash)
+			if tracing {
+				log.Trace("Removed old pending transaction", "hash", hash)
+			}
 			delete(pool.all, hash)
 		}
 		// Drop all transactions that are too costly (low balance or out of gas), and queue any invalids back for later
 		drops, invalids := list.Filter(pool.currentState.GetBalance(addr), pool.currentMaxGas)
 		for _, tx := range drops {
 			hash := tx.Hash()
-			log.Trace("Removed unpayable pending transaction", "hash", hash)
+			if tracing {
+				log.Trace("Removed unpayable pending transaction", "hash", hash)
+			}
 			delete(pool.all, hash)
 			pendingNofundsCounter.Inc(1)
 		}
 		for _, tx := range invalids {
 			hash := tx.Hash()
-			log.Trace("Demoting pending transaction", "hash", hash)
+			if tracing {
+				log.Trace("Demoting pending transaction", "hash", hash)
+			}
 			pool.enqueueTx(hash, tx)
 		}
 		// If there's a gap in front, warn (should never happen) and postpone all transactions

@@ -379,9 +379,12 @@ func (f *Fetcher) loop() {
 					}
 				}
 			}
+			tracing := log.Tracing()
 			// Send out all block header requests
 			for peer, hashes := range request {
-				log.Trace("Fetching scheduled headers", "peer", peer, "list", hashes)
+				if tracing {
+					log.Trace("Fetching scheduled headers", "peer", peer, "list", hashes)
+				}
 
 				// Create a closure of the fetch and schedule in on a new thread
 				fetchHeader, hashes := f.fetching[hashes[0]].fetchHeader, hashes
@@ -413,9 +416,12 @@ func (f *Fetcher) loop() {
 					f.completing[hash] = announce
 				}
 			}
+			tracing := log.Tracing()
 			// Send out all block body requests
 			for peer, hashes := range request {
-				log.Trace("Fetching scheduled bodies", "peer", peer, "list", hashes)
+				if tracing {
+					log.Trace("Fetching scheduled bodies", "peer", peer, "list", hashes)
+				}
 
 				// Create a closure of the fetch and schedule in on a new thread
 				if f.completingHook != nil {
@@ -439,6 +445,7 @@ func (f *Fetcher) loop() {
 			}
 			headerFilterInMeter.Mark(int64(len(task.headers)))
 
+			tracing := log.Tracing()
 			// Split the batch of headers into unknown ones (to return to the caller),
 			// known incomplete ones (requiring body retrievals) and completed blocks.
 			unknown, incomplete, complete := []*types.Header{}, []*announce{}, []*types.Block{}
@@ -449,7 +456,9 @@ func (f *Fetcher) loop() {
 				if announce := f.fetching[hash]; announce != nil && announce.origin == task.peer && f.fetched[hash] == nil && f.completing[hash] == nil && f.queued[hash] == nil {
 					// If the delivered header does not match the promised number, drop the announcer
 					if header.Number.Uint64() != announce.number {
-						log.Trace("Invalid block number fetched", "peer", announce.origin, "hash", header.Hash(), "announced", announce.number, "provided", header.Number)
+						if tracing {
+							log.Trace("Invalid block number fetched", "peer", announce.origin, "hash", header.Hash(), "announced", announce.number, "provided", header.Number)
+						}
 						f.dropPeer(announce.origin)
 						f.forgetHash(hash)
 						continue
@@ -461,7 +470,9 @@ func (f *Fetcher) loop() {
 
 						// If the block is empty (header only), short circuit into the final import queue
 						if header.TxHash == types.DeriveSha(types.Transactions{}) && header.UncleHash == types.CalcUncleHash([]*types.Header{}) {
-							log.Trace("Block empty, skipping body retrieval", "peer", announce.origin, "number", header.Number, "hash", header.Hash())
+							if tracing {
+								log.Trace("Block empty, skipping body retrieval", "peer", announce.origin, "number", header.Number, "hash", header.Hash())
+							}
 
 							block := types.NewBlockWithHeader(header)
 							block.ReceivedAt = task.time
@@ -473,7 +484,9 @@ func (f *Fetcher) loop() {
 						// Otherwise add to the list of blocks needing completion
 						incomplete = append(incomplete, announce)
 					} else {
-						log.Trace("Block already imported, discarding header", "peer", announce.origin, "number", header.Number, "hash", header.Hash())
+						if tracing {
+							log.Trace("Block already imported, discarding header", "peer", announce.origin, "number", header.Number, "hash", header.Hash())
+						}
 						f.forgetHash(hash)
 					}
 				} else {

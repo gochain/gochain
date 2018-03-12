@@ -457,14 +457,17 @@ func (self *worker) commitNewWork() {
 	var (
 		uncles    []*types.Header
 		badUncles []common.Hash
+		tracing   = log.Tracing()
 	)
 	for hash, uncle := range self.possibleUncles {
 		if len(uncles) == 2 {
 			break
 		}
 		if err := self.commitUncle(work, uncle.Header()); err != nil {
-			log.Trace("Bad uncle found and will be removed", "hash", hash)
-			log.Trace(fmt.Sprint(uncle))
+			if tracing {
+				log.Trace("Bad uncle found and will be removed", "hash", hash)
+				log.Trace(fmt.Sprint(uncle))
+			}
 
 			badUncles = append(badUncles, hash)
 		} else {
@@ -511,12 +514,15 @@ func (*worker) commitUncle(work *Work, uncle *types.Header) error {
 func (env *Work) commitTransactions(mux *event.TypeMux, txs *types.TransactionsByPriceAndNonce, bc *core.BlockChain, coinbase common.Address) {
 	gp := new(core.GasPool).AddGas(env.header.GasLimit)
 
+	tracing := log.Tracing()
 	intPool := vm.NewIntPool()
 	var coalescedLogs []*types.Log
 	for {
 		// If we don't have enough gas for any further transactions then we're done
 		if gp.Gas() < params.TxGas {
-			log.Trace("Not enough gas for further transactions", "gp", gp)
+			if tracing {
+				log.Trace("Not enough gas for further transactions", "gp", gp)
+			}
 			break
 		}
 		// Retrieve the next transaction and abort if all done
@@ -532,7 +538,9 @@ func (env *Work) commitTransactions(mux *event.TypeMux, txs *types.TransactionsB
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
 		if tx.Protected() && !env.config.IsEIP155(env.header.Number) {
-			log.Trace("Ignoring reply protected transaction", "hash", tx.Hash(), "eip155", env.config.EIP155Block)
+			if tracing {
+				log.Trace("Ignoring reply protected transaction", "hash", tx.Hash(), "eip155", env.config.EIP155Block)
+			}
 
 			txs.Pop()
 			continue
@@ -544,17 +552,23 @@ func (env *Work) commitTransactions(mux *event.TypeMux, txs *types.TransactionsB
 		switch err {
 		case core.ErrGasLimitReached:
 			// Pop the current out-of-gas transaction without shifting in the next from the account
-			log.Trace("Gas limit exceeded for current block", "sender", from)
+			if tracing {
+				log.Trace("Gas limit exceeded for current block", "sender", from)
+			}
 			txs.Pop()
 
 		case core.ErrNonceTooLow:
 			// New head notification data race between the transaction pool and miner, shift
-			log.Trace("Skipping transaction with low nonce", "sender", from, "nonce", tx.Nonce())
+			if tracing {
+				log.Trace("Skipping transaction with low nonce", "sender", from, "nonce", tx.Nonce())
+			}
 			txs.Shift()
 
 		case core.ErrNonceTooHigh:
 			// Reorg notification data race between the transaction pool and miner, skip account =
-			log.Trace("Skipping account with hight nonce", "sender", from, "nonce", tx.Nonce())
+			if tracing {
+				log.Trace("Skipping account with high nonce", "sender", from, "nonce", tx.Nonce())
+			}
 			txs.Pop()
 
 		case nil:
