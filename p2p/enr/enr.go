@@ -157,6 +157,7 @@ func (r *Record) DecodeRLP(s *rlp.Stream) error {
 	// Decode the RLP container.
 	dec := Record{raw: raw}
 	s = rlp.NewStream(bytes.NewReader(raw), 0)
+	rlp.Discard(s)
 	if _, err := s.List(); err != nil {
 		return err
 	}

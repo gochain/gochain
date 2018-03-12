@@ -506,8 +506,7 @@ func readHandshakeMsg(msg plainDecoder, plainSize int, prv *ecdsa.PrivateKey, r 
 	}
 	// Can't use rlp.DecodeBytes here because it rejects
 	// trailing data (forward-compatibility).
-	s := rlp.NewStream(bytes.NewReader(dec), 0)
-	return buf, s.Decode(msg)
+	return buf, rlp.Decode(bytes.NewReader(dec), msg)
 }
 
 // importPublicKey unmarshals 512 bit public keys.

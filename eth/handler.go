@@ -466,6 +466,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	case msg.Code == GetBlockBodiesMsg:
 		// Decode the retrieval message
 		msgStream := rlp.NewStream(msg.Payload, uint64(msg.Size))
+		defer rlp.Discard(msgStream)
 		if _, err := msgStream.List(); err != nil {
 			return err
 		}
@@ -519,6 +520,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	case p.version >= eth63 && msg.Code == GetNodeDataMsg:
 		// Decode the retrieval message
 		msgStream := rlp.NewStream(msg.Payload, uint64(msg.Size))
+		defer rlp.Discard(msgStream)
 		if _, err := msgStream.List(); err != nil {
 			return err
 		}
@@ -557,6 +559,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	case p.version >= eth63 && msg.Code == GetReceiptsMsg:
 		// Decode the retrieval message
 		msgStream := rlp.NewStream(msg.Payload, uint64(msg.Size))
+		defer rlp.Discard(msgStream)
 		if _, err := msgStream.List(); err != nil {
 			return err
 		}

@@ -443,7 +443,5 @@ func decodePacket(buffer []byte, pkt *ingressPacket) error {
 	default:
 		return fmt.Errorf("unknown packet type: %d", sigdata[0])
 	}
-	s := rlp.NewStream(bytes.NewReader(sigdata[1:]), 0)
-	err = s.Decode(pkt.data)
-	return err
+	return rlp.Decode(bytes.NewReader(sigdata[1:]), pkt.data)
 }

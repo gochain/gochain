@@ -574,9 +574,7 @@ func decodePacket(buf []byte) (packet, NodeID, []byte, error) {
 	default:
 		return nil, fromID, hash, fmt.Errorf("unknown type: %d", ptype)
 	}
-	s := rlp.NewStream(bytes.NewReader(sigdata[1:]), 0)
-	err = s.Decode(req)
-	return req, fromID, hash, err
+	return req, fromID, hash, rlp.Decode(bytes.NewReader(sigdata[1:]), req)
 }
 
 func (req *ping) handle(t *udp, from *net.UDPAddr, fromID NodeID, mac []byte) error {

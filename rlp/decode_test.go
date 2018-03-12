@@ -817,3 +817,29 @@ func unhex(str string) []byte {
 	}
 	return b
 }
+
+func BenchmarkStreamPool(b *testing.B) {
+	enc := encodeTestSlice(5)
+	b.Run("unpooled", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			var s []uint
+			r := bytes.NewReader(enc)
+			st := new(Stream)
+			st.Reset(r, 0)
+			if err := st.Decode(&s); err != nil {
+				b.Fatalf("Decode error: %v", err)
+			}
+		}
+	})
+	b.Run("pooled", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			var s []uint
+			r := bytes.NewReader(enc)
+			if err := Decode(r, &s); err != nil {
+				b.Fatalf("Decode error: %v", err)
+			}
+		}
+	})
+}
