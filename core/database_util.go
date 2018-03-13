@@ -193,11 +193,11 @@ func numKey(prefix byte, number uint64) []byte {
 }
 
 func tdKey(prefix byte, number uint64, hash common.Hash) []byte {
-	var k [44]byte
+	var k [42]byte
 	k[0] = prefix
 	binary.BigEndian.PutUint64(k[1:], number)
 	copy(k[9:], hash[:])
-	k[43] = tdSuffix
+	k[41] = tdSuffix
 	return k[:]
 }
 
