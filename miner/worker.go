@@ -479,10 +479,7 @@ func (self *worker) commitNewWork() {
 		delete(self.possibleUncles, hash)
 	}
 	// Create the new block to seal with the consensus engine
-	if work.Block, err = self.engine.Finalize(self.chain, header, work.state, work.txs, uncles, work.receipts); err != nil {
-		log.Error("Failed to finalize block for sealing", "err", err)
-		return
-	}
+	work.Block = self.engine.Finalize(self.chain, header, work.state, work.txs, uncles, work.receipts, true)
 	// We only care about logging if we're actually mining.
 	if atomic.LoadInt32(&self.mining) == 1 {
 		log.Info("Commit new mining work", "number", work.Block.Number(), "txs", work.tcount, "uncles", len(uncles), "elapsed", common.PrettyDuration(time.Since(tstart)))
