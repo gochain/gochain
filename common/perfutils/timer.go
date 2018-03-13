@@ -8,41 +8,48 @@ import (
 	"time"
 )
 
-func NewPerfTimer() *PerfTimer {
-	return &PerfTimer{
-		Sections: map[string]*PerfSection{},
+func NewPerfTimer() PerfTimer {
+	return &PerfTimerNormal{
+		Sections: map[string]*PerfSectionNormal{},
 	}
 }
 
 // PerfTimer is a way to time pieces of code, in particular ones that happen many times,
 // then get the metrics for it.
-type PerfTimer struct {
-	Sections map[string]*PerfSection
+type PerfTimer interface {
+	Start(sectionName string) PerfSection
+	Print()
+	Fprint(w io.Writer)
 }
 
-func (pt *PerfTimer) Start(sectionName string) *PerfSection {
+// PerfTimerNormal great name huh?
+type PerfTimerNormal struct {
+	Sections map[string]*PerfSectionNormal
+}
+
+func (pt *PerfTimerNormal) Start(sectionName string) PerfSection {
 	ps := pt.Sections[sectionName]
 	if ps == nil {
-		ps = &PerfSection{
-			Name: sectionName,
+		ps = &PerfSectionNormal{
+			name: sectionName,
 		}
 		pt.Sections[sectionName] = ps
 	}
 	ps.startTime = time.Now()
 	return ps
 }
-func (pt *PerfTimer) Print() {
+func (pt *PerfTimerNormal) Print() {
 	pt.Fprint(os.Stdout)
 }
-func (pt *PerfTimer) Fprint(w io.Writer) {
+func (pt *PerfTimerNormal) Fprint(w io.Writer) {
 	// fmt.Fprint(w, pt.Sections)
 	// totalDuration := time.Duration(0) // doesn't make sense unless we have subsections or something
 	for k, v := range pt.Sections {
 		w.Write([]byte(k))
 		w.Write([]byte(": "))
-		w.Write([]byte(strconv.FormatInt(v.Count, 10)))
+		w.Write([]byte(strconv.FormatInt(v.count, 10)))
 		w.Write([]byte(" times, "))
-		w.Write([]byte(v.TotalDuration.String()))
+		w.Write([]byte(v.totalDuration.String()))
 		w.Write([]byte("\n"))
 		// totalDuration += v.TotalDuration
 	}
@@ -51,27 +58,78 @@ func (pt *PerfTimer) Fprint(w io.Writer) {
 	// w.Write([]byte("\n"))
 }
 
-type PerfSection struct {
-	Name          string
-	TotalDuration time.Duration
-	Count         int64
+type PerfSection interface {
+	Name() string
+	TotalDuration() time.Duration
+	Count() int64
+	Stop()
+}
+
+type PerfSectionNormal struct {
+	name          string
+	totalDuration time.Duration
+	count         int64
 	startTime     time.Time
 }
 
-func (ps *PerfSection) Stop() {
-	ps.TotalDuration += time.Since(ps.startTime)
-	ps.Count += 1
+func (ps *PerfSectionNormal) Name() string {
+	return ps.name
+}
+
+func (ps *PerfSectionNormal) Stop() {
+	ps.totalDuration += time.Since(ps.startTime)
+	ps.count += 1
+}
+
+func (ps *PerfSectionNormal) Count() int64 {
+	return ps.count
+}
+func (ps *PerfSectionNormal) TotalDuration() time.Duration {
+	return ps.totalDuration
 }
 
 type contextKey string
 
 var (
 	contextKeyPerfTimer = contextKey("perf-timer")
+	defaultPerfTimer    = &NoopTimer{
+		section: &NoopSection{},
+	}
 )
 
-func GetTimer(ctx context.Context) *PerfTimer {
-	perfTimer := ctx.Value(contextKeyPerfTimer).(*PerfTimer)
-	return perfTimer
+type NoopTimer struct {
+	section *NoopSection
+}
+
+type NoopSection struct {
+}
+
+func (ps *NoopSection) Name() string {
+	return "NONAME"
+}
+
+func (ps *NoopSection) Stop() {}
+
+func (ps *NoopSection) Count() int64 {
+	return 0
+}
+func (ps *NoopSection) TotalDuration() time.Duration {
+	return 0
+}
+
+func (t *NoopTimer) Start(sectionName string) PerfSection {
+	return t.section
+}
+func (t *NoopTimer) Print() {}
+
+func (t *NoopTimer) Fprint(w io.Writer) {}
+
+func GetTimer(ctx context.Context) PerfTimer {
+	perfTimer, ok := ctx.Value(contextKeyPerfTimer).(PerfTimer)
+	if ok {
+		return perfTimer
+	}
+	return defaultPerfTimer
 }
 
 func WithTimer(ctx context.Context) context.Context {
