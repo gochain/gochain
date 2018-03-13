@@ -17,6 +17,7 @@
 package core
 
 import (
+	"context"
 	"math/big"
 	"reflect"
 	"testing"
@@ -41,6 +42,7 @@ func TestDefaultGenesisBlock(t *testing.T) {
 }
 
 func TestSetupGenesis(t *testing.T) {
+	ctx := context.Background()
 	var (
 		customghash = common.HexToHash("0x7c3428c4a706481debbf2a273a35f1e14ad5e97873d35b72f893b4e8b242eb13")
 		customg     = Genesis{
@@ -118,10 +120,10 @@ func TestSetupGenesis(t *testing.T) {
 				// Commit the 'old' genesis block with Homestead transition at #2.
 				// Advance to block #4, past the homestead transition block of customg.
 				genesis := oldcustomg.MustCommit(db)
-				bc, _ := NewBlockChain(db, nil, oldcustomg.Config, ethash.NewFullFaker(), vm.Config{})
+				bc, _ := NewBlockChain(ctx, db, nil, oldcustomg.Config, ethash.NewFullFaker(), vm.Config{})
 				defer bc.Stop()
 				bc.SetValidator(bproc{})
-				bc.InsertChain(makeBlockChainWithDiff(genesis, []int{2, 3, 4, 5}, 0))
+				bc.InsertChain(ctx, makeBlockChainWithDiff(genesis, []int{2, 3, 4, 5}, 0))
 				bc.CurrentBlock()
 				// This should return a compatibility error.
 				return SetupGenesisBlock(db, &customg)

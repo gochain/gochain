@@ -18,6 +18,7 @@
 package core
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -133,7 +134,7 @@ type BlockChain struct {
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum Validator and
 // Processor.
-func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config) (*BlockChain, error) {
+func NewBlockChain(ctx context.Context, db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
 			TrieNodeLimit: 256 * 1024 * 1024,
@@ -190,7 +191,7 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		}
 	}
 	// Take ownership of this particular state
-	go bc.update()
+	go bc.update(ctx)
 	return bc, nil
 }
 
@@ -676,7 +677,7 @@ func (bc *BlockChain) Stop() {
 	log.Info("Blockchain manager stopped")
 }
 
-func (bc *BlockChain) procFutureBlocks() {
+func (bc *BlockChain) procFutureBlocks(ctx context.Context) {
 	blocks := make([]*types.Block, 0, bc.futureBlocks.Len())
 	for _, hash := range bc.futureBlocks.Keys() {
 		if block, exist := bc.futureBlocks.Peek(hash); exist {
@@ -688,7 +689,7 @@ func (bc *BlockChain) procFutureBlocks() {
 
 		// Insert one by one as chain insertion needs contiguous ancestry between blocks
 		for i := range blocks {
-			bc.InsertChain(blocks[i : i+1])
+			bc.InsertChain(ctx, blocks[i:i+1])
 		}
 	}
 }
@@ -727,7 +728,7 @@ func (bc *BlockChain) Rollback(chain []common.Hash) {
 }
 
 // SetReceiptsData computes all the non-consensus fields of the receipts
-func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts types.Receipts) {
+func SetReceiptsData(ctx context.Context, config *params.ChainConfig, block *types.Block, receipts types.Receipts) {
 	signer := types.MakeSigner(config, block.Number())
 
 	transactions, logIndex := block.Transactions(), uint(0)
@@ -739,7 +740,7 @@ func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts ty
 		// The contract address can be derived from the transaction itself
 		if transactions[j].To() == nil {
 			// Deriving the signer is expensive, only do if it's actually needed
-			from, _ := types.Sender(signer, transactions[j])
+			from, _ := types.Sender(ctx, signer, transactions[j])
 			receipts[j].ContractAddress = crypto.CreateAddress(from, transactions[j].Nonce())
 		}
 		// The used gas can be calculated based on previous receipts
@@ -762,7 +763,7 @@ func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts ty
 
 // InsertReceiptChain attempts to complete an already existing header chain with
 // transaction and receipt data.
-func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain []types.Receipts) (int, error) {
+func (bc *BlockChain) InsertReceiptChain(ctx context.Context, blockChain types.Blocks, receiptChain []types.Receipts) (int, error) {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
@@ -798,7 +799,7 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 			continue
 		}
 		// Compute all the non-consensus fields of the receipts
-		SetReceiptsData(bc.chainConfig, block, receipts)
+		SetReceiptsData(ctx, bc.chainConfig, block, receipts)
 		// Write all the data out into the database
 		if err := WriteBody(batch, block.Hash(), block.NumberU64(), block.Body()); err != nil {
 			return i, fmt.Errorf("failed to write block body: %v", err)
@@ -997,8 +998,8 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 // wrong.
 //
 // After insertion is done, all accumulated events will be fired.
-func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
-	n, events, logs, err := bc.insertChain(chain)
+func (bc *BlockChain) InsertChain(ctx context.Context, chain types.Blocks) (int, error) {
+	n, events, logs, err := bc.insertChain(ctx, chain)
 	bc.PostChainEvents(events, logs)
 	return n, err
 }
@@ -1006,7 +1007,7 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 // insertChain will execute the actual chain insertion and event aggregation. The
 // only reason this method exists as a separate one is to make locking cleaner
 // with deferred statements.
-func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*types.Log, error) {
+func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int, []interface{}, []*types.Log, error) {
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(chain); i++ {
 		if chain[i].NumberU64() != chain[i-1].NumberU64()+1 || chain[i].ParentHash() != chain[i-1].Hash() {
@@ -1113,7 +1114,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			}
 			// Import all the pruned blocks to make the state available
 			bc.chainmu.Unlock()
-			_, evs, logs, err := bc.insertChain(winner)
+			_, evs, logs, err := bc.insertChain(ctx, winner)
 			bc.chainmu.Lock()
 			events, coalescedLogs = evs, logs
 
@@ -1138,7 +1139,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			return i, events, coalescedLogs, err
 		}
 		// Process block using the parent state as reference point.
-		receipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
+		receipts, logs, usedGas, err := bc.processor.Process(ctx, block, state, bc.vmConfig)
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
@@ -1376,13 +1377,13 @@ func (bc *BlockChain) PostChainEvents(events []interface{}, logs []*types.Log) {
 	}
 }
 
-func (bc *BlockChain) update() {
+func (bc *BlockChain) update(ctx context.Context) {
 	futureTimer := time.NewTicker(5 * time.Second)
 	defer futureTimer.Stop()
 	for {
 		select {
 		case <-futureTimer.C:
-			bc.procFutureBlocks()
+			bc.procFutureBlocks(ctx)
 		case <-bc.quit:
 			return
 		}

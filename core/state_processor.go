@@ -17,9 +17,11 @@
 package core
 
 import (
+	"context"
 	"runtime"
 
 	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/common/perfutils"
 	"github.com/gochain-io/gochain/consensus"
 	"github.com/gochain-io/gochain/consensus/misc"
 	"github.com/gochain-io/gochain/core/state"
@@ -57,7 +59,7 @@ func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consen
 // Process returns the receipts and logs accumulated during the process and
 // returns the amount of gas that was used in the process. If any of the
 // transactions failed to execute due to insufficient gas it will return an error.
-func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
+func (p *StateProcessor) Process(ctx context.Context, block *types.Block, statedb *state.StateDB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
 	var (
 		txs      = block.Transactions()
 		receipts = make(types.Receipts, len(txs))
@@ -72,10 +74,12 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	}
 	signer := types.MakeSigner(p.config, header.Number)
 
+	perfTimer := perfutils.GetTimer(ctx)
+
 	for s := 0; s < p.parWorkers; s++ {
 		go func(start int) {
 			for i := start; i < len(txs); i += p.parWorkers {
-				types.Sender(signer, txs[i])
+				types.Sender(ctx, signer, txs[i])
 			}
 		}(s)
 	}
@@ -87,7 +91,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
 		ps.Stop()
 		ps = perfTimer.Start("ApplyTransaction")
-		receipt, _, err := ApplyTransaction(p.config, p.bc, nil, gp, statedb, header, tx, usedGas, cfg, intPool, signer)
+		receipt, _, err := ApplyTransaction(ctx, p.config, p.bc, nil, gp, statedb, header, tx, usedGas, cfg, intPool, signer)
 		if err != nil {
 			return nil, nil, 0, err
 		}
@@ -106,9 +110,10 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config, intPool *vm.IntPool, signer types.Signer) (*types.Receipt, uint64, error) {
+func ApplyTransaction(ctx context.Context, config *params.ChainConfig, bc *BlockChain, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config, intPool *vm.IntPool, signer types.Signer) (*types.Receipt, uint64, error) {
+	perfTimer := perfutils.GetTimer(ctx)
 	ps := perfTimer.Start("tx.AsMessage")
-	msg, err := tx.AsMessage(signer)
+	msg, err := tx.AsMessage(ctx, signer)
 	if err != nil {
 		return nil, 0, err
 	}

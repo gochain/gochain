@@ -1,6 +1,7 @@
 package perfutils
 
 import (
+	"context"
 	"io"
 	"os"
 	"strconv"
@@ -60,4 +61,19 @@ type PerfSection struct {
 func (ps *PerfSection) Stop() {
 	ps.TotalDuration += time.Since(ps.startTime)
 	ps.Count += 1
+}
+
+type contextKey string
+
+var (
+	contextKeyPerfTimer = contextKey("perf-timer")
+)
+
+func GetTimer(ctx context.Context) *PerfTimer {
+	perfTimer := ctx.Value(contextKeyPerfTimer).(*PerfTimer)
+	return perfTimer
+}
+
+func WithTimer(ctx context.Context) context.Context {
+	return context.WithValue(ctx, contextKeyPerfTimer, NewPerfTimer())
 }

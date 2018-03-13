@@ -17,6 +17,7 @@
 package core
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"io/ioutil"
 	"math/big"
@@ -40,16 +41,20 @@ func BenchmarkInsertChain_empty_diskdb(b *testing.B) {
 	benchInsertChain(b, true, nil)
 }
 func BenchmarkInsertChain_valueTx_memdb(b *testing.B) {
-	benchInsertChain(b, false, genValueTx(0))
+	ctx := context.Background()
+	benchInsertChain(b, false, genValueTx(ctx, 0))
 }
 func BenchmarkInsertChain_valueTx_diskdb(b *testing.B) {
-	benchInsertChain(b, true, genValueTx(0))
+	ctx := context.Background()
+	benchInsertChain(b, true, genValueTx(ctx, 0))
 }
 func BenchmarkInsertChain_valueTx_100kB_memdb(b *testing.B) {
-	benchInsertChain(b, false, genValueTx(100*1024))
+	ctx := context.Background()
+	benchInsertChain(b, false, genValueTx(ctx, 100*1024))
 }
 func BenchmarkInsertChain_valueTx_100kB_diskdb(b *testing.B) {
-	benchInsertChain(b, true, genValueTx(100*1024))
+	ctx := context.Background()
+	benchInsertChain(b, true, genValueTx(ctx, 100*1024))
 }
 func BenchmarkInsertChain_uncles_memdb(b *testing.B) {
 	benchInsertChain(b, false, genUncles)
@@ -58,16 +63,20 @@ func BenchmarkInsertChain_uncles_diskdb(b *testing.B) {
 	benchInsertChain(b, true, genUncles)
 }
 func BenchmarkInsertChain_ring200_memdb(b *testing.B) {
-	benchInsertChain(b, false, genTxRing(200))
+	ctx := context.Background()
+	benchInsertChain(b, false, genTxRing(ctx, 200))
 }
 func BenchmarkInsertChain_ring200_diskdb(b *testing.B) {
-	benchInsertChain(b, true, genTxRing(200))
+	ctx := context.Background()
+	benchInsertChain(b, true, genTxRing(ctx, 200))
 }
 func BenchmarkInsertChain_ring1000_memdb(b *testing.B) {
-	benchInsertChain(b, false, genTxRing(1000))
+	ctx := context.Background()
+	benchInsertChain(b, false, genTxRing(ctx, 1000))
 }
 func BenchmarkInsertChain_ring1000_diskdb(b *testing.B) {
-	benchInsertChain(b, true, genTxRing(1000))
+	ctx := context.Background()
+	benchInsertChain(b, true, genTxRing(ctx, 1000))
 }
 
 var (
@@ -80,13 +89,13 @@ var (
 // genValueTx returns a block generator that includes a single
 // value-transfer transaction with n bytes of extra data in each
 // block.
-func genValueTx(nbytes int) func(int, *BlockGen) {
+func genValueTx(ctx context.Context, nbytes int) func(int, *BlockGen) {
 	return func(i int, gen *BlockGen) {
 		toaddr := common.Address{}
 		data := make([]byte, nbytes)
 		gas, _ := IntrinsicGas(data, false, false)
 		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(benchRootAddr), toaddr, big.NewInt(1), gas, nil, data), types.HomesteadSigner{}, benchRootKey)
-		gen.AddTx(tx)
+		gen.AddTx(ctx, tx)
 	}
 }
 
@@ -107,7 +116,7 @@ func init() {
 // genTxRing returns a block generator that sends ether in a ring
 // among n accounts. This is creates n entries in the state database
 // and fills the blocks with many small transactions.
-func genTxRing(naccounts int) func(int, *BlockGen) {
+func genTxRing(ctx context.Context, naccounts int) func(int, *BlockGen) {
 	from := 0
 	return func(i int, gen *BlockGen) {
 		gas := CalcGasLimit(gen.PrevBlock(i - 1))
@@ -126,7 +135,7 @@ func genTxRing(naccounts int) func(int, *BlockGen) {
 				nil,
 			)
 			tx, _ = types.SignTx(tx, types.HomesteadSigner{}, ringKeys[from])
-			gen.AddTx(tx)
+			gen.AddTx(ctx, tx)
 			from = to
 		}
 	}
@@ -145,6 +154,7 @@ func genUncles(i int, gen *BlockGen) {
 }
 
 func benchInsertChain(b *testing.B, disk bool, gen func(int, *BlockGen)) {
+	ctx := context.Background()
 	// Create the database in memory or in a temporary directory.
 	var db ethdb.Database
 	if !disk {
@@ -169,15 +179,15 @@ func benchInsertChain(b *testing.B, disk bool, gen func(int, *BlockGen)) {
 		Alloc:  GenesisAlloc{benchRootAddr: {Balance: benchRootFunds}},
 	}
 	genesis := gspec.MustCommit(db)
-	chain, _ := GenerateChain(gspec.Config, genesis, ethash.NewFaker(), db, b.N, gen)
+	chain, _ := GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), db, b.N, gen)
 
 	// Time the insertion of the new chain.
 	// State and blocks are stored in the same DB.
-	chainman, _ := NewBlockChain(db, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
+	chainman, _ := NewBlockChain(ctx, db, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
 	defer chainman.Stop()
 	b.ReportAllocs()
 	b.ResetTimer()
-	if i, err := chainman.InsertChain(chain); err != nil {
+	if i, err := chainman.InsertChain(ctx, chain); err != nil {
 		b.Fatalf("insert error (block %d): %v\n", i, err)
 	}
 }
@@ -262,6 +272,7 @@ func benchWriteChain(b *testing.B, full bool, count uint64) {
 }
 
 func benchReadChain(b *testing.B, full bool, count uint64) {
+	ctx := context.Background()
 	dir, err := ioutil.TempDir("", "eth-chain-bench")
 	if err != nil {
 		b.Fatalf("cannot create temporary directory: %v", err)
@@ -283,7 +294,7 @@ func benchReadChain(b *testing.B, full bool, count uint64) {
 		if err != nil {
 			b.Fatalf("error opening database at %v: %v", dir, err)
 		}
-		chain, err := NewBlockChain(db, nil, params.TestChainConfig, ethash.NewFaker(), vm.Config{})
+		chain, err := NewBlockChain(ctx, db, nil, params.TestChainConfig, ethash.NewFaker(), vm.Config{})
 		if err != nil {
 			b.Fatalf("error creating chain: %v", err)
 		}

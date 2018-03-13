@@ -1,10 +1,13 @@
 package core
 
 import (
+	"context"
 	"log"
 	"math/big"
 	"testing"
 	"time"
+
+	"github.com/gochain-io/gochain/common/perfutils"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/state"
@@ -57,6 +60,8 @@ func BenchmarkStateProcessor_Process(b *testing.B) {
 }
 
 func TestStateProcessor(b *testing.T) {
+	ctx := context.Background()
+	ctx = perfutils.WithTimer(ctx)
 	start := time.Now()
 	key, _ := crypto.GenerateKey()
 	address := crypto.PubkeyToAddress(key.PublicKey)
@@ -69,7 +74,7 @@ func TestStateProcessor(b *testing.T) {
 	}
 	signer := types.NewEIP155Signer(genesis.Config.ChainId)
 
-	bc := newTestBlockChainWithGenesis(true, true, genesis)
+	bc := newTestBlockChainWithGenesis(ctx, true, true, genesis)
 	log.Printf("newTestBlockchain duration: %s", time.Since(start))
 	defer bc.Stop()
 	cfg := vm.Config{}
@@ -101,7 +106,7 @@ func TestStateProcessor(b *testing.T) {
 		b.Fatal(err)
 	}
 	start = time.Now()
-	_, _, _, err = bc.Processor().Process(block, statedb, cfg)
+	_, _, _, err = bc.Processor().Process(ctx, block, statedb, cfg)
 	if err != nil {
 		b.Fatal(err)
 	}
