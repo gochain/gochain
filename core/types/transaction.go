@@ -227,6 +227,15 @@ func (tx *Transaction) Size() common.StorageSize {
 //
 // XXX Rename message to something less arbitrary?
 func (tx *Transaction) AsMessage(ctx context.Context, s Signer) (Message, error) {
+	from, err := Sender(ctx, s, tx)
+	if err != nil {
+		return Message{}, err
+	}
+	msg := tx.AsMessageWithSender(ctx, s, from)
+	return msg, nil
+}
+
+func (tx *Transaction) AsMessageWithSender(ctx context.Context, s Signer, from common.Address) Message {
 	msg := Message{
 		nonce:      tx.data.AccountNonce,
 		gasLimit:   tx.data.GasLimit,
@@ -235,11 +244,9 @@ func (tx *Transaction) AsMessage(ctx context.Context, s Signer) (Message, error)
 		amount:     tx.data.Amount,
 		data:       tx.data.Payload,
 		checkNonce: true,
+		from:       from,
 	}
-
-	var err error
-	msg.from, err = Sender(ctx, s, tx)
-	return msg, err
+	return msg
 }
 
 // WithSignature returns a new transaction with the given signature.

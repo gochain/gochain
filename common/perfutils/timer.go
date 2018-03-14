@@ -5,12 +5,14 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 )
 
 func NewPerfTimer() PerfTimer {
 	return &PerfTimerNormal{
-		Sections: map[string]*PerfSectionNormal{},
+		// Sections: map[string]*PerfSectionNormal{},
+
 	}
 }
 
@@ -24,16 +26,22 @@ type PerfTimer interface {
 
 // PerfTimerNormal great name huh?
 type PerfTimerNormal struct {
-	Sections map[string]*PerfSectionNormal
+	// Sections map[string]*PerfSectionNormal
+	Sections sync.Map
 }
 
 func (pt *PerfTimerNormal) Start(sectionName string) PerfSection {
-	ps := pt.Sections[sectionName]
-	if ps == nil {
+	// ps := pt.Sections[sectionName]
+	var ps *PerfSectionNormal
+	psl, _ := pt.Sections.Load(sectionName)
+	if psl == nil {
 		ps = &PerfSectionNormal{
 			name: sectionName,
 		}
-		pt.Sections[sectionName] = ps
+		// pt.Sections[sectionName] = ps
+		pt.Sections.Store(sectionName, ps)
+	} else {
+		ps = psl.(*PerfSectionNormal)
 	}
 	ps.startTime = time.Now()
 	return ps
@@ -44,15 +52,17 @@ func (pt *PerfTimerNormal) Print() {
 func (pt *PerfTimerNormal) Fprint(w io.Writer) {
 	// fmt.Fprint(w, pt.Sections)
 	// totalDuration := time.Duration(0) // doesn't make sense unless we have subsections or something
-	for k, v := range pt.Sections {
-		w.Write([]byte(k))
+	// for k, v := range pt.Sections {
+	pt.Sections.Range(func(k, v interface{}) bool {
+		w.Write([]byte(k.(string)))
 		w.Write([]byte(": "))
-		w.Write([]byte(strconv.FormatInt(v.count, 10)))
+		w.Write([]byte(strconv.FormatInt(v.(*PerfSectionNormal).count, 10)))
 		w.Write([]byte(" times, "))
-		w.Write([]byte(v.totalDuration.String()))
+		w.Write([]byte(v.(*PerfSectionNormal).totalDuration.String()))
 		w.Write([]byte("\n"))
 		// totalDuration += v.TotalDuration
-	}
+		return true
+	})
 	// w.Write([]byte("TOTAL Duration: "))
 	// w.Write([]byte(totalDuration.String()))
 	// w.Write([]byte("\n"))

@@ -85,6 +85,7 @@ func (p *StateProcessor) Process(ctx context.Context, block *types.Block, stated
 	}
 
 	intPool := vm.NewIntPool()
+
 	// Iterate over and process the individual transactions
 	for i, tx := range txs {
 		ps := perfTimer.Start("statedb.Prepare")
@@ -101,7 +102,6 @@ func (p *StateProcessor) Process(ctx context.Context, block *types.Block, stated
 	}
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
 	_ = p.engine.Finalize(p.bc, header, statedb, block.Transactions(), block.Uncles(), receipts, false)
-	perfTimer.Print()
 
 	return receipts, allLogs, *usedGas, nil
 }
@@ -118,6 +118,7 @@ func ApplyTransaction(ctx context.Context, config *params.ChainConfig, bc *Block
 		return nil, 0, err
 	}
 	ps.Stop()
+
 	// Create a new context to be used in the EVM environment
 	ps = perfTimer.Start("NewEVMContext")
 	context := NewEVMContext(msg, header, bc, author)
