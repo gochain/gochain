@@ -74,7 +74,6 @@ func SignTx(tx *Transaction, s Signer, prv *ecdsa.PrivateKey) (*Transaction, err
 // not match the signer used in the current call.
 func Sender(ctx context.Context, signer Signer, tx *Transaction) (common.Address, error) {
 	perfTimer := perfutils.GetTimer(ctx)
-	ps := perfTimer.Start("tx.from.Load")
 	if sc := tx.from.Load(); sc != nil {
 		sigCache := sc.(sigCache)
 		// If the signer used to derive from in a previous
@@ -84,17 +83,14 @@ func Sender(ctx context.Context, signer Signer, tx *Transaction) (common.Address
 			return sigCache.from, nil
 		}
 	}
-	ps.Stop()
 
-	ps = perfTimer.Start("signer.Sender")
+	ps := perfTimer.Start("signer.Sender")
 	addr, err := signer.Sender(tx)
 	if err != nil {
 		return common.Address{}, err
 	}
 	ps.Stop()
-	ps = perfTimer.Start("tx.from.Store")
 	tx.from.Store(sigCache{signer: signer, from: addr})
-	ps.Stop()
 	return addr, nil
 }
 

@@ -10,16 +10,13 @@ import (
 )
 
 func NewPerfTimer() PerfTimer {
-	return &PerfTimerNormal{
-		// Sections: map[string]*PerfSectionNormal{},
-
-	}
+	return &PerfTimerNormal{}
 }
 
 // PerfTimer is a way to time pieces of code, in particular ones that happen many times,
 // then get the metrics for it.
 type PerfTimer interface {
-	Start(sectionName string) PerfSection
+	Start(sectionName string) PerfRun
 	Print()
 	Fprint(w io.Writer)
 }
@@ -30,21 +27,12 @@ type PerfTimerNormal struct {
 	Sections sync.Map
 }
 
-func (pt *PerfTimerNormal) Start(sectionName string) PerfSection {
+func (pt *PerfTimerNormal) Start(sectionName string) PerfRun {
 	// ps := pt.Sections[sectionName]
 	var ps *PerfSectionNormal
-	psl, _ := pt.Sections.Load(sectionName)
-	if psl == nil {
-		ps = &PerfSectionNormal{
-			name: sectionName,
-		}
-		// pt.Sections[sectionName] = ps
-		pt.Sections.Store(sectionName, ps)
-	} else {
-		ps = psl.(*PerfSectionNormal)
-	}
-	ps.startTime = time.Now()
-	return ps
+	psl, _ := pt.Sections.LoadOrStore(sectionName, &PerfSectionNormal{name: sectionName})
+	ps = psl.(*PerfSectionNormal)
+	return &PerfRunNormal{ps: ps, startTime: time.Now()}
 }
 func (pt *PerfTimerNormal) Print() {
 	pt.Fprint(os.Stdout)
@@ -72,23 +60,25 @@ type PerfSection interface {
 	Name() string
 	TotalDuration() time.Duration
 	Count() int64
-	Stop()
 }
 
 type PerfSectionNormal struct {
 	name          string
 	totalDuration time.Duration
 	count         int64
-	startTime     time.Time
+
+	mutex sync.Mutex
+}
+
+func (ps *PerfSectionNormal) update(dur time.Duration) {
+	ps.mutex.Lock()
+	ps.totalDuration += dur
+	ps.count++
+	ps.mutex.Unlock()
 }
 
 func (ps *PerfSectionNormal) Name() string {
 	return ps.name
-}
-
-func (ps *PerfSectionNormal) Stop() {
-	ps.totalDuration += time.Since(ps.startTime)
-	ps.count += 1
 }
 
 func (ps *PerfSectionNormal) Count() int64 {
@@ -96,6 +86,19 @@ func (ps *PerfSectionNormal) Count() int64 {
 }
 func (ps *PerfSectionNormal) TotalDuration() time.Duration {
 	return ps.totalDuration
+}
+
+// PerfRun keep time for each particular run
+type PerfRun interface {
+	Stop()
+}
+type PerfRunNormal struct {
+	ps        *PerfSectionNormal
+	startTime time.Time
+}
+
+func (pr *PerfRunNormal) Stop() {
+	pr.ps.update(time.Since(pr.startTime))
 }
 
 type contextKey string
@@ -127,7 +130,7 @@ func (ps *NoopSection) TotalDuration() time.Duration {
 	return 0
 }
 
-func (t *NoopTimer) Start(sectionName string) PerfSection {
+func (t *NoopTimer) Start(sectionName string) PerfRun {
 	return t.section
 }
 func (t *NoopTimer) Print() {}
