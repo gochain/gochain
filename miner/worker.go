@@ -604,7 +604,8 @@ func (env *Work) commitTransactions(mux *event.TypeMux, txs *types.TransactionsB
 
 func (env *Work) commitTransaction(tx *types.Transaction, bc *core.BlockChain, coinbase common.Address, gp *core.GasPool, intPool *vm.IntPool) (error, []*types.Log) {
 	snap := env.state.Snapshot()
-	receipt, _, err := core.ApplyTransaction(env.config, bc, &coinbase, gp, env.state, env.header, tx, &env.header.GasUsed, vm.Config{}, intPool)
+	signer := types.MakeSigner(env.config, env.header.Number)
+	receipt, _, err := core.ApplyTransaction(env.config, bc, &coinbase, gp, env.state, env.header, tx, &env.header.GasUsed, vm.Config{}, intPool, signer)
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
 		return err, nil

@@ -17,6 +17,8 @@
 package core
 
 import (
+	"runtime"
+
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/consensus"
 	"github.com/gochain-io/gochain/consensus/misc"
@@ -32,17 +34,19 @@ import (
 //
 // StateProcessor implements Processor.
 type StateProcessor struct {
-	config *params.ChainConfig // Chain configuration options
-	bc     *BlockChain         // Canonical block chain
-	engine consensus.Engine    // Consensus engine used for block rewards
+	config     *params.ChainConfig // Chain configuration options
+	bc         *BlockChain         // Canonical block chain
+	engine     consensus.Engine    // Consensus engine used for block rewards
+	parWorkers int                 // Number of workers to spawn for parallel tasks.
 }
 
 // NewStateProcessor initialises a new StateProcessor.
 func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consensus.Engine) *StateProcessor {
 	return &StateProcessor{
-		config: config,
-		bc:     bc,
-		engine: engine,
+		config:     config,
+		bc:         bc,
+		engine:     engine,
+		parWorkers: runtime.GOMAXPROCS(0) - 1,
 	}
 }
 
@@ -66,11 +70,21 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	if p.config.DAOForkSupport && p.config.DAOForkBlock != nil && p.config.DAOForkBlock.Cmp(block.Number()) == 0 {
 		misc.ApplyDAOHardFork(statedb)
 	}
+	signer := types.MakeSigner(p.config, header.Number)
+
+	for s := 0; s < p.parWorkers; s++ {
+		go func(start int) {
+			for i := start; i < len(txs); i += p.parWorkers {
+				types.Sender(signer, txs[i])
+			}
+		}(s)
+	}
+
 	intPool := vm.NewIntPool()
 	// Iterate over and process the individual transactions
 	for i, tx := range txs {
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
-		receipt, _, err := ApplyTransaction(p.config, p.bc, nil, gp, statedb, header, tx, usedGas, cfg, intPool)
+		receipt, _, err := ApplyTransaction(p.config, p.bc, nil, gp, statedb, header, tx, usedGas, cfg, intPool, signer)
 		if err != nil {
 			return nil, nil, 0, err
 		}
@@ -87,8 +101,8 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config, intPool *vm.IntPool) (*types.Receipt, uint64, error) {
-	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number))
+func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, author *common.Address, gp *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, usedGas *uint64, cfg vm.Config, intPool *vm.IntPool, signer types.Signer) (*types.Receipt, uint64, error) {
+	msg, err := tx.AsMessage(signer)
 	if err != nil {
 		return nil, 0, err
 	}
