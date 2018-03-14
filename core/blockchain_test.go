@@ -18,8 +18,11 @@ package core
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
 	"math/big"
 	"math/rand"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -35,18 +38,41 @@ import (
 )
 
 // newTestBlockChain creates a blockchain without validation.
-func newTestBlockChain(fake bool) *BlockChain {
-	db, _ := ethdb.NewMemDatabase()
-	gspec := &Genesis{
-		Config:     params.TestChainConfig,
-		Difficulty: big.NewInt(1),
+// genesis can be nil to use default
+func newTestBlockChain(fake, disk bool) *BlockChain {
+	return newTestBlockChainWithGenesis(fake, disk, nil)
+}
+
+// newTestBlockChain creates a blockchain without validation.
+// genesis can be nil to use default
+func newTestBlockChainWithGenesis(fake, disk bool, genesis *Genesis) *BlockChain {
+	var err error
+	var db ethdb.Database
+	if disk {
+		dir, err := ioutil.TempDir("", "example")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer os.RemoveAll(dir)
+		db, err = ethdb.NewLDBDatabase(dir, 128, 1024) // todo: not sure what best values here should be
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		db, _ = ethdb.NewMemDatabase()
 	}
-	gspec.MustCommit(db)
+	if genesis == nil {
+		genesis = &Genesis{
+			Config:     params.TestChainConfig,
+			Difficulty: big.NewInt(1),
+		}
+	}
+	genesis.MustCommit(db)
 	engine := ethash.NewFullFaker()
 	if !fake {
 		engine = ethash.NewTester()
 	}
-	blockchain, err := NewBlockChain(db, nil, gspec.Config, engine, vm.Config{})
+	blockchain, err := NewBlockChain(db, nil, genesis.Config, engine, vm.Config{})
 	if err != nil {
 		panic(err)
 	}
@@ -183,7 +209,7 @@ func insertChain(done chan bool, blockchain *BlockChain, chain types.Blocks, t *
 }
 
 func TestLastBlock(t *testing.T) {
-	bchain := newTestBlockChain(false)
+	bchain := newTestBlockChain(false, false)
 	defer bchain.Stop()
 
 	block := makeBlockChain(bchain.CurrentBlock(), 1, ethash.NewFaker(), bchain.db, 0)[0]
@@ -398,7 +424,7 @@ func testReorgShort(t *testing.T, full bool) {
 }
 
 func testReorg(t *testing.T, first, second []int, td int64, full bool) {
-	bc := newTestBlockChain(true)
+	bc := newTestBlockChain(true, false)
 	defer bc.Stop()
 
 	// Insert an easy and a difficult chain afterwards
@@ -443,7 +469,7 @@ func TestBadHeaderHashes(t *testing.T) { testBadHashes(t, false) }
 func TestBadBlockHashes(t *testing.T)  { testBadHashes(t, true) }
 
 func testBadHashes(t *testing.T, full bool) {
-	bc := newTestBlockChain(true)
+	bc := newTestBlockChain(true, false)
 	defer bc.Stop()
 
 	// Create a chain, ban a hash and try to import
@@ -468,7 +494,7 @@ func TestReorgBadHeaderHashes(t *testing.T) { testReorgBadHashes(t, false) }
 func TestReorgBadBlockHashes(t *testing.T)  { testReorgBadHashes(t, true) }
 
 func testReorgBadHashes(t *testing.T, full bool) {
-	bc := newTestBlockChain(true)
+	bc := newTestBlockChain(true, false)
 	defer bc.Stop()
 
 	// Create a chain, import and ban afterwards
@@ -858,7 +884,6 @@ func TestChainTxReorgs(t *testing.T) {
 }
 
 func TestLogReorgs(t *testing.T) {
-
 	var (
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
@@ -989,7 +1014,7 @@ done:
 
 // Tests if the canonical block can be fetched from the database during chain insertion.
 func TestCanonicalBlockRetrieval(t *testing.T) {
-	bc := newTestBlockChain(true)
+	bc := newTestBlockChain(true, false)
 	defer bc.Stop()
 
 	chain, _ := GenerateChain(bc.chainConfig, bc.genesisBlock, ethash.NewFaker(), bc.db, 10, func(i int, gen *BlockGen) {})
