@@ -346,7 +346,7 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction) error
 
 	// Validate the transaction sender and it's sig. Throw
 	// if the from fields is invalid.
-	if from, err = types.Sender(pool.signer, tx); err != nil {
+	if from, err = types.Sender(ctx, pool.signer, tx); err != nil {
 		return core.ErrInvalidSender
 	}
 	// Last but not least check for nonce errors
@@ -404,7 +404,7 @@ func (self *TxPool) add(ctx context.Context, tx *types.Transaction) error {
 
 		nonce := tx.Nonce() + 1
 
-		addr, _ := types.Sender(self.signer, tx)
+		addr, _ := types.Sender(ctx, self.signer, tx)
 		if nonce > self.nonce[addr] {
 			self.nonce[addr] = nonce
 		}
@@ -416,7 +416,7 @@ func (self *TxPool) add(ctx context.Context, tx *types.Transaction) error {
 	}
 
 	// Print a log message if low enough level is set
-	log.Debug("Pooled new transaction", "hash", hash, "from", log.Lazy{Fn: func() common.Address { from, _ := types.Sender(self.signer, tx); return from }}, "to", tx.To())
+	log.Debug("Pooled new transaction", "hash", hash, "from", log.Lazy{Fn: func() common.Address { from, _ := types.Sender(ctx, self.signer, tx); return from }}, "to", tx.To())
 	return nil
 }
 
@@ -485,14 +485,14 @@ func (self *TxPool) GetTransactions() types.Transactions {
 
 // Content retrieves the data content of the transaction pool, returning all the
 // pending as well as queued transactions, grouped by account and nonce.
-func (self *TxPool) Content() (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
+func (self *TxPool) Content(ctx context.Context) (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
 	self.mu.RLock()
 	defer self.mu.RUnlock()
 
 	// Retrieve all the pending transactions and sort by account and by nonce
 	pending := make(map[common.Address]types.Transactions)
 	for _, tx := range self.pending {
-		account, _ := types.Sender(self.signer, tx)
+		account, _ := types.Sender(ctx, self.signer, tx)
 		pending[account] = append(pending[account], tx)
 	}
 	// There are no queued transactions in a light pool, just return an empty map

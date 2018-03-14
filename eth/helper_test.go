@@ -20,6 +20,7 @@
 package eth
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"math/big"
@@ -49,7 +50,7 @@ var (
 // newTestProtocolManager creates a new protocol manager for testing purposes,
 // with the given number of blocks already known, and potential notification
 // channels for different events.
-func newTestProtocolManager(mode downloader.SyncMode, blocks int, generator func(int, *core.BlockGen), newtx chan<- []*types.Transaction) (*ProtocolManager, *ethdb.MemDatabase, error) {
+func newTestProtocolManager(ctx context.Context, mode downloader.SyncMode, blocks int, generator func(context.Context, int, *core.BlockGen), newtx chan<- []*types.Transaction) (*ProtocolManager, *ethdb.MemDatabase, error) {
 	var (
 		evmux  = new(event.TypeMux)
 		engine = ethash.NewFaker()
@@ -59,18 +60,18 @@ func newTestProtocolManager(mode downloader.SyncMode, blocks int, generator func
 			Alloc:  core.GenesisAlloc{testBank: {Balance: big.NewInt(1000000)}},
 		}
 		genesis       = gspec.MustCommit(db)
-		blockchain, _ = core.NewBlockChain(db, nil, gspec.Config, engine, vm.Config{})
+		blockchain, _ = core.NewBlockChain(ctx, db, nil, gspec.Config, engine, vm.Config{})
 	)
-	chain, _ := core.GenerateChain(gspec.Config, genesis, ethash.NewFaker(), db, blocks, generator)
-	if _, err := blockchain.InsertChain(chain); err != nil {
+	chain, _ := core.GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), db, blocks, generator)
+	if _, err := blockchain.InsertChain(ctx, chain); err != nil {
 		panic(err)
 	}
 
-	pm, err := NewProtocolManager(gspec.Config, mode, DefaultConfig.NetworkId, evmux, &testTxPool{added: newtx}, engine, blockchain, db)
+	pm, err := NewProtocolManager(ctx, gspec.Config, mode, DefaultConfig.NetworkId, evmux, &testTxPool{added: newtx}, engine, blockchain, db)
 	if err != nil {
 		return nil, nil, err
 	}
-	pm.Start(1000)
+	pm.Start(ctx, 1000)
 	return pm, db, nil
 }
 
@@ -78,8 +79,8 @@ func newTestProtocolManager(mode downloader.SyncMode, blocks int, generator func
 // with the given number of blocks already known, and potential notification
 // channels for different events. In case of an error, the constructor force-
 // fails the test.
-func newTestProtocolManagerMust(t *testing.T, mode downloader.SyncMode, blocks int, generator func(int, *core.BlockGen), newtx chan<- []*types.Transaction) (*ProtocolManager, *ethdb.MemDatabase) {
-	pm, db, err := newTestProtocolManager(mode, blocks, generator, newtx)
+func newTestProtocolManagerMust(ctx context.Context, t *testing.T, mode downloader.SyncMode, blocks int, generator func(context.Context, int, *core.BlockGen), newtx chan<- []*types.Transaction) (*ProtocolManager, *ethdb.MemDatabase) {
+	pm, db, err := newTestProtocolManager(ctx, mode, blocks, generator, newtx)
 	if err != nil {
 		t.Fatalf("Failed to create protocol manager: %v", err)
 	}
@@ -97,7 +98,7 @@ type testTxPool struct {
 
 // AddRemotes appends a batch of transactions to the pool, and notifies any
 // listeners if the addition channel is non nil
-func (p *testTxPool) AddRemotes(txs []*types.Transaction) []error {
+func (p *testTxPool) AddRemotes(ctx context.Context, txs []*types.Transaction) []error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -109,13 +110,13 @@ func (p *testTxPool) AddRemotes(txs []*types.Transaction) []error {
 }
 
 // Pending returns all the transactions known to the pool
-func (p *testTxPool) Pending() map[common.Address]types.Transactions {
+func (p *testTxPool) Pending(ctx context.Context) map[common.Address]types.Transactions {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	batches := make(map[common.Address]types.Transactions)
 	for _, tx := range p.pool {
-		from, _ := types.Sender(types.HomesteadSigner{}, tx)
+		from, _ := types.Sender(ctx, types.HomesteadSigner{}, tx)
 		batches[from] = append(batches[from], tx)
 	}
 	for _, batch := range batches {
@@ -124,9 +125,9 @@ func (p *testTxPool) Pending() map[common.Address]types.Transactions {
 	return batches
 }
 
-func (p *testTxPool) PendingList() types.Transactions {
+func (p *testTxPool) PendingList(ctx context.Context) types.Transactions {
 	var pending types.Transactions
-	for _, txs := range p.Pending() {
+	for _, txs := range p.Pending(ctx) {
 		pending = append(pending, txs...)
 	}
 	return pending
@@ -151,7 +152,7 @@ type testPeer struct {
 }
 
 // newTestPeer creates a new peer registered at the given protocol manager.
-func newTestPeer(name string, version int, pm *ProtocolManager, shake bool) (*testPeer, <-chan error) {
+func newTestPeer(ctx context.Context, name string, version int, pm *ProtocolManager, shake bool) (*testPeer, <-chan error) {
 	// Create a message pipe to communicate through
 	app, net := p2p.MsgPipe()
 
@@ -166,7 +167,7 @@ func newTestPeer(name string, version int, pm *ProtocolManager, shake bool) (*te
 	go func() {
 		select {
 		case pm.newPeerCh <- peer:
-			errc <- pm.handle(peer)
+			errc <- pm.handle(ctx, peer)
 		case <-pm.quitSync:
 			errc <- p2p.DiscQuitting
 		}

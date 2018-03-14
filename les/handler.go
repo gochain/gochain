@@ -18,6 +18,7 @@
 package les
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -87,8 +88,8 @@ type BlockChain interface {
 }
 
 type txPool interface {
-	AddRemotes(txs []*types.Transaction) []error
-	Status(hashes []common.Hash) []core.TxStatus
+	AddRemotes(ctx context.Context, txs []*types.Transaction) []error
+	Status(ctx context.Context, hashes []common.Hash) []core.TxStatus
 }
 
 type ProtocolManager struct {
@@ -127,7 +128,7 @@ type ProtocolManager struct {
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
 // with the ethereum network.
-func NewProtocolManager(chainConfig *params.ChainConfig, lightSync bool, protocolVersions []uint, networkId uint64, mux *event.TypeMux, engine consensus.Engine, peers *peerSet, blockchain BlockChain, txpool txPool, chainDb ethdb.Database, odr *LesOdr, txrelay *LesTxRelay, quitSync chan struct{}, wg *sync.WaitGroup) (*ProtocolManager, error) {
+func NewProtocolManager(ctx context.Context, chainConfig *params.ChainConfig, lightSync bool, protocolVersions []uint, networkId uint64, mux *event.TypeMux, engine consensus.Engine, peers *peerSet, blockchain BlockChain, txpool txPool, chainDb ethdb.Database, odr *LesOdr, txrelay *LesTxRelay, quitSync chan struct{}, wg *sync.WaitGroup) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		lightSync:   lightSync,
@@ -171,7 +172,7 @@ func NewProtocolManager(chainConfig *params.ChainConfig, lightSync bool, protoco
 				case manager.newPeerCh <- peer:
 					manager.wg.Add(1)
 					defer manager.wg.Done()
-					err := manager.handle(peer)
+					err := manager.handle(ctx, peer)
 					if entry != nil {
 						manager.serverPool.disconnect(entry)
 					}
@@ -259,7 +260,7 @@ func (pm *ProtocolManager) newPeer(pv int, nv uint64, p *p2p.Peer, rw p2p.MsgRea
 
 // handle is the callback invoked to manage the life cycle of a les peer. When
 // this function terminates, the peer is disconnected.
-func (pm *ProtocolManager) handle(p *peer) error {
+func (pm *ProtocolManager) handle(ctx context.Context, p *peer) error {
 	if pm.peers.Len() >= pm.maxPeers {
 		return p2p.DiscTooManyPeers
 	}
@@ -322,7 +323,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 
 	// main loop. handle incoming messages.
 	for {
-		if err := pm.handleMsg(p); err != nil {
+		if err := pm.handleMsg(ctx, p); err != nil {
 			p.Log().Debug("Light Ethereum message handling failed", "err", err)
 			return err
 		}
@@ -333,7 +334,7 @@ var reqList = []uint64{GetBlockHeadersMsg, GetBlockBodiesMsg, GetCodeMsg, GetRec
 
 // handleMsg is invoked whenever an inbound message is received from a remote
 // peer. The remote connection is torn down upon returning any error.
-func (pm *ProtocolManager) handleMsg(p *peer) error {
+func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 	// Read the next message from the remote peer, and ensure it's fully consumed
 	msg, err := p.rw.ReadMsg()
 	if err != nil {
@@ -996,7 +997,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if reject(uint64(reqCnt), MaxTxSend) {
 			return errResp(ErrRequestRejected, "")
 		}
-		pm.txpool.AddRemotes(txs)
+		pm.txpool.AddRemotes(ctx, txs)
 
 		_, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
 		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
@@ -1022,14 +1023,14 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		for i, tx := range req.Txs {
 			hashes[i] = tx.Hash()
 		}
-		stats := pm.txStatus(hashes)
+		stats := pm.txStatus(ctx, hashes)
 		for i, stat := range stats {
 			if stat.Status == core.TxStatusUnknown {
-				if errs := pm.txpool.AddRemotes([]*types.Transaction{req.Txs[i]}); len(errs) > 0 {
+				if errs := pm.txpool.AddRemotes(ctx, []*types.Transaction{req.Txs[i]}); len(errs) > 0 {
 					stats[i].Error = errs[0].Error()
 					continue
 				}
-				stats[i] = pm.txStatus([]common.Hash{hashes[i]})[0]
+				stats[i] = pm.txStatus(ctx, []common.Hash{hashes[i]})[0]
 			}
 		}
 
@@ -1057,7 +1058,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
 		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
 
-		return p.SendTxStatus(req.ReqID, bv, pm.txStatus(req.Hashes))
+		return p.SendTxStatus(req.ReqID, bv, pm.txStatus(ctx, req.Hashes))
 
 	case TxStatusMsg:
 		if pm.odr == nil {
@@ -1133,9 +1134,9 @@ func (pm *ProtocolManager) getHelperTrieAuxData(req HelperTrieReq) []byte {
 	return nil
 }
 
-func (pm *ProtocolManager) txStatus(hashes []common.Hash) []txStatus {
+func (pm *ProtocolManager) txStatus(ctx context.Context, hashes []common.Hash) []txStatus {
 	stats := make([]txStatus, len(hashes))
-	for i, stat := range pm.txpool.Status(hashes) {
+	for i, stat := range pm.txpool.Status(ctx, hashes) {
 		// Save the status we've got from the transaction pool
 		stats[i].Status = stat
 

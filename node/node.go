@@ -17,6 +17,7 @@
 package node
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -135,7 +136,7 @@ func (n *Node) Register(constructor ServiceConstructor) error {
 }
 
 // Start create a live P2P node and starts running it.
-func (n *Node) Start() error {
+func (n *Node) Start(ctx context.Context) error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
@@ -200,7 +201,7 @@ func (n *Node) Start() error {
 	started := []reflect.Type{}
 	for kind, service := range services {
 		// Start the next service, stopping all previous upon failure
-		if err := service.Start(running); err != nil {
+		if err := service.Start(ctx, running); err != nil {
 			for _, kind := range started {
 				services[kind].Stop()
 			}
@@ -541,11 +542,11 @@ func (n *Node) Wait() {
 
 // Restart terminates a running node and boots up a new one in its place. If the
 // node isn't running, an error is returned.
-func (n *Node) Restart() error {
+func (n *Node) Restart(ctx context.Context) error {
 	if err := n.Stop(); err != nil {
 		return err
 	}
-	if err := n.Start(); err != nil {
+	if err := n.Start(ctx); err != nil {
 		return err
 	}
 	return nil

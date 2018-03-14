@@ -76,6 +76,7 @@ func tfCodeAccess(db ethdb.Database, bhash common.Hash, number uint64) light.Odr
 }
 
 func testAccess(t *testing.T, protocol int, fn accessTestFn) {
+	ctx := context.Background()
 	// Assemble the test environment
 	peers := newPeerSet()
 	dist := newRequestDistributor(peers, make(chan struct{}))
@@ -84,9 +85,9 @@ func testAccess(t *testing.T, protocol int, fn accessTestFn) {
 	ldb, _ := ethdb.NewMemDatabase()
 	odr := NewLesOdr(ldb, light.NewChtIndexer(db, true), light.NewBloomTrieIndexer(db, true), eth.NewBloomIndexer(db, light.BloomTrieFrequency), rm)
 
-	pm := newTestProtocolManagerMust(t, false, 4, testChainGen, nil, nil, db)
-	lpm := newTestProtocolManagerMust(t, true, 0, nil, peers, odr, ldb)
-	_, err1, lpeer, err2 := newTestPeerPair("peer", protocol, pm, lpm)
+	pm := newTestProtocolManagerMust(ctx, t, false, 4, testChainGen, nil, nil, db)
+	lpm := newTestProtocolManagerMust(ctx, t, true, 0, nil, peers, odr, ldb)
+	_, err1, lpeer, err2 := newTestPeerPair(ctx, "peer", protocol, pm, lpm)
 	select {
 	case <-time.After(time.Millisecond * 100):
 	case err := <-err1:

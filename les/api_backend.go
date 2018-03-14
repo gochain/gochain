@@ -121,8 +121,8 @@ func (b *LesApiBackend) Stats() (pending int, queued int) {
 	return b.eth.txPool.Stats(), 0
 }
 
-func (b *LesApiBackend) TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
-	return b.eth.txPool.Content()
+func (b *LesApiBackend) TxPoolContent(ctx context.Context) (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
+	return b.eth.txPool.Content(ctx)
 }
 
 func (b *LesApiBackend) SubscribeTxPreEvent(ch chan<- core.TxPreEvent) event.Subscription {

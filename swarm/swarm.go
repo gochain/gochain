@@ -167,7 +167,7 @@ Start is called when the stack is started
 * TODO: start subservices like sword, swear, swarmdns
 */
 // implements the node.Service interface
-func (self *Swarm) Start(srv *p2p.Server) error {
+func (self *Swarm) Start(ctx context.Context, srv *p2p.Server) error {
 	connectPeer := func(url string) error {
 		node, err := discover.ParseNode(url)
 		if err != nil {

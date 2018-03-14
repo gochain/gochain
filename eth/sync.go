@@ -17,6 +17,7 @@
 package eth
 
 import (
+	"context"
 	"math/rand"
 	"sync/atomic"
 	"time"
@@ -44,7 +45,8 @@ type txsync struct {
 
 // syncTransactions starts sending all currently pending transactions to the given peer.
 func (pm *ProtocolManager) syncTransactions(p *peer) {
-	txs := pm.txpool.PendingList()
+	ctx := context.TODO()
+	txs := pm.txpool.PendingList(ctx)
 	if len(txs) == 0 {
 		return
 	}
@@ -127,7 +129,7 @@ func (pm *ProtocolManager) txsyncLoop() {
 
 // syncer is responsible for periodically synchronising with the network, both
 // downloading hashes and blocks as well as handling the announcement handler.
-func (pm *ProtocolManager) syncer() {
+func (pm *ProtocolManager) syncer(ctx context.Context) {
 	// Start and ensure cleanup of sync mechanisms
 	pm.fetcher.Start()
 	defer pm.fetcher.Stop()
@@ -144,11 +146,11 @@ func (pm *ProtocolManager) syncer() {
 			if pm.peers.Len() < minDesiredPeerCount {
 				break
 			}
-			go pm.synchronise(pm.peers.BestPeer())
+			go pm.synchronise(ctx, pm.peers.BestPeer())
 
 		case <-forceSync.C:
 			// Force a sync even if not enough peers are present
-			go pm.synchronise(pm.peers.BestPeer())
+			go pm.synchronise(ctx, pm.peers.BestPeer())
 
 		case <-pm.noMorePeers:
 			return
@@ -157,7 +159,7 @@ func (pm *ProtocolManager) syncer() {
 }
 
 // synchronise tries to sync up our local block chain with a remote peer.
-func (pm *ProtocolManager) synchronise(peer *peer) {
+func (pm *ProtocolManager) synchronise(ctx context.Context, peer *peer) {
 	// Short circuit if no peers are available
 	if peer == nil {
 		return
@@ -185,7 +187,7 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 		mode = downloader.FastSync
 	}
 	// Run the sync cycle, and disable fast sync if we've went past the pivot block
-	if err := pm.downloader.Synchronise(peer.id, pHead, pTd, mode); err != nil {
+	if err := pm.downloader.Synchronise(ctx, peer.id, pHead, pTd, mode); err != nil {
 		return
 	}
 	if atomic.LoadUint32(&pm.fastSync) == 1 {

@@ -52,7 +52,7 @@ func ExampleGenerateChain() {
 	// each block and adds different features to gen based on the
 	// block index.
 	signer := types.HomesteadSigner{}
-	chain, _ := GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), db, 5, func(i int, gen *BlockGen) {
+	chain, _ := GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), db, 5, func(ctx context.Context, i int, gen *BlockGen) {
 		switch i {
 		case 0:
 			// In block 1, addr1 sends addr2 some ether.

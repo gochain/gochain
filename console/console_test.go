@@ -18,6 +18,7 @@ package console
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -84,6 +85,7 @@ type tester struct {
 // newTester creates a test environment based on which the console can operate.
 // Please ensure you call Close() on the returned tester to avoid leaks.
 func newTester(t *testing.T, confOverride func(*eth.Config)) *tester {
+	ctx := context.Background()
 	// Create a temporary storage for the node keys and initialize it
 	workspace, err := ioutil.TempDir("", "console-tester-")
 	if err != nil {
@@ -105,11 +107,11 @@ func newTester(t *testing.T, confOverride func(*eth.Config)) *tester {
 	if confOverride != nil {
 		confOverride(ethConf)
 	}
-	if err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) { return eth.New(ctx, ethConf) }); err != nil {
+	if err = stack.Register(func(sctx *node.ServiceContext) (node.Service, error) { return eth.New(ctx, sctx, ethConf) }); err != nil {
 		t.Fatalf("failed to register Ethereum protocol: %v", err)
 	}
 	// Start the node and assemble the JavaScript console around it
-	if err = stack.Start(); err != nil {
+	if err = stack.Start(ctx); err != nil {
 		t.Fatalf("failed to start test stack: %v", err)
 	}
 	client, err := stack.Attach()

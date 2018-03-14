@@ -20,6 +20,7 @@
 package geth
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -149,8 +150,9 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 		ethConf.SyncMode = downloader.LightSync
 		ethConf.NetworkId = uint64(config.EthereumNetworkID)
 		ethConf.DatabaseCache = config.EthereumDatabaseCache
-		if err := rawStack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-			return les.New(ctx, &ethConf)
+		if err := rawStack.Register(func(sctx *node.ServiceContext) (node.Service, error) {
+			ctx := context.TODO()
+			return les.New(ctx, sctx, &ethConf)
 		}); err != nil {
 			return nil, fmt.Errorf("ethereum init: %v", err)
 		}
@@ -179,7 +181,8 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 
 // Start creates a live P2P node and starts running it.
 func (n *Node) Start() error {
-	return n.node.Start()
+	ctx := context.TODO()
+	return n.node.Start(ctx)
 }
 
 // Stop terminates a running node along with all it's services. In the node was

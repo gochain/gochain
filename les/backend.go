@@ -18,6 +18,7 @@
 package les
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -79,8 +80,8 @@ type LightEthereum struct {
 	wg sync.WaitGroup
 }
 
-func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
-	chainDb, err := eth.CreateDB(ctx, config, "lightchaindata")
+func New(ctx context.Context, sctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
+	chainDb, err := eth.CreateDB(sctx, config, "lightchaindata")
 	if err != nil {
 		return nil, err
 	}
@@ -97,11 +98,11 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 		config:           config,
 		chainConfig:      chainConfig,
 		chainDb:          chainDb,
-		eventMux:         ctx.EventMux,
+		eventMux:         sctx.EventMux,
 		peers:            peers,
 		reqDist:          newRequestDistributor(peers, quitSync),
-		accountManager:   ctx.AccountManager,
-		engine:           eth.CreateConsensusEngine(ctx, &config.Ethash, chainConfig, chainDb),
+		accountManager:   sctx.AccountManager,
+		engine:           eth.CreateConsensusEngine(sctx, &config.Ethash, chainConfig, chainDb),
 		shutdownChan:     make(chan bool),
 		networkId:        config.NetworkId,
 		bloomRequests:    make(chan chan *bloombits.Retrieval),
@@ -126,7 +127,7 @@ func New(ctx *node.ServiceContext, config *eth.Config) (*LightEthereum, error) {
 	}
 
 	leth.txPool = light.NewTxPool(leth.chainConfig, leth.blockchain, leth.relay)
-	if leth.protocolManager, err = NewProtocolManager(leth.chainConfig, true, ClientProtocolVersions, config.NetworkId, leth.eventMux, leth.engine, leth.peers, leth.blockchain, nil, chainDb, leth.odr, leth.relay, quitSync, &leth.wg); err != nil {
+	if leth.protocolManager, err = NewProtocolManager(ctx, leth.chainConfig, true, ClientProtocolVersions, config.NetworkId, leth.eventMux, leth.engine, leth.peers, leth.blockchain, nil, chainDb, leth.odr, leth.relay, quitSync, &leth.wg); err != nil {
 		return nil, err
 	}
 	leth.ApiBackend = &LesApiBackend{leth, nil}
@@ -220,7 +221,7 @@ func (s *LightEthereum) Protocols() []p2p.Protocol {
 
 // Start implements node.Service, starting all internal goroutines needed by the
 // Ethereum protocol implementation.
-func (s *LightEthereum) Start(srvr *p2p.Server) error {
+func (s *LightEthereum) Start(ctx context.Context, srvr *p2p.Server) error {
 	s.startBloomHandlers()
 	log.Warn("Light client mode is an experimental feature")
 	s.netRPCService = ethapi.NewPublicNetAPI(srvr, s.networkId)

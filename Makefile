@@ -40,8 +40,9 @@ ios:
 	@echo "Done building."
 	@echo "Import \"$(GOBIN)/gochain.framework\" to use the library."
 
-test: all
-	build/env.sh go run build/ci.go test
+test:
+# build/env.sh go run build/ci.go test
+	go test ./...
 
 clean:
 	rm -fr build/_workspace/pkg/ $(GOBIN)/*

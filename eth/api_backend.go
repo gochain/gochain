@@ -137,11 +137,12 @@ func (b *EthApiBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscri
 }
 
 func (b *EthApiBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
-	return b.eth.txPool.AddLocal(signedTx)
+	return b.eth.txPool.AddLocal(ctx, signedTx)
 }
 
 func (b *EthApiBackend) GetPoolTransactions() types.Transactions {
-	return b.eth.txPool.PendingList()
+	ctx := context.TODO()
+	return b.eth.txPool.PendingList(ctx)
 }
 
 func (b *EthApiBackend) GetPoolTransaction(hash common.Hash) *types.Transaction {
@@ -156,8 +157,8 @@ func (b *EthApiBackend) Stats() (pending int, queued int) {
 	return b.eth.txPool.Stats()
 }
 
-func (b *EthApiBackend) TxPoolContent() (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
-	return b.eth.TxPool().Content()
+func (b *EthApiBackend) TxPoolContent(ctx context.Context) (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
+	return b.eth.TxPool().Content(ctx)
 }
 
 func (b *EthApiBackend) SubscribeTxPreEvent(ch chan<- core.TxPreEvent) event.Subscription {

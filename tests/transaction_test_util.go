@@ -18,6 +18,7 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -68,6 +69,7 @@ type ttTransactionMarshaling struct {
 }
 
 func (tt *TransactionTest) Run(config *params.ChainConfig) error {
+	ctx := context.Background()
 	tx := new(types.Transaction)
 	if err := rlp.DecodeBytes(tt.json.RLP, tx); err != nil {
 		if tt.json.Transaction == nil {
@@ -78,7 +80,7 @@ func (tt *TransactionTest) Run(config *params.ChainConfig) error {
 	}
 	// Check sender derivation.
 	signer := types.MakeSigner(config, new(big.Int).SetUint64(uint64(tt.json.BlockNumber)))
-	sender, err := types.Sender(signer, tx)
+	sender, err := types.Sender(ctx, signer, tx)
 	if err != nil {
 		return err
 	}

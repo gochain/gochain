@@ -65,10 +65,11 @@ type SimulatedBackend struct {
 // NewSimulatedBackend creates a new binding backend using a simulated blockchain
 // for testing purposes.
 func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
+	ctx := context.TODO()
 	database, _ := ethdb.NewMemDatabase()
 	genesis := core.Genesis{Config: params.AllEthashProtocolChanges, Alloc: alloc}
 	genesis.MustCommit(database)
-	blockchain, _ := core.NewBlockChain(database, nil, genesis.Config, ethash.NewFaker(), vm.Config{})
+	blockchain, _ := core.NewBlockChain(ctx, database, nil, genesis.Config, ethash.NewFaker(), vm.Config{})
 
 	backend := &SimulatedBackend{
 		database:   database,
@@ -82,11 +83,11 @@ func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
 
 // Commit imports all the pending transactions as a single block and starts a
 // fresh new state.
-func (b *SimulatedBackend) Commit() {
+func (b *SimulatedBackend) Commit(ctx context.Context) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if _, err := b.blockchain.InsertChain([]*types.Block{b.pendingBlock}); err != nil {
+	if _, err := b.blockchain.InsertChain(ctx, []*types.Block{b.pendingBlock}); err != nil {
 		panic(err) // This cannot happen unless the simulator is wrong, fail in that case
 	}
 	b.rollback()
@@ -101,7 +102,8 @@ func (b *SimulatedBackend) Rollback() {
 }
 
 func (b *SimulatedBackend) rollback() {
-	blocks, _ := core.GenerateChain(b.config, b.blockchain.CurrentBlock(), ethash.NewFaker(), b.database, 1, func(int, *core.BlockGen) {})
+	ctx := context.TODO()
+	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlock(), ethash.NewFaker(), b.database, 1, func(context.Context, int, *core.BlockGen) {})
 	statedb, _ := b.blockchain.State()
 
 	b.pendingBlock = blocks[0]
@@ -296,7 +298,7 @@ func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx *types.Transa
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	sender, err := types.Sender(types.HomesteadSigner{}, tx)
+	sender, err := types.Sender(ctx, types.HomesteadSigner{}, tx)
 	if err != nil {
 		panic(fmt.Errorf("invalid transaction: %v", err))
 	}
@@ -305,11 +307,11 @@ func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx *types.Transa
 		panic(fmt.Errorf("invalid transaction nonce: got %d, want %d", tx.Nonce(), nonce))
 	}
 
-	blocks, _ := core.GenerateChain(b.config, b.blockchain.CurrentBlock(), ethash.NewFaker(), b.database, 1, func(number int, block *core.BlockGen) {
+	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlock(), ethash.NewFaker(), b.database, 1, func(ctx context.Context, number int, block *core.BlockGen) {
 		for _, tx := range b.pendingBlock.Transactions() {
-			block.AddTx(tx)
+			block.AddTx(ctx, tx)
 		}
-		block.AddTx(tx)
+		block.AddTx(ctx, tx)
 	})
 	statedb, _ := b.blockchain.State()
 
@@ -382,11 +384,12 @@ func (b *SimulatedBackend) SubscribeFilterLogs(ctx context.Context, query ethere
 
 // AdjustTime adds a time shift to the simulated clock.
 func (b *SimulatedBackend) AdjustTime(adjustment time.Duration) error {
+	ctx := context.TODO()
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	blocks, _ := core.GenerateChain(b.config, b.blockchain.CurrentBlock(), ethash.NewFaker(), b.database, 1, func(number int, block *core.BlockGen) {
+	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlock(), ethash.NewFaker(), b.database, 1, func(ctx context.Context, number int, block *core.BlockGen) {
 		for _, tx := range b.pendingBlock.Transactions() {
-			block.AddTx(tx)
+			block.AddTx(ctx, tx)
 		}
 		block.OffsetTime(int64(adjustment.Seconds()))
 	})

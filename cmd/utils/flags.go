@@ -18,6 +18,7 @@
 package utils
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"io/ioutil"
@@ -1123,17 +1124,17 @@ func SetDashboardConfig(ctx *cli.Context, cfg *dashboard.Config) {
 }
 
 // RegisterEthService adds an Ethereum client to the stack.
-func RegisterEthService(stack *node.Node, cfg *eth.Config) {
+func RegisterEthService(ctx context.Context, stack *node.Node, cfg *eth.Config) {
 	var err error
 	if cfg.SyncMode == downloader.LightSync {
-		err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-			return les.New(ctx, cfg)
+		err = stack.Register(func(sctx *node.ServiceContext) (node.Service, error) {
+			return les.New(ctx, sctx, cfg)
 		})
 	} else {
-		err = stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-			fullNode, err := eth.New(ctx, cfg)
+		err = stack.Register(func(sctx *node.ServiceContext) (node.Service, error) {
+			fullNode, err := eth.New(ctx, sctx, cfg)
 			if fullNode != nil && cfg.LightServ > 0 {
-				ls, _ := les.NewLesServer(fullNode, cfg)
+				ls, _ := les.NewLesServer(ctx, fullNode, cfg)
 				fullNode.AddLesServer(ls)
 			}
 			return fullNode, err
@@ -1250,7 +1251,7 @@ func MakeChain(ctx *cli.Context, stack *node.Node) (chain *core.BlockChain, chai
 		cache.TrieNodeLimit = ctx.GlobalInt(CacheFlag.Name) * ctx.GlobalInt(CacheGCFlag.Name) / 100
 	}
 	vmcfg := vm.Config{EnablePreimageRecording: ctx.GlobalBool(VMEnableDebugFlag.Name)}
-	chain, err = core.NewBlockChain(chainDb, cache, config, engine, vmcfg)
+	chain, err = core.NewBlockChain(context.TODO(), chainDb, cache, config, engine, vmcfg)
 	if err != nil {
 		Fatalf("Can't create BlockChain: %v", err)
 	}

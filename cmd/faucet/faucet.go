@@ -213,6 +213,7 @@ type faucet struct {
 }
 
 func newFaucet(genesis *core.Genesis, port int, enodes []*discv5.Node, network uint64, stats string, ks *keystore.KeyStore, index []byte) (*faucet, error) {
+	ctx := context.TODO()
 	// Assemble the raw devp2p protocol stack
 	stack, err := node.New(&node.Config{
 		Name:    "geth",
@@ -231,12 +232,12 @@ func newFaucet(genesis *core.Genesis, port int, enodes []*discv5.Node, network u
 		return nil, err
 	}
 	// Assemble the Ethereum light client protocol
-	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+	if err := stack.Register(func(sctx *node.ServiceContext) (node.Service, error) {
 		cfg := eth.DefaultConfig
 		cfg.SyncMode = downloader.LightSync
 		cfg.NetworkId = network
 		cfg.Genesis = genesis
-		return les.New(ctx, &cfg)
+		return les.New(ctx, sctx, &cfg)
 	}); err != nil {
 		return nil, err
 	}
@@ -251,7 +252,7 @@ func newFaucet(genesis *core.Genesis, port int, enodes []*discv5.Node, network u
 		}
 	}
 	// Boot up the client and ensure it connects to bootnodes
-	if err := stack.Start(); err != nil {
+	if err := stack.Start(ctx); err != nil {
 		return nil, err
 	}
 	for _, boot := range enodes {

@@ -19,6 +19,7 @@
 package geth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -252,7 +253,8 @@ func (tx *Transaction) EncodeJSON() (string, error) {
 // String implements the fmt.Stringer interface to print some semi-meaningful
 // data dump of the transaction for debugging purposes.
 func (tx *Transaction) String() string {
-	return tx.tx.String()
+	ctx := context.TODO()
+	return tx.tx.String(ctx)
 }
 
 func (tx *Transaction) GetData() []byte      { return tx.tx.Data() }
@@ -269,11 +271,12 @@ func (tx *Transaction) GetSigHash() *Hash { return &Hash{types.HomesteadSigner{}
 
 // Deprecated: use EthereumClient.TransactionSender
 func (tx *Transaction) GetFrom(chainID *BigInt) (address *Address, _ error) {
+	ctx := context.TODO()
 	var signer types.Signer = types.HomesteadSigner{}
 	if chainID != nil {
 		signer = types.NewEIP155Signer(chainID.bigint)
 	}
-	from, err := types.Sender(signer, tx.tx)
+	from, err := types.Sender(ctx, signer, tx.tx)
 	return &Address{from}, err
 }
 

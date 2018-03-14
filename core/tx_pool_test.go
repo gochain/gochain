@@ -217,7 +217,7 @@ func TestStateChangeDuringTransactionPoolReset(t *testing.T) {
 
 	pool.lockedReset(ctx, nil, nil)
 
-	for addr, txs := range pool.Pending() {
+	for addr, txs := range pool.Pending(ctx) {
 		t.Logf("%0x: %d\n", addr, len(txs))
 	}
 

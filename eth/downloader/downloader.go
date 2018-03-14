@@ -18,6 +18,7 @@
 package downloader
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -189,10 +190,10 @@ type BlockChain interface {
 	FastSyncCommitHead(common.Hash) error
 
 	// InsertChain inserts a batch of blocks into the local chain.
-	InsertChain(types.Blocks) (int, error)
+	InsertChain(context.Context, types.Blocks) (int, error)
 
 	// InsertReceiptChain inserts a batch of receipts into the local chain.
-	InsertReceiptChain(types.Blocks, []types.Receipts) (int, error)
+	InsertReceiptChain(context.Context, types.Blocks, []types.Receipts) (int, error)
 }
 
 // New creates a new downloader to fetch hashes and blocks from remote peers.
@@ -308,8 +309,8 @@ func (d *Downloader) UnregisterPeer(id string) error {
 
 // Synchronise tries to sync up our local block chain with a remote peer, both
 // adding various sanity checks as well as wrapping it with various log entries.
-func (d *Downloader) Synchronise(id string, head common.Hash, td *big.Int, mode SyncMode) error {
-	err := d.synchronise(id, head, td, mode)
+func (d *Downloader) Synchronise(ctx context.Context, id string, head common.Hash, td *big.Int, mode SyncMode) error {
+	err := d.synchronise(ctx, id, head, td, mode)
 	switch err {
 	case nil:
 	case errBusy:
@@ -334,7 +335,7 @@ func (d *Downloader) Synchronise(id string, head common.Hash, td *big.Int, mode 
 // synchronise will select the peer and use it for synchronising. If an empty string is given
 // it will use the best peer possible and synchronize if its TD is higher than our own. If any of the
 // checks fail an error will be returned. This method is synchronous
-func (d *Downloader) synchronise(id string, hash common.Hash, td *big.Int, mode SyncMode) error {
+func (d *Downloader) synchronise(ctx context.Context, id string, hash common.Hash, td *big.Int, mode SyncMode) error {
 	// Mock out the synchronisation if testing
 	if d.synchroniseMock != nil {
 		return d.synchroniseMock(id, hash)
@@ -391,12 +392,12 @@ func (d *Downloader) synchronise(id string, hash common.Hash, td *big.Int, mode 
 	if p == nil {
 		return errUnknownPeer
 	}
-	return d.syncWithPeer(p, hash, td)
+	return d.syncWithPeer(ctx, p, hash, td)
 }
 
 // syncWithPeer starts a block synchronization based on the hash chain from the
 // specified peer and head hash.
-func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.Int) (err error) {
+func (d *Downloader) syncWithPeer(ctx context.Context, p *peerConnection, hash common.Hash, td *big.Int) (err error) {
 	d.mux.Post(StartEvent{})
 	defer func() {
 		// reset on error
@@ -455,29 +456,29 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
 		d.syncInitHook(origin, height)
 	}
 
-	fetchers := []func() error{
-		func() error { return d.fetchHeaders(p, origin+1, pivot) }, // Headers are always retrieved
-		func() error { return d.fetchBodies(origin + 1) },          // Bodies are retrieved during normal and fast sync
-		func() error { return d.fetchReceipts(origin + 1) },        // Receipts are retrieved during fast sync
-		func() error { return d.processHeaders(origin+1, pivot, td) },
+	fetchers := []func(ctx context.Context) error{
+		func(ctx context.Context) error { return d.fetchHeaders(p, origin+1, pivot) }, // Headers are always retrieved
+		func(ctx context.Context) error { return d.fetchBodies(origin + 1) },          // Bodies are retrieved during normal and fast sync
+		func(ctx context.Context) error { return d.fetchReceipts(origin + 1) },        // Receipts are retrieved during fast sync
+		func(ctx context.Context) error { return d.processHeaders(origin+1, pivot, td) },
 	}
 	if d.mode == FastSync {
-		fetchers = append(fetchers, func() error { return d.processFastSyncContent(latest) })
+		fetchers = append(fetchers, func(ctx context.Context) error { return d.processFastSyncContent(ctx, latest) })
 	} else if d.mode == FullSync {
 		fetchers = append(fetchers, d.processFullSyncContent)
 	}
-	return d.spawnSync(fetchers)
+	return d.spawnSync(ctx, fetchers)
 }
 
 // spawnSync runs d.process and all given fetcher functions to completion in
 // separate goroutines, returning the first error that appears.
-func (d *Downloader) spawnSync(fetchers []func() error) error {
+func (d *Downloader) spawnSync(ctx context.Context, fetchers []func(ctx context.Context) error) error {
 	var wg sync.WaitGroup
 	errc := make(chan error, len(fetchers))
 	wg.Add(len(fetchers))
 	for _, fn := range fetchers {
 		fn := fn
-		go func() { defer wg.Done(); errc <- fn() }()
+		go func(ctx context.Context) { defer wg.Done(); errc <- fn(ctx) }(ctx)
 	}
 	// Wait for the first error, then terminate the others.
 	var err error
@@ -1304,7 +1305,7 @@ func (d *Downloader) processHeaders(origin uint64, pivot uint64, td *big.Int) er
 }
 
 // processFullSyncContent takes fetch results from the queue and imports them into the chain.
-func (d *Downloader) processFullSyncContent() error {
+func (d *Downloader) processFullSyncContent(ctx context.Context) error {
 	for {
 		results := d.queue.Results(true)
 		if len(results) == 0 {
@@ -1313,13 +1314,13 @@ func (d *Downloader) processFullSyncContent() error {
 		if d.chainInsertHook != nil {
 			d.chainInsertHook(results)
 		}
-		if err := d.importBlockResults(results); err != nil {
+		if err := d.importBlockResults(ctx, results); err != nil {
 			return err
 		}
 	}
 }
 
-func (d *Downloader) importBlockResults(results []*fetchResult) error {
+func (d *Downloader) importBlockResults(ctx context.Context, results []*fetchResult) error {
 	// Check for any early termination requests
 	if len(results) == 0 {
 		return nil
@@ -1339,7 +1340,7 @@ func (d *Downloader) importBlockResults(results []*fetchResult) error {
 	for i, result := range results {
 		blocks[i] = types.NewBlockWithHeader(result.Header).WithBody(result.Transactions, result.Uncles)
 	}
-	if index, err := d.blockchain.InsertChain(blocks); err != nil {
+	if index, err := d.blockchain.InsertChain(ctx, blocks); err != nil {
 		log.Debug("Downloaded item processing failed", "number", results[index].Header.Number, "hash", results[index].Header.Hash(), "err", err)
 		return errInvalidChain
 	}
@@ -1348,7 +1349,7 @@ func (d *Downloader) importBlockResults(results []*fetchResult) error {
 
 // processFastSyncContent takes fetch results from the queue and writes them to the
 // database. It also controls the synchronisation of state nodes of the pivot block.
-func (d *Downloader) processFastSyncContent(latest *types.Header) error {
+func (d *Downloader) processFastSyncContent(ctx context.Context, latest *types.Header) error {
 	// Start syncing state of the reported head block. This should get us most of
 	// the state of the pivot block.
 	stateSync := d.syncState(latest.Root)
@@ -1401,7 +1402,7 @@ func (d *Downloader) processFastSyncContent(latest *types.Header) error {
 			}
 		}
 		P, beforeP, afterP := splitAroundPivot(pivot, results)
-		if err := d.commitFastSyncData(beforeP, stateSync); err != nil {
+		if err := d.commitFastSyncData(ctx, beforeP, stateSync); err != nil {
 			return err
 		}
 		if P != nil {
@@ -1424,7 +1425,7 @@ func (d *Downloader) processFastSyncContent(latest *types.Header) error {
 				if stateSync.err != nil {
 					return stateSync.err
 				}
-				if err := d.commitPivotBlock(P); err != nil {
+				if err := d.commitPivotBlock(ctx, P); err != nil {
 					return err
 				}
 				oldPivot = nil
@@ -1435,7 +1436,7 @@ func (d *Downloader) processFastSyncContent(latest *types.Header) error {
 			}
 		}
 		// Fast sync done, pivot commit done, full import
-		if err := d.importBlockResults(afterP); err != nil {
+		if err := d.importBlockResults(ctx, afterP); err != nil {
 			return err
 		}
 	}
@@ -1456,7 +1457,7 @@ func splitAroundPivot(pivot uint64, results []*fetchResult) (p *fetchResult, bef
 	return p, before, after
 }
 
-func (d *Downloader) commitFastSyncData(results []*fetchResult, stateSync *stateSync) error {
+func (d *Downloader) commitFastSyncData(ctx context.Context, results []*fetchResult, stateSync *stateSync) error {
 	// Check for any early termination requests
 	if len(results) == 0 {
 		return nil
@@ -1482,17 +1483,17 @@ func (d *Downloader) commitFastSyncData(results []*fetchResult, stateSync *state
 		blocks[i] = types.NewBlockWithHeader(result.Header).WithBody(result.Transactions, result.Uncles)
 		receipts[i] = result.Receipts
 	}
-	if index, err := d.blockchain.InsertReceiptChain(blocks, receipts); err != nil {
+	if index, err := d.blockchain.InsertReceiptChain(ctx, blocks, receipts); err != nil {
 		log.Debug("Downloaded item processing failed", "number", results[index].Header.Number, "hash", results[index].Header.Hash(), "err", err)
 		return errInvalidChain
 	}
 	return nil
 }
 
-func (d *Downloader) commitPivotBlock(result *fetchResult) error {
+func (d *Downloader) commitPivotBlock(ctx context.Context, result *fetchResult) error {
 	block := types.NewBlockWithHeader(result.Header).WithBody(result.Transactions, result.Uncles)
 	log.Debug("Committing fast sync pivot as new head", "number", block.Number(), "hash", block.Hash())
-	if _, err := d.blockchain.InsertReceiptChain([]*types.Block{block}, []types.Receipts{result.Receipts}); err != nil {
+	if _, err := d.blockchain.InsertReceiptChain(ctx, []*types.Block{block}, []types.Receipts{result.Receipts}); err != nil {
 		return err
 	}
 	if err := d.blockchain.FastSyncCommitHead(block.Hash()); err != nil {

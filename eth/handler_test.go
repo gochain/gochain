@@ -17,6 +17,7 @@
 package eth
 
 import (
+	"context"
 	"math"
 	"math/big"
 	"math/rand"
@@ -39,6 +40,7 @@ import (
 
 // Tests that protocol versions and modes of operations are matched up properly.
 func TestProtocolCompatibility(t *testing.T) {
+	ctx := context.Background()
 	// Define the compatibility chart
 	tests := []struct {
 		version    uint
@@ -56,7 +58,7 @@ func TestProtocolCompatibility(t *testing.T) {
 	for i, tt := range tests {
 		ProtocolVersions = []uint{tt.version}
 
-		pm, _, err := newTestProtocolManager(tt.mode, 0, nil, nil)
+		pm, _, err := newTestProtocolManager(ctx, tt.mode, 0, nil, nil)
 		if pm != nil {
 			defer pm.Stop()
 		}
@@ -71,8 +73,9 @@ func TestGetBlockHeaders62(t *testing.T) { testGetBlockHeaders(t, 62) }
 func TestGetBlockHeaders63(t *testing.T) { testGetBlockHeaders(t, 63) }
 
 func testGetBlockHeaders(t *testing.T, protocol int) {
-	pm, _ := newTestProtocolManagerMust(t, downloader.FullSync, downloader.MaxHashFetch+15, nil, nil)
-	peer, _ := newTestPeer("peer", protocol, pm, true)
+	ctx := context.Background()
+	pm, _ := newTestProtocolManagerMust(ctx, t, downloader.FullSync, downloader.MaxHashFetch+15, nil, nil)
+	peer, _ := newTestPeer(ctx, "peer", protocol, pm, true)
 	defer peer.close()
 
 	// Create a "random" unknown hash for testing
@@ -230,8 +233,9 @@ func TestGetBlockBodies62(t *testing.T) { testGetBlockBodies(t, 62) }
 func TestGetBlockBodies63(t *testing.T) { testGetBlockBodies(t, 63) }
 
 func testGetBlockBodies(t *testing.T, protocol int) {
-	pm, _ := newTestProtocolManagerMust(t, downloader.FullSync, downloader.MaxBlockFetch+15, nil, nil)
-	peer, _ := newTestPeer("peer", protocol, pm, true)
+	ctx := context.Background()
+	pm, _ := newTestProtocolManagerMust(ctx, t, downloader.FullSync, downloader.MaxBlockFetch+15, nil, nil)
+	peer, _ := newTestPeer(ctx, "peer", protocol, pm, true)
 	defer peer.close()
 
 	// Create a batch of tests for various scenarios
@@ -301,6 +305,7 @@ func testGetBlockBodies(t *testing.T, protocol int) {
 func TestGetNodeData63(t *testing.T) { testGetNodeData(t, 63) }
 
 func testGetNodeData(t *testing.T, protocol int) {
+	ctx := context.Background()
 	// Define three accounts to simulate transactions with
 	acc1Key, _ := crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
 	acc2Key, _ := crypto.HexToECDSA("49a7b37aa6f6645917e7b807e9d1c00d4fa71f18343b0d4122a4d2df64dd6fee")
@@ -309,19 +314,19 @@ func testGetNodeData(t *testing.T, protocol int) {
 
 	signer := types.HomesteadSigner{}
 	// Create a chain generator with some simple transactions (blatantly stolen from @fjl/chain_markets_test)
-	generator := func(i int, block *core.BlockGen) {
+	generator := func(ctx context.Context, i int, block *core.BlockGen) {
 		switch i {
 		case 0:
 			// In block 1, the test bank sends account #1 some ether.
 			tx, _ := types.SignTx(types.NewTransaction(block.TxNonce(testBank), acc1Addr, big.NewInt(10000), params.TxGas, nil, nil), signer, testBankKey)
-			block.AddTx(tx)
+			block.AddTx(ctx, tx)
 		case 1:
 			// In block 2, the test bank sends some more ether to account #1.
 			// acc1Addr passes it on to account #2.
 			tx1, _ := types.SignTx(types.NewTransaction(block.TxNonce(testBank), acc1Addr, big.NewInt(1000), params.TxGas, nil, nil), signer, testBankKey)
 			tx2, _ := types.SignTx(types.NewTransaction(block.TxNonce(acc1Addr), acc2Addr, big.NewInt(1000), params.TxGas, nil, nil), signer, acc1Key)
-			block.AddTx(tx1)
-			block.AddTx(tx2)
+			block.AddTx(ctx, tx1)
+			block.AddTx(ctx, tx2)
 		case 2:
 			// Block 3 is empty but was mined by account #2.
 			block.SetCoinbase(acc2Addr)
@@ -337,8 +342,8 @@ func testGetNodeData(t *testing.T, protocol int) {
 		}
 	}
 	// Assemble the test environment
-	pm, db := newTestProtocolManagerMust(t, downloader.FullSync, 4, generator, nil)
-	peer, _ := newTestPeer("peer", protocol, pm, true)
+	pm, db := newTestProtocolManagerMust(ctx, t, downloader.FullSync, 4, generator, nil)
+	peer, _ := newTestPeer(ctx, "peer", protocol, pm, true)
 	defer peer.close()
 
 	// Fetch for now the entire chain db
@@ -393,6 +398,7 @@ func testGetNodeData(t *testing.T, protocol int) {
 func TestGetReceipt63(t *testing.T) { testGetReceipt(t, 63) }
 
 func testGetReceipt(t *testing.T, protocol int) {
+	ctx := context.Background()
 	// Define three accounts to simulate transactions with
 	acc1Key, _ := crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
 	acc2Key, _ := crypto.HexToECDSA("49a7b37aa6f6645917e7b807e9d1c00d4fa71f18343b0d4122a4d2df64dd6fee")
@@ -401,19 +407,19 @@ func testGetReceipt(t *testing.T, protocol int) {
 
 	signer := types.HomesteadSigner{}
 	// Create a chain generator with some simple transactions (blatantly stolen from @fjl/chain_markets_test)
-	generator := func(i int, block *core.BlockGen) {
+	generator := func(ctx context.Context, i int, block *core.BlockGen) {
 		switch i {
 		case 0:
 			// In block 1, the test bank sends account #1 some ether.
 			tx, _ := types.SignTx(types.NewTransaction(block.TxNonce(testBank), acc1Addr, big.NewInt(10000), params.TxGas, nil, nil), signer, testBankKey)
-			block.AddTx(tx)
+			block.AddTx(ctx, tx)
 		case 1:
 			// In block 2, the test bank sends some more ether to account #1.
 			// acc1Addr passes it on to account #2.
 			tx1, _ := types.SignTx(types.NewTransaction(block.TxNonce(testBank), acc1Addr, big.NewInt(1000), params.TxGas, nil, nil), signer, testBankKey)
 			tx2, _ := types.SignTx(types.NewTransaction(block.TxNonce(acc1Addr), acc2Addr, big.NewInt(1000), params.TxGas, nil, nil), signer, acc1Key)
-			block.AddTx(tx1)
-			block.AddTx(tx2)
+			block.AddTx(ctx, tx1)
+			block.AddTx(ctx, tx2)
 		case 2:
 			// Block 3 is empty but was mined by account #2.
 			block.SetCoinbase(acc2Addr)
@@ -429,8 +435,8 @@ func testGetReceipt(t *testing.T, protocol int) {
 		}
 	}
 	// Assemble the test environment
-	pm, _ := newTestProtocolManagerMust(t, downloader.FullSync, 4, generator, nil)
-	peer, _ := newTestPeer("peer", protocol, pm, true)
+	pm, _ := newTestProtocolManagerMust(ctx, t, downloader.FullSync, 4, generator, nil)
+	peer, _ := newTestPeer(ctx, "peer", protocol, pm, true)
 	defer peer.close()
 
 	// Collect the hashes to request, and the response to expect
@@ -459,6 +465,7 @@ func TestDAOChallengeNoVsTimeout(t *testing.T)  { testDAOChallenge(t, false, fal
 func TestDAOChallengeProVsTimeout(t *testing.T) { testDAOChallenge(t, true, true, true) }
 
 func testDAOChallenge(t *testing.T, localForked, remoteForked bool, timeout bool) {
+	ctx := context.Background()
 	// Reduce the DAO handshake challenge timeout
 	if timeout {
 		defer func(old time.Duration) { daoChallengeTimeout = old }(daoChallengeTimeout)
@@ -472,17 +479,17 @@ func testDAOChallenge(t *testing.T, localForked, remoteForked bool, timeout bool
 		config        = &params.ChainConfig{DAOForkBlock: big.NewInt(1), DAOForkSupport: localForked}
 		gspec         = &core.Genesis{Config: config}
 		genesis       = gspec.MustCommit(db)
-		blockchain, _ = core.NewBlockChain(db, nil, config, pow, vm.Config{})
+		blockchain, _ = core.NewBlockChain(ctx, db, nil, config, pow, vm.Config{})
 	)
-	pm, err := NewProtocolManager(config, downloader.FullSync, DefaultConfig.NetworkId, evmux, new(testTxPool), pow, blockchain, db)
+	pm, err := NewProtocolManager(ctx, config, downloader.FullSync, DefaultConfig.NetworkId, evmux, new(testTxPool), pow, blockchain, db)
 	if err != nil {
 		t.Fatalf("failed to start test protocol manager: %v", err)
 	}
-	pm.Start(1000)
+	pm.Start(ctx, 1000)
 	defer pm.Stop()
 
 	// Connect a new peer and check that we receive the DAO challenge
-	peer, _ := newTestPeer("peer", eth63, pm, true)
+	peer, _ := newTestPeer(ctx, "peer", eth63, pm, true)
 	defer peer.close()
 
 	challenge := &getBlockHeadersData{
@@ -496,7 +503,7 @@ func testDAOChallenge(t *testing.T, localForked, remoteForked bool, timeout bool
 	}
 	// Create a block to reply to the challenge if no timeout is simulated
 	if !timeout {
-		blocks, _ := core.GenerateChain(&params.ChainConfig{}, genesis, ethash.NewFaker(), db, 1, func(i int, block *core.BlockGen) {
+		blocks, _ := core.GenerateChain(ctx, &params.ChainConfig{}, genesis, ethash.NewFaker(), db, 1, func(ctx context.Context, i int, block *core.BlockGen) {
 			if remoteForked {
 				block.SetExtra(params.DAOForkBlockExtra)
 			}

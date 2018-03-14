@@ -21,6 +21,7 @@
 package usbwallet
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -152,11 +153,11 @@ func (w *trezorDriver) Derive(path accounts.DerivationPath) (common.Address, err
 
 // SignTx implements usbwallet.driver, sending the transaction to the Trezor and
 // waiting for the user to confirm or deny the transaction.
-func (w *trezorDriver) SignTx(path accounts.DerivationPath, tx *types.Transaction, chainID *big.Int) (common.Address, *types.Transaction, error) {
+func (w *trezorDriver) SignTx(ctx context.Context, path accounts.DerivationPath, tx *types.Transaction, chainID *big.Int) (common.Address, *types.Transaction, error) {
 	if w.device == nil {
 		return common.Address{}, nil, accounts.ErrWalletClosed
 	}
-	return w.trezorSign(path, tx, chainID)
+	return w.trezorSign(ctx, path, tx, chainID)
 }
 
 // trezorDerive sends a derivation request to the Trezor device and returns the
@@ -171,7 +172,7 @@ func (w *trezorDriver) trezorDerive(derivationPath []uint32) (common.Address, er
 
 // trezorSign sends the transaction to the Trezor wallet, and waits for the user
 // to confirm or deny the transaction.
-func (w *trezorDriver) trezorSign(derivationPath []uint32, tx *types.Transaction, chainID *big.Int) (common.Address, *types.Transaction, error) {
+func (w *trezorDriver) trezorSign(ctx context.Context, derivationPath []uint32, tx *types.Transaction, chainID *big.Int) (common.Address, *types.Transaction, error) {
 	// Create the transaction initiation message
 	data := tx.Data()
 	length := uint32(len(data))
@@ -228,7 +229,7 @@ func (w *trezorDriver) trezorSign(derivationPath []uint32, tx *types.Transaction
 	if err != nil {
 		return common.Address{}, nil, err
 	}
-	sender, err := types.Sender(signer, signed)
+	sender, err := types.Sender(ctx, signer, signed)
 	if err != nil {
 		return common.Address{}, nil, err
 	}

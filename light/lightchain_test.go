@@ -36,8 +36,8 @@ var (
 )
 
 // makeHeaderChain creates a deterministic chain of headers rooted at parent.
-func makeHeaderChain(parent *types.Header, n int, db ethdb.Database, seed int) []*types.Header {
-	blocks, _ := core.GenerateChain(params.TestChainConfig, types.NewBlockWithHeader(parent), ethash.NewFaker(), db, n, func(i int, b *core.BlockGen) {
+func makeHeaderChain(ctx context.Context, parent *types.Header, n int, db ethdb.Database, seed int) []*types.Header {
+	blocks, _ := core.GenerateChain(ctx, params.TestChainConfig, types.NewBlockWithHeader(parent), ethash.NewFaker(), db, n, func(ctx context.Context, i int, b *core.BlockGen) {
 		b.SetCoinbase(common.Address{0: byte(seed), 19: byte(i)})
 	})
 	headers := make([]*types.Header, len(blocks))
@@ -51,6 +51,7 @@ func makeHeaderChain(parent *types.Header, n int, db ethdb.Database, seed int) [
 // chain. Depending on the full flag, if creates either a full block chain or a
 // header only chain.
 func newCanonical(n int) (ethdb.Database, *LightChain, error) {
+	ctx := context.Background()
 	db, _ := ethdb.NewMemDatabase()
 	gspec := core.Genesis{Config: params.TestChainConfig}
 	genesis := gspec.MustCommit(db)
@@ -61,7 +62,7 @@ func newCanonical(n int) (ethdb.Database, *LightChain, error) {
 		return db, blockchain, nil
 	}
 	// Header-only chain requested
-	headers := makeHeaderChain(genesis.Header(), n, db, canonicalSeed)
+	headers := makeHeaderChain(ctx, genesis.Header(), n, db, canonicalSeed)
 	_, err := blockchain.InsertHeaderChain(headers, 1)
 	return db, blockchain, err
 }
@@ -83,6 +84,7 @@ func newTestLightChain() *LightChain {
 
 // Test fork of length N starting from block i
 func testFork(t *testing.T, LightChain *LightChain, i, n int, comparator func(td1, td2 *big.Int)) {
+	ctx := context.Background()
 	// Copy old chain up to #i into a new db
 	db, LightChain2, err := newCanonical(i)
 	if err != nil {
@@ -96,7 +98,7 @@ func testFork(t *testing.T, LightChain *LightChain, i, n int, comparator func(td
 		t.Errorf("chain content mismatch at %d: have hash %v, want hash %v", i, hash2, hash1)
 	}
 	// Extend the newly created chain
-	headerChainB := makeHeaderChain(LightChain2.CurrentHeader(), n, db, forkSeed)
+	headerChainB := makeHeaderChain(ctx, LightChain2.CurrentHeader(), n, db, forkSeed)
 	if _, err := LightChain2.InsertHeaderChain(headerChainB, 1); err != nil {
 		t.Fatalf("failed to insert forking chain: %v", err)
 	}
@@ -229,13 +231,14 @@ func TestEqualForkHeaders(t *testing.T) {
 
 // Tests that chains missing links do not get accepted by the processor.
 func TestBrokenHeaderChain(t *testing.T) {
+	ctx := context.Background()
 	// Make chain starting from genesis
 	db, LightChain, err := newCanonical(10)
 	if err != nil {
 		t.Fatalf("failed to make new canonical chain: %v", err)
 	}
 	// Create a forked chain, and try to insert with a missing link
-	chain := makeHeaderChain(LightChain.CurrentHeader(), 5, db, forkSeed)[1:]
+	chain := makeHeaderChain(ctx, LightChain.CurrentHeader(), 5, db, forkSeed)[1:]
 	if err := testHeaderChainImport(chain, LightChain); err == nil {
 		t.Errorf("broken header chain not reported")
 	}

@@ -160,7 +160,7 @@ func (b *BlockGen) OffsetTime(seconds int64) {
 // Blocks created by GenerateChain do not contain valid proof of work
 // values. Inserting them into BlockChain requires use of FakePow or
 // a similar non-validating proof of work implementation.
-func GenerateChain(ctx context.Context, config *params.ChainConfig, parent *types.Block, engine consensus.Engine, db ethdb.Database, n int, gen func(int, *BlockGen)) ([]*types.Block, []types.Receipts) {
+func GenerateChain(ctx context.Context, config *params.ChainConfig, parent *types.Block, engine consensus.Engine, db ethdb.Database, n int, gen func(context.Context, int, *BlockGen)) ([]*types.Block, []types.Receipts) {
 	if config == nil {
 		config = params.TestChainConfig
 	}
@@ -188,7 +188,7 @@ func GenerateChain(ctx context.Context, config *params.ChainConfig, parent *type
 		}
 		// Execute any user modifications to the block and finalize it
 		if gen != nil {
-			gen(i, b)
+			gen(ctx, i, b)
 		}
 
 		if b.engine != nil {
@@ -280,7 +280,7 @@ func makeHeaderChain(ctx context.Context, parent *types.Header, n int, engine co
 
 // makeBlockChain creates a deterministic chain of blocks rooted at parent.
 func makeBlockChain(ctx context.Context, parent *types.Block, n int, engine consensus.Engine, db ethdb.Database, seed int) []*types.Block {
-	blocks, _ := GenerateChain(ctx, params.TestChainConfig, parent, engine, db, n, func(i int, b *BlockGen) {
+	blocks, _ := GenerateChain(ctx, params.TestChainConfig, parent, engine, db, n, func(ctx context.Context, i int, b *BlockGen) {
 		b.SetCoinbase(common.Address{0: byte(seed), 19: byte(i)})
 	})
 	return blocks

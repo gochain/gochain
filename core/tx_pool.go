@@ -505,7 +505,7 @@ func (pool *TxPool) stats() (int, int) {
 
 // Content retrieves the data content of the transaction pool, returning all the
 // pending as well as queued transactions, grouped by account and sorted by nonce.
-func (pool *TxPool) Content() (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
+func (pool *TxPool) Content(ctx context.Context) (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
@@ -523,7 +523,7 @@ func (pool *TxPool) Content() (map[common.Address]types.Transactions, map[common
 // Pending retrieves all currently processable transactions, groupped by origin
 // account and sorted by nonce. The returned transaction set is a copy and can be
 // freely modified by calling code.
-func (pool *TxPool) Pending() map[common.Address]types.Transactions {
+func (pool *TxPool) Pending(ctx context.Context) map[common.Address]types.Transactions {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
@@ -535,7 +535,7 @@ func (pool *TxPool) Pending() map[common.Address]types.Transactions {
 }
 
 // PendingList is like Pending, but only txs.
-func (pool *TxPool) PendingList() types.Transactions {
+func (pool *TxPool) PendingList(ctx context.Context) types.Transactions {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
