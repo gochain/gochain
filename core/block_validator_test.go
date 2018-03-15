@@ -17,6 +17,7 @@
 package core
 
 import (
+	"context"
 	"runtime"
 	"testing"
 	"time"
@@ -30,19 +31,20 @@ import (
 
 // Tests that simple header verification works, for both good and bad blocks.
 func TestHeaderVerification(t *testing.T) {
+	ctx := context.Background()
 	// Create a simple chain to verify
 	var (
 		testdb, _ = ethdb.NewMemDatabase()
 		gspec     = &Genesis{Config: params.TestChainConfig}
 		genesis   = gspec.MustCommit(testdb)
-		blocks, _ = GenerateChain(params.TestChainConfig, genesis, ethash.NewFaker(), testdb, 8, nil)
+		blocks, _ = GenerateChain(ctx, params.TestChainConfig, genesis, ethash.NewFaker(), testdb, 8, nil)
 	)
 	headers := make([]*types.Header, len(blocks))
 	for i, block := range blocks {
 		headers[i] = block.Header()
 	}
 	// Run the header checker for blocks one-by-one, checking for both valid and invalid nonces
-	chain, _ := NewBlockChain(testdb, nil, params.TestChainConfig, ethash.NewFaker(), vm.Config{})
+	chain, _ := NewBlockChain(ctx, testdb, nil, params.TestChainConfig, ethash.NewFaker(), vm.Config{})
 	defer chain.Stop()
 
 	for i := 0; i < len(blocks); i++ {
@@ -72,7 +74,7 @@ func TestHeaderVerification(t *testing.T) {
 			case <-time.After(25 * time.Millisecond):
 			}
 		}
-		chain.InsertChain(blocks[i : i+1])
+		chain.InsertChain(ctx, blocks[i:i+1])
 	}
 }
 
@@ -82,12 +84,13 @@ func TestHeaderConcurrentVerification8(t *testing.T)  { testHeaderConcurrentVeri
 func TestHeaderConcurrentVerification32(t *testing.T) { testHeaderConcurrentVerification(t, 32) }
 
 func testHeaderConcurrentVerification(t *testing.T, threads int) {
+	ctx := context.Background()
 	// Create a simple chain to verify
 	var (
 		testdb, _ = ethdb.NewMemDatabase()
 		gspec     = &Genesis{Config: params.TestChainConfig}
 		genesis   = gspec.MustCommit(testdb)
-		blocks, _ = GenerateChain(params.TestChainConfig, genesis, ethash.NewFaker(), testdb, 8, nil)
+		blocks, _ = GenerateChain(ctx, params.TestChainConfig, genesis, ethash.NewFaker(), testdb, 8, nil)
 	)
 	headers := make([]*types.Header, len(blocks))
 	seals := make([]bool, len(blocks))
@@ -106,11 +109,11 @@ func testHeaderConcurrentVerification(t *testing.T, threads int) {
 		var results <-chan error
 
 		if valid {
-			chain, _ := NewBlockChain(testdb, nil, params.TestChainConfig, ethash.NewFaker(), vm.Config{})
+			chain, _ := NewBlockChain(ctx, testdb, nil, params.TestChainConfig, ethash.NewFaker(), vm.Config{})
 			_, results = chain.engine.VerifyHeaders(chain, headers, seals)
 			chain.Stop()
 		} else {
-			chain, _ := NewBlockChain(testdb, nil, params.TestChainConfig, ethash.NewFakeFailer(uint64(len(headers)-1)), vm.Config{})
+			chain, _ := NewBlockChain(ctx, testdb, nil, params.TestChainConfig, ethash.NewFakeFailer(uint64(len(headers)-1)), vm.Config{})
 			_, results = chain.engine.VerifyHeaders(chain, headers, seals)
 			chain.Stop()
 		}
@@ -154,12 +157,13 @@ func TestHeaderConcurrentAbortion8(t *testing.T)  { testHeaderConcurrentAbortion
 func TestHeaderConcurrentAbortion32(t *testing.T) { testHeaderConcurrentAbortion(t, 32) }
 
 func testHeaderConcurrentAbortion(t *testing.T, threads int) {
+	ctx := context.Background()
 	// Create a simple chain to verify
 	var (
 		testdb, _ = ethdb.NewMemDatabase()
 		gspec     = &Genesis{Config: params.TestChainConfig}
 		genesis   = gspec.MustCommit(testdb)
-		blocks, _ = GenerateChain(params.TestChainConfig, genesis, ethash.NewFaker(), testdb, 1024, nil)
+		blocks, _ = GenerateChain(ctx, params.TestChainConfig, genesis, ethash.NewFaker(), testdb, 1024, nil)
 	)
 	headers := make([]*types.Header, len(blocks))
 	seals := make([]bool, len(blocks))
@@ -173,7 +177,7 @@ func testHeaderConcurrentAbortion(t *testing.T, threads int) {
 	defer runtime.GOMAXPROCS(old)
 
 	// Start the verifications and immediately abort
-	chain, _ := NewBlockChain(testdb, nil, params.TestChainConfig, ethash.NewFakeDelayer(time.Millisecond), vm.Config{})
+	chain, _ := NewBlockChain(ctx, testdb, nil, params.TestChainConfig, ethash.NewFakeDelayer(time.Millisecond), vm.Config{})
 	defer chain.Stop()
 
 	abort, results := chain.engine.VerifyHeaders(chain, headers, seals)

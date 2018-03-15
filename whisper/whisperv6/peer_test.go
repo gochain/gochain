@@ -173,7 +173,7 @@ func initialize(t *testing.T) {
 
 	var err error
 	ip := net.IPv4(127, 0, 0, 1)
-	port0 := 30303
+	port0 := 30403
 
 	for i := 0; i < NumNodes; i++ {
 		var node TestNode
@@ -237,7 +237,7 @@ func initialize(t *testing.T) {
 func startServer(t *testing.T, s *p2p.Server) {
 	err := s.Start()
 	if err != nil {
-		t.Fatalf("failed to start the fisrt server.")
+		t.Fatalf("failed to start the fisrt server: %v", err)
 	}
 
 	result.mutex.Lock()

@@ -17,6 +17,7 @@
 package core
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -40,12 +41,13 @@ import (
 // newTestBlockChain creates a blockchain without validation.
 // genesis can be nil to use default
 func newTestBlockChain(fake, disk bool) *BlockChain {
-	return newTestBlockChainWithGenesis(fake, disk, nil)
+	ctx := context.Background()
+	return newTestBlockChainWithGenesis(ctx, fake, disk, nil)
 }
 
 // newTestBlockChain creates a blockchain without validation.
 // genesis can be nil to use default
-func newTestBlockChainWithGenesis(fake, disk bool, genesis *Genesis) *BlockChain {
+func newTestBlockChainWithGenesis(ctx context.Context, fake, disk bool, genesis *Genesis) *BlockChain {
 	var err error
 	var db ethdb.Database
 	if disk {
@@ -72,7 +74,7 @@ func newTestBlockChainWithGenesis(fake, disk bool, genesis *Genesis) *BlockChain
 	if !fake {
 		engine = ethash.NewTester()
 	}
-	blockchain, err := NewBlockChain(db, nil, genesis.Config, engine, vm.Config{})
+	blockchain, err := NewBlockChain(ctx, db, nil, genesis.Config, engine, vm.Config{})
 	if err != nil {
 		panic(err)
 	}
@@ -82,8 +84,9 @@ func newTestBlockChainWithGenesis(fake, disk bool, genesis *Genesis) *BlockChain
 
 // Test fork of length N starting from block i
 func testFork(t *testing.T, blockchain *BlockChain, i, n int, full bool, comparator func(td1, td2 *big.Int)) {
+	ctx := context.Background()
 	// Copy old chain up to #i into a new db
-	db, blockchain2, err := newCanonical(ethash.NewFaker(), i, full)
+	db, blockchain2, err := newCanonical(ctx, ethash.NewFaker(), i, full)
 	if err != nil {
 		t.Fatal("could not make new canonical in testFork", err)
 	}
@@ -107,12 +110,12 @@ func testFork(t *testing.T, blockchain *BlockChain, i, n int, full bool, compara
 		headerChainB []*types.Header
 	)
 	if full {
-		blockChainB = makeBlockChain(blockchain2.CurrentBlock(), n, ethash.NewFaker(), db, forkSeed)
-		if _, err := blockchain2.InsertChain(blockChainB); err != nil {
+		blockChainB = makeBlockChain(ctx, blockchain2.CurrentBlock(), n, ethash.NewFaker(), db, forkSeed)
+		if _, err := blockchain2.InsertChain(ctx, blockChainB); err != nil {
 			t.Fatalf("failed to insert forking chain: %v", err)
 		}
 	} else {
-		headerChainB = makeHeaderChain(blockchain2.CurrentHeader(), n, ethash.NewFaker(), db, forkSeed)
+		headerChainB = makeHeaderChain(ctx, blockchain2.CurrentHeader(), n, ethash.NewFaker(), db, forkSeed)
 		if _, err := blockchain2.InsertHeaderChain(headerChainB, 1); err != nil {
 			t.Fatalf("failed to insert forking chain: %v", err)
 		}
@@ -122,13 +125,13 @@ func testFork(t *testing.T, blockchain *BlockChain, i, n int, full bool, compara
 
 	if full {
 		tdPre = blockchain.GetTdByHash(blockchain.CurrentBlock().Hash())
-		if err := testBlockChainImport(blockChainB, blockchain); err != nil {
+		if err := testBlockChainImport(ctx, blockChainB, blockchain); err != nil {
 			t.Fatalf("failed to import forked block chain: %v", err)
 		}
 		tdPost = blockchain.GetTdByHash(blockChainB[len(blockChainB)-1].Hash())
 	} else {
 		tdPre = blockchain.GetTdByHash(blockchain.CurrentHeader().Hash())
-		if err := testHeaderChainImport(headerChainB, blockchain); err != nil {
+		if err := testHeaderChainImport(ctx, headerChainB, blockchain); err != nil {
 			t.Fatalf("failed to import forked header chain: %v", err)
 		}
 		tdPost = blockchain.GetTdByHash(headerChainB[len(headerChainB)-1].Hash())
@@ -146,7 +149,7 @@ func printChain(bc *BlockChain) {
 
 // testBlockChainImport tries to process a chain of blocks, writing them into
 // the database if successful.
-func testBlockChainImport(chain types.Blocks, blockchain *BlockChain) error {
+func testBlockChainImport(ctx context.Context, chain types.Blocks, blockchain *BlockChain) error {
 	for _, block := range chain {
 		// Try and process the block
 		err := blockchain.engine.VerifyHeader(blockchain, block.Header(), true)
@@ -163,7 +166,7 @@ func testBlockChainImport(chain types.Blocks, blockchain *BlockChain) error {
 		if err != nil {
 			return err
 		}
-		receipts, _, usedGas, err := blockchain.Processor().Process(block, statedb, vm.Config{})
+		receipts, _, usedGas, err := blockchain.Processor().Process(ctx, block, statedb, vm.Config{})
 		if err != nil {
 			blockchain.reportBlock(block, receipts, err)
 			return err
@@ -184,7 +187,7 @@ func testBlockChainImport(chain types.Blocks, blockchain *BlockChain) error {
 
 // testHeaderChainImport tries to process a chain of header, writing them into
 // the database if successful.
-func testHeaderChainImport(chain []*types.Header, blockchain *BlockChain) error {
+func testHeaderChainImport(ctx context.Context, chain []*types.Header, blockchain *BlockChain) error {
 	for _, header := range chain {
 		// Try and validate the header
 		if err := blockchain.engine.VerifyHeader(blockchain, header, false); err != nil {
@@ -199,8 +202,8 @@ func testHeaderChainImport(chain []*types.Header, blockchain *BlockChain) error 
 	return nil
 }
 
-func insertChain(done chan bool, blockchain *BlockChain, chain types.Blocks, t *testing.T) {
-	_, err := blockchain.InsertChain(chain)
+func insertChain(ctx context.Context, done chan bool, blockchain *BlockChain, chain types.Blocks, t *testing.T) {
+	_, err := blockchain.InsertChain(ctx, chain)
 	if err != nil {
 		fmt.Println(err)
 		t.FailNow()
@@ -209,10 +212,11 @@ func insertChain(done chan bool, blockchain *BlockChain, chain types.Blocks, t *
 }
 
 func TestLastBlock(t *testing.T) {
+	ctx := context.Background()
 	bchain := newTestBlockChain(false, false)
 	defer bchain.Stop()
 
-	block := makeBlockChain(bchain.CurrentBlock(), 1, ethash.NewFaker(), bchain.db, 0)[0]
+	block := makeBlockChain(ctx, bchain.CurrentBlock(), 1, ethash.NewFaker(), bchain.db, 0)[0]
 	bchain.insert(block)
 	if block.Hash() != GetHeadBlockHash(bchain.db) {
 		t.Errorf("Write/Get HeadBlockHash failed")
@@ -225,10 +229,11 @@ func TestExtendCanonicalHeaders(t *testing.T) { testExtendCanonical(t, false) }
 func TestExtendCanonicalBlocks(t *testing.T)  { testExtendCanonical(t, true) }
 
 func testExtendCanonical(t *testing.T, full bool) {
+	ctx := context.Background()
 	length := 5
 
 	// Make first chain starting from genesis
-	_, processor, err := newCanonical(ethash.NewFaker(), length, full)
+	_, processor, err := newCanonical(ctx, ethash.NewFaker(), length, full)
 	if err != nil {
 		t.Fatalf("failed to make new canonical chain: %v", err)
 	}
@@ -253,10 +258,11 @@ func TestShorterForkHeaders(t *testing.T) { testShorterFork(t, false) }
 func TestShorterForkBlocks(t *testing.T)  { testShorterFork(t, true) }
 
 func testShorterFork(t *testing.T, full bool) {
+	ctx := context.Background()
 	length := 10
 
 	// Make first chain starting from genesis
-	_, processor, err := newCanonical(ethash.NewFaker(), length, full)
+	_, processor, err := newCanonical(ctx, ethash.NewFaker(), length, full)
 	if err != nil {
 		t.Fatalf("failed to make new canonical chain: %v", err)
 	}
@@ -283,10 +289,11 @@ func TestLongerForkHeaders(t *testing.T) { testLongerFork(t, false) }
 func TestLongerForkBlocks(t *testing.T)  { testLongerFork(t, true) }
 
 func testLongerFork(t *testing.T, full bool) {
+	ctx := context.Background()
 	length := 10
 
 	// Make first chain starting from genesis
-	_, processor, err := newCanonical(ethash.NewFaker(), length, full)
+	_, processor, err := newCanonical(ctx, ethash.NewFaker(), length, full)
 	if err != nil {
 		t.Fatalf("failed to make new canonical chain: %v", err)
 	}
@@ -313,10 +320,11 @@ func TestEqualForkHeaders(t *testing.T) { testEqualFork(t, false) }
 func TestEqualForkBlocks(t *testing.T)  { testEqualFork(t, true) }
 
 func testEqualFork(t *testing.T, full bool) {
+	ctx := context.Background()
 	length := 10
 
 	// Make first chain starting from genesis
-	_, processor, err := newCanonical(ethash.NewFaker(), length, full)
+	_, processor, err := newCanonical(ctx, ethash.NewFaker(), length, full)
 	if err != nil {
 		t.Fatalf("failed to make new canonical chain: %v", err)
 	}
@@ -342,8 +350,9 @@ func TestBrokenHeaderChain(t *testing.T) { testBrokenChain(t, false) }
 func TestBrokenBlockChain(t *testing.T)  { testBrokenChain(t, true) }
 
 func testBrokenChain(t *testing.T, full bool) {
+	ctx := context.Background()
 	// Make chain starting from genesis
-	db, blockchain, err := newCanonical(ethash.NewFaker(), 10, full)
+	db, blockchain, err := newCanonical(ctx, ethash.NewFaker(), 10, full)
 	if err != nil {
 		t.Fatalf("failed to make new canonical chain: %v", err)
 	}
@@ -351,13 +360,13 @@ func testBrokenChain(t *testing.T, full bool) {
 
 	// Create a forked chain, and try to insert with a missing link
 	if full {
-		chain := makeBlockChain(blockchain.CurrentBlock(), 5, ethash.NewFaker(), db, forkSeed)[1:]
-		if err := testBlockChainImport(chain, blockchain); err == nil {
+		chain := makeBlockChain(ctx, blockchain.CurrentBlock(), 5, ethash.NewFaker(), db, forkSeed)[1:]
+		if err := testBlockChainImport(ctx, chain, blockchain); err == nil {
 			t.Errorf("broken block chain not reported")
 		}
 	} else {
-		chain := makeHeaderChain(blockchain.CurrentHeader(), 5, ethash.NewFaker(), db, forkSeed)[1:]
-		if err := testHeaderChainImport(chain, blockchain); err == nil {
+		chain := makeHeaderChain(ctx, blockchain.CurrentHeader(), 5, ethash.NewFaker(), db, forkSeed)[1:]
+		if err := testHeaderChainImport(ctx, chain, blockchain); err == nil {
 			t.Errorf("broken header chain not reported")
 		}
 	}
@@ -424,13 +433,14 @@ func testReorgShort(t *testing.T, full bool) {
 }
 
 func testReorg(t *testing.T, first, second []int, td int64, full bool) {
+	ctx := context.Background()
 	bc := newTestBlockChain(true, false)
 	defer bc.Stop()
 
 	// Insert an easy and a difficult chain afterwards
 	if full {
-		bc.InsertChain(makeBlockChainWithDiff(bc.genesisBlock, first, 11))
-		bc.InsertChain(makeBlockChainWithDiff(bc.genesisBlock, second, 22))
+		bc.InsertChain(ctx, makeBlockChainWithDiff(bc.genesisBlock, first, 11))
+		bc.InsertChain(ctx, makeBlockChainWithDiff(bc.genesisBlock, second, 22))
 	} else {
 		bc.InsertHeaderChain(makeHeaderChainWithDiff(bc.genesisBlock, first, 11), 1)
 		bc.InsertHeaderChain(makeHeaderChainWithDiff(bc.genesisBlock, second, 22), 1)
@@ -469,6 +479,7 @@ func TestBadHeaderHashes(t *testing.T) { testBadHashes(t, false) }
 func TestBadBlockHashes(t *testing.T)  { testBadHashes(t, true) }
 
 func testBadHashes(t *testing.T, full bool) {
+	ctx := context.Background()
 	bc := newTestBlockChain(true, false)
 	defer bc.Stop()
 
@@ -477,7 +488,7 @@ func testBadHashes(t *testing.T, full bool) {
 	if full {
 		blocks := makeBlockChainWithDiff(bc.genesisBlock, []int{1, 2, 4}, 10)
 		BadHashes[blocks[2].Header().Hash()] = true
-		_, err = bc.InsertChain(blocks)
+		_, err = bc.InsertChain(ctx, blocks)
 	} else {
 		headers := makeHeaderChainWithDiff(bc.genesisBlock, []int{1, 2, 4}, 10)
 		BadHashes[headers[2].Hash()] = true
@@ -494,6 +505,7 @@ func TestReorgBadHeaderHashes(t *testing.T) { testReorgBadHashes(t, false) }
 func TestReorgBadBlockHashes(t *testing.T)  { testReorgBadHashes(t, true) }
 
 func testReorgBadHashes(t *testing.T, full bool) {
+	ctx := context.Background()
 	bc := newTestBlockChain(true, false)
 	defer bc.Stop()
 
@@ -502,7 +514,7 @@ func testReorgBadHashes(t *testing.T, full bool) {
 	blocks := makeBlockChainWithDiff(bc.genesisBlock, []int{1, 2, 3, 4}, 10)
 
 	if full {
-		if _, err := bc.InsertChain(blocks); err != nil {
+		if _, err := bc.InsertChain(ctx, blocks); err != nil {
 			t.Fatalf("failed to import blocks: %v", err)
 		}
 		if bc.CurrentBlock().Hash() != blocks[3].Hash() {
@@ -522,7 +534,7 @@ func testReorgBadHashes(t *testing.T, full bool) {
 	}
 
 	// Create a new BlockChain and check that it rolled back the state.
-	ncm, err := NewBlockChain(bc.db, nil, bc.chainConfig, ethash.NewFaker(), vm.Config{})
+	ncm, err := NewBlockChain(ctx, bc.db, nil, bc.chainConfig, ethash.NewFaker(), vm.Config{})
 	if err != nil {
 		t.Fatalf("failed to create new chain manager: %v", err)
 	}
@@ -547,9 +559,10 @@ func TestHeadersInsertNonceError(t *testing.T) { testInsertNonceError(t, false) 
 func TestBlocksInsertNonceError(t *testing.T)  { testInsertNonceError(t, true) }
 
 func testInsertNonceError(t *testing.T, full bool) {
+	ctx := context.Background()
 	for i := 1; i < 25 && !t.Failed(); i++ {
 		// Create a pristine chain and database
-		db, blockchain, err := newCanonical(ethash.NewFaker(), 0, full)
+		db, blockchain, err := newCanonical(ctx, ethash.NewFaker(), 0, full)
 		if err != nil {
 			t.Fatalf("failed to create pristine chain: %v", err)
 		}
@@ -562,15 +575,15 @@ func testInsertNonceError(t *testing.T, full bool) {
 			failNum uint64
 		)
 		if full {
-			blocks := makeBlockChain(blockchain.CurrentBlock(), i, ethash.NewFaker(), db, 0)
+			blocks := makeBlockChain(ctx, blockchain.CurrentBlock(), i, ethash.NewFaker(), db, 0)
 
 			failAt = rand.Int() % len(blocks)
 			failNum = blocks[failAt].NumberU64()
 
 			blockchain.engine = ethash.NewFakeFailer(failNum)
-			failRes, err = blockchain.InsertChain(blocks)
+			failRes, err = blockchain.InsertChain(ctx, blocks)
 		} else {
-			headers := makeHeaderChain(blockchain.CurrentHeader(), i, ethash.NewFaker(), db, 0)
+			headers := makeHeaderChain(ctx, blockchain.CurrentHeader(), i, ethash.NewFaker(), db, 0)
 
 			failAt = rand.Int() % len(headers)
 			failNum = headers[failAt].Number.Uint64()
@@ -601,6 +614,7 @@ func testInsertNonceError(t *testing.T, full bool) {
 // Tests that fast importing a block chain produces the same chain data as the
 // classical full block processing.
 func TestFastVsFullChains(t *testing.T) {
+	ctx := context.Background()
 	// Configure and generate a sample block chain
 	var (
 		gendb, _ = ethdb.NewMemDatabase()
@@ -614,7 +628,7 @@ func TestFastVsFullChains(t *testing.T) {
 		genesis = gspec.MustCommit(gendb)
 		signer  = types.NewEIP155Signer(gspec.Config.ChainId)
 	)
-	blocks, receipts := GenerateChain(gspec.Config, genesis, ethash.NewFaker(), gendb, 1024, func(i int, block *BlockGen) {
+	blocks, receipts := GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), gendb, 1024, func(ctx context.Context, i int, block *BlockGen) {
 		block.SetCoinbase(common.Address{0x00})
 
 		// If the block number is multiple of 3, send a few bonus transactions to the miner
@@ -624,7 +638,7 @@ func TestFastVsFullChains(t *testing.T) {
 				if err != nil {
 					panic(err)
 				}
-				block.AddTx(tx)
+				block.AddTx(ctx, tx)
 			}
 		}
 		// If the block number is a multiple of 5, add a few bonus uncles to the block
@@ -635,16 +649,16 @@ func TestFastVsFullChains(t *testing.T) {
 	// Import the chain as an archive node for the comparison baseline
 	archiveDb, _ := ethdb.NewMemDatabase()
 	gspec.MustCommit(archiveDb)
-	archive, _ := NewBlockChain(archiveDb, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
+	archive, _ := NewBlockChain(ctx, archiveDb, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
 	defer archive.Stop()
 
-	if n, err := archive.InsertChain(blocks); err != nil {
+	if n, err := archive.InsertChain(ctx, blocks); err != nil {
 		t.Fatalf("failed to process block %d: %v", n, err)
 	}
 	// Fast import the chain as a non-archive node to test
 	fastDb, _ := ethdb.NewMemDatabase()
 	gspec.MustCommit(fastDb)
-	fast, _ := NewBlockChain(fastDb, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
+	fast, _ := NewBlockChain(ctx, fastDb, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
 	defer fast.Stop()
 
 	headers := make([]*types.Header, len(blocks))
@@ -654,7 +668,7 @@ func TestFastVsFullChains(t *testing.T) {
 	if n, err := fast.InsertHeaderChain(headers, 1); err != nil {
 		t.Fatalf("failed to insert header %d: %v", n, err)
 	}
-	if n, err := fast.InsertReceiptChain(blocks, receipts); err != nil {
+	if n, err := fast.InsertReceiptChain(ctx, blocks, receipts); err != nil {
 		t.Fatalf("failed to insert receipt %d: %v", n, err)
 	}
 	// Iterate over all chain data components, and cross reference
@@ -689,6 +703,7 @@ func TestFastVsFullChains(t *testing.T) {
 // Tests that various import methods move the chain head pointers to the correct
 // positions.
 func TestLightVsFastVsFullChainHeads(t *testing.T) {
+	ctx := context.Background()
 	// Configure and generate a sample block chain
 	var (
 		gendb, _ = ethdb.NewMemDatabase()
@@ -699,7 +714,7 @@ func TestLightVsFastVsFullChainHeads(t *testing.T) {
 		genesis  = gspec.MustCommit(gendb)
 	)
 	height := uint64(1024)
-	blocks, receipts := GenerateChain(gspec.Config, genesis, ethash.NewFaker(), gendb, int(height), nil)
+	blocks, receipts := GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), gendb, int(height), nil)
 
 	// Configure a subchain to roll back
 	remove := []common.Hash{}
@@ -722,8 +737,8 @@ func TestLightVsFastVsFullChainHeads(t *testing.T) {
 	archiveDb, _ := ethdb.NewMemDatabase()
 	gspec.MustCommit(archiveDb)
 
-	archive, _ := NewBlockChain(archiveDb, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
-	if n, err := archive.InsertChain(blocks); err != nil {
+	archive, _ := NewBlockChain(ctx, archiveDb, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
+	if n, err := archive.InsertChain(ctx, blocks); err != nil {
 		t.Fatalf("failed to process block %d: %v", n, err)
 	}
 	defer archive.Stop()
@@ -735,7 +750,7 @@ func TestLightVsFastVsFullChainHeads(t *testing.T) {
 	// Import the chain as a non-archive node and ensure all pointers are updated
 	fastDb, _ := ethdb.NewMemDatabase()
 	gspec.MustCommit(fastDb)
-	fast, _ := NewBlockChain(fastDb, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
+	fast, _ := NewBlockChain(ctx, fastDb, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
 	defer fast.Stop()
 
 	headers := make([]*types.Header, len(blocks))
@@ -745,7 +760,7 @@ func TestLightVsFastVsFullChainHeads(t *testing.T) {
 	if n, err := fast.InsertHeaderChain(headers, 1); err != nil {
 		t.Fatalf("failed to insert header %d: %v", n, err)
 	}
-	if n, err := fast.InsertReceiptChain(blocks, receipts); err != nil {
+	if n, err := fast.InsertReceiptChain(ctx, blocks, receipts); err != nil {
 		t.Fatalf("failed to insert receipt %d: %v", n, err)
 	}
 	assert(t, "fast", fast, height, height, 0)
@@ -756,7 +771,7 @@ func TestLightVsFastVsFullChainHeads(t *testing.T) {
 	lightDb, _ := ethdb.NewMemDatabase()
 	gspec.MustCommit(lightDb)
 
-	light, _ := NewBlockChain(lightDb, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
+	light, _ := NewBlockChain(ctx, lightDb, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
 	if n, err := light.InsertHeaderChain(headers, 1); err != nil {
 		t.Fatalf("failed to insert header %d: %v", n, err)
 	}
@@ -769,6 +784,7 @@ func TestLightVsFastVsFullChainHeads(t *testing.T) {
 
 // Tests that chain reorganisations handle transaction removals and reinsertions.
 func TestChainTxReorgs(t *testing.T) {
+	ctx := context.Background()
 	var (
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
@@ -807,50 +823,50 @@ func TestChainTxReorgs(t *testing.T) {
 	//  - futureAdd: transaction added after the reorg has already finished
 	var pastAdd, freshAdd, futureAdd *types.Transaction
 
-	chain, _ := GenerateChain(gspec.Config, genesis, ethash.NewFaker(), db, 3, func(i int, gen *BlockGen) {
+	chain, _ := GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), db, 3, func(ctx context.Context, i int, gen *BlockGen) {
 		switch i {
 		case 0:
 			pastDrop, _ = types.SignTx(types.NewTransaction(gen.TxNonce(addr2), addr2, big.NewInt(1000), params.TxGas, nil, nil), signer, key2)
 
-			gen.AddTx(pastDrop)  // This transaction will be dropped in the fork from below the split point
-			gen.AddTx(postponed) // This transaction will be postponed till block #3 in the fork
+			gen.AddTx(ctx, pastDrop)  // This transaction will be dropped in the fork from below the split point
+			gen.AddTx(ctx, postponed) // This transaction will be postponed till block #3 in the fork
 
 		case 2:
 			freshDrop, _ = types.SignTx(types.NewTransaction(gen.TxNonce(addr2), addr2, big.NewInt(1000), params.TxGas, nil, nil), signer, key2)
 
-			gen.AddTx(freshDrop) // This transaction will be dropped in the fork from exactly at the split point
-			gen.AddTx(swapped)   // This transaction will be swapped out at the exact height
+			gen.AddTx(ctx, freshDrop) // This transaction will be dropped in the fork from exactly at the split point
+			gen.AddTx(ctx, swapped)   // This transaction will be swapped out at the exact height
 
 			gen.OffsetTime(9) // Lower the block difficulty to simulate a weaker chain
 		}
 	})
 	// Import the chain. This runs all block validation rules.
-	blockchain, _ := NewBlockChain(db, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
-	if i, err := blockchain.InsertChain(chain); err != nil {
+	blockchain, _ := NewBlockChain(ctx, db, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
+	if i, err := blockchain.InsertChain(ctx, chain); err != nil {
 		t.Fatalf("failed to insert original chain[%d]: %v", i, err)
 	}
 	defer blockchain.Stop()
 
 	// overwrite the old chain
-	chain, _ = GenerateChain(gspec.Config, genesis, ethash.NewFaker(), db, 5, func(i int, gen *BlockGen) {
+	chain, _ = GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), db, 5, func(ctx context.Context, i int, gen *BlockGen) {
 		switch i {
 		case 0:
 			pastAdd, _ = types.SignTx(types.NewTransaction(gen.TxNonce(addr3), addr3, big.NewInt(1000), params.TxGas, nil, nil), signer, key3)
-			gen.AddTx(pastAdd) // This transaction needs to be injected during reorg
+			gen.AddTx(ctx, pastAdd) // This transaction needs to be injected during reorg
 
 		case 2:
-			gen.AddTx(postponed) // This transaction was postponed from block #1 in the original chain
-			gen.AddTx(swapped)   // This transaction was swapped from the exact current spot in the original chain
+			gen.AddTx(ctx, postponed) // This transaction was postponed from block #1 in the original chain
+			gen.AddTx(ctx, swapped)   // This transaction was swapped from the exact current spot in the original chain
 
 			freshAdd, _ = types.SignTx(types.NewTransaction(gen.TxNonce(addr3), addr3, big.NewInt(1000), params.TxGas, nil, nil), signer, key3)
-			gen.AddTx(freshAdd) // This transaction will be added exactly at reorg time
+			gen.AddTx(ctx, freshAdd) // This transaction will be added exactly at reorg time
 
 		case 3:
 			futureAdd, _ = types.SignTx(types.NewTransaction(gen.TxNonce(addr3), addr3, big.NewInt(1000), params.TxGas, nil, nil), signer, key3)
-			gen.AddTx(futureAdd) // This transaction will be added after a full reorg
+			gen.AddTx(ctx, futureAdd) // This transaction will be added after a full reorg
 		}
 	})
-	if _, err := blockchain.InsertChain(chain); err != nil {
+	if _, err := blockchain.InsertChain(ctx, chain); err != nil {
 		t.Fatalf("failed to insert forked chain: %v", err)
 	}
 
@@ -884,6 +900,7 @@ func TestChainTxReorgs(t *testing.T) {
 }
 
 func TestLogReorgs(t *testing.T) {
+	ctx := context.Background()
 	var (
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
@@ -895,26 +912,26 @@ func TestLogReorgs(t *testing.T) {
 		signer  = types.NewEIP155Signer(gspec.Config.ChainId)
 	)
 
-	blockchain, _ := NewBlockChain(db, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
+	blockchain, _ := NewBlockChain(ctx, db, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
 	defer blockchain.Stop()
 
 	rmLogsCh := make(chan RemovedLogsEvent)
 	blockchain.SubscribeRemovedLogsEvent(rmLogsCh)
-	chain, _ := GenerateChain(params.TestChainConfig, genesis, ethash.NewFaker(), db, 2, func(i int, gen *BlockGen) {
+	chain, _ := GenerateChain(ctx, params.TestChainConfig, genesis, ethash.NewFaker(), db, 2, func(ctx context.Context, i int, gen *BlockGen) {
 		if i == 1 {
 			tx, err := types.SignTx(types.NewContractCreation(gen.TxNonce(addr1), new(big.Int), 1000000, new(big.Int), code), signer, key1)
 			if err != nil {
 				t.Fatalf("failed to create tx: %v", err)
 			}
-			gen.AddTx(tx)
+			gen.AddTx(ctx, tx)
 		}
 	})
-	if _, err := blockchain.InsertChain(chain); err != nil {
+	if _, err := blockchain.InsertChain(ctx, chain); err != nil {
 		t.Fatalf("failed to insert chain: %v", err)
 	}
 
-	chain, _ = GenerateChain(params.TestChainConfig, genesis, ethash.NewFaker(), db, 3, func(i int, gen *BlockGen) {})
-	if _, err := blockchain.InsertChain(chain); err != nil {
+	chain, _ = GenerateChain(ctx, params.TestChainConfig, genesis, ethash.NewFaker(), db, 3, func(ctx context.Context, i int, gen *BlockGen) {})
+	if _, err := blockchain.InsertChain(ctx, chain); err != nil {
 		t.Fatalf("failed to insert forked chain: %v", err)
 	}
 
@@ -930,6 +947,7 @@ func TestLogReorgs(t *testing.T) {
 }
 
 func TestReorgSideEvent(t *testing.T) {
+	ctx := context.Background()
 	var (
 		db, _   = ethdb.NewMemDatabase()
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
@@ -942,15 +960,15 @@ func TestReorgSideEvent(t *testing.T) {
 		signer  = types.NewEIP155Signer(gspec.Config.ChainId)
 	)
 
-	blockchain, _ := NewBlockChain(db, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
+	blockchain, _ := NewBlockChain(ctx, db, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
 	defer blockchain.Stop()
 
-	chain, _ := GenerateChain(gspec.Config, genesis, ethash.NewFaker(), db, 3, func(i int, gen *BlockGen) {})
-	if _, err := blockchain.InsertChain(chain); err != nil {
+	chain, _ := GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), db, 3, func(ctx context.Context, i int, gen *BlockGen) {})
+	if _, err := blockchain.InsertChain(ctx, chain); err != nil {
 		t.Fatalf("failed to insert chain: %v", err)
 	}
 
-	replacementBlocks, _ := GenerateChain(gspec.Config, genesis, ethash.NewFaker(), db, 4, func(i int, gen *BlockGen) {
+	replacementBlocks, _ := GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), db, 4, func(ctx context.Context, i int, gen *BlockGen) {
 		tx, err := types.SignTx(types.NewContractCreation(gen.TxNonce(addr1), new(big.Int), 1000000, new(big.Int), nil), signer, key1)
 		if i == 2 {
 			gen.OffsetTime(-9)
@@ -958,11 +976,11 @@ func TestReorgSideEvent(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create tx: %v", err)
 		}
-		gen.AddTx(tx)
+		gen.AddTx(ctx, tx)
 	})
 	chainSideCh := make(chan ChainSideEvent, 64)
 	blockchain.SubscribeChainSideEvent(chainSideCh)
-	if _, err := blockchain.InsertChain(replacementBlocks); err != nil {
+	if _, err := blockchain.InsertChain(ctx, replacementBlocks); err != nil {
 		t.Fatalf("failed to insert chain: %v", err)
 	}
 
@@ -1014,10 +1032,11 @@ done:
 
 // Tests if the canonical block can be fetched from the database during chain insertion.
 func TestCanonicalBlockRetrieval(t *testing.T) {
+	ctx := context.Background()
 	bc := newTestBlockChain(true, false)
 	defer bc.Stop()
 
-	chain, _ := GenerateChain(bc.chainConfig, bc.genesisBlock, ethash.NewFaker(), bc.db, 10, func(i int, gen *BlockGen) {})
+	chain, _ := GenerateChain(ctx, bc.chainConfig, bc.genesisBlock, ethash.NewFaker(), bc.db, 10, func(ctx context.Context, i int, gen *BlockGen) {})
 
 	var pend sync.WaitGroup
 	pend.Add(len(chain))
@@ -1046,7 +1065,7 @@ func TestCanonicalBlockRetrieval(t *testing.T) {
 			}
 		}(chain[i])
 
-		if _, err := bc.InsertChain(types.Blocks{chain[i]}); err != nil {
+		if _, err := bc.InsertChain(ctx, types.Blocks{chain[i]}); err != nil {
 			t.Fatalf("failed to insert block %d: %v", i, err)
 		}
 	}
@@ -1054,6 +1073,7 @@ func TestCanonicalBlockRetrieval(t *testing.T) {
 }
 
 func TestEIP155Transition(t *testing.T) {
+	ctx := context.Background()
 	// Configure and generate a sample block chain
 	var (
 		db, _      = ethdb.NewMemDatabase()
@@ -1068,10 +1088,10 @@ func TestEIP155Transition(t *testing.T) {
 		genesis = gspec.MustCommit(db)
 	)
 
-	blockchain, _ := NewBlockChain(db, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
+	blockchain, _ := NewBlockChain(ctx, db, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
 	defer blockchain.Stop()
 
-	blocks, _ := GenerateChain(gspec.Config, genesis, ethash.NewFaker(), db, 4, func(i int, block *BlockGen) {
+	blocks, _ := GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), db, 4, func(ctx context.Context, i int, block *BlockGen) {
 		var (
 			tx      *types.Transaction
 			err     error
@@ -1085,35 +1105,35 @@ func TestEIP155Transition(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			block.AddTx(tx)
+			block.AddTx(ctx, tx)
 		case 2:
 			tx, err = basicTx(types.HomesteadSigner{})
 			if err != nil {
 				t.Fatal(err)
 			}
-			block.AddTx(tx)
+			block.AddTx(ctx, tx)
 
 			tx, err = basicTx(types.NewEIP155Signer(gspec.Config.ChainId))
 			if err != nil {
 				t.Fatal(err)
 			}
-			block.AddTx(tx)
+			block.AddTx(ctx, tx)
 		case 3:
 			tx, err = basicTx(types.HomesteadSigner{})
 			if err != nil {
 				t.Fatal(err)
 			}
-			block.AddTx(tx)
+			block.AddTx(ctx, tx)
 
 			tx, err = basicTx(types.NewEIP155Signer(gspec.Config.ChainId))
 			if err != nil {
 				t.Fatal(err)
 			}
-			block.AddTx(tx)
+			block.AddTx(ctx, tx)
 		}
 	})
 
-	if _, err := blockchain.InsertChain(blocks); err != nil {
+	if _, err := blockchain.InsertChain(ctx, blocks); err != nil {
 		t.Fatal(err)
 	}
 	block := blockchain.GetBlockByNumber(1)
@@ -1128,13 +1148,13 @@ func TestEIP155Transition(t *testing.T) {
 	if !block.Transactions()[1].Protected() {
 		t.Error("Expected block[3].txs[1] to be replay protected")
 	}
-	if _, err := blockchain.InsertChain(blocks[4:]); err != nil {
+	if _, err := blockchain.InsertChain(ctx, blocks[4:]); err != nil {
 		t.Fatal(err)
 	}
 
 	// generate an invalid chain id transaction
 	config := &params.ChainConfig{ChainId: big.NewInt(2), EIP155Block: big.NewInt(2), HomesteadBlock: new(big.Int)}
-	blocks, _ = GenerateChain(config, blocks[len(blocks)-1], ethash.NewFaker(), db, 4, func(i int, block *BlockGen) {
+	blocks, _ = GenerateChain(ctx, config, blocks[len(blocks)-1], ethash.NewFaker(), db, 4, func(ctx context.Context, i int, block *BlockGen) {
 		var (
 			tx      *types.Transaction
 			err     error
@@ -1148,16 +1168,17 @@ func TestEIP155Transition(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			block.AddTx(tx)
+			block.AddTx(ctx, tx)
 		}
 	})
-	_, err := blockchain.InsertChain(blocks)
+	_, err := blockchain.InsertChain(ctx, blocks)
 	if err != types.ErrInvalidChainId {
 		t.Error("expected error:", types.ErrInvalidChainId)
 	}
 }
 
 func TestEIP161AccountRemoval(t *testing.T) {
+	ctx := context.Background()
 	// Configure and generate a sample block chain
 	var (
 		db, _   = ethdb.NewMemDatabase()
@@ -1176,10 +1197,10 @@ func TestEIP161AccountRemoval(t *testing.T) {
 		}
 		genesis = gspec.MustCommit(db)
 	)
-	blockchain, _ := NewBlockChain(db, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
+	blockchain, _ := NewBlockChain(ctx, db, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
 	defer blockchain.Stop()
 
-	blocks, _ := GenerateChain(gspec.Config, genesis, ethash.NewFaker(), db, 3, func(i int, block *BlockGen) {
+	blocks, _ := GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), db, 3, func(ctx context.Context, i int, block *BlockGen) {
 		var (
 			tx     *types.Transaction
 			err    error
@@ -1196,10 +1217,10 @@ func TestEIP161AccountRemoval(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		block.AddTx(tx)
+		block.AddTx(ctx, tx)
 	})
 	// account must exist pre eip 161
-	if _, err := blockchain.InsertChain(types.Blocks{blocks[0]}); err != nil {
+	if _, err := blockchain.InsertChain(ctx, types.Blocks{blocks[0]}); err != nil {
 		t.Fatal(err)
 	}
 	if st, _ := blockchain.State(); !st.Exist(theAddr) {
@@ -1207,7 +1228,7 @@ func TestEIP161AccountRemoval(t *testing.T) {
 	}
 
 	// account needs to be deleted post eip 161
-	if _, err := blockchain.InsertChain(types.Blocks{blocks[1]}); err != nil {
+	if _, err := blockchain.InsertChain(ctx, types.Blocks{blocks[1]}); err != nil {
 		t.Fatal(err)
 	}
 	if st, _ := blockchain.State(); st.Exist(theAddr) {
@@ -1215,7 +1236,7 @@ func TestEIP161AccountRemoval(t *testing.T) {
 	}
 
 	// account musn't be created post eip 161
-	if _, err := blockchain.InsertChain(types.Blocks{blocks[2]}); err != nil {
+	if _, err := blockchain.InsertChain(ctx, types.Blocks{blocks[2]}); err != nil {
 		t.Fatal(err)
 	}
 	if st, _ := blockchain.State(); st.Exist(theAddr) {
@@ -1229,12 +1250,13 @@ func TestEIP161AccountRemoval(t *testing.T) {
 //
 // https://github.com/ethereum/go-ethereum/pull/15941
 func TestBlockchainHeaderchainReorgConsistency(t *testing.T) {
+	ctx := context.Background()
 	// Generate a canonical chain to act as the main dataset
 	engine := ethash.NewFaker()
 
 	db, _ := ethdb.NewMemDatabase()
 	genesis := new(Genesis).MustCommit(db)
-	blocks, _ := GenerateChain(params.TestChainConfig, genesis, engine, db, 64, func(i int, b *BlockGen) { b.SetCoinbase(common.Address{1}) })
+	blocks, _ := GenerateChain(ctx, params.TestChainConfig, genesis, engine, db, 64, func(ctx context.Context, i int, b *BlockGen) { b.SetCoinbase(common.Address{1}) })
 
 	// Generate a bunch of fork blocks, each side forking from the canonical chain
 	forks := make([]*types.Block, len(blocks))
@@ -1243,7 +1265,7 @@ func TestBlockchainHeaderchainReorgConsistency(t *testing.T) {
 		if i > 0 {
 			parent = blocks[i-1]
 		}
-		fork, _ := GenerateChain(params.TestChainConfig, parent, engine, db, 1, func(i int, b *BlockGen) { b.SetCoinbase(common.Address{2}) })
+		fork, _ := GenerateChain(ctx, params.TestChainConfig, parent, engine, db, 1, func(ctx context.Context, i int, b *BlockGen) { b.SetCoinbase(common.Address{2}) })
 		forks[i] = fork[0]
 	}
 	// Import the canonical and fork chain side by side, verifying the current block
@@ -1251,18 +1273,18 @@ func TestBlockchainHeaderchainReorgConsistency(t *testing.T) {
 	diskdb, _ := ethdb.NewMemDatabase()
 	new(Genesis).MustCommit(diskdb)
 
-	chain, err := NewBlockChain(diskdb, nil, params.TestChainConfig, engine, vm.Config{})
+	chain, err := NewBlockChain(ctx, diskdb, nil, params.TestChainConfig, engine, vm.Config{})
 	if err != nil {
 		t.Fatalf("failed to create tester chain: %v", err)
 	}
 	for i := 0; i < len(blocks); i++ {
-		if _, err := chain.InsertChain(blocks[i : i+1]); err != nil {
+		if _, err := chain.InsertChain(ctx, blocks[i:i+1]); err != nil {
 			t.Fatalf("block %d: failed to insert into chain: %v", i, err)
 		}
 		if chain.CurrentBlock().Hash() != chain.CurrentHeader().Hash() {
 			t.Errorf("block %d: current block/header mismatch: block #%d [%x…], header #%d [%x…]", i, chain.CurrentBlock().Number(), chain.CurrentBlock().Hash().Bytes()[:4], chain.CurrentHeader().Number, chain.CurrentHeader().Hash().Bytes()[:4])
 		}
-		if _, err := chain.InsertChain(forks[i : i+1]); err != nil {
+		if _, err := chain.InsertChain(ctx, forks[i:i+1]); err != nil {
 			t.Fatalf(" fork %d: failed to insert into chain: %v", i, err)
 		}
 		if chain.CurrentBlock().Hash() != chain.CurrentHeader().Hash() {
@@ -1274,12 +1296,13 @@ func TestBlockchainHeaderchainReorgConsistency(t *testing.T) {
 // Tests that importing small side forks doesn't leave junk in the trie database
 // cache (which would eventually cause memory issues).
 func TestTrieForkGC(t *testing.T) {
+	ctx := context.Background()
 	// Generate a canonical chain to act as the main dataset
 	engine := ethash.NewFaker()
 
 	db, _ := ethdb.NewMemDatabase()
 	genesis := new(Genesis).MustCommit(db)
-	blocks, _ := GenerateChain(params.TestChainConfig, genesis, engine, db, 2*triesInMemory, func(i int, b *BlockGen) { b.SetCoinbase(common.Address{1}) })
+	blocks, _ := GenerateChain(ctx, params.TestChainConfig, genesis, engine, db, 2*triesInMemory, func(ctx context.Context, i int, b *BlockGen) { b.SetCoinbase(common.Address{1}) })
 
 	// Generate a bunch of fork blocks, each side forking from the canonical chain
 	forks := make([]*types.Block, len(blocks))
@@ -1288,22 +1311,22 @@ func TestTrieForkGC(t *testing.T) {
 		if i > 0 {
 			parent = blocks[i-1]
 		}
-		fork, _ := GenerateChain(params.TestChainConfig, parent, engine, db, 1, func(i int, b *BlockGen) { b.SetCoinbase(common.Address{2}) })
+		fork, _ := GenerateChain(ctx, params.TestChainConfig, parent, engine, db, 1, func(ctx context.Context, i int, b *BlockGen) { b.SetCoinbase(common.Address{2}) })
 		forks[i] = fork[0]
 	}
 	// Import the canonical and fork chain side by side, forcing the trie cache to cache both
 	diskdb, _ := ethdb.NewMemDatabase()
 	new(Genesis).MustCommit(diskdb)
 
-	chain, err := NewBlockChain(diskdb, nil, params.TestChainConfig, engine, vm.Config{})
+	chain, err := NewBlockChain(ctx, diskdb, nil, params.TestChainConfig, engine, vm.Config{})
 	if err != nil {
 		t.Fatalf("failed to create tester chain: %v", err)
 	}
 	for i := 0; i < len(blocks); i++ {
-		if _, err := chain.InsertChain(blocks[i : i+1]); err != nil {
+		if _, err := chain.InsertChain(ctx, blocks[i:i+1]); err != nil {
 			t.Fatalf("block %d: failed to insert into chain: %v", i, err)
 		}
-		if _, err := chain.InsertChain(forks[i : i+1]); err != nil {
+		if _, err := chain.InsertChain(ctx, forks[i:i+1]); err != nil {
 			t.Fatalf("fork %d: failed to insert into chain: %v", i, err)
 		}
 	}
@@ -1320,28 +1343,29 @@ func TestTrieForkGC(t *testing.T) {
 // Tests that doing large reorgs works even if the state associated with the
 // forking point is not available any more.
 func TestLargeReorgTrieGC(t *testing.T) {
+	ctx := context.Background()
 	// Generate the original common chain segment and the two competing forks
 	engine := ethash.NewFaker()
 
 	db, _ := ethdb.NewMemDatabase()
 	genesis := new(Genesis).MustCommit(db)
 
-	shared, _ := GenerateChain(params.TestChainConfig, genesis, engine, db, 64, func(i int, b *BlockGen) { b.SetCoinbase(common.Address{1}) })
-	original, _ := GenerateChain(params.TestChainConfig, shared[len(shared)-1], engine, db, 2*triesInMemory, func(i int, b *BlockGen) { b.SetCoinbase(common.Address{2}) })
-	competitor, _ := GenerateChain(params.TestChainConfig, shared[len(shared)-1], engine, db, 2*triesInMemory+1, func(i int, b *BlockGen) { b.SetCoinbase(common.Address{3}) })
+	shared, _ := GenerateChain(ctx, params.TestChainConfig, genesis, engine, db, 64, func(ctx context.Context, i int, b *BlockGen) { b.SetCoinbase(common.Address{1}) })
+	original, _ := GenerateChain(ctx, params.TestChainConfig, shared[len(shared)-1], engine, db, 2*triesInMemory, func(ctx context.Context, i int, b *BlockGen) { b.SetCoinbase(common.Address{2}) })
+	competitor, _ := GenerateChain(ctx, params.TestChainConfig, shared[len(shared)-1], engine, db, 2*triesInMemory+1, func(ctx context.Context, i int, b *BlockGen) { b.SetCoinbase(common.Address{3}) })
 
 	// Import the shared chain and the original canonical one
 	diskdb, _ := ethdb.NewMemDatabase()
 	new(Genesis).MustCommit(diskdb)
 
-	chain, err := NewBlockChain(diskdb, nil, params.TestChainConfig, engine, vm.Config{})
+	chain, err := NewBlockChain(ctx, diskdb, nil, params.TestChainConfig, engine, vm.Config{})
 	if err != nil {
 		t.Fatalf("failed to create tester chain: %v", err)
 	}
-	if _, err := chain.InsertChain(shared); err != nil {
+	if _, err := chain.InsertChain(ctx, shared); err != nil {
 		t.Fatalf("failed to insert shared chain: %v", err)
 	}
-	if _, err := chain.InsertChain(original); err != nil {
+	if _, err := chain.InsertChain(ctx, original); err != nil {
 		t.Fatalf("failed to insert shared chain: %v", err)
 	}
 	// Ensure that the state associated with the forking point is pruned away
@@ -1350,7 +1374,7 @@ func TestLargeReorgTrieGC(t *testing.T) {
 	}
 	// Import the competitor chain without exceeding the canonical's TD and ensure
 	// we have not processed any of the blocks (protection against malicious blocks)
-	if _, err := chain.InsertChain(competitor[:len(competitor)-2]); err != nil {
+	if _, err := chain.InsertChain(ctx, competitor[:len(competitor)-2]); err != nil {
 		t.Fatalf("failed to insert competitor chain: %v", err)
 	}
 	for i, block := range competitor[:len(competitor)-2] {
@@ -1360,7 +1384,7 @@ func TestLargeReorgTrieGC(t *testing.T) {
 	}
 	// Import the head of the competitor chain, triggering the reorg and ensure we
 	// successfully reprocess all the stashed away blocks.
-	if _, err := chain.InsertChain(competitor[len(competitor)-2:]); err != nil {
+	if _, err := chain.InsertChain(ctx, competitor[len(competitor)-2:]); err != nil {
 		t.Fatalf("failed to finalize competitor chain: %v", err)
 	}
 	for i, block := range competitor[:len(competitor)-triesInMemory] {

@@ -17,6 +17,7 @@
 package node_test
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -37,10 +38,14 @@ type SampleService struct{}
 
 func (s *SampleService) Protocols() []p2p.Protocol { return nil }
 func (s *SampleService) APIs() []rpc.API           { return nil }
-func (s *SampleService) Start(*p2p.Server) error   { fmt.Println("Service starting..."); return nil }
-func (s *SampleService) Stop() error               { fmt.Println("Service stopping..."); return nil }
+func (s *SampleService) Start(context.Context, *p2p.Server) error {
+	fmt.Println("Service starting...")
+	return nil
+}
+func (s *SampleService) Stop() error { fmt.Println("Service stopping..."); return nil }
 
 func ExampleService() {
+	ctx := context.Background()
 	// Create a network node to run protocols with the default values.
 	stack, err := node.New(&node.Config{})
 	if err != nil {
@@ -57,10 +62,10 @@ func ExampleService() {
 		log.Fatalf("Failed to register service: %v", err)
 	}
 	// Boot up the entire protocol stack, do a restart and terminate
-	if err := stack.Start(); err != nil {
+	if err := stack.Start(ctx); err != nil {
 		log.Fatalf("Failed to start the protocol stack: %v", err)
 	}
-	if err := stack.Restart(); err != nil {
+	if err := stack.Restart(ctx); err != nil {
 		log.Fatalf("Failed to restart the protocol stack: %v", err)
 	}
 	if err := stack.Stop(); err != nil {

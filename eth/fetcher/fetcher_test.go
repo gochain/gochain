@@ -17,6 +17,7 @@
 package fetcher
 
 import (
+	"context"
 	"errors"
 	"math/big"
 	"sync"
@@ -46,7 +47,8 @@ var (
 // contains a transaction and every 5th an uncle to allow testing correct block
 // reassembly.
 func makeChain(n int, seed byte, parent *types.Block) ([]common.Hash, map[common.Hash]*types.Block) {
-	blocks, _ := core.GenerateChain(params.TestChainConfig, parent, ethash.NewFaker(), testdb, n, func(i int, block *core.BlockGen) {
+	ctx := context.Background()
+	blocks, _ := core.GenerateChain(ctx, params.TestChainConfig, parent, ethash.NewFaker(), testdb, n, func(ctx context.Context, i int, block *core.BlockGen) {
 		block.SetCoinbase(common.Address{seed})
 
 		// If the block number is multiple of 3, send a bonus transaction to the miner
@@ -56,7 +58,7 @@ func makeChain(n int, seed byte, parent *types.Block) ([]common.Hash, map[common
 			if err != nil {
 				panic(err)
 			}
-			block.AddTx(tx)
+			block.AddTx(ctx, tx)
 		}
 		// If the block number is a multiple of 5, add a bonus uncle to the block
 		if i%5 == 0 {

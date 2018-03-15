@@ -17,6 +17,7 @@
 package eth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -98,7 +99,7 @@ type ProtocolManager struct {
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
 // with the ethereum network.
-func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, networkId uint64, mux *event.TypeMux, txpool txPool, engine consensus.Engine, blockchain *core.BlockChain, chaindb ethdb.Database) (*ProtocolManager, error) {
+func NewProtocolManager(ctx context.Context, config *params.ChainConfig, mode downloader.SyncMode, networkId uint64, mux *event.TypeMux, txpool txPool, engine consensus.Engine, blockchain *core.BlockChain, chaindb ethdb.Database) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		networkId:   networkId,
@@ -139,7 +140,7 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 				case manager.newPeerCh <- peer:
 					manager.wg.Add(1)
 					defer manager.wg.Done()
-					return manager.handle(peer)
+					return manager.handle(ctx, peer)
 				case <-manager.quitSync:
 					return p2p.DiscQuitting
 				}
@@ -174,7 +175,7 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 			return 0, nil
 		}
 		atomic.StoreUint32(&manager.acceptTxs, 1) // Mark initial sync done on any fetcher import
-		return manager.blockchain.InsertChain(blocks)
+		return manager.blockchain.InsertChain(ctx, blocks)
 	}
 	manager.fetcher = fetcher.New(blockchain.GetBlockByHash, validator, manager.BroadcastBlock, heighter, inserter, manager.removePeer)
 
@@ -200,7 +201,7 @@ func (pm *ProtocolManager) removePeer(id string) {
 	}
 }
 
-func (pm *ProtocolManager) Start(maxPeers int) {
+func (pm *ProtocolManager) Start(ctx context.Context, maxPeers int) {
 	pm.maxPeers = maxPeers
 
 	// broadcast transactions
@@ -213,7 +214,7 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 	go pm.minedBroadcastLoop()
 
 	// start sync handlers
-	go pm.syncer()
+	go pm.syncer(ctx)
 	go pm.txsyncLoop()
 }
 
@@ -248,7 +249,7 @@ func (pm *ProtocolManager) newPeer(pv int, p *p2p.Peer, rw p2p.MsgReadWriter) *p
 
 // handle is the callback invoked to manage the life cycle of an eth peer. When
 // this function terminates, the peer is disconnected.
-func (pm *ProtocolManager) handle(p *peer) error {
+func (pm *ProtocolManager) handle(ctx context.Context, p *peer) error {
 	if pm.peers.Len() >= pm.maxPeers {
 		return p2p.DiscTooManyPeers
 	}
@@ -305,7 +306,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	}
 	// main loop. handle incoming messages.
 	for {
-		if err := pm.handleMsg(p); err != nil {
+		if err := pm.handleMsg(ctx, p); err != nil {
 			p.Log().Debug("Ethereum message handling failed", "err", err)
 			return err
 		}
@@ -314,7 +315,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 
 // handleMsg is invoked whenever an inbound message is received from a remote
 // peer. The remote connection is torn down upon returning any error.
-func (pm *ProtocolManager) handleMsg(p *peer) error {
+func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 	// Read the next message from the remote peer, and ensure it's fully consumed
 	msg, err := p.rw.ReadMsg()
 	if err != nil {
@@ -652,7 +653,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			// scenario should easily be covered by the fetcher.
 			currentBlock := pm.blockchain.CurrentBlock()
 			if trueTD.Cmp(pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())) > 0 {
-				go pm.synchronise(p)
+				go pm.synchronise(ctx, p)
 			}
 		}
 
@@ -673,7 +674,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			}
 			p.MarkTransaction(tx.Hash())
 		}
-		pm.txpool.AddRemotes(txs)
+		pm.txpool.AddRemotes(ctx, txs)
 
 	default:
 		return errResp(ErrInvalidMsgCode, "%v", msg.Code)

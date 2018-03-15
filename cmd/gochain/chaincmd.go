@@ -17,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -204,12 +205,12 @@ func importChain(ctx *cli.Context) error {
 	start := time.Now()
 
 	if len(ctx.Args()) == 1 {
-		if err := utils.ImportChain(chain, ctx.Args().First()); err != nil {
+		if err := utils.ImportChain(context.TODO(), chain, ctx.Args().First()); err != nil {
 			log.Error("Import error", "err", err)
 		}
 	} else {
 		for _, arg := range ctx.Args() {
-			if err := utils.ImportChain(chain, arg); err != nil {
+			if err := utils.ImportChain(context.TODO(), chain, arg); err != nil {
 				log.Error("Import error", "file", arg, "err", err)
 			}
 		}
@@ -319,7 +320,7 @@ func copyDb(ctx *cli.Context) error {
 	start := time.Now()
 
 	currentHeader := hc.CurrentHeader()
-	if err = dl.Synchronise("local", currentHeader.Hash(), hc.GetTd(currentHeader.Hash(), currentHeader.Number.Uint64()), syncmode); err != nil {
+	if err = dl.Synchronise(context.TODO(), "local", currentHeader.Hash(), hc.GetTd(currentHeader.Hash(), currentHeader.Number.Uint64()), syncmode); err != nil {
 		return err
 	}
 	for dl.Synchronising() {

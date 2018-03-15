@@ -94,9 +94,9 @@ func (api *PublicMinerAPI) SubmitWork(nonce types.BlockNonce, solution, digest c
 // result[0], 32 bytes hex encoded current block header pow-hash
 // result[1], 32 bytes hex encoded seed hash used for DAG
 // result[2], 32 bytes hex encoded boundary condition ("target"), 2^256/difficulty
-func (api *PublicMinerAPI) GetWork() ([3]string, error) {
+func (api *PublicMinerAPI) GetWork(ctx context.Context) ([3]string, error) {
 	if !api.e.IsMining() {
-		if err := api.e.StartMining(false); err != nil {
+		if err := api.e.StartMining(ctx, false); err != nil {
 			return [3]string{}, err
 		}
 	}
@@ -130,7 +130,7 @@ func NewPrivateMinerAPI(e *Ethereum) *PrivateMinerAPI {
 // of workers started is equal to the number of logical CPUs that are usable by
 // this process. If mining is already running, this method adjust the number of
 // threads allowed to use.
-func (api *PrivateMinerAPI) Start(threads *int) error {
+func (api *PrivateMinerAPI) Start(ctx context.Context, threads *int) error {
 	// Set the number of threads if the seal engine supports it
 	if threads == nil {
 		threads = new(int)
@@ -151,8 +151,8 @@ func (api *PrivateMinerAPI) Start(threads *int) error {
 		price := api.e.gasPrice
 		api.e.lock.RUnlock()
 
-		api.e.txPool.SetGasPrice(price)
-		return api.e.StartMining(true)
+		api.e.txPool.SetGasPrice(ctx, price)
+		return api.e.StartMining(ctx, true)
 	}
 	return nil
 }
@@ -178,12 +178,12 @@ func (api *PrivateMinerAPI) SetExtra(extra string) (bool, error) {
 }
 
 // SetGasPrice sets the minimum accepted gas price for the miner.
-func (api *PrivateMinerAPI) SetGasPrice(gasPrice hexutil.Big) bool {
+func (api *PrivateMinerAPI) SetGasPrice(ctx context.Context, gasPrice hexutil.Big) bool {
 	api.e.lock.Lock()
 	api.e.gasPrice = (*big.Int)(&gasPrice)
 	api.e.lock.Unlock()
 
-	api.e.txPool.SetGasPrice((*big.Int)(&gasPrice))
+	api.e.txPool.SetGasPrice(ctx, (*big.Int)(&gasPrice))
 	return true
 }
 
@@ -243,7 +243,7 @@ func hasAllBlocks(chain *core.BlockChain, bs []*types.Block) bool {
 }
 
 // ImportChain imports a blockchain from a local file.
-func (api *PrivateAdminAPI) ImportChain(file string) (bool, error) {
+func (api *PrivateAdminAPI) ImportChain(ctx context.Context, file string) (bool, error) {
 	// Make sure the can access the file to import
 	in, err := os.Open(file)
 	if err != nil {
@@ -284,7 +284,7 @@ func (api *PrivateAdminAPI) ImportChain(file string) (bool, error) {
 			continue
 		}
 		// Import the batch and reset the buffer
-		if _, err := api.eth.BlockChain().InsertChain(blocks); err != nil {
+		if _, err := api.eth.BlockChain().InsertChain(ctx, blocks); err != nil {
 			return false, fmt.Errorf("batch %d: failed to insert: %v", batch, err)
 		}
 		blocks = blocks[:0]
@@ -369,7 +369,7 @@ type storageEntry struct {
 
 // StorageRangeAt returns the storage at the given block height and transaction index.
 func (api *PrivateDebugAPI) StorageRangeAt(ctx context.Context, blockHash common.Hash, txIndex int, contractAddress common.Address, keyStart hexutil.Bytes, maxResult int) (StorageRangeResult, error) {
-	_, _, statedb, err := api.computeTxEnv(blockHash, txIndex, 0)
+	_, _, statedb, err := api.computeTxEnv(ctx, blockHash, txIndex, 0)
 	if err != nil {
 		return StorageRangeResult{}, err
 	}

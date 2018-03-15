@@ -18,6 +18,7 @@ package types
 
 import (
 	"container/heap"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -225,7 +226,16 @@ func (tx *Transaction) Size() common.StorageSize {
 // AsMessage requires a signer to derive the sender.
 //
 // XXX Rename message to something less arbitrary?
-func (tx *Transaction) AsMessage(s Signer) (Message, error) {
+func (tx *Transaction) AsMessage(ctx context.Context, s Signer) (Message, error) {
+	from, err := Sender(ctx, s, tx)
+	if err != nil {
+		return Message{}, err
+	}
+	msg := tx.AsMessageWithSender(ctx, s, from)
+	return msg, nil
+}
+
+func (tx *Transaction) AsMessageWithSender(ctx context.Context, s Signer, from common.Address) Message {
 	msg := Message{
 		nonce:      tx.data.AccountNonce,
 		gasLimit:   tx.data.GasLimit,
@@ -234,11 +244,9 @@ func (tx *Transaction) AsMessage(s Signer) (Message, error) {
 		amount:     tx.data.Amount,
 		data:       tx.data.Payload,
 		checkNonce: true,
+		from:       from,
 	}
-
-	var err error
-	msg.from, err = Sender(s, tx)
-	return msg, err
+	return msg
 }
 
 // WithSignature returns a new transaction with the given signature.
@@ -264,13 +272,13 @@ func (tx *Transaction) RawSignatureValues() (*big.Int, *big.Int, *big.Int) {
 	return tx.data.V, tx.data.R, tx.data.S
 }
 
-func (tx *Transaction) String() string {
+func (tx *Transaction) String(ctx context.Context) string {
 	var from, to string
 	if tx.data.V != nil {
 		// make a best guess about the signer and use that to derive
 		// the sender.
 		signer := deriveSigner(tx.data.V)
-		if f, err := Sender(signer, tx); err != nil { // derive but don't cache
+		if f, err := Sender(ctx, signer, tx); err != nil { // derive but don't cache
 			from = "[invalid sender: invalid sig]"
 		} else {
 			from = fmt.Sprintf("%x", f[:])
@@ -374,13 +382,13 @@ type TransactionsByPriceAndNonce struct {
 //
 // Note, the input map is reowned so the caller should not interact any more with
 // if after providing it to the constructor.
-func NewTransactionsByPriceAndNonce(signer Signer, txs map[common.Address]Transactions) *TransactionsByPriceAndNonce {
+func NewTransactionsByPriceAndNonce(ctx context.Context, signer Signer, txs map[common.Address]Transactions) *TransactionsByPriceAndNonce {
 	// Initialize a price based heap with the head transactions
 	heads := make(TxByPrice, 0, len(txs))
 	for _, accTxs := range txs {
 		heads = append(heads, accTxs[0])
 		// Ensure the sender address is from the signer
-		acc, _ := Sender(signer, accTxs[0])
+		acc, _ := Sender(ctx, signer, accTxs[0])
 		txs[acc] = accTxs[1:]
 	}
 	heap.Init(&heads)
@@ -402,8 +410,8 @@ func (t *TransactionsByPriceAndNonce) Peek() *Transaction {
 }
 
 // Shift replaces the current best head with the next one from the same account.
-func (t *TransactionsByPriceAndNonce) Shift() {
-	acc, _ := Sender(t.signer, t.heads[0])
+func (t *TransactionsByPriceAndNonce) Shift(ctx context.Context) {
+	acc, _ := Sender(ctx, t.signer, t.heads[0])
 	if txs, ok := t.txs[acc]; ok && len(txs) > 0 {
 		t.heads[0], t.txs[acc] = txs[0], txs[1:]
 		heap.Fix(&t.heads, 0)

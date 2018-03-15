@@ -17,6 +17,7 @@
 package types
 
 import (
+	"context"
 	"math/big"
 	"testing"
 
@@ -26,6 +27,7 @@ import (
 )
 
 func TestEIP155Signing(t *testing.T) {
+	ctx := context.Background()
 	key, _ := crypto.GenerateKey()
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 
@@ -35,7 +37,7 @@ func TestEIP155Signing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	from, err := Sender(signer, tx)
+	from, err := Sender(ctx, signer, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,6 +79,7 @@ func TestEIP155ChainId(t *testing.T) {
 }
 
 func TestEIP155SigningVitalik(t *testing.T) {
+	ctx := context.Background()
 	// Test vectors come from http://vitalik.ca/files/eip155_testvec.txt
 	for i, test := range []struct {
 		txRlp, addr string
@@ -101,7 +104,7 @@ func TestEIP155SigningVitalik(t *testing.T) {
 			continue
 		}
 
-		from, err := Sender(signer, tx)
+		from, err := Sender(ctx, signer, tx)
 		if err != nil {
 			t.Errorf("%d: %v", i, err)
 			continue
@@ -114,8 +117,8 @@ func TestEIP155SigningVitalik(t *testing.T) {
 
 	}
 }
-
 func TestChainId(t *testing.T) {
+	ctx := context.Background()
 	key, _ := defaultTestKey()
 
 	tx := NewTransaction(0, common.Address{}, new(big.Int), 0, new(big.Int), nil)
@@ -126,12 +129,12 @@ func TestChainId(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = Sender(NewEIP155Signer(big.NewInt(2)), tx)
+	_, err = Sender(ctx, NewEIP155Signer(big.NewInt(2)), tx)
 	if err != ErrInvalidChainId {
 		t.Error("expected error:", ErrInvalidChainId)
 	}
 
-	_, err = Sender(NewEIP155Signer(big.NewInt(1)), tx)
+	_, err = Sender(ctx, NewEIP155Signer(big.NewInt(1)), tx)
 	if err != nil {
 		t.Error("expected no error")
 	}

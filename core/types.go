@@ -17,6 +17,8 @@
 package core
 
 import (
+	"context"
+
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
@@ -42,5 +44,5 @@ type Validator interface {
 // of gas used in the process and return an error if any of the internal rules
 // failed.
 type Processor interface {
-	Process(block *types.Block, statedb *state.StateDB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error)
+	Process(ctx context.Context, block *types.Block, statedb *state.StateDB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error)
 }

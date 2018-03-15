@@ -17,6 +17,7 @@
 package tracers
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"math/big"
@@ -119,6 +120,7 @@ type callTracerTest struct {
 // Iterates over all the input-output datasets in the tracer test harness and
 // runs the JavaScript tracers against them.
 func TestCallTracer(t *testing.T) {
+	ctx := context.Background()
 	files, err := ioutil.ReadDir("testdata")
 	if err != nil {
 		t.Fatalf("failed to retrieve tracer test suite: %v", err)
@@ -169,7 +171,7 @@ func TestCallTracer(t *testing.T) {
 			}
 			evm := vm.NewEVM(context, statedb, test.Genesis.Config, vm.Config{Debug: true, Tracer: tracer})
 
-			msg, err := tx.AsMessage(signer)
+			msg, err := tx.AsMessage(ctx, signer)
 			if err != nil {
 				t.Fatalf("failed to prepare transaction for tracing: %v", err)
 			}

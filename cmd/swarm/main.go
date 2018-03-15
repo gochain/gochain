@@ -397,6 +397,7 @@ func version(ctx *cli.Context) error {
 }
 
 func bzzd(ctx *cli.Context) error {
+	ctx2 := context.Background()
 	//build a valid bzzapi.Config from all available sources:
 	//default config, file config, command line and env vars
 	bzzconfig, err := buildConfig(ctx)
@@ -423,7 +424,7 @@ func bzzd(ctx *cli.Context) error {
 	//register BZZ as node.Service in the ethereum node
 	registerBzzService(bzzconfig, ctx, stack)
 	//start the node
-	utils.StartNode(stack)
+	utils.StartNode(ctx2, stack)
 
 	go func() {
 		sigc := make(chan os.Signal, 1)

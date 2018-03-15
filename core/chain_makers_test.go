@@ -17,6 +17,7 @@
 package core
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 
@@ -29,6 +30,7 @@ import (
 )
 
 func ExampleGenerateChain() {
+	ctx := context.Background()
 	var (
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
@@ -50,19 +52,19 @@ func ExampleGenerateChain() {
 	// each block and adds different features to gen based on the
 	// block index.
 	signer := types.HomesteadSigner{}
-	chain, _ := GenerateChain(gspec.Config, genesis, ethash.NewFaker(), db, 5, func(i int, gen *BlockGen) {
+	chain, _ := GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), db, 5, func(ctx context.Context, i int, gen *BlockGen) {
 		switch i {
 		case 0:
 			// In block 1, addr1 sends addr2 some ether.
 			tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
-			gen.AddTx(tx)
+			gen.AddTx(ctx, tx)
 		case 1:
 			// In block 2, addr1 sends some more ether to addr2.
 			// addr2 passes it on to addr3.
 			tx1, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(1000), params.TxGas, nil, nil), signer, key1)
 			tx2, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr2), addr3, big.NewInt(1000), params.TxGas, nil, nil), signer, key2)
-			gen.AddTx(tx1)
-			gen.AddTx(tx2)
+			gen.AddTx(ctx, tx1)
+			gen.AddTx(ctx, tx2)
 		case 2:
 			// Block 3 is empty but was mined by addr3.
 			gen.SetCoinbase(addr3)
@@ -79,10 +81,10 @@ func ExampleGenerateChain() {
 	})
 
 	// Import the chain. This runs all block validation rules.
-	blockchain, _ := NewBlockChain(db, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
+	blockchain, _ := NewBlockChain(ctx, db, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
 	defer blockchain.Stop()
 
-	if i, err := blockchain.InsertChain(chain); err != nil {
+	if i, err := blockchain.InsertChain(ctx, chain); err != nil {
 		fmt.Printf("insert error (block %d): %v\n", chain[i].NumberU64(), err)
 		return
 	}

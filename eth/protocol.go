@@ -17,6 +17,7 @@
 package eth
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math/big"
@@ -97,14 +98,14 @@ var errorToString = map[int]string{
 
 type txPool interface {
 	// AddRemotes should add the given transactions to the pool.
-	AddRemotes([]*types.Transaction) []error
+	AddRemotes(context.Context, []*types.Transaction) []error
 
 	// Pending should return pending transactions.
 	// The slice should be modifiable by the caller.
-	Pending() map[common.Address]types.Transactions
+	Pending(ctx context.Context) map[common.Address]types.Transactions
 
 	// PendingList is like Pending, but only txs.
-	PendingList() types.Transactions
+	PendingList(ctx context.Context) types.Transactions
 
 	// SubscribeTxPreEvent should return an event subscription of
 	// TxPreEvent and send events to the given channel.

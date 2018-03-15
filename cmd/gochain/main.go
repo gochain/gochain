@@ -18,6 +18,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime"
@@ -226,7 +227,7 @@ func gochain(ctx *cli.Context) error {
 // miner.
 func startNode(ctx *cli.Context, stack *node.Node) {
 	// Start up the node itself
-	utils.StartNode(stack)
+	utils.StartNode(context.TODO(), stack)
 
 	// Unlock any account specifically requested
 	ks := stack.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
@@ -299,8 +300,8 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 			}
 		}
 		// Set the gas price to the limits from the CLI and start mining
-		ethereum.TxPool().SetGasPrice(utils.GlobalBig(ctx, utils.GasPriceFlag.Name))
-		if err := ethereum.StartMining(true); err != nil {
+		ethereum.TxPool().SetGasPrice(context.TODO(), utils.GlobalBig(ctx, utils.GasPriceFlag.Name))
+		if err := ethereum.StartMining(context.TODO(), true); err != nil {
 			utils.Fatalf("Failed to start mining: %v", err)
 		}
 	}

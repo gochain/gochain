@@ -18,6 +18,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -153,7 +154,7 @@ func enableWhisper(ctx *cli.Context) bool {
 func makeFullNode(ctx *cli.Context) *node.Node {
 	stack, cfg := makeConfigNode(ctx)
 
-	utils.RegisterEthService(stack, &cfg.Eth)
+	utils.RegisterEthService(context.TODO(), stack, &cfg.Eth)
 
 	if ctx.GlobalBool(utils.DashboardEnabledFlag.Name) {
 		utils.RegisterDashboardService(stack, &cfg.Dashboard, gitCommit)

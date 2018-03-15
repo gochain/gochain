@@ -126,6 +126,7 @@ func (b *testBackend) ServiceFilter(ctx context.Context, session *bloombits.Matc
 // - one that is created after a cutoff moment and uninstalled after a second cutoff moment (blockHashes[cutoff1:cutoff2])
 // - one that is created after the second cutoff moment (blockHashes[cutoff2:])
 func TestBlockSubscription(t *testing.T) {
+	ctx := context.Background()
 	t.Parallel()
 
 	var (
@@ -138,7 +139,7 @@ func TestBlockSubscription(t *testing.T) {
 		backend     = &testBackend{mux, db, 0, txFeed, rmLogsFeed, logsFeed, chainFeed}
 		api         = NewPublicFilterAPI(backend, false)
 		genesis     = new(core.Genesis).MustCommit(db)
-		chain, _    = core.GenerateChain(params.TestChainConfig, genesis, ethash.NewFaker(), db, 10, func(i int, gen *core.BlockGen) {})
+		chain, _    = core.GenerateChain(ctx, params.TestChainConfig, genesis, ethash.NewFaker(), db, 10, func(ctx context.Context, i int, gen *core.BlockGen) {})
 		chainEvents = []core.ChainEvent{}
 	)
 

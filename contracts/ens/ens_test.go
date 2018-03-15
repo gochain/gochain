@@ -17,6 +17,7 @@
 package ens
 
 import (
+	"context"
 	"math/big"
 	"testing"
 
@@ -35,6 +36,7 @@ var (
 )
 
 func TestENS(t *testing.T) {
+	ctx := context.Background()
 	contractBackend := backends.NewSimulatedBackend(core.GenesisAlloc{addr: {Balance: big.NewInt(1000000000)}})
 	transactOpts := bind.NewKeyedTransactor(key)
 
@@ -42,13 +44,13 @@ func TestENS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("can't deploy root registry: %v", err)
 	}
-	contractBackend.Commit()
+	contractBackend.Commit(ctx)
 
 	// Set ourself as the owner of the name.
 	if _, err := ens.Register(name); err != nil {
 		t.Fatalf("can't register: %v", err)
 	}
-	contractBackend.Commit()
+	contractBackend.Commit(ctx)
 
 	// Deploy a resolver and make it responsible for the name.
 	resolverAddr, _, _, err := contract.DeployPublicResolver(transactOpts, contractBackend, ensAddr)
@@ -58,13 +60,13 @@ func TestENS(t *testing.T) {
 	if _, err := ens.SetResolver(ensNode(name), resolverAddr); err != nil {
 		t.Fatalf("can't set resolver: %v", err)
 	}
-	contractBackend.Commit()
+	contractBackend.Commit(ctx)
 
 	// Set the content hash for the name.
 	if _, err = ens.SetContentHash(name, hash); err != nil {
 		t.Fatalf("can't set content hash: %v", err)
 	}
-	contractBackend.Commit()
+	contractBackend.Commit(ctx)
 
 	// Try to resolve the name.
 	vhost, err := ens.Resolve(name)

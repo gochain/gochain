@@ -19,6 +19,7 @@ package utils
 
 import (
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -58,8 +59,8 @@ func Fatalf(format string, args ...interface{}) {
 	os.Exit(1)
 }
 
-func StartNode(stack *node.Node) {
-	if err := stack.Start(); err != nil {
+func StartNode(ctx context.Context, stack *node.Node) {
+	if err := stack.Start(ctx); err != nil {
 		Fatalf("Error starting protocol stack: %v", err)
 	}
 	go func() {
@@ -80,7 +81,7 @@ func StartNode(stack *node.Node) {
 	}()
 }
 
-func ImportChain(chain *core.BlockChain, fn string) error {
+func ImportChain(ctx context.Context, chain *core.BlockChain, fn string) error {
 	// Watch for Ctrl-C while the import is running.
 	// If a signal is received, the import will stop at the next batch.
 	interrupt := make(chan os.Signal, 1)
@@ -154,7 +155,7 @@ func ImportChain(chain *core.BlockChain, fn string) error {
 			log.Info("Skipping batch as all blocks present", "batch", batch, "first", blocks[0].Hash(), "last", blocks[i-1].Hash())
 			continue
 		}
-		if _, err := chain.InsertChain(missing); err != nil {
+		if _, err := chain.InsertChain(ctx, missing); err != nil {
 			return fmt.Errorf("invalid block %d: %v", n, err)
 		}
 	}

@@ -18,6 +18,7 @@ package whisperv5
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"net"
@@ -107,6 +108,7 @@ func TestSimulation(t *testing.T) {
 }
 
 func initialize(t *testing.T) {
+	ctx := context.Background()
 	var err error
 	ip := net.IPv4(127, 0, 0, 1)
 	port0 := 30303
@@ -115,7 +117,7 @@ func initialize(t *testing.T) {
 		var node TestNode
 		node.shh = New(&DefaultConfig)
 		node.shh.SetMinimumPoW(0.00000001)
-		node.shh.Start(nil)
+		node.shh.Start(ctx, nil)
 		topics := make([]TopicType, 0)
 		topics = append(topics, sharedTopic)
 		f := Filter{KeySym: sharedKey}

@@ -18,6 +18,7 @@ package miner
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math/big"
 	"sync"
@@ -127,7 +128,7 @@ type worker struct {
 	atWork int32
 }
 
-func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase common.Address, eth Backend, mux *event.TypeMux) *worker {
+func newWorker(ctx context.Context, config *params.ChainConfig, engine consensus.Engine, coinbase common.Address, eth Backend, mux *event.TypeMux) *worker {
 	worker := &worker{
 		config:         config,
 		engine:         engine,
@@ -150,10 +151,10 @@ func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase com
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
 	worker.chainSideSub = eth.BlockChain().SubscribeChainSideEvent(worker.chainSideCh)
-	go worker.update()
+	go worker.update(ctx)
 
-	go worker.wait()
-	worker.commitNewWork()
+	go worker.wait(ctx)
+	worker.commitNewWork(ctx)
 
 	return worker
 }
@@ -240,7 +241,7 @@ func (self *worker) unregister(agent Agent) {
 	agent.Stop()
 }
 
-func (self *worker) update() {
+func (self *worker) update(ctx context.Context) {
 	defer self.txSub.Unsubscribe()
 	defer self.chainHeadSub.Unsubscribe()
 	defer self.chainSideSub.Unsubscribe()
@@ -250,7 +251,7 @@ func (self *worker) update() {
 		select {
 		// Handle ChainHeadEvent
 		case <-self.chainHeadCh:
-			self.commitNewWork()
+			self.commitNewWork(ctx)
 
 		// Handle ChainSideEvent
 		case ev := <-self.chainSideCh:
@@ -263,16 +264,16 @@ func (self *worker) update() {
 			// Apply transaction to the pending state if we're not mining
 			if atomic.LoadInt32(&self.mining) == 0 {
 				self.currentMu.Lock()
-				acc, _ := types.Sender(self.current.signer, ev.Tx)
+				acc, _ := types.Sender(ctx, self.current.signer, ev.Tx)
 				txs := map[common.Address]types.Transactions{acc: {ev.Tx}}
-				txset := types.NewTransactionsByPriceAndNonce(self.current.signer, txs)
+				txset := types.NewTransactionsByPriceAndNonce(ctx, self.current.signer, txs)
 
-				self.current.commitTransactions(self.mux, txset, self.chain, self.coinbase)
+				self.current.commitTransactions(ctx, self.mux, txset, self.chain, self.coinbase)
 				self.currentMu.Unlock()
 			} else {
 				// If we're mining, but nothing is being processed, wake on new transactions
 				if self.config.Clique != nil && self.config.Clique.Period == 0 {
-					self.commitNewWork()
+					self.commitNewWork(ctx)
 				}
 			}
 
@@ -287,7 +288,7 @@ func (self *worker) update() {
 	}
 }
 
-func (self *worker) wait() {
+func (self *worker) wait(ctx context.Context) {
 	for {
 		mustCommitNewWork := true
 		for result := range self.recv {
@@ -335,7 +336,7 @@ func (self *worker) wait() {
 			self.unconfirmed.Insert(block.NumberU64(), block.Hash())
 
 			if mustCommitNewWork {
-				self.commitNewWork()
+				self.commitNewWork(ctx)
 			}
 		}
 	}
@@ -387,7 +388,7 @@ func (self *worker) makeCurrent(parent *types.Block, header *types.Header) error
 	return nil
 }
 
-func (self *worker) commitNewWork() {
+func (self *worker) commitNewWork(ctx context.Context) {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 	self.uncleMu.Lock()
@@ -449,9 +450,9 @@ func (self *worker) commitNewWork() {
 	if self.config.DAOForkSupport && self.config.DAOForkBlock != nil && self.config.DAOForkBlock.Cmp(header.Number) == 0 {
 		misc.ApplyDAOHardFork(work.state)
 	}
-	pending := self.eth.TxPool().Pending()
-	txs := types.NewTransactionsByPriceAndNonce(self.current.signer, pending)
-	work.commitTransactions(self.mux, txs, self.chain, self.coinbase)
+	pending := self.eth.TxPool().Pending(ctx)
+	txs := types.NewTransactionsByPriceAndNonce(ctx, self.current.signer, pending)
+	work.commitTransactions(ctx, self.mux, txs, self.chain, self.coinbase)
 
 	// compute uncles for the new block.
 	var (
@@ -508,7 +509,7 @@ func (*worker) commitUncle(work *Work, uncle *types.Header) error {
 	return nil
 }
 
-func (env *Work) commitTransactions(mux *event.TypeMux, txs *types.TransactionsByPriceAndNonce, bc *core.BlockChain, coinbase common.Address) {
+func (env *Work) commitTransactions(ctx context.Context, mux *event.TypeMux, txs *types.TransactionsByPriceAndNonce, bc *core.BlockChain, coinbase common.Address) {
 	gp := new(core.GasPool).AddGas(env.header.GasLimit)
 
 	tracing := log.Tracing()
@@ -531,7 +532,7 @@ func (env *Work) commitTransactions(mux *event.TypeMux, txs *types.TransactionsB
 		// during transaction acceptance is the transaction pool.
 		//
 		// We use the eip155 signer regardless of the current hf.
-		from, _ := types.Sender(env.signer, tx)
+		from, _ := types.Sender(ctx, env.signer, tx)
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
 		if tx.Protected() && !env.config.IsEIP155(env.header.Number) {
@@ -545,7 +546,7 @@ func (env *Work) commitTransactions(mux *event.TypeMux, txs *types.TransactionsB
 		// Start executing the transaction
 		env.state.Prepare(tx.Hash(), common.Hash{}, env.tcount)
 
-		err, logs := env.commitTransaction(tx, bc, coinbase, gp, intPool)
+		err, logs := env.commitTransaction(ctx, tx, bc, coinbase, gp, intPool)
 		switch err {
 		case core.ErrGasLimitReached:
 			// Pop the current out-of-gas transaction without shifting in the next from the account
@@ -559,7 +560,7 @@ func (env *Work) commitTransactions(mux *event.TypeMux, txs *types.TransactionsB
 			if tracing {
 				log.Trace("Skipping transaction with low nonce", "sender", from, "nonce", tx.Nonce())
 			}
-			txs.Shift()
+			txs.Shift(ctx)
 
 		case core.ErrNonceTooHigh:
 			// Reorg notification data race between the transaction pool and miner, skip account =
@@ -572,13 +573,13 @@ func (env *Work) commitTransactions(mux *event.TypeMux, txs *types.TransactionsB
 			// Everything ok, collect the logs and shift in the next transaction from the same account
 			coalescedLogs = append(coalescedLogs, logs...)
 			env.tcount++
-			txs.Shift()
+			txs.Shift(ctx)
 
 		default:
 			// Strange error, discard the transaction and get the next in line (note, the
 			// nonce-too-high clause will prevent us from executing in vain).
 			log.Debug("Transaction failed, account skipped", "hash", tx.Hash(), "err", err)
-			txs.Shift()
+			txs.Shift(ctx)
 		}
 	}
 
@@ -602,10 +603,10 @@ func (env *Work) commitTransactions(mux *event.TypeMux, txs *types.TransactionsB
 	}
 }
 
-func (env *Work) commitTransaction(tx *types.Transaction, bc *core.BlockChain, coinbase common.Address, gp *core.GasPool, intPool *vm.IntPool) (error, []*types.Log) {
+func (env *Work) commitTransaction(ctx context.Context, tx *types.Transaction, bc *core.BlockChain, coinbase common.Address, gp *core.GasPool, intPool *vm.IntPool) (error, []*types.Log) {
 	snap := env.state.Snapshot()
 	signer := types.MakeSigner(env.config, env.header.Number)
-	receipt, _, err := core.ApplyTransaction(env.config, bc, &coinbase, gp, env.state, env.header, tx, &env.header.GasUsed, vm.Config{}, intPool, signer)
+	receipt, _, err := core.ApplyTransaction(ctx, env.config, bc, &coinbase, gp, env.state, env.header, tx, &env.header.GasUsed, vm.Config{}, intPool, signer)
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
 		return err, nil

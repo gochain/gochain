@@ -18,6 +18,7 @@
 package miner
 
 import (
+	"context"
 	"fmt"
 	"sync/atomic"
 
@@ -57,16 +58,16 @@ type Miner struct {
 	shouldStart int32 // should start indicates whether we should start after sync
 }
 
-func New(eth Backend, config *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine) *Miner {
+func New(ctx context.Context, eth Backend, config *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine) *Miner {
 	miner := &Miner{
 		eth:      eth,
 		mux:      mux,
 		engine:   engine,
-		worker:   newWorker(config, engine, common.Address{}, eth, mux),
+		worker:   newWorker(ctx, config, engine, common.Address{}, eth, mux),
 		canStart: 1,
 	}
 	miner.Register(NewCpuAgent(eth.BlockChain(), engine))
-	go miner.update()
+	go miner.update(ctx)
 
 	return miner
 }
@@ -75,7 +76,7 @@ func New(eth Backend, config *params.ChainConfig, mux *event.TypeMux, engine con
 // It's entered once and as soon as `Done` or `Failed` has been broadcasted the events are unregistered and
 // the loop is exited. This to prevent a major security vuln where external parties can DOS you with blocks
 // and halt your mining operation for as long as the DOS continues.
-func (self *Miner) update() {
+func (self *Miner) update(ctx context.Context) {
 	events := self.mux.Subscribe(downloader.StartEvent{}, downloader.DoneEvent{}, downloader.FailedEvent{})
 out:
 	for ev := range events.Chan() {
@@ -93,7 +94,7 @@ out:
 			atomic.StoreInt32(&self.canStart, 1)
 			atomic.StoreInt32(&self.shouldStart, 0)
 			if shouldStart {
-				self.Start(self.coinbase)
+				self.Start(ctx, self.coinbase)
 			}
 			// unsubscribe. we're only interested in this event once
 			events.Unsubscribe()
@@ -103,7 +104,7 @@ out:
 	}
 }
 
-func (self *Miner) Start(coinbase common.Address) {
+func (self *Miner) Start(ctx context.Context, coinbase common.Address) {
 	atomic.StoreInt32(&self.shouldStart, 1)
 	self.worker.setEtherbase(coinbase)
 	self.coinbase = coinbase
@@ -116,7 +117,7 @@ func (self *Miner) Start(coinbase common.Address) {
 
 	log.Info("Starting mining operation")
 	self.worker.start()
-	self.worker.commitNewWork()
+	self.worker.commitNewWork(ctx)
 }
 
 func (self *Miner) Stop() {

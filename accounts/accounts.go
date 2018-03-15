@@ -18,6 +18,7 @@
 package accounts
 
 import (
+	"context"
 	"math/big"
 
 	ethereum "github.com/gochain-io/gochain"
@@ -111,21 +112,21 @@ type Wallet interface {
 	// about which fields or actions are needed. The user may retry by providing
 	// the needed details via SignTxWithPassphrase, or by other means (e.g. unlock
 	// the account in a keystore).
-	SignTx(account Account, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error)
+	SignTx(ctx context.Context, account Account, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error)
 
 	// SignHashWithPassphrase requests the wallet to sign the given hash with the
 	// given passphrase as extra authentication information.
 	//
 	// It looks up the account specified either solely via its address contained within,
 	// or optionally with the aid of any location metadata from the embedded URL field.
-	SignHashWithPassphrase(account Account, passphrase string, hash []byte) ([]byte, error)
+	SignHashWithPassphrase(ctx context.Context, account Account, passphrase string, hash []byte) ([]byte, error)
 
 	// SignTxWithPassphrase requests the wallet to sign the given transaction, with the
 	// given passphrase as extra authentication information.
 	//
 	// It looks up the account specified either solely via its address contained within,
 	// or optionally with the aid of any location metadata from the embedded URL field.
-	SignTxWithPassphrase(account Account, passphrase string, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error)
+	SignTxWithPassphrase(ctx context.Context, account Account, passphrase string, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error)
 }
 
 // Backend is a "wallet provider" that may contain a batch of accounts they can
