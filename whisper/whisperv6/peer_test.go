@@ -173,7 +173,7 @@ func initialize(t *testing.T) {
 
 	var err error
 	ip := net.IPv4(127, 0, 0, 1)
-	port0 := 30303
+	port0 := 30403
 
 	for i := 0; i < NumNodes; i++ {
 		var node TestNode
