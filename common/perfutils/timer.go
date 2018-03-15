@@ -45,7 +45,9 @@ func (pt *PerfTimerNormal) Fprint(w io.Writer) {
 		w.Write([]byte(k.(string)))
 		w.Write([]byte(": "))
 		w.Write([]byte(strconv.FormatInt(v.(*PerfSectionNormal).count, 10)))
-		w.Write([]byte(" times, "))
+		w.Write([]byte(" times, total duration: "))
+		w.Write([]byte(v.(*PerfSectionNormal).totalDuration.String()))
+		w.Write([]byte(" average duration: "))
 		w.Write([]byte(v.(*PerfSectionNormal).totalDuration.String()))
 		w.Write([]byte("\n"))
 		// totalDuration += v.TotalDuration

@@ -237,7 +237,7 @@ func initialize(t *testing.T) {
 func startServer(t *testing.T, s *p2p.Server) {
 	err := s.Start()
 	if err != nil {
-		t.Fatalf("failed to start the fisrt server.")
+		t.Fatalf("failed to start the fisrt server:", err)
 	}
 
 	result.mutex.Lock()
