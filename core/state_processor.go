@@ -82,7 +82,7 @@ func (p *StateProcessor) Process(ctx context.Context, block *types.Block, stated
 	for s := 0; s < p.parWorkers; s++ {
 		go func() {
 			for i := atomic.AddInt32(&wi, 1); i < l32; i = atomic.AddInt32(&wi, 1) {
-				types.Sender(signer, txs[i])
+				types.Sender(ctx, signer, txs[i])
 			}
 		}()
 	}
