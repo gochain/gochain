@@ -18,6 +18,7 @@ import (
 )
 
 func BenchmarkStateProcessor_Process(b *testing.B) {
+	ctx := context.Background()
 	key, _ := crypto.GenerateKey()
 	address := crypto.PubkeyToAddress(key.PublicKey)
 	funds := big.NewInt(1000000000)
@@ -29,7 +30,7 @@ func BenchmarkStateProcessor_Process(b *testing.B) {
 	}
 	signer := types.NewEIP155Signer(genesis.Config.ChainId)
 
-	bc := newTestBlockChainWithGenesis(true, true, genesis)
+	bc := newTestBlockChainWithGenesis(ctx, true, true, genesis)
 	defer bc.Stop()
 	cfg := vm.Config{}
 
@@ -52,7 +53,7 @@ func BenchmarkStateProcessor_Process(b *testing.B) {
 		}
 		b.StartTimer()
 
-		_, _, _, err = bc.Processor().Process(block, statedb, cfg)
+		_, _, _, err = bc.Processor().Process(ctx, block, statedb, cfg)
 		if err != nil {
 			b.Fatal(err)
 		}
