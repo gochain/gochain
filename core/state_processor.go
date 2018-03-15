@@ -19,6 +19,7 @@ package core
 import (
 	"context"
 	"runtime"
+	"sync/atomic"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/perfutils"
@@ -76,12 +77,14 @@ func (p *StateProcessor) Process(ctx context.Context, block *types.Block, stated
 
 	perfTimer := perfutils.GetTimer(ctx)
 
+	var wi int32 = -1
+	l32 := int32(len(txs))
 	for s := 0; s < p.parWorkers; s++ {
-		go func(start int) {
-			for i := start; i < len(txs); i += p.parWorkers {
-				types.Sender(ctx, signer, txs[i])
+		go func() {
+			for i := atomic.AddInt32(&wi, 1); i < l32; i = atomic.AddInt32(&wi, 1) {
+				types.Sender(signer, txs[i])
 			}
-		}(s)
+		}()
 	}
 
 	intPool := vm.NewIntPool()
