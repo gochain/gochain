@@ -18,6 +18,7 @@ package core
 
 import (
 	"runtime"
+	"sync/atomic"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/consensus"
@@ -72,12 +73,14 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	}
 	signer := types.MakeSigner(p.config, header.Number)
 
+	var wi int32 = -1
+	l32 := int32(len(txs))
 	for s := 0; s < p.parWorkers; s++ {
-		go func(start int) {
-			for i := start; i < len(txs); i += p.parWorkers {
+		go func() {
+			for i := atomic.AddInt32(&wi, 1); i < l32; i = atomic.AddInt32(&wi, 1) {
 				types.Sender(signer, txs[i])
 			}
-		}(s)
+		}()
 	}
 
 	intPool := vm.NewIntPool()
