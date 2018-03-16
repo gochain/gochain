@@ -4,12 +4,56 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
-	"strconv"
+	"sort"
+	"strings"
 	"sync"
 	"text/tabwriter"
 	"time"
 )
+
+type section int
+
+const (
+	ApplyTransaction = iota
+	CliqueSeal
+	CliqueSnapshot
+	CliqueVerifySeal
+	CreateBloom
+	Finalize
+	GetLogs
+	IntermediateRoot
+	NewEVMContext
+	NewEVMPool
+	NewReceipt
+	Process
+	SignerSender
+	StatedbFinalize
+	StatedbPrepare
+	TxAsMessage
+)
+
+var sectionNames = [...]string{
+	ApplyTransaction: "ApplyTransaction",
+	CliqueSeal:       "Clique.Seal",
+	CliqueSnapshot:   "Clique.snapshot",
+	CliqueVerifySeal: "Clique.verifySeal",
+	CreateBloom:      "CreateBloom",
+	Finalize:         "Finalize",
+	GetLogs:          "GetLogs",
+	IntermediateRoot: "IntermediateRoot",
+	NewEVMContext:    "NewEVMContext",
+	NewEVMPool:       "NewEVMPool",
+	NewReceipt:       "NewReceipt",
+	Process:          "Process",
+	StatedbFinalize:  "statedb.Finalize",
+	StatedbPrepare:   "statedb.Prepare",
+	SignerSender:     "signer.Sender",
+	TxAsMessage:      "tx.AsMessage",
+}
+
+func (s section) String() string {
+	return sectionNames[s]
+}
 
 func NewPerfTimer() PerfTimer {
 	return &PerfTimerNormal{}
@@ -18,8 +62,8 @@ func NewPerfTimer() PerfTimer {
 // PerfTimer is a way to time pieces of code, in particular ones that happen many times,
 // then get the metrics for it.
 type PerfTimer interface {
-	Start(sectionName string) PerfRun
-	Print()
+	Start(section) PerfRun
+	Print() string
 	Fprint(w io.Writer)
 }
 
@@ -29,25 +73,52 @@ type PerfTimerNormal struct {
 	Sections sync.Map
 }
 
-func (pt *PerfTimerNormal) Start(sectionName string) PerfRun {
+func (pt *PerfTimerNormal) Start(s section) PerfRun {
 	// ps := pt.Sections[sectionName]
 	var ps *PerfSectionNormal
-	psl, _ := pt.Sections.LoadOrStore(sectionName, &PerfSectionNormal{name: sectionName})
+	psl, _ := pt.Sections.LoadOrStore(s, &PerfSectionNormal{s: s})
 	ps = psl.(*PerfSectionNormal)
 	return &PerfRunNormal{ps: ps, startTime: time.Now()}
 }
-func (pt *PerfTimerNormal) Print() {
-	pt.Fprint(os.Stdout)
+func (pt *PerfTimerNormal) Print() string {
+	var s strings.Builder
+	fmt.Fprintln(&s)
+	pt.Fprint(&s)
+	return s.String()
 }
 func (pt *PerfTimerNormal) Fprint(w io.Writer) {
 	tw := tabwriter.NewWriter(w, 0, 8, 1, '\t', 0)
 	fmt.Fprintln(tw, "Section\tCount\tTotal Dur\tAvg Dur")
+	var prfs perfs
 	pt.Sections.Range(func(k, v interface{}) bool {
-		ps := v.(*PerfSectionNormal)
-		fmt.Fprintf(tw, "%v\t%v\t%v\t%v\n", k.(string), strconv.FormatInt(ps.count, 10), ps.totalDuration.String(), (ps.totalDuration / time.Duration(ps.count)).String())
+		prfs.keys = append(prfs.keys, k.(section))
+		prfs.vals = append(prfs.vals, v.(*PerfSectionNormal))
 		return true
 	})
+	sort.Sort(&prfs)
+	for i := range prfs.keys {
+		ps := prfs.vals[i]
+		fmt.Fprintf(tw, "%s\t%d\t%s\t%s\n", prfs.keys[i], ps.count, ps.totalDuration, ps.totalDuration/time.Duration(ps.count))
+	}
 	tw.Flush()
+}
+
+type perfs struct {
+	keys []section
+	vals []*PerfSectionNormal
+}
+
+func (p *perfs) Len() int {
+	return len(p.keys)
+}
+
+func (p *perfs) Less(i, j int) bool {
+	return p.keys[i] < p.keys[j]
+}
+
+func (p *perfs) Swap(i, j int) {
+	p.keys[i], p.keys[j] = p.keys[j], p.keys[i]
+	p.vals[i], p.vals[j] = p.vals[j], p.vals[i]
 }
 
 type PerfSection interface {
@@ -57,7 +128,7 @@ type PerfSection interface {
 }
 
 type PerfSectionNormal struct {
-	name          string
+	s             section
 	totalDuration time.Duration
 	count         int64
 
@@ -72,7 +143,7 @@ func (ps *PerfSectionNormal) update(dur time.Duration) {
 }
 
 func (ps *PerfSectionNormal) Name() string {
-	return ps.name
+	return ps.s.String()
 }
 
 func (ps *PerfSectionNormal) Count() int64 {
@@ -95,14 +166,13 @@ func (pr *PerfRunNormal) Stop() {
 	pr.ps.update(time.Since(pr.startTime))
 }
 
-type contextKey string
+type contextKey int
 
-var (
-	contextKeyPerfTimer = contextKey("perf-timer")
-	defaultPerfTimer    = &NoopTimer{
-		section: &NoopSection{},
-	}
-)
+const contextKeyPerfTimer contextKey = iota
+
+var defaultPerfTimer = &NoopTimer{
+	section: &NoopSection{},
+}
 
 type NoopTimer struct {
 	section *NoopSection
@@ -124,10 +194,10 @@ func (ps *NoopSection) TotalDuration() time.Duration {
 	return 0
 }
 
-func (t *NoopTimer) Start(sectionName string) PerfRun {
+func (t *NoopTimer) Start(s section) PerfRun {
 	return t.section
 }
-func (t *NoopTimer) Print() {}
+func (t *NoopTimer) Print() string { return "" }
 
 func (t *NoopTimer) Fprint(w io.Writer) {}
 
