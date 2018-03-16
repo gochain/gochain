@@ -164,7 +164,7 @@ type LightChain interface {
 	GetTd(common.Hash, uint64) *big.Int
 
 	// InsertHeaderChain inserts a batch of headers into the local chain.
-	InsertHeaderChain([]*types.Header, int) (int, error)
+	InsertHeaderChain(context.Context, []*types.Header, int) (int, error)
 
 	// Rollback removes a few recently added elements from the local chain.
 	Rollback([]common.Hash)
@@ -460,7 +460,7 @@ func (d *Downloader) syncWithPeer(ctx context.Context, p *peerConnection, hash c
 		func(ctx context.Context) error { return d.fetchHeaders(p, origin+1, pivot) }, // Headers are always retrieved
 		func(ctx context.Context) error { return d.fetchBodies(origin + 1) },          // Bodies are retrieved during normal and fast sync
 		func(ctx context.Context) error { return d.fetchReceipts(origin + 1) },        // Receipts are retrieved during fast sync
-		func(ctx context.Context) error { return d.processHeaders(origin+1, pivot, td) },
+		func(ctx context.Context) error { return d.processHeaders(ctx, origin+1, pivot, td) },
 	}
 	if d.mode == FastSync {
 		fetchers = append(fetchers, func(ctx context.Context) error { return d.processFastSyncContent(ctx, latest) })
@@ -1147,7 +1147,7 @@ func (d *Downloader) fetchParts(errCancel error, deliveryCh chan dataPack, deliv
 // processHeaders takes batches of retrieved headers from an input channel and
 // keeps processing and scheduling them into the header chain and downloader's
 // queue until the stream ends or a failure occurs.
-func (d *Downloader) processHeaders(origin uint64, pivot uint64, td *big.Int) error {
+func (d *Downloader) processHeaders(ctx context.Context, origin uint64, pivot uint64, td *big.Int) error {
 	// Keep a count of uncertain headers to roll back
 	rollback := []*types.Header{}
 	defer func() {
@@ -1259,7 +1259,7 @@ func (d *Downloader) processHeaders(origin uint64, pivot uint64, td *big.Int) er
 					if chunk[len(chunk)-1].Number.Uint64()+uint64(fsHeaderForceVerify) > pivot {
 						frequency = 1
 					}
-					if n, err := d.lightchain.InsertHeaderChain(chunk, frequency); err != nil {
+					if n, err := d.lightchain.InsertHeaderChain(ctx, chunk, frequency); err != nil {
 						// If some headers were inserted, add them too to the rollback list
 						if n > 0 {
 							rollback = append(rollback, chunk[:n]...)

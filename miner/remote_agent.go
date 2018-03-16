@@ -17,6 +17,7 @@
 package miner
 
 import (
+	"context"
 	"errors"
 	"math/big"
 	"sync"
@@ -77,7 +78,7 @@ func (a *RemoteAgent) SetReturnCh(returnCh chan<- *Result) {
 	a.returnCh = returnCh
 }
 
-func (a *RemoteAgent) Start() {
+func (a *RemoteAgent) Start(ctx context.Context) {
 	if !atomic.CompareAndSwapInt32(&a.running, 0, 1) {
 		return
 	}
@@ -134,7 +135,7 @@ func (a *RemoteAgent) GetWork() ([3]string, error) {
 // SubmitWork tries to inject a pow solution into the remote agent, returning
 // whether the solution was accepted or not (not can be both a bad pow as well as
 // any other error, like no work pending).
-func (a *RemoteAgent) SubmitWork(nonce types.BlockNonce, mixDigest, hash common.Hash) bool {
+func (a *RemoteAgent) SubmitWork(ctx context.Context, nonce types.BlockNonce, mixDigest, hash common.Hash) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -149,7 +150,7 @@ func (a *RemoteAgent) SubmitWork(nonce types.BlockNonce, mixDigest, hash common.
 	result.Nonce = nonce
 	result.MixDigest = mixDigest
 
-	if err := a.engine.VerifySeal(a.chain, result); err != nil {
+	if err := a.engine.VerifySeal(ctx, a.chain, result); err != nil {
 		log.Warn("Invalid proof-of-work submitted", "hash", hash, "err", err)
 		return false
 	}

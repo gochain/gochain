@@ -18,6 +18,7 @@
 package les
 
 import (
+	"context"
 	"math/big"
 	"sync"
 	"time"
@@ -125,6 +126,7 @@ func newLightFetcher(pm *ProtocolManager) *lightFetcher {
 
 // syncLoop is the main event loop of the light fetcher
 func (f *lightFetcher) syncLoop() {
+	ctx := context.TODO()
 	requesting := false
 	defer f.pm.wg.Done()
 	for {
@@ -195,7 +197,7 @@ func (f *lightFetcher) syncLoop() {
 				f.pm.serverPool.adjustResponseTime(req.peer.poolEntry, time.Duration(mclock.Now()-req.sent), req.timeout)
 			}
 			f.lock.Lock()
-			if !ok || !(f.syncing || f.processResponse(req, resp)) {
+			if !ok || !(f.syncing || f.processResponse(ctx, req, resp)) {
 				resp.peer.Log().Debug("Failed processing response")
 				go f.pm.removePeer(resp.peer.id)
 			}
@@ -493,7 +495,7 @@ func (f *lightFetcher) deliverHeaders(peer *peer, reqID uint64, headers []*types
 }
 
 // processResponse processes header download request responses, returns true if successful
-func (f *lightFetcher) processResponse(req fetchRequest, resp fetchResponse) bool {
+func (f *lightFetcher) processResponse(ctx context.Context, req fetchRequest, resp fetchResponse) bool {
 	if uint64(len(resp.headers)) != req.amount || resp.headers[0].Hash() != req.hash {
 		req.peer.Log().Debug("Response content mismatch", "requested", len(resp.headers), "reqfrom", resp.headers[0], "delivered", req.amount, "delfrom", req.hash)
 		return false
@@ -502,7 +504,7 @@ func (f *lightFetcher) processResponse(req fetchRequest, resp fetchResponse) boo
 	for i, header := range resp.headers {
 		headers[int(req.amount)-1-i] = header
 	}
-	if _, err := f.chain.InsertHeaderChain(headers, 1); err != nil {
+	if _, err := f.chain.InsertHeaderChain(ctx, headers, 1); err != nil {
 		if err == consensus.ErrFutureBlock {
 			return true
 		}

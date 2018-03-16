@@ -104,7 +104,9 @@ func (p *StateProcessor) Process(ctx context.Context, block *types.Block, stated
 		allLogs = append(allLogs, receipt.Logs...)
 	}
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	_ = p.engine.Finalize(p.bc, header, statedb, block.Transactions(), block.Uncles(), receipts, false)
+	ps := perfTimer.Start("Finalize()")
+	_ = p.engine.Finalize(ctx, p.bc, header, statedb, block.Transactions(), block.Uncles(), receipts, false)
+	ps.Stop()
 
 	return receipts, allLogs, *usedGas, nil
 }
@@ -139,7 +141,7 @@ func ApplyTransaction(ctx context.Context, config *params.ChainConfig, bc *Block
 	// Update the state with pending changes
 	var root []byte
 	if config.IsByzantium(header.Number) {
-		ps = perfTimer.Start("Finalize")
+		ps = perfTimer.Start("statedb.Finalize")
 		statedb.Finalise(true)
 		ps.Stop()
 	} else {

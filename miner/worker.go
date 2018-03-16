@@ -56,7 +56,7 @@ type Agent interface {
 	Work() chan<- *Work
 	SetReturnCh(chan<- *Result)
 	Stop()
-	Start()
+	Start(ctx context.Context)
 	GetHashRate() int64
 }
 
@@ -201,7 +201,7 @@ func (self *worker) pendingBlock() *types.Block {
 	return self.current.Block
 }
 
-func (self *worker) start() {
+func (self *worker) start(ctx context.Context) {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 
@@ -209,7 +209,7 @@ func (self *worker) start() {
 
 	// spin up agents
 	for agent := range self.agents {
-		agent.Start()
+		agent.Start(ctx)
 	}
 }
 
@@ -422,7 +422,7 @@ func (self *worker) commitNewWork(ctx context.Context) {
 	if atomic.LoadInt32(&self.mining) == 1 {
 		header.Coinbase = self.coinbase
 	}
-	if err := self.engine.Prepare(self.chain, header); err != nil {
+	if err := self.engine.Prepare(ctx, self.chain, header); err != nil {
 		log.Error("Failed to prepare header for mining", "err", err)
 		return
 	}
@@ -480,7 +480,7 @@ func (self *worker) commitNewWork(ctx context.Context) {
 		delete(self.possibleUncles, hash)
 	}
 	// Create the new block to seal with the consensus engine
-	work.Block = self.engine.Finalize(self.chain, header, work.state, work.txs, uncles, work.receipts, true)
+	work.Block = self.engine.Finalize(ctx, self.chain, header, work.state, work.txs, uncles, work.receipts, true)
 	// We only care about logging if we're actually mining.
 	if atomic.LoadInt32(&self.mining) == 1 {
 		log.Info("Commit new mining work", "number", work.Block.Number(), "txs", work.tcount, "uncles", len(uncles), "elapsed", common.PrettyDuration(time.Since(tstart)))

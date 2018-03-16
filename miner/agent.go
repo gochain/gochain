@@ -17,6 +17,7 @@
 package miner
 
 import (
+	"context"
 	"sync"
 
 	"sync/atomic"
@@ -68,14 +69,14 @@ done:
 	}
 }
 
-func (self *CpuAgent) Start() {
+func (self *CpuAgent) Start(ctx context.Context) {
 	if !atomic.CompareAndSwapInt32(&self.isMining, 0, 1) {
 		return // agent already started
 	}
-	go self.update()
+	go self.update(ctx)
 }
 
-func (self *CpuAgent) update() {
+func (self *CpuAgent) update(ctx context.Context) {
 out:
 	for {
 		select {
@@ -85,7 +86,7 @@ out:
 				close(self.quitCurrentOp)
 			}
 			self.quitCurrentOp = make(chan struct{})
-			go self.mine(work, self.quitCurrentOp)
+			go self.mine(ctx, work, self.quitCurrentOp)
 			self.mu.Unlock()
 		case <-self.stop:
 			self.mu.Lock()
@@ -99,8 +100,8 @@ out:
 	}
 }
 
-func (self *CpuAgent) mine(work *Work, stop <-chan struct{}) {
-	if result, err := self.engine.Seal(self.chain, work.Block, stop); result != nil {
+func (self *CpuAgent) mine(ctx context.Context, work *Work, stop <-chan struct{}) {
+	if result, err := self.engine.Seal(ctx, self.chain, work.Block, stop); result != nil {
 		log.Info("Successfully sealed new block", "number", result.Number(), "hash", result.Hash())
 		self.returnCh <- &Result{work, result}
 	} else {

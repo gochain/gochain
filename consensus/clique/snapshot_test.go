@@ -18,6 +18,7 @@ package clique
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"math/big"
 	"testing"
@@ -88,6 +89,7 @@ func (r *testerChainReader) GetHeaderByNumber(number uint64) *types.Header {
 
 // Tests that voting is evaluated correctly for various simple and complex scenarios.
 func TestVoting(t *testing.T) {
+	ctx := context.Background()
 	// Define the various voting scenarios to test
 	tests := []struct {
 		epoch          uint64
@@ -431,7 +433,7 @@ func TestVoting(t *testing.T) {
 		// Pass all the headers through clique and ensure tallying succeeds
 		head := headers[len(headers)-1]
 
-		snap, err := New(&params.CliqueConfig{Epoch: tt.epoch}, db).snapshot(&testerChainReader{db: db}, head.Number.Uint64(), head.Hash(), headers)
+		snap, err := New(&params.CliqueConfig{Epoch: tt.epoch}, db).snapshot(ctx, &testerChainReader{db: db}, head.Number.Uint64(), head.Hash(), headers)
 		if err != nil {
 			t.Errorf("test %d: failed to create voting snapshot: %v", i, err)
 			continue
