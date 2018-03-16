@@ -88,7 +88,10 @@ func (b *BlockGen) AddTx(ctx context.Context, tx *types.Transaction) {
 	}
 	b.statedb.Prepare(tx.Hash(), common.Hash{}, len(b.txs))
 	signer := types.MakeSigner(b.config, b.header.Number)
-	receipt, _, err := ApplyTransaction(ctx, b.config, nil, &b.header.Coinbase, b.gasPool, b.statedb, b.header, tx, &b.header.GasUsed, vm.Config{}, vm.NewIntPool(), signer)
+	// Create a new emv context and environment.
+	evmContext := NewEVMContextLite(b.header, nil, &b.header.Coinbase)
+	vmenv := vm.NewEVM(evmContext, b.statedb, b.config, vm.Config{})
+	receipt, _, err := ApplyTransaction(ctx, vmenv, b.config, b.gasPool, b.statedb, b.header, tx, &b.header.GasUsed, signer)
 	if err != nil {
 		panic(err)
 	}

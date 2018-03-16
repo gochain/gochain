@@ -14,7 +14,8 @@ import (
 type section int
 
 const (
-	ApplyTransaction = iota
+	ApplyMessage = iota
+	ApplyTransaction
 	CliqueSeal
 	CliqueSnapshot
 	CliqueVerifySeal
@@ -33,6 +34,7 @@ const (
 )
 
 var sectionNames = [...]string{
+	ApplyMessage:     "ApplyMessage",
 	ApplyTransaction: "ApplyTransaction",
 	CliqueSeal:       "Clique.Seal",
 	CliqueSnapshot:   "Clique.snapshot",

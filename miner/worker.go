@@ -513,7 +513,9 @@ func (env *Work) commitTransactions(ctx context.Context, mux *event.TypeMux, txs
 	gp := new(core.GasPool).AddGas(env.header.GasLimit)
 
 	tracing := log.Tracing()
-	intPool := vm.NewIntPool()
+	// Create a new emv context and environment.
+	evmContext := core.NewEVMContextLite(env.header, bc, &coinbase)
+	vmenv := vm.NewEVM(evmContext, env.state, env.config, vm.Config{})
 	var coalescedLogs []*types.Log
 	for {
 		// If we don't have enough gas for any further transactions then we're done
@@ -546,7 +548,7 @@ func (env *Work) commitTransactions(ctx context.Context, mux *event.TypeMux, txs
 		// Start executing the transaction
 		env.state.Prepare(tx.Hash(), common.Hash{}, env.tcount)
 
-		err, logs := env.commitTransaction(ctx, tx, bc, coinbase, gp, intPool)
+		err, logs := env.commitTransaction(ctx, vmenv, tx, gp)
 		switch err {
 		case core.ErrGasLimitReached:
 			// Pop the current out-of-gas transaction without shifting in the next from the account
@@ -603,10 +605,10 @@ func (env *Work) commitTransactions(ctx context.Context, mux *event.TypeMux, txs
 	}
 }
 
-func (env *Work) commitTransaction(ctx context.Context, tx *types.Transaction, bc *core.BlockChain, coinbase common.Address, gp *core.GasPool, intPool *vm.IntPool) (error, []*types.Log) {
+func (env *Work) commitTransaction(ctx context.Context, vmenv *vm.EVM, tx *types.Transaction, gp *core.GasPool) (error, []*types.Log) {
 	snap := env.state.Snapshot()
 	signer := types.MakeSigner(env.config, env.header.Number)
-	receipt, _, err := core.ApplyTransaction(ctx, env.config, bc, &coinbase, gp, env.state, env.header, tx, &env.header.GasUsed, vm.Config{}, intPool, signer)
+	receipt, _, err := core.ApplyTransaction(ctx, vmenv, env.config, gp, env.state, env.header, tx, &env.header.GasUsed, signer)
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
 		return err, nil
