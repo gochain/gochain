@@ -30,7 +30,7 @@ func BenchmarkStateProcessor_Process(b *testing.B) {
 	}
 	signer := types.NewEIP155Signer(genesis.Config.ChainId)
 
-	bc := newTestBlockChainWithGenesis(ctx, true, true, genesis)
+	bc := newTestBlockChainWithGenesis(ctx, false, true, genesis)
 	defer bc.Stop()
 	cfg := vm.Config{}
 
@@ -61,6 +61,9 @@ func BenchmarkStateProcessor_Process(b *testing.B) {
 }
 
 func TestStateProcessor(b *testing.T) {
+
+	numTxs := 10000
+
 	ctx := context.Background()
 	ctx = perfutils.WithTimer(ctx)
 	start := time.Now()
@@ -75,7 +78,7 @@ func TestStateProcessor(b *testing.T) {
 	}
 	signer := types.NewEIP155Signer(genesis.Config.ChainId)
 
-	bc := newTestBlockChainWithGenesis(ctx, true, true, genesis)
+	bc := newTestBlockChainWithGenesis(ctx, false, true, genesis)
 	log.Printf("newTestBlockchain duration: %s", time.Since(start))
 	defer bc.Stop()
 	cfg := vm.Config{}
@@ -86,7 +89,7 @@ func TestStateProcessor(b *testing.T) {
 	// for i := 0; i < b.N; i++ {
 	perfTimer := perfutils.GetTimer(ctx)
 	txs := []*types.Transaction{}
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < numTxs; i++ {
 		tx := types.NewTransaction(uint64(i), common.Address{}, big.NewInt(100), 100000, big.NewInt(1), nil)
 		tx, _ = types.SignTx(tx, signer, key)
 		// txs = append(txs, types.NewTransaction(uint64(i), common.Address{}, big.NewInt(1), uint64(21000), big.NewInt(21000), nil))

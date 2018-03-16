@@ -116,7 +116,7 @@ func (self *Miner) Start(ctx context.Context, coinbase common.Address) {
 	atomic.StoreInt32(&self.mining, 1)
 
 	log.Info("Starting mining operation")
-	self.worker.start()
+	self.worker.start(ctx)
 	self.worker.commitNewWork(ctx)
 }
 
@@ -127,8 +127,9 @@ func (self *Miner) Stop() {
 }
 
 func (self *Miner) Register(agent Agent) {
+	ctx := context.TODO()
 	if self.Mining() {
-		agent.Start()
+		agent.Start(ctx)
 	}
 	self.worker.register(agent)
 }

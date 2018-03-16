@@ -17,6 +17,7 @@
 package ethash
 
 import (
+	"context"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
@@ -29,16 +30,17 @@ import (
 
 // Tests that ethash works correctly in test mode.
 func TestTestMode(t *testing.T) {
+	ctx := context.Background()
 	head := &types.Header{Number: big.NewInt(1), Difficulty: big.NewInt(100)}
 
 	ethash := NewTester()
-	block, err := ethash.Seal(nil, types.NewBlockWithHeader(head), nil)
+	block, err := ethash.Seal(ctx, nil, types.NewBlockWithHeader(head), nil)
 	if err != nil {
 		t.Fatalf("failed to seal block: %v", err)
 	}
 	head.Nonce = types.EncodeNonce(block.Nonce())
 	head.MixDigest = block.MixDigest()
-	if err := ethash.VerifySeal(nil, head); err != nil {
+	if err := ethash.VerifySeal(ctx, nil, head); err != nil {
 		t.Fatalf("unexpected verification error: %v", err)
 	}
 }
@@ -64,6 +66,7 @@ func TestCacheFileEvict(t *testing.T) {
 }
 
 func verifyTest(wg *sync.WaitGroup, e *Ethash, workerIndex, epochs int) {
+	ctx := context.Background()
 	defer wg.Done()
 
 	const wiggle = 4 * epochLength
@@ -74,6 +77,6 @@ func verifyTest(wg *sync.WaitGroup, e *Ethash, workerIndex, epochs int) {
 			block = 0
 		}
 		head := &types.Header{Number: big.NewInt(block), Difficulty: big.NewInt(100)}
-		e.VerifySeal(nil, head)
+		e.VerifySeal(ctx, nil, head)
 	}
 }

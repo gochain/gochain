@@ -18,6 +18,7 @@ package ethash
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -671,6 +672,7 @@ func TestHashimoto(t *testing.T) {
 
 // Tests that caches generated on disk may be done concurrently.
 func TestConcurrentDiskCacheGeneration(t *testing.T) {
+	ctx := context.Background()
 	// Create a temp folder to generate the caches into
 	cachedir, err := ioutil.TempDir("", "")
 	if err != nil {
@@ -704,7 +706,7 @@ func TestConcurrentDiskCacheGeneration(t *testing.T) {
 		go func(idx int) {
 			defer pend.Done()
 			ethash := New(Config{cachedir, 0, 1, "", 0, 0, ModeNormal})
-			if err := ethash.VerifySeal(nil, block.Header()); err != nil {
+			if err := ethash.VerifySeal(ctx, nil, block.Header()); err != nil {
 				t.Errorf("proc %d: block verification failed: %v", idx, err)
 			}
 		}(i)

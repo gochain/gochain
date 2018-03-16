@@ -29,6 +29,8 @@ import (
 	"time"
 
 	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/consensus"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/consensus/ethash"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
@@ -70,9 +72,10 @@ func newTestBlockChainWithGenesis(ctx context.Context, fake, disk bool, genesis 
 		}
 	}
 	genesis.MustCommit(db)
-	engine := ethash.NewFullFaker()
+	var engine consensus.Engine
+	engine = ethash.NewFullFaker()
 	if !fake {
-		engine = ethash.NewTester()
+		engine = clique.New(genesis.Config.Clique, db)
 	}
 	blockchain, err := NewBlockChain(ctx, db, nil, genesis.Config, engine, vm.Config{})
 	if err != nil {
@@ -116,7 +119,7 @@ func testFork(t *testing.T, blockchain *BlockChain, i, n int, full bool, compara
 		}
 	} else {
 		headerChainB = makeHeaderChain(ctx, blockchain2.CurrentHeader(), n, ethash.NewFaker(), db, forkSeed)
-		if _, err := blockchain2.InsertHeaderChain(headerChainB, 1); err != nil {
+		if _, err := blockchain2.InsertHeaderChain(ctx, headerChainB, 1); err != nil {
 			t.Fatalf("failed to insert forking chain: %v", err)
 		}
 	}
@@ -152,9 +155,9 @@ func printChain(bc *BlockChain) {
 func testBlockChainImport(ctx context.Context, chain types.Blocks, blockchain *BlockChain) error {
 	for _, block := range chain {
 		// Try and process the block
-		err := blockchain.engine.VerifyHeader(blockchain, block.Header(), true)
+		err := blockchain.engine.VerifyHeader(ctx, blockchain, block.Header(), true)
 		if err == nil {
-			err = blockchain.validator.ValidateBody(block)
+			err = blockchain.validator.ValidateBody(ctx, block)
 		}
 		if err != nil {
 			if err == ErrKnownBlock {
@@ -171,7 +174,7 @@ func testBlockChainImport(ctx context.Context, chain types.Blocks, blockchain *B
 			blockchain.reportBlock(block, receipts, err)
 			return err
 		}
-		err = blockchain.validator.ValidateState(block, blockchain.GetBlockByHash(block.ParentHash()), statedb, receipts, usedGas)
+		err = blockchain.validator.ValidateState(ctx, block, blockchain.GetBlockByHash(block.ParentHash()), statedb, receipts, usedGas)
 		if err != nil {
 			blockchain.reportBlock(block, receipts, err)
 			return err
@@ -190,7 +193,7 @@ func testBlockChainImport(ctx context.Context, chain types.Blocks, blockchain *B
 func testHeaderChainImport(ctx context.Context, chain []*types.Header, blockchain *BlockChain) error {
 	for _, header := range chain {
 		// Try and validate the header
-		if err := blockchain.engine.VerifyHeader(blockchain, header, false); err != nil {
+		if err := blockchain.engine.VerifyHeader(ctx, blockchain, header, false); err != nil {
 			return err
 		}
 		// Manually insert the header into the database, but don't reorganise (allows subsequent testing)
@@ -374,8 +377,8 @@ func testBrokenChain(t *testing.T, full bool) {
 
 type bproc struct{}
 
-func (bproc) ValidateBody(*types.Block) error { return nil }
-func (bproc) ValidateState(block, parent *types.Block, state *state.StateDB, receipts types.Receipts, usedGas uint64) error {
+func (bproc) ValidateBody(context.Context, *types.Block) error { return nil }
+func (bproc) ValidateState(ctx context.Context, block, parent *types.Block, state *state.StateDB, receipts types.Receipts, usedGas uint64) error {
 	return nil
 }
 func (bproc) Process(block *types.Block, statedb *state.StateDB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
@@ -442,8 +445,8 @@ func testReorg(t *testing.T, first, second []int, td int64, full bool) {
 		bc.InsertChain(ctx, makeBlockChainWithDiff(bc.genesisBlock, first, 11))
 		bc.InsertChain(ctx, makeBlockChainWithDiff(bc.genesisBlock, second, 22))
 	} else {
-		bc.InsertHeaderChain(makeHeaderChainWithDiff(bc.genesisBlock, first, 11), 1)
-		bc.InsertHeaderChain(makeHeaderChainWithDiff(bc.genesisBlock, second, 22), 1)
+		bc.InsertHeaderChain(ctx, makeHeaderChainWithDiff(bc.genesisBlock, first, 11), 1)
+		bc.InsertHeaderChain(ctx, makeHeaderChainWithDiff(bc.genesisBlock, second, 22), 1)
 	}
 	// Check that the chain is valid number and link wise
 	if full {
@@ -492,7 +495,7 @@ func testBadHashes(t *testing.T, full bool) {
 	} else {
 		headers := makeHeaderChainWithDiff(bc.genesisBlock, []int{1, 2, 4}, 10)
 		BadHashes[headers[2].Hash()] = true
-		_, err = bc.InsertHeaderChain(headers, 1)
+		_, err = bc.InsertHeaderChain(ctx, headers, 1)
 	}
 	if err != ErrBlacklistedHash {
 		t.Errorf("error mismatch: have: %v, want: %v", err, ErrBlacklistedHash)
@@ -523,7 +526,7 @@ func testReorgBadHashes(t *testing.T, full bool) {
 		BadHashes[blocks[3].Header().Hash()] = true
 		defer func() { delete(BadHashes, blocks[3].Header().Hash()) }()
 	} else {
-		if _, err := bc.InsertHeaderChain(headers, 1); err != nil {
+		if _, err := bc.InsertHeaderChain(ctx, headers, 1); err != nil {
 			t.Fatalf("failed to import headers: %v", err)
 		}
 		if bc.CurrentHeader().Hash() != headers[3].Hash() {
@@ -590,7 +593,7 @@ func testInsertNonceError(t *testing.T, full bool) {
 
 			blockchain.engine = ethash.NewFakeFailer(failNum)
 			blockchain.hc.engine = blockchain.engine
-			failRes, err = blockchain.InsertHeaderChain(headers, 1)
+			failRes, err = blockchain.InsertHeaderChain(ctx, headers, 1)
 		}
 		// Check that the returned error indicates the failure.
 		if failRes != failAt {
@@ -665,7 +668,7 @@ func TestFastVsFullChains(t *testing.T) {
 	for i, block := range blocks {
 		headers[i] = block.Header()
 	}
-	if n, err := fast.InsertHeaderChain(headers, 1); err != nil {
+	if n, err := fast.InsertHeaderChain(ctx, headers, 1); err != nil {
 		t.Fatalf("failed to insert header %d: %v", n, err)
 	}
 	if n, err := fast.InsertReceiptChain(ctx, blocks, receipts); err != nil {
@@ -757,7 +760,7 @@ func TestLightVsFastVsFullChainHeads(t *testing.T) {
 	for i, block := range blocks {
 		headers[i] = block.Header()
 	}
-	if n, err := fast.InsertHeaderChain(headers, 1); err != nil {
+	if n, err := fast.InsertHeaderChain(ctx, headers, 1); err != nil {
 		t.Fatalf("failed to insert header %d: %v", n, err)
 	}
 	if n, err := fast.InsertReceiptChain(ctx, blocks, receipts); err != nil {
@@ -772,7 +775,7 @@ func TestLightVsFastVsFullChainHeads(t *testing.T) {
 	gspec.MustCommit(lightDb)
 
 	light, _ := NewBlockChain(ctx, lightDb, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
-	if n, err := light.InsertHeaderChain(headers, 1); err != nil {
+	if n, err := light.InsertHeaderChain(ctx, headers, 1); err != nil {
 		t.Fatalf("failed to insert header %d: %v", n, err)
 	}
 	defer light.Stop()

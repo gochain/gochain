@@ -79,7 +79,7 @@ type BlockChain interface {
 	CurrentHeader() *types.Header
 	GetTd(hash common.Hash, number uint64) *big.Int
 	State() (*state.StateDB, error)
-	InsertHeaderChain(chain []*types.Header, checkFreq int) (int, error)
+	InsertHeaderChain(ctx context.Context, chain []*types.Header, checkFreq int) (int, error)
 	Rollback(chain []common.Hash)
 	GetHeaderByNumber(number uint64) *types.Header
 	GetBlockHashesFromHash(hash common.Hash, max uint64) []common.Hash

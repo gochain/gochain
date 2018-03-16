@@ -2,10 +2,12 @@ package perfutils
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
 	"sync"
+	"text/tabwriter"
 	"time"
 )
 
@@ -38,24 +40,14 @@ func (pt *PerfTimerNormal) Print() {
 	pt.Fprint(os.Stdout)
 }
 func (pt *PerfTimerNormal) Fprint(w io.Writer) {
-	// fmt.Fprint(w, pt.Sections)
-	// totalDuration := time.Duration(0) // doesn't make sense unless we have subsections or something
-	// for k, v := range pt.Sections {
+	tw := tabwriter.NewWriter(w, 0, 8, 1, '\t', 0)
+	fmt.Fprintln(tw, "Section\tCount\tTotal Dur\tAvg Dur")
 	pt.Sections.Range(func(k, v interface{}) bool {
-		w.Write([]byte(k.(string)))
-		w.Write([]byte(": "))
-		w.Write([]byte(strconv.FormatInt(v.(*PerfSectionNormal).count, 10)))
-		w.Write([]byte(" times, total duration: "))
-		w.Write([]byte(v.(*PerfSectionNormal).totalDuration.String()))
-		w.Write([]byte(" average duration: "))
-		w.Write([]byte(v.(*PerfSectionNormal).totalDuration.String()))
-		w.Write([]byte("\n"))
-		// totalDuration += v.TotalDuration
+		ps := v.(*PerfSectionNormal)
+		fmt.Fprintf(tw, "%v\t%v\t%v\t%v\n", k.(string), strconv.FormatInt(ps.count, 10), ps.totalDuration.String(), (ps.totalDuration / time.Duration(ps.count)).String())
 		return true
 	})
-	// w.Write([]byte("TOTAL Duration: "))
-	// w.Write([]byte(totalDuration.String()))
-	// w.Write([]byte("\n"))
+	tw.Flush()
 }
 
 type PerfSection interface {
