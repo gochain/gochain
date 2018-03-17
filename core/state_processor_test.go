@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"log"
 	"math/big"
 	"testing"
 	"time"
@@ -60,7 +59,7 @@ func BenchmarkStateProcessor_Process(b *testing.B) {
 	}
 }
 
-func TestStateProcessor(b *testing.T) {
+func TestStateProcessor(t *testing.T) {
 
 	numTxs := 10000
 
@@ -79,14 +78,13 @@ func TestStateProcessor(b *testing.T) {
 	signer := types.NewEIP155Signer(genesis.Config.ChainId)
 
 	bc := newTestBlockChainWithGenesis(ctx, false, true, genesis)
-	log.Printf("newTestBlockchain duration: %s", time.Since(start))
+	t.Logf("newTestBlockchain duration: %s", time.Since(start))
 	defer bc.Stop()
 	cfg := vm.Config{}
 	// statedb, err := state.New(bc.CurrentBlock().Root(), bc.stateCache)
 	// 	if err != nil {
-	// 		b.Fatal(err)
+	// 		t.Fatal(err)
 	// 	}
-	// for i := 0; i < b.N; i++ {
 	perfTimer := perfutils.GetTimer(ctx)
 	txs := []*types.Transaction{}
 	for i := 0; i < numTxs; i++ {
@@ -100,15 +98,15 @@ func TestStateProcessor(b *testing.T) {
 	}, txs, nil, nil)
 	statedb, err := state.New(bc.CurrentBlock().Root(), bc.stateCache)
 	if err != nil {
-		b.Fatal(err)
+		t.Fatal(err)
 	}
 	start = time.Now()
-	ps := perfTimer.Start("Process()")
+	ps := perfTimer.Start(perfutils.Process)
 	_, _, _, err = bc.Processor().Process(ctx, block, statedb, cfg)
 	if err != nil {
-		b.Fatal(err)
+		t.Fatal(err)
 	}
 	ps.Stop()
-	perfTimer.Print()
-	log.Printf("process() duration: %s", time.Since(start))
+	t.Log(perfTimer.Print())
+	t.Logf("process() duration: %s", time.Since(start))
 }

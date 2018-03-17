@@ -384,7 +384,7 @@ func (c *Clique) verifyCascadingFields(ctx context.Context, chain consensus.Chai
 // snapshot retrieves the authorization snapshot at a given point in time.
 func (c *Clique) snapshot(ctx context.Context, chain consensus.ChainReader, number uint64, hash common.Hash, parents []*types.Header) (*Snapshot, error) {
 	pt := perfutils.GetTimer(ctx)
-	ps := pt.Start("Clique.snapshot")
+	ps := pt.Start(perfutils.CliqueSnapshot)
 	defer ps.Stop()
 	// Search for a snapshot in memory or on disk for checkpoints
 	var (
@@ -478,7 +478,7 @@ func (c *Clique) VerifySeal(ctx context.Context, chain consensus.ChainReader, he
 // from.
 func (c *Clique) verifySeal(ctx context.Context, chain consensus.ChainReader, header *types.Header, parents []*types.Header) error {
 	pt := perfutils.GetTimer(ctx)
-	ps := pt.Start("Clique.verifySeal")
+	ps := pt.Start(perfutils.CliqueVerifySeal)
 	defer ps.Stop()
 	// Verifying the genesis block is not supported
 	number := header.Number.Uint64()
@@ -522,7 +522,7 @@ func (c *Clique) verifySeal(ctx context.Context, chain consensus.ChainReader, he
 // header for running the transactions on top.
 func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, header *types.Header) error {
 	pt := perfutils.GetTimer(ctx)
-	ps := pt.Start("Clique.Seal")
+	ps := pt.Start(perfutils.CliqueSeal)
 	defer ps.Stop()
 	// If the block isn't a checkpoint, cast a random vote (good enough for now)
 	header.Coinbase = common.Address{}
@@ -593,7 +593,7 @@ func (c *Clique) Authorize(signer common.Address, signFn SignerFn) {
 // the local signing credentials.
 func (c *Clique) Seal(ctx context.Context, chain consensus.ChainReader, block *types.Block, stop <-chan struct{}) (*types.Block, error) {
 	pt := perfutils.GetTimer(ctx)
-	ps := pt.Start("Clique.Seal")
+	ps := pt.Start(perfutils.CliqueSeal)
 	defer ps.Stop()
 	header := block.Header()
 

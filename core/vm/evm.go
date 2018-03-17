@@ -114,11 +114,6 @@ type EVM struct {
 // NewEVM returns a new EVM . The returned EVM is not thread safe and should
 // only ever be used *once*.
 func NewEVM(ctx Context, statedb StateDB, chainConfig *params.ChainConfig, vmConfig Config) *EVM {
-	return NewEVMPool(ctx, statedb, chainConfig, vmConfig, NewIntPool())
-}
-
-// NewEVMPool is like NewEVM, but also takes an IntPool, which can be recycled across multiple (serial) invocations.
-func NewEVMPool(ctx Context, statedb StateDB, chainConfig *params.ChainConfig, vmConfig Config, intPool *IntPool) *EVM {
 	evm := &EVM{
 		Context:     ctx,
 		StateDB:     statedb,
@@ -126,8 +121,14 @@ func NewEVMPool(ctx Context, statedb StateDB, chainConfig *params.ChainConfig, v
 		chainConfig: chainConfig,
 		chainRules:  chainConfig.Rules(ctx.BlockNumber),
 	}
-	evm.interpreter = NewInterpreter(evm, vmConfig, intPool)
+	evm.interpreter = NewInterpreter(evm, vmConfig, newIntPool())
 	return evm
+}
+
+func (evm *EVM) Reset() {
+	evm.depth = 0
+	atomic.StoreInt32(&evm.abort, 0)
+	evm.callGasTemp = 0
 }
 
 // Cancel cancels any running EVM operation. This may be called concurrently and

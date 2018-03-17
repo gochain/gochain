@@ -28,7 +28,7 @@ type IntPool struct {
 	pool *Stack
 }
 
-func NewIntPool() *IntPool {
+func newIntPool() *IntPool {
 	return &IntPool{pool: newstack()}
 }
 

@@ -84,7 +84,7 @@ func Sender(ctx context.Context, signer Signer, tx *Transaction) (common.Address
 		}
 	}
 
-	ps := perfTimer.Start("signer.Sender")
+	ps := perfTimer.Start(perfutils.SignerSender)
 	addr, err := signer.Sender(tx)
 	if err != nil {
 		return common.Address{}, err
