@@ -79,10 +79,16 @@ func (p *StateProcessor) Process(ctx context.Context, block *types.Block, stated
 	var wi int32 = -1
 	l32 := int32(len(txs))
 	for s := 0; s < p.parWorkers; s++ {
+		const delta = 4
 		go func() {
-			for i := atomic.AddInt32(&wi, 1); i < l32; i = atomic.AddInt32(&wi, 1) {
-				types.Sender(ctx, signer, txs[i])
-				txs[i].Hash()
+			for i := atomic.AddInt32(&wi, delta); ; i = atomic.AddInt32(&wi, delta) {
+				for j := i + 1 - delta; j < i; j++ {
+					if j >= l32 {
+						return
+					}
+					types.Sender(ctx, signer, txs[j])
+					txs[j].Hash()
+				}
 			}
 		}()
 	}
