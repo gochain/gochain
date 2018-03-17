@@ -226,17 +226,12 @@ func (tx *Transaction) Size() common.StorageSize {
 // AsMessage requires a signer to derive the sender.
 //
 // XXX Rename message to something less arbitrary?
-func (tx *Transaction) AsMessage(ctx context.Context, s Signer) (Message, error) {
+func (tx *Transaction) AsMessage(ctx context.Context, s Signer) (*Message, error) {
 	from, err := Sender(ctx, s, tx)
 	if err != nil {
-		return Message{}, err
+		return nil, err
 	}
-	msg := tx.AsMessageWithSender(ctx, s, from)
-	return msg, nil
-}
-
-func (tx *Transaction) AsMessageWithSender(ctx context.Context, s Signer, from common.Address) Message {
-	msg := Message{
+	msg := &Message{
 		nonce:      tx.data.AccountNonce,
 		gasLimit:   tx.data.GasLimit,
 		gasPrice:   tx.data.Price,
@@ -246,7 +241,7 @@ func (tx *Transaction) AsMessageWithSender(ctx context.Context, s Signer, from c
 		checkNonce: true,
 		from:       from,
 	}
-	return msg
+	return msg, nil
 }
 
 // WithSignature returns a new transaction with the given signature.
@@ -441,8 +436,8 @@ type Message struct {
 	checkNonce bool
 }
 
-func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, checkNonce bool) Message {
-	return Message{
+func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, checkNonce bool) *Message {
+	return &Message{
 		from:       from,
 		to:         to,
 		nonce:      nonce,

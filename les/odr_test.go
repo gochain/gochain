@@ -109,10 +109,10 @@ func TestOdrContractCallLes1(t *testing.T) { testOdr(t, 1, 2, odrContractCall) }
 func TestOdrContractCallLes2(t *testing.T) { testOdr(t, 2, 2, odrContractCall) }
 
 type callmsg struct {
-	types.Message
+	*types.Message
 }
 
-func (callmsg) CheckNonce() bool { return false }
+func (*callmsg) CheckNonce() bool { return false }
 
 func odrContractCall(ctx context.Context, db ethdb.Database, config *params.ChainConfig, bc *core.BlockChain, lc *light.LightChain, bhash common.Hash) []byte {
 	data := common.Hex2Bytes("60CD26850000000000000000000000000000000000000000000000000000000000000000")

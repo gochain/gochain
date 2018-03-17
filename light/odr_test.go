@@ -146,7 +146,7 @@ func odrAccounts(ctx context.Context, db ethdb.Database, bc *core.BlockChain, lc
 func TestOdrContractCallLes1(t *testing.T) { testChainOdr(t, 1, odrContractCall) }
 
 type callmsg struct {
-	types.Message
+	*types.Message
 }
 
 func (callmsg) CheckNonce() bool { return false }

@@ -234,7 +234,7 @@ func (tx *stTransaction) toMessage(ps stPostState) (core.Message, error) {
 	}
 
 	msg := types.NewMessage(from, to, tx.Nonce, value, gasLimit, tx.GasPrice, data, true)
-	return &msg, nil
+	return msg, nil
 }
 
 func rlpHash(x interface{}) (h common.Hash) {

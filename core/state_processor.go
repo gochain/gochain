@@ -132,7 +132,7 @@ func ApplyTransaction(ctx context.Context, vmenv *vm.EVM, config *params.ChainCo
 
 	// Apply the transaction to the current state (included in the env)
 	ps = perfTimer.Start(perfutils.ApplyMessage)
-	_, gas, failed, err := ApplyMessage(vmenv, &msg, gp)
+	_, gas, failed, err := ApplyMessage(vmenv, msg, gp)
 	ps.Stop()
 	if err != nil {
 		return nil, 0, err
