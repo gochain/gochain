@@ -23,9 +23,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/gochain-io/gochain/common/perfutils"
-
 	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/common/perfutils"
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/params"
 )

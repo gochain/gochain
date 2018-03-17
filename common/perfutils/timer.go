@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"text/tabwriter"
 	"time"
 )
@@ -133,15 +134,11 @@ type PerfSectionNormal struct {
 	s             section
 	totalDuration time.Duration
 	count         int64
-
-	mutex sync.Mutex
 }
 
 func (ps *PerfSectionNormal) update(dur time.Duration) {
-	ps.mutex.Lock()
-	ps.totalDuration += dur
-	ps.count++
-	ps.mutex.Unlock()
+	atomic.AddInt64((*int64)(&ps.totalDuration), int64(dur))
+	atomic.AddInt64(&ps.count, 1)
 }
 
 func (ps *PerfSectionNormal) Name() string {
@@ -149,10 +146,10 @@ func (ps *PerfSectionNormal) Name() string {
 }
 
 func (ps *PerfSectionNormal) Count() int64 {
-	return ps.count
+	return atomic.LoadInt64(&ps.count)
 }
 func (ps *PerfSectionNormal) TotalDuration() time.Duration {
-	return ps.totalDuration
+	return time.Duration(atomic.LoadInt64((*int64)(&ps.totalDuration)))
 }
 
 // PerfRun keep time for each particular run
