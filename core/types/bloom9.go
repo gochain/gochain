@@ -117,10 +117,11 @@ func bloom9(b []byte) *big.Int {
 
 	r := new(big.Int)
 
+	var t big.Int
 	for i := 0; i < 6; i += 2 {
-		t := big.NewInt(1)
+		t.SetUint64(1)
 		b := (uint(h[i+1]) + (uint(h[i]) << 8)) & 2047
-		r.Or(r, t.Lsh(t, b))
+		r.Or(r, t.Lsh(&t, b))
 	}
 
 	return r
@@ -130,7 +131,7 @@ var Bloom9 = bloom9
 
 func BloomLookup(bin Bloom, topic bytesBacked) bool {
 	bloom := bin.Big()
-	cmp := bloom9(topic.Bytes()[:])
+	cmp := bloom9(topic.Bytes())
 
 	return bloom.And(bloom, cmp).Cmp(cmp) == 0
 }

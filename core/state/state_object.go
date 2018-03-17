@@ -27,7 +27,10 @@ import (
 	"github.com/gochain-io/gochain/rlp"
 )
 
-var emptyCodeHash = crypto.Keccak256(nil)
+var (
+	emptyCodeHash = crypto.Keccak256Hash(nil)
+	zeroHash      common.Hash
+)
 
 type Code []byte
 
@@ -92,7 +95,7 @@ type stateObject struct {
 
 // empty returns whether the account is considered empty.
 func (s *stateObject) empty() bool {
-	return s.data.Nonce == 0 && s.data.Balance.Sign() == 0 && bytes.Equal(s.data.CodeHash, emptyCodeHash)
+	return s.data.Nonce == 0 && s.data.Balance.Sign() == 0 && s.data.CodeHash == emptyCodeHash
 }
 
 // Account is the Ethereum consensus representation of accounts.
@@ -101,7 +104,7 @@ type Account struct {
 	Nonce    uint64
 	Balance  *big.Int
 	Root     common.Hash // merkle root of the storage trie
-	CodeHash []byte
+	CodeHash common.Hash
 }
 
 // newObject creates a state object.
@@ -109,7 +112,7 @@ func newObject(db *StateDB, address common.Address, data Account, onDirty func(a
 	if data.Balance == nil {
 		data.Balance = new(big.Int)
 	}
-	if data.CodeHash == nil {
+	if data.CodeHash == zeroHash {
 		data.CodeHash = emptyCodeHash
 	}
 	return &stateObject{
@@ -320,12 +323,12 @@ func (self *stateObject) Code(db Database) []byte {
 	if self.code != nil {
 		return self.code
 	}
-	if bytes.Equal(self.CodeHash(), emptyCodeHash) {
+	if self.data.CodeHash == emptyCodeHash {
 		return nil
 	}
-	code, err := db.ContractCode(self.addrHash, common.BytesToHash(self.CodeHash()))
+	code, err := db.ContractCode(self.addrHash, self.data.CodeHash)
 	if err != nil {
-		self.setError(fmt.Errorf("can't load code hash %x: %v", self.CodeHash(), err))
+		self.setError(fmt.Errorf("can't load code hash %x: %v", self.data.CodeHash, err))
 	}
 	self.code = code
 	return code
@@ -335,7 +338,7 @@ func (self *stateObject) SetCode(codeHash common.Hash, code []byte) {
 	prevcode := self.Code(self.db.db)
 	self.db.journal = append(self.db.journal, codeChange{
 		account:  &self.address,
-		prevhash: self.CodeHash(),
+		prevhash: self.data.CodeHash,
 		prevcode: prevcode,
 	})
 	self.setCode(codeHash, code)
@@ -343,7 +346,7 @@ func (self *stateObject) SetCode(codeHash common.Hash, code []byte) {
 
 func (self *stateObject) setCode(codeHash common.Hash, code []byte) {
 	self.code = code
-	self.data.CodeHash = codeHash[:]
+	self.data.CodeHash = codeHash
 	self.dirtyCode = true
 	if self.onDirty != nil {
 		self.onDirty(self.Address())
@@ -365,10 +368,6 @@ func (self *stateObject) setNonce(nonce uint64) {
 		self.onDirty(self.Address())
 		self.onDirty = nil
 	}
-}
-
-func (self *stateObject) CodeHash() []byte {
-	return self.data.CodeHash
 }
 
 func (self *stateObject) Balance() *big.Int {

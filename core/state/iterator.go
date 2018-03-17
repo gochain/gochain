@@ -116,10 +116,10 @@ func (it *NodeIterator) step() error {
 	if !it.dataIt.Next(true) {
 		it.dataIt = nil
 	}
-	if !bytes.Equal(account.CodeHash, emptyCodeHash) {
-		it.codeHash = common.BytesToHash(account.CodeHash)
+	if account.CodeHash != emptyCodeHash {
+		it.codeHash = account.CodeHash
 		addrHash := common.BytesToHash(it.stateIt.LeafKey())
-		it.code, err = it.state.db.ContractCode(addrHash, common.BytesToHash(account.CodeHash))
+		it.code, err = it.state.db.ContractCode(addrHash, account.CodeHash)
 		if err != nil {
 			return fmt.Errorf("code %x: %v", account.CodeHash, err)
 		}
