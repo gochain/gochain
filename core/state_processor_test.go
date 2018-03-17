@@ -2,8 +2,8 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"math/big"
-	"strconv"
 	"testing"
 	"time"
 
@@ -19,7 +19,7 @@ import (
 
 func BenchmarkStateProcessor_Process(b *testing.B) {
 	for _, cnt := range []int{1, 10, 100, 1000, 10000} {
-		b.Run(strconv.Itoa(cnt), benchmarkStateProcessor_Process(cnt))
+		b.Run(fmt.Sprintf("% 5d", cnt), benchmarkStateProcessor_Process(cnt))
 	}
 }
 
