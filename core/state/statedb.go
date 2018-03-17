@@ -220,7 +220,7 @@ func (self *StateDB) GetCodeSize(addr common.Address) int {
 	if stateObject.code != nil {
 		return len(stateObject.code)
 	}
-	size, err := self.db.ContractCodeSize(stateObject.addrHash, common.BytesToHash(stateObject.CodeHash()))
+	size, err := self.db.ContractCodeSize(stateObject.addrHash, stateObject.data.CodeHash)
 	if err != nil {
 		self.setError(err)
 	}
@@ -232,7 +232,7 @@ func (self *StateDB) GetCodeHash(addr common.Address) common.Hash {
 	if stateObject == nil {
 		return common.Hash{}
 	}
-	return common.BytesToHash(stateObject.CodeHash())
+	return stateObject.data.CodeHash
 }
 
 func (self *StateDB) GetState(a common.Address, b common.Hash) common.Hash {
@@ -596,7 +596,7 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) 
 		case isDirty:
 			// Write any contract code associated with the state object
 			if stateObject.code != nil && stateObject.dirtyCode {
-				s.db.TrieDB().Insert(common.BytesToHash(stateObject.CodeHash()), stateObject.code)
+				s.db.TrieDB().Insert(stateObject.data.CodeHash, stateObject.code)
 				stateObject.dirtyCode = false
 			}
 			// Write any storage changes in the state object to its storage trie.
@@ -617,7 +617,7 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) 
 		if account.Root != emptyState {
 			s.db.TrieDB().Reference(account.Root, parent)
 		}
-		code := common.BytesToHash(account.CodeHash)
+		code := account.CodeHash
 		if code != emptyCode {
 			s.db.TrieDB().Reference(code, parent)
 		}

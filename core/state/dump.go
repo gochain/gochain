@@ -58,7 +58,7 @@ func (self *StateDB) RawDump() Dump {
 			Balance:  data.Balance.String(),
 			Nonce:    data.Nonce,
 			Root:     common.Bytes2Hex(data.Root[:]),
-			CodeHash: common.Bytes2Hex(data.CodeHash),
+			CodeHash: common.Bytes2Hex(data.CodeHash[:]),
 			Code:     common.Bytes2Hex(obj.Code(self.db)),
 			Storage:  make(map[string]string),
 		}

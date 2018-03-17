@@ -86,12 +86,12 @@ func TestStateProcessor(t *testing.T) {
 	// 		t.Fatal(err)
 	// 	}
 	perfTimer := perfutils.GetTimer(ctx)
-	txs := []*types.Transaction{}
+	txs := make([]*types.Transaction, numTxs)
 	for i := 0; i < numTxs; i++ {
 		tx := types.NewTransaction(uint64(i), common.Address{}, big.NewInt(100), 100000, big.NewInt(1), nil)
 		tx, _ = types.SignTx(tx, signer, key)
 		// txs = append(txs, types.NewTransaction(uint64(i), common.Address{}, big.NewInt(1), uint64(21000), big.NewInt(21000), nil))
-		txs = append(txs, tx)
+		txs[i] = tx
 	}
 	block := types.NewBlock(&types.Header{
 		GasLimit: bc.GasLimit(),
