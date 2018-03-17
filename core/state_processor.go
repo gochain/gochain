@@ -82,6 +82,7 @@ func (p *StateProcessor) Process(ctx context.Context, block *types.Block, stated
 		go func() {
 			for i := atomic.AddInt32(&wi, 1); i < l32; i = atomic.AddInt32(&wi, 1) {
 				types.Sender(ctx, signer, txs[i])
+				txs[i].Hash()
 			}
 		}()
 	}
