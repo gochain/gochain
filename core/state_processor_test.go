@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"math/big"
+	"strconv"
 	"testing"
 	"time"
 
@@ -17,6 +18,12 @@ import (
 )
 
 func BenchmarkStateProcessor_Process(b *testing.B) {
+	for _, cnt := range []int{1, 10, 100, 1000, 10000} {
+		b.Run(strconv.Itoa(cnt), benchmarkStateProcessor_Process(cnt))
+	}
+}
+
+func benchmarkStateProcessor_Process(cnt int) func(b *testing.B) {
 	ctx := context.Background()
 	key, _ := crypto.GenerateKey()
 	address := crypto.PubkeyToAddress(key.PublicKey)
@@ -27,34 +34,34 @@ func BenchmarkStateProcessor_Process(b *testing.B) {
 		Difficulty: big.NewInt(1),
 		Alloc:      GenesisAlloc{address: {Balance: funds}},
 	}
+	txs := make([]*types.Transaction, cnt)
 	signer := types.NewEIP155Signer(genesis.Config.ChainId)
-
+	for i := range txs {
+		tx := types.NewTransaction(uint64(i), common.Address{}, big.NewInt(100), 100000, big.NewInt(1), nil)
+		tx, _ = types.SignTx(tx, signer, key)
+		txs[i] = tx
+	}
 	bc := newTestBlockChainWithGenesis(ctx, false, true, genesis)
-	defer bc.Stop()
-	cfg := vm.Config{}
+	block := types.NewBlock(&types.Header{
+		GasLimit: bc.GasLimit(),
+	}, txs, nil, nil)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		b.StopTimer()
-		txs := make([]*types.Transaction, 1000)
-		for i := 0; i < 1000; i++ {
-			tx := types.NewTransaction(uint64(i), common.Address{}, big.NewInt(100), 100000, big.NewInt(1), nil)
-			tx, _ = types.SignTx(tx, signer, key)
-			txs[i] = tx
-		}
+	return func(b *testing.B) {
+		defer bc.Stop()
+		var cfg vm.Config
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			b.StopTimer()
+			statedb, err := state.New(bc.CurrentBlock().Root(), bc.stateCache)
+			if err != nil {
+				b.Fatal(err)
+			}
+			b.StartTimer()
 
-		block := types.NewBlock(&types.Header{
-			GasLimit: bc.GasLimit(),
-		}, txs, nil, nil)
-		statedb, err := state.New(bc.CurrentBlock().Root(), bc.stateCache)
-		if err != nil {
-			b.Fatal(err)
-		}
-		b.StartTimer()
-
-		_, _, _, err = bc.Processor().Process(ctx, block, statedb, cfg)
-		if err != nil {
-			b.Fatal(err)
+			_, _, _, err = bc.Processor().Process(ctx, block, statedb, cfg)
+			if err != nil {
+				b.Fatal(err)
+			}
 		}
 	}
 }
