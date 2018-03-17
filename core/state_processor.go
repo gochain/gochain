@@ -48,7 +48,7 @@ func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consen
 		config:     config,
 		bc:         bc,
 		engine:     engine,
-		parWorkers: runtime.GOMAXPROCS(0) - 1,
+		parWorkers: 2 * runtime.GOMAXPROCS(0),
 	}
 }
 
@@ -60,32 +60,34 @@ func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consen
 // returns the amount of gas that was used in the process. If any of the
 // transactions failed to execute due to insufficient gas it will return an error.
 func (p *StateProcessor) Process(ctx context.Context, block *types.Block, statedb *state.StateDB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
-	var (
-		txs      = block.Transactions()
-		receipts = make(types.Receipts, len(txs))
-		usedGas  = new(uint64)
-		header   = block.Header()
-		allLogs  []*types.Log
-		gp       = new(GasPool).AddGas(block.GasLimit())
-	)
-	// Mutate the the block and state according to any hard-fork specs
-	if p.config.DAOForkSupport && p.config.DAOForkBlock != nil && p.config.DAOForkBlock.Cmp(block.Number()) == 0 {
-		misc.ApplyDAOHardFork(statedb)
-	}
+	txs := block.Transactions()
+	header := block.Header()
+
 	signer := types.MakeSigner(p.config, header.Number)
-
-	perfTimer := perfutils.GetTimer(ctx)
-
 	var wi int32 = -1
 	l32 := int32(len(txs))
 	for s := 0; s < p.parWorkers; s++ {
 		go func() {
 			for i := atomic.AddInt32(&wi, 1); i < l32; i = atomic.AddInt32(&wi, 1) {
-				types.Sender(ctx, signer, txs[i])
 				txs[i].Hash()
+				types.Sender(ctx, signer, txs[i])
 			}
 		}()
 	}
+
+	var (
+		receipts = make(types.Receipts, len(txs))
+		usedGas  = new(uint64)
+		allLogs  []*types.Log
+		gp       = new(GasPool).AddGas(block.GasLimit())
+	)
+
+	// Mutate the the block and state according to any hard-fork specs
+	if p.config.DAOForkSupport && p.config.DAOForkBlock != nil && p.config.DAOForkBlock.Cmp(block.Number()) == 0 {
+		misc.ApplyDAOHardFork(statedb)
+	}
+
+	perfTimer := perfutils.GetTimer(ctx)
 
 	// Create a new emv context and environment.
 	evmContext := NewEVMContextLite(header, p.bc, nil)

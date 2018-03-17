@@ -72,7 +72,6 @@ func SignTx(tx *Transaction, s Signer, prv *ecdsa.PrivateKey) (*Transaction, err
 // signing method. The cache is invalidated if the cached signer does
 // not match the signer used in the current call.
 func Sender(ctx context.Context, signer Signer, tx *Transaction) (common.Address, error) {
-	perfTimer := perfutils.GetTimer(ctx)
 	if sc := tx.from.Load(); sc != nil {
 		sigCache := sc.(sigCache)
 		// If the signer used to derive from in a previous
@@ -82,7 +81,7 @@ func Sender(ctx context.Context, signer Signer, tx *Transaction) (common.Address
 			return sigCache.from, nil
 		}
 	}
-
+	perfTimer := perfutils.GetTimer(ctx)
 	ps := perfTimer.Start(perfutils.SignerSender)
 	addr, err := signer.Sender(tx)
 	if err != nil {
