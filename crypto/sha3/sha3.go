@@ -190,3 +190,13 @@ func (d *state) Sum(in []byte) []byte {
 	dup.Read(hash)
 	return append(in, hash...)
 }
+
+type singleSumState struct {
+	state
+}
+
+func (d *singleSumState) Sum(in []byte) []byte {
+	hash := make([]byte, d.outputLen)
+	d.Read(hash)
+	return append(in, hash...)
+}

@@ -151,7 +151,7 @@ type SignerFn func(accounts.Account, []byte) ([]byte, error)
 // panics. This is done to avoid accidentally using both forms (signature present
 // or not), which could be abused to produce different hashes for the same header.
 func sigHash(header *types.Header) (hash common.Hash) {
-	hasher := sha3.NewKeccak256()
+	hasher := sha3.NewKeccak256SingleSum()
 
 	rlp.Encode(hasher, []interface{}{
 		header.ParentHash,
