@@ -236,18 +236,30 @@ func (h *virtualHostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	}
 	// Not an ip address, but a hostname. Need to validate
-	if _, exist := h.vhosts["*"]; exist {
-		h.next.ServeHTTP(w, r)
-		return
-	}
-	if _, exist := h.vhosts[host]; exist {
+	if h.validHost(host) {
 		h.next.ServeHTTP(w, r)
 		return
 	}
 	http.Error(w, "invalid host specified", http.StatusForbidden)
 }
 
-func newVHostHandler(vhosts []string, next http.Handler) http.Handler {
+func (h *virtualHostHandler) validHost(host string) bool {
+	if _, exist := h.vhosts["*"]; exist {
+		return true
+	}
+	if _, exist := h.vhosts[host]; exist {
+		return true
+	}
+	for i := strings.IndexByte(host, '.'); i > -1; i = strings.IndexByte(host, '.') {
+		if _, exist := h.vhosts["*"+host[i:]]; exist {
+			return true
+		}
+		host = host[i+1:] // Drop leading '.'.
+	}
+	return false
+}
+
+func newVHostHandler(vhosts []string, next http.Handler) *virtualHostHandler {
 	vhostMap := make(map[string]struct{})
 	for _, allowedHost := range vhosts {
 		vhostMap[strings.ToLower(allowedHost)] = struct{}{}
