@@ -15,6 +15,12 @@ import (
 // NewKeccak256 creates a new Keccak-256 hash.
 func NewKeccak256() hash.Hash { return &state{rate: 136, outputLen: 32, dsbyte: 0x01} }
 
+// NewKeccak256SingleSum is like NewKeccak256, but the returned hash must be
+// Reset() after calling Sum(). This allows skipping an internal state copy.
+func NewKeccak256SingleSum() hash.Hash {
+	return &singleSumState{state{rate: 136, outputLen: 32, dsbyte: 0x01}}
+}
+
 // Keccak256 is optimized for cases that call Sum() just once. When h is 32
 // bytes it is equivalent to calling NewKeccak256() and using the Write() and
 // Sum() hash.Hash interface methods, but avoids the extra allocations in
@@ -30,6 +36,11 @@ func Keccak256(h []byte, data ...[]byte) {
 
 // NewKeccak512 creates a new Keccak-512 hash.
 func NewKeccak512() hash.Hash { return &state{rate: 72, outputLen: 64, dsbyte: 0x01} }
+
+// NewKeccak512SingleSum returns an optimized instance, like NewKeccak256SingleSum().
+func NewKeccak512SingleSum() hash.Hash {
+	return &singleSumState{state{rate: 72, outputLen: 64, dsbyte: 0x01}}
+}
 
 // Keccack512 is an optimized alternative to NewKeccak512/Write/Sum, like Keccack256.
 func Keccak512(data ...[]byte) []byte {

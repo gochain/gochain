@@ -1239,7 +1239,7 @@ func (net *Network) checkTopicRegister(data *topicRegister) (*pong, error) {
 }
 
 func rlpHash(x interface{}) (h common.Hash) {
-	hw := sha3.NewKeccak256()
+	hw := sha3.NewKeccak256SingleSum()
 	rlp.Encode(hw, x)
 	hw.Sum(h[:0])
 	return h
