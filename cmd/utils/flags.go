@@ -400,7 +400,7 @@ var (
 	}
 	RPCVirtualHostsFlag = cli.StringFlag{
 		Name:  "rpcvhosts",
-		Usage: "Comma separated list of virtual hostnames from which to accept requests (server enforced). Accepts '*' wildcard.",
+		Usage: "Comma separated list of virtual hostnames from which to accept requests (server enforced). Accepts global ('*') or subdomain ('*.example.com') wildcards.",
 		Value: "localhost",
 	}
 	RPCApiFlag = cli.StringFlag{

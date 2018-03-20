@@ -52,3 +52,51 @@ func testHTTPErrorResponse(t *testing.T, method, contentType, body string, expec
 		t.Fatalf("response code should be %d not %d", expected, code)
 	}
 }
+
+func TestVirtualHostHandler_validHost(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		vhosts  []string
+		valid   []string
+		invalid []string
+	}{
+		{
+			name:   "any",
+			vhosts: []string{"*"},
+			valid:  []string{"google.com", "example.com", "gochain.io"},
+		},
+		{
+			name:    "literal",
+			vhosts:  []string{"test.gochain.io"},
+			valid:   []string{"test.gochain.io"},
+			invalid: []string{"a.gochain.io", "a.test.gochain.io"},
+		},
+		{
+			name:    "subdomain",
+			vhosts:  []string{"*.gochain.io"},
+			valid:   []string{"test.gochain.io", "a.gochain.io", "a.b.gochain.io"},
+			invalid: []string{"gochain.io"},
+		},
+		{
+			name:    "multi",
+			vhosts:  []string{"*.e.d.c.b.a"},
+			valid:   []string{"f.e.d.c.b.a"},
+			invalid: []string{"e.d.c.b.a", "c.b.a", "b.a"},
+		},
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			h := newVHostHandler(test.vhosts, nil)
+			for _, host := range test.valid {
+				if !h.validHost(host) {
+					t.Errorf("expected %q to be valid", host)
+				}
+			}
+			for _, host := range test.invalid {
+				if h.validHost(host) {
+					t.Errorf("expected %q to be invalid", host)
+				}
+			}
+		})
+	}
+}
