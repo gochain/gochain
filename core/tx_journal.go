@@ -82,9 +82,7 @@ func (journal *txJournal) load(add func(types.Transactions) []error) error {
 	addBatch := func() {
 		if errs := add(batch); len(errs) > 0 {
 			dropped += len(errs)
-			for err := range errs {
-				log.Debug("Failed to add journaled transaction", "err", err)
-			}
+			log.Debug("Failed to add journaled transactions", "errs", len(errs))
 		}
 		batch = batch[:0]
 	}
