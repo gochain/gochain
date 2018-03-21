@@ -54,3 +54,12 @@ jobs:
               docker tag gochain/gochain:${version} gochain/gochain:testnet
               docker push gochain/gochain:testnet
             fi
+            if [[ "${CIRCLE_BRANCH}" == "mainnet" && -z "${CIRCLE_PR_REPONAME}" ]]; then
+              docker login -u $DOCKER_USER -p $DOCKER_PASS
+              version_file="params/version.go"
+              version=$(grep -m1 -Eo "[0-9]+\.[0-9]+\.[0-9]+" ${version_file})
+              echo "Version: ${version}"
+              docker pull gochain/gochain:${version}
+              docker tag gochain/gochain:${version} gochain/gochain:mainnet
+              docker push gochain/gochain:mainnet
+            fi
