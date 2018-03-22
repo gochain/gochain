@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/consensus"
 	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/consensus/ethash"
 	"github.com/gochain-io/gochain/core/state"
@@ -41,7 +40,7 @@ import (
 
 // newTestBlockChain creates a blockchain without validation.
 // genesis can be nil to use default
-func newTestBlockChainWithGenesis(ctx context.Context, fake, disk bool, genesis *Genesis) (*BlockChain, error) {
+func newTestBlockChainWithGenesis(ctx context.Context, disk bool, genesis *Genesis) (*BlockChain, error) {
 	var err error
 	var db ethdb.Database
 	if disk {
@@ -64,11 +63,7 @@ func newTestBlockChainWithGenesis(ctx context.Context, fake, disk bool, genesis 
 		}
 	}
 	genesis.MustCommit(db)
-	var engine consensus.Engine
-	engine = ethash.NewFullFaker()
-	if !fake {
-		engine = clique.New(genesis.Config.Clique, db)
-	}
+	engine := clique.New(genesis.Config.Clique, db)
 	blockchain, err := NewBlockChain(ctx, db, nil, genesis.Config, engine, vm.Config{})
 	if err != nil {
 		panic(err)
