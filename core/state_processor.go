@@ -23,7 +23,6 @@ import (
 
 	"github.com/gochain-io/gochain/common/perfutils"
 	"github.com/gochain-io/gochain/consensus"
-	"github.com/gochain-io/gochain/consensus/misc"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
@@ -81,11 +80,6 @@ func (p *StateProcessor) Process(ctx context.Context, block *types.Block, stated
 		allLogs  []*types.Log
 		gp       = new(GasPool).AddGas(block.GasLimit())
 	)
-
-	// Mutate the the block and state according to any hard-fork specs
-	if p.config.DAOForkSupport && p.config.DAOForkBlock != nil && p.config.DAOForkBlock.Cmp(block.Number()) == 0 {
-		misc.ApplyDAOHardFork(statedb)
-	}
 
 	perfTimer := perfutils.GetTimer(ctx)
 
