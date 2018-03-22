@@ -23,7 +23,6 @@ import (
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/consensus"
-	"github.com/gochain-io/gochain/consensus/misc"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
@@ -178,18 +177,6 @@ func GenerateChain(ctx context.Context, config *params.ChainConfig, parent *type
 		b := &BlockGen{i: i, parent: parent, chain: blocks, chainReader: blockchain, statedb: statedb, config: config, engine: engine}
 		b.header = makeHeader(ctx, b.chainReader, parent, statedb, b.engine)
 
-		// Mutate the state and block according to any hard-fork specs
-		if daoBlock := config.DAOForkBlock; daoBlock != nil {
-			limit := new(big.Int).Add(daoBlock, params.DAOForkExtraRange)
-			if b.header.Number.Cmp(daoBlock) >= 0 && b.header.Number.Cmp(limit) < 0 {
-				if config.DAOForkSupport {
-					b.header.Extra = common.CopyBytes(params.DAOForkBlockExtra)
-				}
-			}
-		}
-		if config.DAOForkSupport && config.DAOForkBlock != nil && config.DAOForkBlock.Cmp(b.header.Number) == 0 {
-			misc.ApplyDAOHardFork(statedb)
-		}
 		// Execute any user modifications to the block and finalize it
 		if gen != nil {
 			gen(ctx, i, b)
