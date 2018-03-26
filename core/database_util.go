@@ -55,6 +55,21 @@ const (
 	bloomBitsPrefix     byte = 'B' // bloomBitsPrefix + bit (uint16 big endian) + section (uint64 big endian) + hash -> bloom bits
 )
 
+// DBArchivePrefixes is the set of key prefixes which are eligible for archival.
+var DBArchivePrefixes = [...]byte{bodyPrefix, blockReceiptsPrefix, headerPrefix}
+
+// DBArchiveKey checks if a key is archivable, and returns its parts if so.
+func DBArchiveKey(key []byte) (bool, byte, uint64, common.Hash) {
+	if len(key) != 41 {
+		return false, 0, 0, common.Hash{}
+	}
+	switch key[0] {
+	case headerPrefix, bodyPrefix, blockReceiptsPrefix:
+		return true, key[0], binary.BigEndian.Uint64(key[1:]), common.BytesToHash(key[9:])
+	}
+	return false, 0, 0, common.Hash{}
+}
+
 var (
 	headHeaderKey = []byte("LastHeader")
 	headBlockKey  = []byte("LastBlock")
@@ -93,7 +108,7 @@ func encodeBlockNumber(number uint64) []byte {
 
 // GetCanonicalHash retrieves a hash assigned to a canonical block number.
 func GetCanonicalHash(db DatabaseReader, number uint64) common.Hash {
-	data, _ := db.Get(numKey(headerPrefix, number))
+	data, _ := db.Get(numKey(number))
 	if len(data) == 0 {
 		return common.Hash{}
 	}
@@ -184,17 +199,17 @@ func numHashKey(prefix byte, number uint64, hash common.Hash) []byte {
 	return k[:]
 }
 
-func numKey(prefix byte, number uint64) []byte {
+func numKey(number uint64) []byte {
 	var k [10]byte
-	k[0] = prefix
+	k[0] = headerPrefix
 	binary.BigEndian.PutUint64(k[1:], number)
 	k[9] = numSuffix
 	return k[:]
 }
 
-func tdKey(prefix byte, number uint64, hash common.Hash) []byte {
+func tdKey(number uint64, hash common.Hash) []byte {
 	var k [42]byte
-	k[0] = prefix
+	k[0] = headerPrefix
 	binary.BigEndian.PutUint64(k[1:], number)
 	copy(k[9:], hash[:])
 	k[41] = tdSuffix
@@ -226,7 +241,7 @@ func GetBody(db DatabaseReader, hash common.Hash, number uint64) *types.Body {
 // GetTd retrieves a block's total difficulty corresponding to the hash, nil if
 // none found.
 func GetTd(db DatabaseReader, hash common.Hash, number uint64) *big.Int {
-	data, _ := db.Get(tdKey(headerPrefix, number, hash))
+	data, _ := db.Get(tdKey(number, hash))
 	if len(data) == 0 {
 		return nil
 	}
@@ -365,7 +380,7 @@ func GetBloomBits(db DatabaseReader, bit uint, section uint64, head common.Hash)
 
 // WriteCanonicalHash stores the canonical hash for the given block number.
 func WriteCanonicalHash(db ethdb.Putter, hash common.Hash, number uint64) error {
-	key := numKey(headerPrefix, number)
+	key := numKey(number)
 	if err := db.Put(key, hash.Bytes()); err != nil {
 		log.Crit("Failed to store number to hash mapping", "err", err)
 	}
@@ -439,7 +454,7 @@ func WriteTd(db ethdb.Putter, hash common.Hash, number uint64, td *big.Int) erro
 	if err != nil {
 		return err
 	}
-	key := tdKey(headerPrefix, number, hash)
+	key := tdKey(number, hash)
 	if err := db.Put(key, data); err != nil {
 		log.Crit("Failed to store block total difficulty", "err", err)
 	}
@@ -513,7 +528,7 @@ func WriteBloomBits(db ethdb.Putter, bit uint, section uint64, head common.Hash,
 
 // DeleteCanonicalHash removes the number to hash canonical mapping.
 func DeleteCanonicalHash(db DatabaseDeleter, number uint64) {
-	db.Delete(numKey(headerPrefix, number))
+	db.Delete(numKey(number))
 }
 
 // DeleteHeader removes all block header data associated with a hash.
@@ -529,7 +544,7 @@ func DeleteBody(db DatabaseDeleter, hash common.Hash, number uint64) {
 
 // DeleteTd removes all block total difficulty data associated with a hash.
 func DeleteTd(db DatabaseDeleter, hash common.Hash, number uint64) {
-	db.Delete(tdKey(headerPrefix, number, hash))
+	db.Delete(tdKey(number, hash))
 }
 
 // DeleteBlock removes all block data associated with a hash.

@@ -24,13 +24,13 @@ import (
 
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/metrics"
+	gometrics "github.com/rcrowley/go-metrics"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
-
-	gometrics "github.com/rcrowley/go-metrics"
+	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 var OpenFileLimit = 64
@@ -145,8 +145,8 @@ func (db *LDBDatabase) Delete(key []byte) error {
 	return db.db.Delete(key, nil)
 }
 
-func (db *LDBDatabase) NewIterator() iterator.Iterator {
-	return db.db.NewIterator(nil, nil)
+func (db *LDBDatabase) NewIterator(slice *util.Range, ro *opt.ReadOptions) iterator.Iterator {
+	return db.db.NewIterator(slice, ro)
 }
 
 func (db *LDBDatabase) Close() {

@@ -402,11 +402,11 @@ func TestNumHashKey(t *testing.T) {
 		},
 		{
 			orig: append(append(prefix, encodeBlockNumber(123456789)...), []byte{numSuffix}...),
-			opt:  numKey(headerPrefix, 123456789),
+			opt:  numKey(123456789),
 		},
 		{
 			orig: append(append(append(prefix, encodeBlockNumber(123456789)...), hash[:]...), []byte{tdSuffix}...),
-			opt:  tdKey(headerPrefix, 123456789, hash),
+			opt:  tdKey(123456789, hash),
 		},
 	} {
 		if !bytes.Equal(test.orig, test.opt) {

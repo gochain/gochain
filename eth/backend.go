@@ -40,6 +40,7 @@ import (
 	"github.com/gochain-io/gochain/eth/filters"
 	"github.com/gochain-io/gochain/eth/gasprice"
 	"github.com/gochain-io/gochain/ethdb"
+	"github.com/gochain-io/gochain/ethdb/archive"
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/internal/ethapi"
 	"github.com/gochain-io/gochain/log"
@@ -113,7 +114,22 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *Config) (*Ether
 	if err != nil {
 		return nil, err
 	}
+
 	stopDbUpgrade := upgradeDeduplicateData(chainDb)
+
+	if config.Archive.Endpoint != "" {
+		ar, err := archive.NewArchive(config.Archive)
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to archive: %s", err)
+		}
+		ar.Meter("db/archive/chaindata/")
+		if ldb, ok := chainDb.(*ethdb.LDBDatabase); !ok {
+			return nil, fmt.Errorf("only ethdb.LDBDatabase maybe be archived, but found: %T", chainDb)
+		} else {
+			chainDb = archive.NewDB(ldb, ar)
+		}
+	}
+
 	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
 	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {
 		return nil, genesisErr
@@ -152,6 +168,17 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *Config) (*Ether
 	eth.blockchain, err = core.NewBlockChain(ctx, chainDb, cacheConfig, eth.chainConfig, eth.engine, vmConfig)
 	if err != nil {
 		return nil, err
+	}
+	if arDB, ok := eth.chainDb.(*archive.DB); ok {
+		arDB.Start(func(prefix byte) uint64 {
+			switch prefix {
+			case 'h':
+				return eth.blockchain.CurrentHeader().Number.Uint64()
+			case 'b', 'r':
+				return eth.blockchain.CurrentBlock().Number().Uint64()
+			}
+			return 0
+		})
 	}
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
@@ -206,7 +233,7 @@ func CreateDB(ctx *node.ServiceContext, config *Config, name string) (ethdb.Data
 		return nil, err
 	}
 	if db, ok := db.(*ethdb.LDBDatabase); ok {
-		db.Meter("gochain/db/chaindata/")
+		db.Meter("db/chaindata/")
 	}
 	return db, nil
 }
