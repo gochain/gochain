@@ -41,20 +41,11 @@ func TestnetGenesis() string {
 	return string(enc)
 }
 
-// RinkebyGenesis returns the JSON spec to use for the Rinkeby test network
-func RinkebyGenesis() string {
-	enc, err := json.Marshal(core.DefaultRinkebyGenesisBlock())
-	if err != nil {
-		panic(err)
-	}
-	return string(enc)
-}
-
 // FoundationBootnodes returns the enode URLs of the P2P bootstrap nodes operated
 // by the foundation running the V5 discovery protocol.
 func FoundationBootnodes() *Enodes {
-	nodes := &Enodes{nodes: make([]*discv5.Node, len(params.DiscoveryV5Bootnodes))}
-	for i, url := range params.DiscoveryV5Bootnodes {
+	nodes := &Enodes{nodes: make([]*discv5.Node, len(params.MainnetBootnodes))}
+	for i, url := range params.MainnetBootnodes {
 		nodes.nodes[i] = discv5.MustParseNode(url)
 	}
 	return nodes
