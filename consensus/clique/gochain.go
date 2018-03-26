@@ -14,9 +14,7 @@ import (
 
 // Finalize implements consensus.Engine, ensuring no uncles are set, but this does give rewards.
 func (c *Clique) Finalize(ctx context.Context, chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt, block bool) *types.Block {
-	if c.signer != (common.Address{}) {
-		accumulateRewards(chain.Config(), state, header, uncles, c.signer)
-	}
+	accumulateRewards(chain.Config(), state, header, uncles, header.Coinbase)
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	header.UncleHash = types.CalcUncleHash(nil)
 

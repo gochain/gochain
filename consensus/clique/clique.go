@@ -157,6 +157,7 @@ func sigHash(header *types.Header) (hash common.Hash) {
 		header.ParentHash,
 		header.UncleHash,
 		header.Coinbase,
+		header.Candidate,
 		header.Root,
 		header.TxHash,
 		header.ReceiptHash,
@@ -247,7 +248,8 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 // Author implements consensus.Engine, returning the Ethereum address recovered
 // from the signature in the header's extra-data section.
 func (c *Clique) Author(header *types.Header) (common.Address, error) {
-	return ecrecover(header, c.signatures)
+	return header.Coinbase, nil
+	//return ecrecover(header, c.signatures)
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules.
@@ -292,7 +294,7 @@ func (c *Clique) verifyHeader(ctx context.Context, chain consensus.ChainReader, 
 	}
 	// Checkpoint blocks need to enforce zero beneficiary
 	checkpoint := (number % c.config.Epoch) == 0
-	if checkpoint && header.Coinbase != (common.Address{}) {
+	if checkpoint && header.Candidate != (common.Address{}) {
 		return errInvalidCheckpointBeneficiary
 	}
 	// Nonces must be 0x00..0 or 0xff..f, zeroes enforced on checkpoints
@@ -531,7 +533,7 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 	ps := pt.Start(perfutils.CliqueSeal)
 	defer ps.Stop()
 	// If the block isn't a checkpoint, cast a random vote (good enough for now)
-	header.Coinbase = common.Address{}
+	header.Candidate = common.Address{}
 	header.Nonce = types.BlockNonce{}
 
 	number := header.Number.Uint64()
@@ -558,8 +560,8 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 		}
 		// If there's pending proposals, cast a vote on them
 		if len(addresses) > 0 {
-			header.Coinbase = addresses[rand.Intn(len(addresses))]
-			propose := c.proposals[header.Coinbase]
+			header.Candidate = addresses[rand.Intn(len(addresses))]
+			propose := c.proposals[header.Candidate]
 			if propose.Authorize {
 				copy(header.Nonce[:], nonceAuthVote)
 			} else {
