@@ -418,11 +418,11 @@ func TestVoting(t *testing.T) {
 		headers := make([]*types.Header, len(tt.votes))
 		for j, vote := range tt.votes {
 			headers[j] = &types.Header{
-				Number:   big.NewInt(int64(j) + 1),
-				Time:     big.NewInt(int64(j) * int64(blockPeriod)),
-				Coinbase: accounts.address(vote.voted),
-				Signer:   make([]byte, extraSeal),
-				Extra:    make([]byte, extraVanity),
+				Number:    big.NewInt(int64(j) + 1),
+				Time:      big.NewInt(int64(j) * int64(blockPeriod)),
+				Candidate: accounts.address(vote.voted),
+				Signer:    make([]byte, extraSeal),
+				Extra:     make([]byte, extraVanity),
 			}
 			if j > 0 {
 				headers[j].ParentHash = headers[j-1].Hash()

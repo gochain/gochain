@@ -235,7 +235,7 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 
 			// Header authorized, discard any previous votes from the voter
 			for i, vote := range snap.Votes {
-				if vote.Signer == signer && vote.Address == header.Coinbase {
+				if vote.Signer == signer && vote.Address == header.Candidate {
 					// Uncast the vote from the cached tally
 					snap.uncast(vote.Address, vote.Authorize)
 
@@ -264,37 +264,37 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 					voterElection = false
 				}
 			}
-			if snap.cast(header.Coinbase, authorize, voterElection) {
+			if snap.cast(header.Ccandidate, authorize, voterElection) {
 				snap.Votes = append(snap.Votes, &Vote{
 					Signer:    signer,
 					Block:     number,
-					Address:   header.Coinbase,
+					Address:   header.Candidate,
 					Authorize: authorize,
 				})
 			}
 			// If the vote passed, update the list of signers or voters
-			if tally := snap.Tally[header.Coinbase]; tally.Votes > len(snap.Voters)/2 {
+			if tally := snap.Tally[header.Candidate]; tally.Votes > len(snap.Voters)/2 {
 				if tally.Authorize {
-					_, signer := snap.Signers[header.Coinbase]
+					_, signer := snap.Signers[header.Candidate]
 					if !signer {
-						snap.Signers[header.Coinbase] = struct{}{}
+						snap.Signers[header.Candidate] = struct{}{}
 					} else {
-						snap.Voters[header.Coinbase] = struct{}{}
+						snap.Voters[header.Candidate] = struct{}{}
 					}
 				} else {
-					_, voter := snap.Voters[header.Coinbase]
+					_, voter := snap.Voters[header.Candidate]
 					if !voter {
-						delete(snap.Signers, header.Coinbase)
+						delete(snap.Signers, header.Candidate)
 
 						// Signer list shrunk, delete any leftover recent caches
 						if limit := uint64(len(snap.Signers)/2 + 1); number >= limit {
 							delete(snap.Recents, number-limit)
 						}
 					} else {
-						delete(snap.Voters, header.Coinbase)
+						delete(snap.Voters, header.Candidate)
 						// Discard any previous votes the deauthorized voter cast
 						for i := 0; i < len(snap.Votes); i++ {
-							if snap.Votes[i].Signer == header.Coinbase {
+							if snap.Votes[i].Signer == header.Candidate {
 								// Uncast the vote from the cached tally
 								snap.uncast(snap.Votes[i].Address, snap.Votes[i].Authorize)
 
@@ -308,12 +308,12 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 				}
 				// Discard any previous votes around the just changed account
 				for i := 0; i < len(snap.Votes); i++ {
-					if snap.Votes[i].Address == header.Coinbase {
+					if snap.Votes[i].Address == header.Candidate {
 						snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
 						i--
 					}
 				}
-				delete(snap.Tally, header.Coinbase)
+				delete(snap.Tally, header.Candidate)
 			}
 		}
 	}
