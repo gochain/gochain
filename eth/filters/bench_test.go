@@ -147,7 +147,7 @@ func benchmarkBloomBits(b *testing.B, sectionSize uint64) {
 }
 
 func forEachKey(db ethdb.Database, startPrefix, endPrefix []byte, fn func(key []byte)) {
-	it := db.(*ethdb.LDBDatabase).NewIterator()
+	it := db.(*ethdb.LDBDatabase).NewIterator(nil, nil)
 	it.Seek(startPrefix)
 	for it.Valid() {
 		key := it.Key()

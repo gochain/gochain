@@ -30,6 +30,7 @@ import (
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/eth/downloader"
 	"github.com/gochain-io/gochain/eth/gasprice"
+	"github.com/gochain-io/gochain/ethdb/archive"
 	"github.com/gochain-io/gochain/params"
 )
 
@@ -114,6 +115,9 @@ type Config struct {
 
 	// Miscellaneous options
 	DocRoot string `toml:"-"`
+
+	// Archive options.
+	Archive archive.Config `toml:",omitempty"`
 }
 
 type configMarshaling struct {
