@@ -1,5 +1,5 @@
 ## How to configure private cluster monitoring
-# eth-netstat
+# netstat
 ```
 docker run -d -p 80:80 --name netstats -e PORT=80 -e WS_SECRET=SELECTED_SECRET
 gochain/netstats
@@ -33,7 +33,7 @@ gochain/netstats
 ]
 ```
 
-Where WS_SECRET is a secret which you use to launch eth-netstat and WS_SERVER is a netstats address (ie http://localhost )
+Where WS_SECRET is a secret which you use to launch netstat and WS_SERVER is a netstats address (ie http://localhost )
 and
 ```
 docker run -d --net=host --name net-intelligence -v $PWD/app.json:/home/ethnetintel/eth-net-intelligence-api/app.json  gochain/net-intelligence-api
