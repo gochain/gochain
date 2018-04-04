@@ -21,7 +21,7 @@ import (
 	"context"
 	"math/big"
 
-	ethereum "github.com/gochain-io/gochain"
+	"github.com/gochain-io/gochain"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/event"
@@ -86,7 +86,7 @@ type Wallet interface {
 	//
 	// You can disable automatic account discovery by calling SelfDerive with a nil
 	// chain state reader.
-	SelfDerive(base DerivationPath, chain ethereum.ChainStateReader)
+	SelfDerive(base DerivationPath, chain gochain.ChainStateReader)
 
 	// SignHash requests the wallet to sign the given hash.
 	//

@@ -29,9 +29,9 @@
 # - sign installer
 CRCCheck on
 
-!define GROUPNAME "Ethereum"
+!define GROUPNAME "GoChain"
 !define APPNAME "GoChain"
-!define DESCRIPTION "Official Go implementation of the Ethereum protocol"
+!define DESCRIPTION "Official Go implementation of the GoChain protocol"
 !addplugindir .\
 
 # Require admin rights on NT6+ (When UAC is turned on)
