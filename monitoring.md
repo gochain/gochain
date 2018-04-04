@@ -5,7 +5,7 @@ docker run -d -p 80:80 --name netstats -e PORT=80 -e WS_SECRET=SELECTED_SECRET
 gochain/netstats
 ```
 
-# eth-intelligence-api
+# net-intelligence-api
 1. Create app.json file with following content(one node example):
 ```
 [
@@ -33,10 +33,10 @@ gochain/netstats
 ]
 ```
 
-Where WS_SECRET is a secret which you use to launch eth-netstat and WS_SERVER is a eth-netstats address (ie http://localhost )
+Where WS_SECRET is a secret which you use to launch eth-netstat and WS_SERVER is a netstats address (ie http://localhost )
 and
 ```
-docker run -d --net=host --name eth-intelligence -v $PWD/app.json:/home/ethnetintel/eth-net-intelligence-api/app.json  gochain/net-intelligence-api
+docker run -d --net=host --name net-intelligence -v $PWD/app.json:/home/ethnetintel/eth-net-intelligence-api/app.json  gochain/net-intelligence-api
 ```
 
 After this you should see some stats in dashboard at http://IP_ADDRESS_OF_YOUR_HOST
