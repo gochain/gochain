@@ -20,7 +20,7 @@ import (
 	"context"
 	"math/big"
 
-	ethereum "github.com/gochain-io/gochain"
+	"github.com/gochain-io/gochain"
 	"github.com/gochain-io/gochain/accounts"
 	"github.com/gochain-io/gochain/core/types"
 )
@@ -77,7 +77,7 @@ func (w *keystoreWallet) Derive(path accounts.DerivationPath, pin bool) (account
 
 // SelfDerive implements accounts.Wallet, but is a noop for plain wallets since
 // there is no notion of hierarchical account derivation for plain keystore accounts.
-func (w *keystoreWallet) SelfDerive(base accounts.DerivationPath, chain ethereum.ChainStateReader) {}
+func (w *keystoreWallet) SelfDerive(base accounts.DerivationPath, chain gochain.ChainStateReader) {}
 
 // SignHash implements accounts.Wallet, attempting to sign the given hash with
 // the given account. If the wallet does not wrap this particular account, an

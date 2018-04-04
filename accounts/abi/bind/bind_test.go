@@ -172,33 +172,33 @@ var bindTests = []struct {
 			 )
 			 _, err = e.FilterEmpty(nil)
 			 _, err = e.FilterIndexed(nil, []common.Address{}, []*big.Int{})
-
+	
 			 mit, err := e.FilterMixed(nil, []common.Address{})
-
+	
 			 res = mit.Next()  // Make sure the iterator has a Next method
 			 err = mit.Error() // Make sure the iterator has an Error method
 			 err = mit.Close() // Make sure the iterator has a Close method
-
+	
 			 fmt.Println(mit.Event.Raw.BlockHash) // Make sure the raw log is contained within the results
 			 fmt.Println(mit.Event.Num)           // Make sure the unpacked non-indexed fields are present
 			 fmt.Println(mit.Event.Addr)          // Make sure the reconstructed indexed fields are present
-
+	
 			 dit, err := e.FilterDynamic(nil, []string{}, [][]byte{})
-
+	
 			 str  = dit.Event.Str    // Make sure non-indexed strings retain their type
 			 dat  = dit.Event.Dat    // Make sure non-indexed bytes retain their type
 			 hash = dit.Event.IdxStr // Make sure indexed strings turn into hashes
 			 hash = dit.Event.IdxDat // Make sure indexed bytes turn into hashes
-
+	
 			 sink := make(chan *EventCheckerMixed)
 			 sub, err := e.WatchMixed(nil, sink, []common.Address{})
 			 defer sub.Unsubscribe()
-
+	
 			 event := <-sink
 			 fmt.Println(event.Raw.BlockHash) // Make sure the raw log is contained within the results
 			 fmt.Println(event.Num)           // Make sure the unpacked non-indexed fields are present
 			 fmt.Println(event.Addr)          // Make sure the reconstructed indexed fields are present
-
+	
 			 fmt.Println(res, str, dat, hash, err)
 		 }
 		 // Run a tiny reflection test to ensure disallowed methods don't appear
@@ -240,7 +240,7 @@ var bindTests = []struct {
 				t.Fatalf("Failed to transact with interactor contract: %v", err)
 			}
 			// Commit all pending transactions in the simulator and check the contract state
-			sim.Commit()
+			sim.Commit(context.TODO())
 
 			if str, err := interactor.DeployString(nil); err != nil {
 				t.Fatalf("Failed to retrieve deploy string: %v", err)
@@ -277,7 +277,7 @@ var bindTests = []struct {
 			if err != nil {
 				t.Fatalf("Failed to deploy getter contract: %v", err)
 			}
-			sim.Commit()
+			sim.Commit(context.TODO())
 
 			if str, num, _, err := getter.Getter(nil); err != nil {
 				t.Fatalf("Failed to call anonymous field retriever: %v", err)
@@ -309,7 +309,7 @@ var bindTests = []struct {
 			if err != nil {
 				t.Fatalf("Failed to deploy tupler contract: %v", err)
 			}
-			sim.Commit()
+			sim.Commit(context.TODO())
 
 			if res, err := tupler.Tuple(nil); err != nil {
 				t.Fatalf("Failed to call structure retriever: %v", err)
@@ -351,7 +351,7 @@ var bindTests = []struct {
 			if err != nil {
 					t.Fatalf("Failed to deploy slicer contract: %v", err)
 			}
-			sim.Commit()
+			sim.Commit(context.TODO())
 
 			if out, err := slicer.EchoAddresses(nil, []common.Address{auth.From, common.Address{}}); err != nil {
 					t.Fatalf("Failed to call slice echoer: %v", err)
@@ -388,7 +388,7 @@ var bindTests = []struct {
 			if _, err := (&DefaulterRaw{defaulter}).Transfer(auth); err != nil {
 				t.Fatalf("Failed to invoke default method: %v", err)
 			}
-			sim.Commit()
+			sim.Commit(context.TODO())
 
 			if caller, err := defaulter.Caller(nil); err != nil {
 				t.Fatalf("Failed to call address retriever: %v", err)
@@ -454,13 +454,13 @@ var bindTests = []struct {
 			if err != nil {
 				t.Fatalf("Failed to deploy funky contract: %v", err)
 			}
-			sim.Commit()
+			sim.Commit(context.TODO())
 
 			// Set the field with automatic estimation and check that it succeeds
 			if _, err := limiter.SetField(auth, "automatic"); err != nil {
 				t.Fatalf("Failed to call automatically gased transaction: %v", err)
 			}
-			sim.Commit()
+			sim.Commit(context.TODO())
 
 			if field, _ := limiter.Field(nil); field != "automatic" {
 				t.Fatalf("Field mismatch: have %v, want %v", field, "automatic")
@@ -489,7 +489,7 @@ var bindTests = []struct {
 			if err != nil {
 				t.Fatalf("Failed to deploy sender contract: %v", err)
 			}
-			sim.Commit()
+			sim.Commit(context.TODO())
 
 			if res, err := callfrom.CallFrom(nil); err != nil {
 				t.Errorf("Failed to call constant function: %v", err)
@@ -545,7 +545,7 @@ var bindTests = []struct {
 			if err != nil {
 				t.Fatalf("Failed to deploy underscorer contract: %v", err)
 			}
-			sim.Commit()
+			sim.Commit(context.TODO())
 
 			// Verify that underscored return values correctly parse into structs
 			if res, err := underscorer.UnderscoredOutput(nil); err != nil {
@@ -580,7 +580,7 @@ var bindTests = []struct {
 				function raiseSimpleEvent(address addr, bytes32 id, bool flag, uint value) {
 					SimpleEvent(addr, id, flag, value);
 				}
-
+	
 				event NodataEvent (
 					uint   indexed Number,
 					int16  indexed Short,
@@ -589,7 +589,7 @@ var bindTests = []struct {
 				function raiseNodataEvent(uint number, int16 short, uint32 long) {
 					NodataEvent(number, short, long);
 				}
-
+	
 				event DynamicEvent (
 					string indexed IndexedString,
 					bytes  indexed IndexedBytes,
@@ -608,14 +608,14 @@ var bindTests = []struct {
 			key, _ := crypto.GenerateKey()
 			auth := bind.NewKeyedTransactor(key)
 			sim := backends.NewSimulatedBackend(core.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000)}})
-
+	
 			// Deploy an eventer contract
 			_, _, eventer, err := DeployEventer(auth, sim)
 			if err != nil {
 				t.Fatalf("Failed to deploy eventer contract: %v", err)
 			}
-			sim.Commit()
-
+			sim.Commit(context.TODO())
+	
 			// Inject a few events into the contract, gradually more in each block
 			for i := 1; i <= 3; i++ {
 				for j := 1; j <= i; j++ {
@@ -623,7 +623,7 @@ var bindTests = []struct {
 						t.Fatalf("block %d, event %d: raise failed: %v", i, j, err)
 					}
 				}
-				sim.Commit()
+				sim.Commit(context.TODO())
 			}
 			// Test filtering for certain events and ensure they can be found
 			sit, err := eventer.FilterSimpleEvent(nil, []common.Address{common.Address{1}, common.Address{3}}, [][32]byte{{byte(1)}, {byte(2)}, {byte(3)}}, []bool{true})
@@ -631,7 +631,7 @@ var bindTests = []struct {
 				t.Fatalf("failed to filter for simple events: %v", err)
 			}
 			defer sit.Close()
-
+	
 			sit.Next()
 			if sit.Event.Value.Uint64() != 11 || !sit.Event.Flag {
 				t.Errorf("simple log content mismatch: have %v, want {11, true}", sit.Event)
@@ -648,7 +648,7 @@ var bindTests = []struct {
 			if sit.Event.Value.Uint64() != 33 || !sit.Event.Flag {
 				t.Errorf("simple log content mismatch: have %v, want {33, true}", sit.Event)
 			}
-
+	
 			if sit.Next() {
 				t.Errorf("unexpected simple event found: %+v", sit.Event)
 			}
@@ -659,14 +659,14 @@ var bindTests = []struct {
 			if _, err := eventer.RaiseNodataEvent(auth, big.NewInt(314), 141, 271); err != nil {
 				t.Fatalf("failed to raise nodata event: %v", err)
 			}
-			sim.Commit()
-
+			sim.Commit(context.TODO())
+	
 			nit, err := eventer.FilterNodataEvent(nil, []*big.Int{big.NewInt(314)}, []int16{140, 141, 142}, []uint32{271})
 			if err != nil {
 				t.Fatalf("failed to filter for nodata events: %v", err)
 			}
 			defer nit.Close()
-
+	
 			if !nit.Next() {
 				t.Fatalf("nodata log not found: %v", nit.Error())
 			}
@@ -683,14 +683,14 @@ var bindTests = []struct {
 			if _, err := eventer.RaiseDynamicEvent(auth, "Hello", []byte("World")); err != nil {
 				t.Fatalf("failed to raise dynamic event: %v", err)
 			}
-			sim.Commit()
-
+			sim.Commit(context.TODO())
+	
 			dit, err := eventer.FilterDynamicEvent(nil, []string{"Hi", "Hello", "Bye"}, [][]byte{[]byte("World")})
 			if err != nil {
 				t.Fatalf("failed to filter for dynamic events: %v", err)
 			}
 			defer dit.Close()
-
+	
 			if !dit.Next() {
 				t.Fatalf("dynamic log not found: %v", dit.Error())
 			}
@@ -712,8 +712,8 @@ var bindTests = []struct {
 			if _, err := eventer.RaiseSimpleEvent(auth, common.Address{255}, [32]byte{255}, true, big.NewInt(255)); err != nil {
 				t.Fatalf("failed to raise subscribed simple event: %v", err)
 			}
-			sim.Commit()
-
+			sim.Commit(context.TODO())
+	
 			select {
 			case event := <-ch:
 				if event.Value.Uint64() != 255 {
@@ -724,12 +724,12 @@ var bindTests = []struct {
 			}
 			// Unsubscribe from the event and make sure we're not delivered more
 			sub.Unsubscribe()
-
+	
 			if _, err := eventer.RaiseSimpleEvent(auth, common.Address{254}, [32]byte{254}, true, big.NewInt(254)); err != nil {
 				t.Fatalf("failed to raise subscribed simple event: %v", err)
 			}
-			sim.Commit()
-
+			sim.Commit(context.TODO())
+	
 			select {
 			case event := <-ch:
 				t.Fatalf("unsubscribed simple event arrived: %v", event)
@@ -747,13 +747,13 @@ func TestBindings(t *testing.T) {
 	if !common.FileExist(gocmd) {
 		t.Skip("go sdk not found for testing")
 	}
-	// Skip the test if the go-ethereum sources are symlinked (https://github.com/golang/go/issues/14845)
+	// Skip the test if the gochain sources are symlinked (https://github.com/golang/go/issues/14845)
 	linkTestCode := fmt.Sprintf("package linktest\nfunc CheckSymlinks(){\nfmt.Println(backends.NewSimulatedBackend(nil))\n}")
 	linkTestDeps, err := imports.Process(os.TempDir(), []byte(linkTestCode), nil)
 	if err != nil {
 		t.Fatalf("failed check for goimports symlink bug: %v", err)
 	}
-	if !strings.Contains(string(linkTestDeps), "go-ethereum") {
+	if !strings.Contains(string(linkTestDeps), "gochain") {
 		t.Skip("symlinked environment doesn't support bind (https://github.com/golang/go/issues/14845)")
 	}
 	// Create a temporary workspace for the test suite

@@ -189,7 +189,7 @@ func checkWallet(client *sshClient, network string) (*walletInfos, error) {
 	}
 	// Assemble and return the useful infos
 	stats := &walletInfos{
-		datadir:  infos.volumes["/root/.ethereum"],
+		datadir:  infos.volumes["/root/.gochain"],
 		nodePort: nodePort,
 		rpcPort:  rpcPort,
 		webHost:  host,

@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	ethereum "github.com/gochain-io/gochain"
+	"github.com/gochain-io/gochain"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/core/types"
@@ -241,7 +241,7 @@ func (api *PublicFilterAPI) Logs(ctx context.Context, crit FilterCriteria) (*rpc
 		matchedLogs = make(chan []*types.Log)
 	)
 
-	logsSub, err := api.events.SubscribeLogs(ethereum.FilterQuery(crit), matchedLogs)
+	logsSub, err := api.events.SubscribeLogs(gochain.FilterQuery(crit), matchedLogs)
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +269,7 @@ func (api *PublicFilterAPI) Logs(ctx context.Context, crit FilterCriteria) (*rpc
 
 // FilterCriteria represents a request to create a new filter.
 //
-// TODO(karalabe): Kill this in favor of ethereum.FilterQuery.
+// TODO(karalabe): Kill this in favor of gochain.FilterQuery.
 type FilterCriteria struct {
 	FromBlock *big.Int
 	ToBlock   *big.Int
@@ -292,7 +292,7 @@ type FilterCriteria struct {
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_newfilter
 func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 	logs := make(chan []*types.Log)
-	logsSub, err := api.events.SubscribeLogs(ethereum.FilterQuery(crit), logs)
+	logsSub, err := api.events.SubscribeLogs(gochain.FilterQuery(crit), logs)
 	if err != nil {
 		return rpc.ID(""), err
 	}

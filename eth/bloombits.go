@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	// bloomServiceThreads is the number of goroutines used globally by an Ethereum
+	// bloomServiceThreads is the number of goroutines used globally by an GoChain
 	// instance to service bloombits lookups for all running filters.
 	bloomServiceThreads = 16
 
@@ -48,7 +48,7 @@ const (
 
 // startBloomHandlers starts a batch of goroutines to accept bloom bit database
 // retrievals from possibly a range of filters and serving the data to satisfy.
-func (eth *Ethereum) startBloomHandlers() {
+func (eth *GoChain) startBloomHandlers() {
 	for i := 0; i < bloomServiceThreads; i++ {
 		go func() {
 			for {
@@ -89,7 +89,7 @@ const (
 )
 
 // BloomIndexer implements a core.ChainIndexer, building up a rotated bloom bits index
-// for the Ethereum header bloom filters, permitting blazing fast filtering.
+// for the GoChain header bloom filters, permitting blazing fast filtering.
 type BloomIndexer struct {
 	size uint64 // section size to generate bloombits for
 

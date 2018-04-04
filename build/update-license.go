@@ -113,12 +113,12 @@ func (i info) ShortLicense() string {
 
 func (i info) Whole(startOfSentence bool) string {
 	if i.gpl() {
-		return "go-ethereum"
+		return "gochain"
 	}
 	if startOfSentence {
-		return "The go-ethereum library"
+		return "The GoChain library"
 	}
-	return "the go-ethereum library"
+	return "the GoChain library"
 }
 
 func (i info) gpl() bool {
