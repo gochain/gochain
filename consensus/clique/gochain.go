@@ -31,7 +31,7 @@ var (
 )
 var (
 	// GochainBlockReward Block reward in wei for successfully sealing a block
-	GochainBlockReward = big.NewInt(1e+18)
+	GochainBlockReward = big.NewInt(7e+18)
 )
 
 // AccumulateRewards credits the coinbase of the given block with the mining
