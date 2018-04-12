@@ -41,6 +41,24 @@ func TestnetGenesis() string {
 	return string(enc)
 }
 
+// GochainTestnetGenesis returns the JSON spec to use for the Gochain test network
+func GochainTestnetGenesis() string {
+	enc, err := json.Marshal(core.DefaultGochainTestnetGenesisBlock())
+	if err != nil {
+		panic(err)
+	}
+	return string(enc)
+}
+
+// GochainDevnetGenesis returns the JSON spec to use for the Gochain dev network
+func GochainDevnetGenesis() string {
+	enc, err := json.Marshal(core.DefaultGochainDevnetGenesisBlock())
+	if err != nil {
+		panic(err)
+	}
+	return string(enc)
+}
+
 // FoundationBootnodes returns the enode URLs of the P2P bootstrap nodes operated
 // by the foundation running the V5 discovery protocol.
 func FoundationBootnodes() *Enodes {

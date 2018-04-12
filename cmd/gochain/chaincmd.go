@@ -108,6 +108,8 @@ if already existing.`,
 			utils.SyncModeFlag,
 			utils.FakePoWFlag,
 			utils.TestnetFlag,
+			utils.GochainTestnetFlag,
+			utils.GochainDevnetFlag,
 		},
 		Category: "BLOCKCHAIN COMMANDS",
 		Description: `

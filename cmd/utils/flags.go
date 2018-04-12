@@ -136,6 +136,14 @@ var (
 		Name:  "testnet",
 		Usage: "Ropsten network: pre-configured proof-of-work test network",
 	}
+	GochainTestnetFlag = cli.BoolFlag{
+		Name:  "gochain-testnet",
+		Usage: "Gochain test network: pre-configured proof-of-authority test network",
+	}
+	GochainDevnetFlag = cli.BoolFlag{
+		Name:  "gochain-devnet",
+		Usage: "Gochain Dev network: pre-configured proof-of-authority test network",
+	}
 	DeveloperFlag = cli.BoolFlag{
 		Name:  "dev",
 		Usage: "Ephemeral proof-of-authority network with a pre-funded developer account, mining enabled",
@@ -574,6 +582,18 @@ func MakeDataDir(ctx *cli.Context) string {
 		}
 		return path
 	}
+	if path := ctx.GlobalString(DataDirFlag.Name); path != "" {
+		if ctx.GlobalBool(GochainTestnetFlag.Name) {
+			return filepath.Join(path, "gochain-testnet")
+		}
+		return path
+	}
+	if path := ctx.GlobalString(DataDirFlag.Name); path != "" {
+		if ctx.GlobalBool(GochainDevnetFlag.Name) {
+			return filepath.Join(path, "gochain-devnet")
+		}
+		return path
+	}
 	Fatalf("Cannot determine default data directory, please set manually (--datadir)")
 	return ""
 }
@@ -620,6 +640,10 @@ func setBootstrapNodes(ctx *cli.Context, cfg *p2p.Config) {
 		urls = strings.Split(ctx.GlobalString(BootnodesFlag.Name), ",")
 	case ctx.GlobalBool(TestnetFlag.Name):
 		urls = params.TestnetBootnodes
+	case ctx.GlobalBool(GochainTestnetFlag.Name):
+		urls = params.GochainTestnetBootnodes
+	case ctx.GlobalBool(GochainDevnetFlag.Name):
+		urls = params.GochainDevnetBootnodes
 	case cfg.BootstrapNodes != nil:
 		return // already set, don't apply defaults.
 	}
@@ -871,6 +895,10 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 		cfg.DataDir = "" // unless explicitly requested, use memory databases
 	case ctx.GlobalBool(TestnetFlag.Name):
 		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "testnet")
+	case ctx.GlobalBool(GochainTestnetFlag.Name):
+		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "gochain-testnet")
+	case ctx.GlobalBool(GochainDevnetFlag.Name):
+		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "gochain-devnet")
 	}
 
 	if ctx.GlobalIsSet(KeyStoreDirFlag.Name) {
@@ -1019,6 +1047,7 @@ func SetShhConfig(ctx *cli.Context, stack *node.Node, cfg *whisper.Config) {
 // SetEthConfig applies eth-related command line flags to the config.
 func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 	// Avoid conflicting network flags
+	checkExclusive(ctx, DeveloperFlag, TestnetFlag, GochainTestnetFlag, GochainDevnetFlag)
 	checkExclusive(ctx, FastSyncFlag, LightModeFlag, SyncModeFlag)
 	checkExclusive(ctx, LightServFlag, LightModeFlag)
 	checkExclusive(ctx, LightServFlag, SyncModeFlag, "light")
@@ -1085,6 +1114,16 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 			cfg.NetworkId = 3
 		}
 		cfg.Genesis = core.DefaultTestnetGenesisBlock()
+	case ctx.GlobalBool(GochainTestnetFlag.Name):
+		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
+			cfg.NetworkId = 31337
+		}
+		cfg.Genesis = core.DefaultGochainTestnetGenesisBlock()
+	case ctx.GlobalBool(GochainDevnetFlag.Name):
+		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
+			cfg.NetworkId = 8888
+		}
+		cfg.Genesis = core.DefaultGochainDevnetGenesisBlock()
 	case ctx.GlobalBool(DeveloperFlag.Name):
 		// Create new developer account or reuse existing one
 		var (
@@ -1206,6 +1245,10 @@ func MakeGenesis(ctx *cli.Context) *core.Genesis {
 	switch {
 	case ctx.GlobalBool(TestnetFlag.Name):
 		genesis = core.DefaultTestnetGenesisBlock()
+	case ctx.GlobalBool(GochainTestnetFlag.Name):
+		genesis = core.DefaultGochainTestnetGenesisBlock()
+	case ctx.GlobalBool(GochainDevnetFlag.Name):
+		genesis = core.DefaultGochainDevnetGenesisBlock()
 	case ctx.GlobalBool(DeveloperFlag.Name):
 		Fatalf("Developer chains are ephemeral")
 	}
