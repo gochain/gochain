@@ -84,17 +84,19 @@ var (
 
 var (
 	evictionInterval    = time.Minute     // Time interval to check for evictable transactions
-	statsReportInterval = 8 * time.Second // Time interval to report transaction pool stats
+	statsReportInterval = 2 * time.Second // Time interval to report transaction pool stats
 )
 
 var (
 	// Metrics for the pending pool
+	pendingGauge            = metrics.NewGauge("txpool/pending")
 	pendingDiscardCounter   = metrics.NewCounter("txpool/pending/discard")
 	pendingReplaceCounter   = metrics.NewCounter("txpool/pending/replace")
 	pendingRateLimitCounter = metrics.NewCounter("txpool/pending/ratelimit") // Dropped due to rate limiting
 	pendingNofundsCounter   = metrics.NewCounter("txpool/pending/nofunds")   // Dropped due to out-of-funds
 
 	// Metrics for the queued pool
+	queuedGauge            = metrics.NewGauge("txpool/queued")
 	queuedDiscardCounter   = metrics.NewCounter("txpool/queued/discard")
 	queuedReplaceCounter   = metrics.NewCounter("txpool/queued/replace")
 	queuedRateLimitCounter = metrics.NewCounter("txpool/queued/ratelimit") // Dropped due to rate limiting
@@ -103,6 +105,12 @@ var (
 	// General tx metrics
 	invalidTxCounter     = metrics.NewCounter("txpool/invalid")
 	underpricedTxCounter = metrics.NewCounter("txpool/underpriced")
+	limitGauge           = metrics.NewGauge("txpool/limit")
+	globalSlotsGauge     = metrics.NewGauge("txpool/slots")
+	globalQueueGauge     = metrics.NewGauge("txpool/queue")
+	poolAddTimer         = metrics.NewTimer("txpool/add")
+	journalInsertTimer   = metrics.NewTimer("txpool/journal/insert")
+	chainHeadGauge       = metrics.NewGauge("txpool/chain/head")
 )
 
 // TxStatus is the current status of a transaction as seen by the pool.
@@ -289,13 +297,15 @@ func (pool *TxPool) loop(ctx context.Context) {
 		case ev := <-pool.chainHeadCh:
 			if ev.Block != nil {
 				pool.mu.Lock()
-				if pool.chainconfig.IsHomestead(ev.Block.Number()) {
+				number := ev.Block.Number()
+				if pool.chainconfig.IsHomestead(number) {
 					pool.homestead = true
 				}
 				pool.reset(ctx, head.Header(), ev.Block.Header())
 				head = ev.Block
-
 				pool.mu.Unlock()
+
+				chainHeadGauge.Update(number.Int64())
 			}
 		// Be unsubscribed due to system stopped
 		case <-pool.chainHeadSub.Err():
@@ -306,6 +316,11 @@ func (pool *TxPool) loop(ctx context.Context) {
 			pool.mu.RLock()
 			pending, queued := pool.stats()
 			pool.mu.RUnlock()
+
+			pendingGauge.Update(int64(pending))
+			queuedGauge.Update(int64(queued))
+			globalSlotsGauge.Update(int64(pool.config.GlobalSlots))
+			globalQueueGauge.Update(int64(pool.config.GlobalQueue))
 
 			if pending != prevPending || queued != prevQueued {
 				log.Debug("Transaction pool status report", "executable", pending, "queued", queued)
@@ -625,6 +640,7 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction, local
 // whitelisted, preventing any associated transaction from being dropped out of
 // the pool due to pricing constraints.
 func (pool *TxPool) add(ctx context.Context, tx *types.Transaction, local bool) (bool, error) {
+	t := time.Now()
 	// If the transaction is already known, discard it
 	hash := tx.Hash()
 	if pool.all[hash] != nil {
@@ -665,6 +681,7 @@ func (pool *TxPool) add(ctx context.Context, tx *types.Transaction, local bool) 
 		if log.Tracing() {
 			log.Trace("Pooled new executable transaction", "hash", hash, "from", from, "to", tx.To())
 		}
+		poolAddTimer.UpdateSince(t)
 
 		// We've directly injected a replacement transaction, notify subsystems
 		go pool.txFeed.Send(TxPreEvent{tx})
@@ -685,6 +702,8 @@ func (pool *TxPool) add(ctx context.Context, tx *types.Transaction, local bool) 
 	if log.Tracing() {
 		log.Trace("Pooled new future transaction", "hash", hash, "from", from, "to", tx.To())
 	}
+	poolAddTimer.UpdateSince(t)
+
 	return replace, nil
 }
 
@@ -719,9 +738,13 @@ func (pool *TxPool) journalTx(from common.Address, tx *types.Transaction) {
 	if pool.journal == nil || !pool.locals.contains(from) {
 		return
 	}
+
+	t := time.Now()
 	if err := pool.journal.insert(tx); err != nil {
 		log.Warn("Failed to journal local transaction", "err", err)
+		return
 	}
+	journalInsertTimer.UpdateSince(t)
 }
 
 // promoteTx adds a transaction to the pending (processable) list of transactions.
