@@ -66,6 +66,15 @@ func NewMeter(name string) metrics.Meter {
 	return metrics.GetOrRegisterMeter(name, metrics.DefaultRegistry)
 }
 
+// NewGauge create a new metrics Gauge, either a real one of a NOP stub depending
+// on the metrics flag.
+func NewGauge(name string) metrics.Gauge {
+	if !Enabled {
+		return new(metrics.NilGauge)
+	}
+	return metrics.GetOrRegisterGauge(name, metrics.DefaultRegistry)
+}
+
 // NewTimer create a new metrics Timer, either a real one of a NOP stub depending
 // on the metrics flag.
 func NewTimer(name string) metrics.Timer {
