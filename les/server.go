@@ -317,7 +317,7 @@ func (s *requestCostStats) update(msgCode, reqCnt, cost uint64) {
 
 func (pm *ProtocolManager) blockLoop() {
 	pm.wg.Add(1)
-	headCh := make(chan core.ChainHeadEvent, 10)
+	headCh := make(chan core.ChainHeadEvent, 100)
 	headSub := pm.blockchain.SubscribeChainHeadEvent(headCh)
 	go func() {
 		var lastHead *types.Header
