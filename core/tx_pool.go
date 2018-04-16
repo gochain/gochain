@@ -105,12 +105,12 @@ var (
 	// General tx metrics
 	invalidTxCounter     = metrics.NewCounter("txpool/invalid")
 	underpricedTxCounter = metrics.NewCounter("txpool/underpriced")
-	limitGauge           = metrics.NewGauge("txpool/limit")
 	globalSlotsGauge     = metrics.NewGauge("txpool/slots")
 	globalQueueGauge     = metrics.NewGauge("txpool/queue")
 	poolAddTimer         = metrics.NewTimer("txpool/add")
 	journalInsertTimer   = metrics.NewTimer("txpool/journal/insert")
 	chainHeadGauge       = metrics.NewGauge("txpool/chain/head")
+	chainHeadTxsGauge    = metrics.NewGauge("txpool/chain/head/txs")
 )
 
 // TxStatus is the current status of a transaction as seen by the pool.
@@ -290,6 +290,12 @@ func (pool *TxPool) loop(ctx context.Context) {
 	// Track the previous head headers for transaction reorgs
 	head := pool.chain.CurrentBlock()
 
+	chainHeadGauge.Update(int64(head.NumberU64()))
+	chainHeadTxsGauge.Update(int64(len(head.Transactions())))
+
+	globalSlotsGauge.Update(int64(pool.config.GlobalSlots))
+	globalQueueGauge.Update(int64(pool.config.GlobalQueue))
+
 	// Keep waiting for and reacting to the various events
 	for {
 		select {
@@ -306,6 +312,7 @@ func (pool *TxPool) loop(ctx context.Context) {
 				pool.mu.Unlock()
 
 				chainHeadGauge.Update(number.Int64())
+				chainHeadTxsGauge.Update(int64(len(ev.Block.Transactions())))
 			}
 		// Be unsubscribed due to system stopped
 		case <-pool.chainHeadSub.Err():
@@ -319,8 +326,6 @@ func (pool *TxPool) loop(ctx context.Context) {
 
 			pendingGauge.Update(int64(pending))
 			queuedGauge.Update(int64(queued))
-			globalSlotsGauge.Update(int64(pool.config.GlobalSlots))
-			globalQueueGauge.Update(int64(pool.config.GlobalQueue))
 
 			if pending != prevPending || queued != prevQueued {
 				log.Debug("Transaction pool status report", "executable", pending, "queued", queued)
