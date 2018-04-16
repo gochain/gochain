@@ -90,6 +90,12 @@ web3._extend({
 			params: 1
 		}),
 		new web3._extend.Method({
+			name: 'getVoters',
+			call: 'clique_getVoters',
+			params: 1,
+			inputFormatter: [null]
+		}),
+		new web3._extend.Method({
 			name: 'propose',
 			call: 'clique_propose',
 			params: 2
