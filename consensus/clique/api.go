@@ -77,6 +77,26 @@ func (api *API) GetSigners(ctx context.Context, number *rpc.BlockNumber) ([]comm
 	return snap.signers(), nil
 }
 
+// GetVoters retrieves the list of authorized voters at the specified block.
+func (api *API) GetVoters(ctx context.Context, number *rpc.BlockNumber) ([]common.Address, error) {
+	// Retrieve the requested block number (or current if none requested)
+	var header *types.Header
+	if number == nil || *number == rpc.LatestBlockNumber {
+		header = api.chain.CurrentHeader()
+	} else {
+		header = api.chain.GetHeaderByNumber(uint64(number.Int64()))
+	}
+	// Ensure we have an actually valid block and return the signers from its snapshot
+	if header == nil {
+		return nil, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(ctx, api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return snap.voters(), nil
+}
+
 // GetSignersAtHash retrieves the state snapshot at a given block.
 func (api *API) GetSignersAtHash(ctx context.Context, hash common.Hash) ([]common.Address, error) {
 	header := api.chain.GetHeaderByHash(hash)
