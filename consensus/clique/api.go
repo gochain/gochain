@@ -111,13 +111,13 @@ func (api *API) GetSignersAtHash(ctx context.Context, hash common.Hash) ([]commo
 }
 
 // Proposals returns the current proposals the node tries to uphold and vote on.
-func (api *API) Proposals() map[common.Address]bool {
+func (api *API) Proposals() map[common.Address]propose {
 	api.clique.lock.RLock()
 	defer api.clique.lock.RUnlock()
 
-	proposals := make(map[common.Address]bool)
-	for address, auth := range api.clique.proposals {
-		proposals[address] = auth
+	proposals := make(map[common.Address]propose)
+	for address, propose := range api.clique.proposals {
+		proposals[address] = propose
 	}
 	return proposals
 }
@@ -128,7 +128,16 @@ func (api *API) Propose(address common.Address, auth bool) {
 	api.clique.lock.Lock()
 	defer api.clique.lock.Unlock()
 
-	api.clique.proposals[address] = auth
+	api.clique.proposals[address] = propose{Authorize: auth, VoterElection: false}
+}
+
+// Propose injects a new authorization proposal that the signer will attempt to
+// push through.
+func (api *API) ProposeVoter(address common.Address, auth bool) {
+	api.clique.lock.Lock()
+	defer api.clique.lock.Unlock()
+
+	api.clique.proposals[address] = propose{Authorize: auth, VoterElection: true}
 }
 
 // Discard drops a currently running proposal, stopping the signer from casting
