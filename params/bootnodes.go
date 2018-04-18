@@ -31,9 +31,3 @@ var TestnetBootnodes = []string{
 var GochainTestnetBootnodes = []string{
 	"enode://bfbb22927487ae6b74d39817e73ee3ba776b12772fc92e00809c3bfca06ad0f1d07276b845f9cd1b1747529b9d2b762c24f877efde7b219cefbc0e012f6c5115@159.65.104.177:30301",
 }
-
-// GochainDevnetBootnodes are the enode URLs of the P2P bootstrap nodes running on the
-// Gochain dev network.
-var GochainDevnetBootnodes = []string{
-	"enode://03b4f35f3980b81d5b11b701aaf2c5aea6768c24d83e9caf42c4c559ca1e6e6684d6825eb0e98c880f3cfe934f3bb9d63f68cdeb136fc994fd1eedff2232b8d0@165.227.101.10:30301",
-}

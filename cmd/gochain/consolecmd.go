@@ -128,9 +128,6 @@ func remoteConsole(ctx *cli.Context) error {
 			if ctx.GlobalBool(utils.GochainTestnetFlag.Name) {
 				path = filepath.Join(path, "gochain-testnet")
 			}
-			if ctx.GlobalBool(utils.GochainDevnetFlag.Name) {
-				path = filepath.Join(path, "gochain-devnet")
-			}
 		}
 		endpoint = fmt.Sprintf("%s/geth.ipc", path)
 	}

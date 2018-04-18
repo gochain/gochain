@@ -109,7 +109,6 @@ if already existing.`,
 			utils.FakePoWFlag,
 			utils.TestnetFlag,
 			utils.GochainTestnetFlag,
-			utils.GochainDevnetFlag,
 		},
 		Category: "BLOCKCHAIN COMMANDS",
 		Description: `

@@ -220,8 +220,6 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 		return params.TestnetChainConfig
 	case ghash == params.GochainTestnetGenesisHash:
 		return params.GochainTestnetChainConfig
-	case ghash == params.GochainDevnetGenesisHash:
-		return params.GochainDevnetChainConfig
 	default:
 		return params.AllEthashProtocolChanges
 	}
@@ -361,27 +359,6 @@ func DefaultGochainTestnetGenesisBlock() *Genesis {
 		},
 		Signer: hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
 		Alloc:  decodePrealloc(gochainTestnetAllocData),
-	}
-}
-
-// DefaultGochainDevnetGenesisBlock returns the Gochain Devnet network genesis block.
-func DefaultGochainDevnetGenesisBlock() *Genesis {
-	return &Genesis{
-		Config:     params.GochainDevnetChainConfig,
-		Timestamp:  1518103741,
-		ExtraData:  hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000"),
-		GasLimit:   210284448,
-		Difficulty: big.NewInt(1),
-		Signers: []common.Address{
-			common.HexToAddress("0x7aeceb5d345a01f8014a4320ab1f3d467c0c086a"),
-			common.HexToAddress("0xdd7e460302a911f9162a208370cdcdc37b892453"),
-			common.HexToAddress("0x10a8a552c8a8945f32f6fded5e44d9101b3491d8"),
-		},
-		Voters: []common.Address{
-			common.HexToAddress("0x109f2cee67e92ce5f9e4ccf186a093924eb7cdba"),
-		},
-		Signer: hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
-		Alloc:  decodePrealloc(gochainDevnetAllocData),
 	}
 }
 
