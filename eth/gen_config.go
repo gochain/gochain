@@ -11,6 +11,7 @@ import (
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/eth/downloader"
 	"github.com/gochain-io/gochain/eth/gasprice"
+	"github.com/gochain-io/gochain/ethdb/archive"
 )
 
 var _ = (*configMarshaling)(nil)
@@ -31,6 +32,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		GasPrice                *big.Int
 		Ethash                  ethash.Config
 		TxPool                  core.TxPoolConfig
+		Archive                 archive.Config `toml:",omitempty"`
 		GPO                     gasprice.Config
 		EnablePreimageRecording bool
 		DocRoot                 string `toml:"-"`
@@ -50,6 +52,7 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.GasPrice = c.GasPrice
 	enc.Ethash = c.Ethash
 	enc.TxPool = c.TxPool
+	enc.Archive = c.Archive
 	enc.GPO = c.GPO
 	enc.EnablePreimageRecording = c.EnablePreimageRecording
 	enc.DocRoot = c.DocRoot
@@ -72,6 +75,7 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		GasPrice                *big.Int
 		Ethash                  *ethash.Config
 		TxPool                  *core.TxPoolConfig
+		Archive                 *archive.Config `toml:",omitempty"`
 		GPO                     *gasprice.Config
 		EnablePreimageRecording *bool
 		DocRoot                 *string `toml:"-"`
@@ -121,6 +125,9 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.TxPool != nil {
 		c.TxPool = *dec.TxPool
+	}
+	if dec.Archive != nil {
+		c.Archive = *dec.Archive
 	}
 	if dec.GPO != nil {
 		c.GPO = *dec.GPO

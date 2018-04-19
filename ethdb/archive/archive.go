@@ -26,11 +26,11 @@ const (
 )
 
 type Config struct {
-	Endpoint   string        // S3 compatible endpoint.
-	Bucket     string        // Bucket name. Must already exist.
-	ID, Secret string        // Credentials.
-	Age        uint64        // Optional. Distance from head before archiving.
-	Period     time.Duration // Optional. How often to run the archive process.
+	Endpoint   string        `toml:",omitempty"` // S3 compatible endpoint.
+	Bucket     string        `toml:",omitempty"` // Bucket name. Must already exist.
+	ID, Secret string        `toml:",omitempty"` // Credentials.
+	Age        uint64        `toml:",omitempty"` // Optional. Distance from head before archiving.
+	Period     time.Duration `toml:",omitempty"` // Optional. How often to run the archive process.
 }
 
 // Archive manages an archive of data in an S3 compatible bucket.
