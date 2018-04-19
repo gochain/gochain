@@ -57,8 +57,9 @@ var (
 	epochLength = uint64(30000) // Default number of blocks after which to checkpoint and reset the pending votes
 	blockPeriod = uint64(5)     // Default minimum difference between two consecutive block's timestamps
 
-	extraVanity = 32 // Fixed number of extra-data prefix bytes reserved for signer vanity
-	extraSeal   = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
+	extraVanity  = 32                       // Fixed number of extra-data prefix bytes reserved for signer vanity
+	extraSeal    = 65                       // Fixed number of extra-data suffix bytes reserved for signer seal
+	extraPropose = common.AddressLength + 1 // Number of extra-data suffix bytes reserver for propose
 
 	nonceAuthVote = hexutil.MustDecode("0xffffffffffffffff") // Magic nonce number to vote on adding a new signer
 	nonceDropVote = hexutil.MustDecode("0x0000000000000000") // Magic nonce number to vote on removing a signer.
@@ -157,7 +158,6 @@ func sigHash(header *types.Header) (hash common.Hash) {
 		header.ParentHash,
 		header.UncleHash,
 		header.Coinbase,
-		header.Candidate,
 		header.Root,
 		header.TxHash,
 		header.ReceiptHash,
@@ -294,7 +294,7 @@ func (c *Clique) verifyHeader(ctx context.Context, chain consensus.ChainReader, 
 	}
 	// Checkpoint blocks need to enforce zero beneficiary
 	checkpoint := (number % c.config.Epoch) == 0
-	if checkpoint && header.Candidate != (common.Address{}) {
+	if checkpoint && len(header.Extra) > extraVanity {
 		return errInvalidCheckpointBeneficiary
 	}
 	// Nonces must be 0x00..0 or 0xff..f, zeroes enforced on checkpoints
@@ -533,7 +533,6 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 	ps := pt.Start(perfutils.CliqueSeal)
 	defer ps.Stop()
 	// If the block isn't a checkpoint, cast a random vote (good enough for now)
-	header.Candidate = common.Address{}
 	header.Nonce = types.BlockNonce{}
 
 	number := header.Number.Uint64()
@@ -560,8 +559,9 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 		}
 		// If there's pending proposals, cast a vote on them
 		if len(addresses) > 0 {
-			header.Candidate = addresses[rand.Intn(len(addresses))]
-			propose := c.proposals[header.Candidate]
+			candidate := addresses[rand.Intn(len(addresses))]
+			header.Extra = append(header.Extra, candidate[:]...)
+			propose := c.proposals[candidate]
 			if propose.Authorize {
 				copy(header.Nonce[:], nonceAuthVote)
 			} else {
@@ -572,7 +572,7 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 			} else {
 				header.Extra = append(header.Extra, []byte{0x00}...)
 			}
-			log.Info("propose", "header.Coinbase", header.Coinbase, "vote", propose.Authorize, "voterElection", propose.VoterElection)
+			log.Info("propose", "Candidate", candidate, "vote", propose.Authorize, "voterElection", propose.VoterElection)
 		}
 		c.lock.RUnlock()
 	}

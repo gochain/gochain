@@ -233,9 +233,21 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 		// Verify if signer can vote
 		if _, ok := snap.Voters[signer]; ok {
 
+			var voterElection bool
+			var candidate common.Address
+
+			if len(header.Extra)-extraVanity == extraPropose {
+				candidate = common.BytesToAddress(header.Extra[extraVanity : extraVanity+common.AddressLength])
+				switch {
+				case bytes.Equal(header.Extra[extraVanity+common.AddressLength:extraVanity+extraPropose], hexutil.MustDecode("0xff")):
+					voterElection = true
+				case bytes.Equal(header.Extra[extraVanity+common.AddressLength:extraVanity+extraPropose], hexutil.MustDecode("0x00")):
+					voterElection = false
+				}
+			}
 			// Header authorized, discard any previous votes from the voter
 			for i, vote := range snap.Votes {
-				if vote.Signer == signer && vote.Address == header.Candidate {
+				if vote.Signer == signer && vote.Address == candidate {
 					// Uncast the vote from the cached tally
 					snap.uncast(vote.Address, vote.Authorize)
 
@@ -255,46 +267,37 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 				return nil, errInvalidVote
 			}
 
-			var voterElection bool
-			if len(header.Extra) > extraVanity {
-				switch {
-				case bytes.Equal(header.Extra[len(header.Extra)-1:], hexutil.MustDecode("0xff")):
-					voterElection = true
-				case bytes.Equal(header.Extra[len(header.Extra)-1:], hexutil.MustDecode("0x00")):
-					voterElection = false
-				}
-			}
-			if snap.cast(header.Ccandidate, authorize, voterElection) {
+			if snap.cast(candidate, authorize, voterElection) {
 				snap.Votes = append(snap.Votes, &Vote{
 					Signer:    signer,
 					Block:     number,
-					Address:   header.Candidate,
+					Address:   candidate,
 					Authorize: authorize,
 				})
 			}
 			// If the vote passed, update the list of signers or voters
-			if tally := snap.Tally[header.Candidate]; tally.Votes > len(snap.Voters)/2 {
+			if tally := snap.Tally[candidate]; tally.Votes > len(snap.Voters)/2 {
 				if tally.Authorize {
-					_, signer := snap.Signers[header.Candidate]
+					_, signer := snap.Signers[candidate]
 					if !signer {
-						snap.Signers[header.Candidate] = struct{}{}
+						snap.Signers[candidate] = struct{}{}
 					} else {
-						snap.Voters[header.Candidate] = struct{}{}
+						snap.Voters[candidate] = struct{}{}
 					}
 				} else {
-					_, voter := snap.Voters[header.Candidate]
+					_, voter := snap.Voters[candidate]
 					if !voter {
-						delete(snap.Signers, header.Candidate)
+						delete(snap.Signers, candidate)
 
 						// Signer list shrunk, delete any leftover recent caches
 						if limit := uint64(len(snap.Signers)/2 + 1); number >= limit {
 							delete(snap.Recents, number-limit)
 						}
 					} else {
-						delete(snap.Voters, header.Candidate)
+						delete(snap.Voters, candidate)
 						// Discard any previous votes the deauthorized voter cast
 						for i := 0; i < len(snap.Votes); i++ {
-							if snap.Votes[i].Signer == header.Candidate {
+							if snap.Votes[i].Signer == candidate {
 								// Uncast the vote from the cached tally
 								snap.uncast(snap.Votes[i].Address, snap.Votes[i].Authorize)
 
@@ -308,12 +311,12 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 				}
 				// Discard any previous votes around the just changed account
 				for i := 0; i < len(snap.Votes); i++ {
-					if snap.Votes[i].Address == header.Candidate {
+					if snap.Votes[i].Address == candidate {
 						snap.Votes = append(snap.Votes[:i], snap.Votes[i+1:]...)
 						i--
 					}
 				}
-				delete(snap.Tally, header.Candidate)
+				delete(snap.Tally, candidate)
 			}
 		}
 	}

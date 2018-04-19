@@ -418,11 +418,10 @@ func TestVoting(t *testing.T) {
 		headers := make([]*types.Header, len(tt.votes))
 		for j, vote := range tt.votes {
 			headers[j] = &types.Header{
-				Number:    big.NewInt(int64(j) + 1),
-				Time:      big.NewInt(int64(j) * int64(blockPeriod)),
-				Candidate: accounts.address(vote.voted),
-				Signer:    make([]byte, extraSeal),
-				Extra:     make([]byte, extraVanity),
+				Number: big.NewInt(int64(j) + 1),
+				Time:   big.NewInt(int64(j) * int64(blockPeriod)),
+				Signer: make([]byte, extraSeal),
+				Extra:  make([]byte, extraVanity),
 			}
 			if j > 0 {
 				headers[j].ParentHash = headers[j-1].Hash()
@@ -430,8 +429,11 @@ func TestVoting(t *testing.T) {
 			if vote.auth {
 				copy(headers[j].Nonce[:], nonceAuthVote)
 			}
+			headers[j].Extra = append(headers[j].Extra, accounts.address(vote.voted).Bytes()...)
 			if vote.voterElection {
 				headers[j].Extra = append(headers[j].Extra, []byte{0xff}...)
+			} else {
+				headers[j].Extra = append(headers[j].Extra, []byte{0x00}...)
 			}
 			accounts.sign(headers[j], vote.signer)
 		}
