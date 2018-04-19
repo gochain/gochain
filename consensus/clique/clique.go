@@ -202,6 +202,11 @@ func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, er
 	return signer, nil
 }
 
+type propose struct {
+	Authorize     bool
+	VoterElection bool
+}
+
 // Clique is the proof-of-authority consensus engine proposed to support the
 // Ethereum testnet following the Ropsten attacks.
 type Clique struct {
@@ -211,7 +216,7 @@ type Clique struct {
 	recents    *lru.ARCCache // Snapshots for recent block to speed up reorgs
 	signatures *lru.ARCCache // Signatures of recent blocks to speed up mining
 
-	proposals map[common.Address]bool // Current list of proposals we are pushing
+	proposals map[common.Address]propose // Current list of proposals we are pushing
 
 	signer common.Address // Ethereum address of the signing key
 	signFn SignerFn       // Signer function to authorize hashes with
@@ -235,7 +240,7 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 		db:         db,
 		recents:    recents,
 		signatures: signatures,
-		proposals:  make(map[common.Address]bool),
+		proposals:  make(map[common.Address]propose),
 	}
 }
 
@@ -298,9 +303,10 @@ func (c *Clique) verifyHeader(ctx context.Context, chain consensus.ChainReader, 
 		return errInvalidCheckpointVote
 	}
 	// Check that the extra-data contains the vanity
-	//	if len(header.Extra) < extraVanity {
-	//		return errMissingVanity
-	//	}
+	//if len(header.Extra) < extraVanity {
+	//	return errMissingVanity
+	//}
+
 	// Check if header contains signers and voters
 	if checkpoint {
 		if len(header.Signers) < 1 {
@@ -534,25 +540,37 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 	if err != nil {
 		return err
 	}
+	// Ensure the extra data has all it's components
+	if len(header.Extra) < extraVanity {
+		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, extraVanity-len(header.Extra))...)
+	}
+	header.Extra = header.Extra[:extraVanity]
 	//if not checkpoint
 	if number%c.config.Epoch != 0 {
 		c.lock.RLock()
 
 		// Gather all the proposals that make sense voting on
 		addresses := make([]common.Address, 0, len(c.proposals))
-		for address, authorize := range c.proposals {
-			if snap.validVote(address, authorize) {
+		for address, propose := range c.proposals {
+			if snap.validVote(address, propose.Authorize, propose.VoterElection) {
 				addresses = append(addresses, address)
 			}
 		}
 		// If there's pending proposals, cast a vote on them
 		if len(addresses) > 0 {
 			header.Coinbase = addresses[rand.Intn(len(addresses))]
-			if c.proposals[header.Coinbase] {
+			propose := c.proposals[header.Coinbase]
+			if propose.Authorize {
 				copy(header.Nonce[:], nonceAuthVote)
 			} else {
 				copy(header.Nonce[:], nonceDropVote)
 			}
+			if propose.VoterElection {
+				header.Extra = append(header.Extra, []byte{0xff}...)
+			} else {
+				header.Extra = append(header.Extra, []byte{0x00}...)
+			}
+			log.Info("propose", "header.Coinbase", header.Coinbase, "vote", propose.Authorize, "voterElection", propose.VoterElection)
 		}
 		c.lock.RUnlock()
 	}

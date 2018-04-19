@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 
 	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/params"
@@ -138,15 +139,19 @@ func (s *Snapshot) copy() *Snapshot {
 // validVote returns whether it makes sense to cast the specified vote in the
 // given snapshot context (e.g. don't try to add an already authorized voter or
 // remove an not authorized signer).
-func (s *Snapshot) validVote(address common.Address, authorize bool) bool {
-	_, voter := s.Voters[address]
-	return (voter && !authorize) || (!voter && authorize)
+func (s *Snapshot) validVote(address common.Address, authorize bool, voterElection bool) bool {
+	if voterElection {
+		_, voter := s.Voters[address]
+		return (voter && !authorize) || (!voter && authorize)
+	}
+	_, signer := s.Signers[address]
+	return (signer && !authorize) || (!signer && authorize)
 }
 
 // cast adds a new vote into the tally.
-func (s *Snapshot) cast(address common.Address, authorize bool) bool {
+func (s *Snapshot) cast(address common.Address, authorize bool, voterElection bool) bool {
 	// Ensure the vote is meaningful
-	if !s.validVote(address, authorize) {
+	if !s.validVote(address, authorize, voterElection) {
 		return false
 	}
 	// Cast the vote into an existing or new tally
@@ -224,6 +229,7 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			}
 		}
 		snap.Recents[number] = signer
+
 		// Verify if signer can vote
 		if _, ok := snap.Voters[signer]; ok {
 
@@ -248,7 +254,17 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			default:
 				return nil, errInvalidVote
 			}
-			if snap.cast(header.Coinbase, authorize) {
+
+			var voterElection bool
+			if len(header.Extra) > extraVanity {
+				switch {
+				case bytes.Equal(header.Extra[len(header.Extra)-1:], hexutil.MustDecode("0xff")):
+					voterElection = true
+				case bytes.Equal(header.Extra[len(header.Extra)-1:], hexutil.MustDecode("0x00")):
+					voterElection = false
+				}
+			}
+			if snap.cast(header.Coinbase, authorize, voterElection) {
 				snap.Votes = append(snap.Votes, &Vote{
 					Signer:    signer,
 					Block:     number,

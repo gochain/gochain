@@ -32,9 +32,10 @@ import (
 )
 
 type testerVote struct {
-	signer string
-	voted  string
-	auth   bool
+	signer        string
+	voted         string
+	auth          bool
+	voterElection bool
 }
 
 // testerAccountPool is a pool to maintain currently active tester accounts,
@@ -100,14 +101,14 @@ func TestVoting(t *testing.T) {
 		votersResults  []string
 	}{
 		{
-			// Single signer, no votes cast
+			// 0: Single signer, no votes cast
 			signers:        []string{"A"},
 			voters:         []string{"A"},
 			votes:          []testerVote{{signer: "A"}},
 			signersResults: []string{"A"},
 			votersResults:  []string{"A"},
 		}, {
-			// Single signer, voting to add two others (only accept first)
+			// 1: Single signer, voting to add two others (only accept first)
 			signers: []string{"A"},
 			voters:  []string{"A"},
 			votes: []testerVote{
@@ -119,7 +120,7 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B"},
 			votersResults:  []string{"A"},
 		}, {
-			// Two signers, voting to add three others (only accept first two)
+			// 2: Two signers, voting to add three others (only accept first two)
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
 			votes: []testerVote{
@@ -134,7 +135,7 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B"},
 		}, {
-			// Single signer, dropping itself (weird, but one less cornercase by explicitly allowing this)
+			// 3: Single signer, dropping itself (weird, but one less cornercase by explicitly allowing this)
 			signers: []string{"A"},
 			voters:  []string{"A"},
 			votes: []testerVote{
@@ -143,7 +144,7 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A"},
 			votersResults:  []string{},
 		}, {
-			// Two signers, actually needing mutual consent to drop either of them (not fulfilled)
+			// 4: Two signers, actually needing mutual consent to drop either of them (not fulfilled)
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
 			votes: []testerVote{
@@ -152,7 +153,7 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B"},
 			votersResults:  []string{"A", "B"},
 		}, {
-			// Two signers, actually needing mutual consent to drop either of them (fulfilled)
+			// 5: Two signers, actually needing mutual consent to drop either of them (fulfilled)
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
 			votes: []testerVote{
@@ -162,7 +163,7 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B"},
 			votersResults:  []string{"A"},
 		}, {
-			// Three signers, two of them deciding to drop the third
+			// 6: Three signers, two of them deciding to drop the third
 			signers: []string{"A", "B", "C"},
 			voters:  []string{"A", "B", "C"},
 			votes: []testerVote{
@@ -172,7 +173,7 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C"},
 			votersResults:  []string{"A", "B"},
 		}, {
-			// Four signers, consensus of two not being enough to drop anyone
+			// 7: Four signers, consensus of two not being enough to drop anyone
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
 			votes: []testerVote{
@@ -182,7 +183,7 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B", "C", "D"},
 		}, {
-			// Four signers, consensus of three already being enough to drop someone
+			// 8: Four signers, consensus of three already being enough to drop someone
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
 			votes: []testerVote{
@@ -193,7 +194,7 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B", "C"},
 		}, {
-			// Authorizations are counted once per signer per target
+			// 9: Authorizations are counted once per signer per target
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
 			votes: []testerVote{
@@ -206,7 +207,7 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B"},
 			votersResults:  []string{"A", "B"},
 		}, {
-			// Authorizing multiple accounts concurrently is permitted
+			// 10: Authorizing multiple accounts concurrently is permitted
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
 			votes: []testerVote{
@@ -222,7 +223,7 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B"},
 		}, {
-			// Deauthorizations are counted once per signer per target
+			// 11: Deauthorizations are counted once per signer per target
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
 			votes: []testerVote{
@@ -235,7 +236,7 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B"},
 			votersResults:  []string{"A", "B"},
 		}, {
-			// Deauthorizing multiple accounts concurrently is permitted
+			// 12: Deauthorizing multiple accounts concurrently is permitted
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
 			votes: []testerVote{
@@ -254,7 +255,7 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B"},
 		}, {
-			// Votes from deauthorized signers are discarded immediately (deauth votes)
+			// 13: Votes from deauthorized signers are discarded immediately (deauth votes)
 			signers: []string{"A", "B", "C"},
 			voters:  []string{"A", "B", "C"},
 			votes: []testerVote{
@@ -266,7 +267,7 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C"},
 			votersResults:  []string{"A", "B"},
 		}, {
-			// Votes from deauthorized signers are discarded immediately (auth votes)
+			// 14: Votes from deauthorized signers are discarded immediately (auth votes)
 			signers: []string{"A", "B", "C"},
 			voters:  []string{"A", "B", "C"},
 			votes: []testerVote{
@@ -278,7 +279,7 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C"},
 			votersResults:  []string{"A", "B"},
 		}, {
-			// Cascading changes are not allowed, only the account being voted on may change
+			// 15: Cascading changes are not allowed, only the account being voted on may change
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
 			votes: []testerVote{
@@ -295,7 +296,7 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B", "C"},
 		}, {
-			// Changes reaching consensus out of bounds (via a deauth) execute on touch
+			// 16: Changes reaching consensus out of bounds (via a deauth) execute on touch
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
 			votes: []testerVote{
@@ -315,53 +316,53 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B"},
 		}, {
-			// Changes reaching consensus out of bounds (via a deauth) may go out of consensus on first touch
+			// 17: Changes reaching consensus out of bounds (via a deauth) may go out of consensus on first touch
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
 			votes: []testerVote{
-				{signer: "A", voted: "C", auth: false},
+				{signer: "A", voted: "C", auth: false, voterElection: true},
 				{signer: "B"},
 				{signer: "C"},
-				{signer: "A", voted: "D", auth: false},
-				{signer: "B", voted: "C", auth: false},
+				{signer: "A", voted: "D", auth: false, voterElection: true},
+				{signer: "B", voted: "C", auth: false, voterElection: true},
 				{signer: "C"},
 				{signer: "A"},
-				{signer: "B", voted: "D", auth: false},
-				{signer: "C", voted: "D", auth: false},
+				{signer: "B", voted: "D", auth: false, voterElection: true},
+				{signer: "C", voted: "D", auth: false, voterElection: true},
 				{signer: "A"},
-				{signer: "B", voted: "C", auth: true},
+				{signer: "B", voted: "C", auth: true, voterElection: true},
 			},
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B", "C"},
 		}, {
-			// Ensure that pending votes don't survive authorization status changes. This
+			// 18: Ensure that pending votes don't survive authorization status changes. This
 			// corner case can only appear if a signer is quickly added, removed and then
 			// readded (or the inverse), while one of the original voters dropped. If a
 			// past vote is left cached in the system somewhere, this will interfere with
 			// the final signer outcome.
-			signers: []string{"A", "B", "C", "D", "E"},
+			signers: []string{"A", "B", "C", "D", "E", "F"},
 			voters:  []string{"A", "B", "C", "D", "E"},
 			votes: []testerVote{
-				{signer: "A", voted: "F", auth: true}, // Authorize F, 3 votes needed
-				{signer: "B", voted: "F", auth: true},
-				{signer: "C", voted: "F", auth: true},
-				{signer: "D", voted: "F", auth: false}, // Deauthorize F, 3 votes needed (leave A's previous vote "unchanged")
-				{signer: "E", voted: "F", auth: false},
-				{signer: "B"},
-				{signer: "C"},
-				{signer: "D", voted: "F", auth: true}, // Almost authorize F as a voter, 2/3 votes needed
-				{signer: "E", voted: "F", auth: true},
-				{signer: "B", voted: "A", auth: false}, // Deauthorize A as a voter, 3 votes needed
-				{signer: "C", voted: "A", auth: false},
-				{signer: "D", voted: "A", auth: false},
+				{signer: "A", voted: "F", auth: true, voterElection: true}, // Authorize F, 3 votes needed
+				{signer: "B", voted: "F", auth: true, voterElection: true},
+				{signer: "C", voted: "F", auth: true, voterElection: true},
+				{signer: "D", voted: "F", auth: false, voterElection: true}, // Deauthorize F, 3 votes needed (leave A's previous vote "unchanged")
+				{signer: "E", voted: "F", auth: false, voterElection: true},
+				{signer: "B", voted: "F", auth: false, voterElection: true},
+				{signer: "C", voted: "F", auth: false, voterElection: true},
+				{signer: "D", voted: "F", auth: true, voterElection: true}, // Almost authorize F as a voter, 2/3 votes needed
+				{signer: "E", voted: "F", auth: true, voterElection: true},
+				{signer: "B", voted: "A", auth: false, voterElection: true}, // Deauthorize A as a voter, 3 votes needed
+				{signer: "C", voted: "A", auth: false, voterElection: true},
+				{signer: "D", voted: "A", auth: false, voterElection: true},
 				{signer: "E"},
-				{signer: "B", voted: "F", auth: true}, // Finish authorizing F as a voter, 3/3 votes needed
+				{signer: "B", voted: "F", auth: true, voterElection: true}, // Finish authorizing F as a voter, 3/3 votes needed
 			},
 			//results: []string{"B", "C", "D", "E", "F"},
 			signersResults: []string{"A", "B", "C", "D", "E", "F"},
 			votersResults:  []string{"B", "C", "D", "E", "F"},
 		}, {
-			// Epoch transitions reset all votes to allow chain checkpointing
+			// 19: Epoch transitions reset all votes to allow chain checkpointing
 			epoch:   3,
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
@@ -421,12 +422,16 @@ func TestVoting(t *testing.T) {
 				Time:     big.NewInt(int64(j) * int64(blockPeriod)),
 				Coinbase: accounts.address(vote.voted),
 				Signer:   make([]byte, extraSeal),
+				Extra:    make([]byte, extraVanity),
 			}
 			if j > 0 {
 				headers[j].ParentHash = headers[j-1].Hash()
 			}
 			if vote.auth {
 				copy(headers[j].Nonce[:], nonceAuthVote)
+			}
+			if vote.voterElection {
+				headers[j].Extra = append(headers[j].Extra, []byte{0xff}...)
 			}
 			accounts.sign(headers[j], vote.signer)
 		}
