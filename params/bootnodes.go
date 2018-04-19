@@ -25,3 +25,9 @@ var MainnetBootnodes = []string{}
 var TestnetBootnodes = []string{
 	"enode://bfbb22927487ae6b74d39817e73ee3ba776b12772fc92e00809c3bfca06ad0f1d07276b845f9cd1b1747529b9d2b762c24f877efde7b219cefbc0e012f6c5115@testnet-bootnode.gochain.io:30301",
 }
+
+// GochainTestnetBootnodes are the enode URLs of the P2P bootstrap nodes running on the
+// Gochain test network.
+var GochainTestnetBootnodes = []string{
+	"enode://bfbb22927487ae6b74d39817e73ee3ba776b12772fc92e00809c3bfca06ad0f1d07276b845f9cd1b1747529b9d2b762c24f877efde7b219cefbc0e012f6c5115@159.65.104.177:30301",
+}
