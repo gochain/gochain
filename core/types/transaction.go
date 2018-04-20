@@ -381,10 +381,12 @@ func NewTransactionsByPriceAndNonce(ctx context.Context, signer Signer, txs map[
 	// Initialize a price based heap with the head transactions
 	heads := make(TxByPrice, 0, len(txs))
 	for _, accTxs := range txs {
-		heads = append(heads, accTxs[0])
-		// Ensure the sender address is from the signer
-		acc, _ := Sender(ctx, signer, accTxs[0])
-		txs[acc] = accTxs[1:]
+		if len(accTxs) > 0 {
+			heads = append(heads, accTxs[0])
+			// Ensure the sender address is from the signer
+			acc, _ := Sender(ctx, signer, accTxs[0])
+			txs[acc] = accTxs[1:]
+		}
 	}
 	heap.Init(&heads)
 
