@@ -36,9 +36,10 @@ var (
 )
 
 const (
-	maxKnownTxs      = 262144 // Maximum transactions hashes to keep in the known list (prevent DOS)
-	maxKnownBlocks   = 1024   // Maximum block hashes to keep in the known list (prevent DOS)
-	handshakeTimeout = 5 * time.Second
+	maxKnownTxs       = 65536           // Maximum transactions hashes to keep in the known list (prevent DOS)
+	maxKnownBlocks    = 1024            // Maximum block hashes to keep in the known list (prevent DOS)
+	forgetTxsInterval = 2 * time.Minute // Timer interval to forget known txs
+	handshakeTimeout  = 5 * time.Second
 )
 
 // PeerInfo represents a short summary of the GoChain sub-protocol metadata known
@@ -49,23 +50,49 @@ type PeerInfo struct {
 	Head       string   `json:"head"`       // SHA3 hash of the peer's best owned block
 }
 
-// setOfHash is a set of common.Hash safe for concurrent access.
-type setOfHash struct {
+// knownHashes is a capped set of common.Hash safe for concurrent access.
+// If forgetInterval is set, then the backing map is ignored or reset when older
+// than forgetInterval.
+type knownHashes struct {
 	sync.RWMutex
-	m map[common.Hash]struct{}
+	m              map[common.Hash]struct{}
+	cap            int
+	lastReset      time.Time
+	forgetInterval time.Duration
 }
 
-func (s *setOfHash) Add(h common.Hash) {
+func (s *knownHashes) reset() {
+	s.m = make(map[common.Hash]struct{}, s.cap)
+	s.lastReset = time.Now()
+}
+
+func (s *knownHashes) Add(h common.Hash) {
 	s.Lock()
+	if s.m == nil || (s.forgetInterval != 0 && time.Since(s.lastReset) > s.forgetInterval) {
+		s.reset()
+	}
 	s.m[h] = struct{}{}
 	s.Unlock()
 }
 
-// AddCapped is like Add, but first makes room if cap has been reached.
-func (s *setOfHash) AddCapped(h common.Hash, cap int) {
+func (s *knownHashes) AddAll(txs types.Transactions) {
 	s.Lock()
-	if len(s.m) >= cap {
-		i := len(s.m) + 1 - cap
+	if s.m == nil || (s.forgetInterval != 0 && time.Since(s.lastReset) > s.forgetInterval) {
+		s.reset()
+	}
+	for _, tx := range txs {
+		s.m[tx.Hash()] = struct{}{}
+	}
+	s.Unlock()
+}
+
+// AddCapped is like Add, but first makes room if cap has been reached.
+func (s *knownHashes) AddCapped(h common.Hash) {
+	s.Lock()
+	if s.m == nil || (s.forgetInterval != 0 && time.Since(s.lastReset) > s.forgetInterval) {
+		s.reset()
+	} else if len(s.m) >= s.cap {
+		i := len(s.m) + 1 - s.cap
 		for d := range s.m {
 			delete(s.m, d)
 			i--
@@ -78,9 +105,14 @@ func (s *setOfHash) AddCapped(h common.Hash, cap int) {
 	s.Unlock()
 }
 
-func (s *setOfHash) Has(h common.Hash) bool {
+func (s *knownHashes) Has(h common.Hash) bool {
+	var ok bool
 	s.RLock()
-	_, ok := s.m[h]
+	if s.m == nil || (s.forgetInterval != 0 && time.Since(s.lastReset) > s.forgetInterval) {
+		ok = false
+	} else {
+		_, ok = s.m[h]
+	}
 	s.RUnlock()
 	return ok
 }
@@ -98,21 +130,22 @@ type peer struct {
 	td   *big.Int
 	lock sync.RWMutex
 
-	knownTxs    setOfHash // Set of transaction hashes known to be known by this peer
-	knownBlocks setOfHash // Set of block hashes known to be known by this peer
+	knownTxs    knownHashes // Set of transaction hashes known to be known by this peer
+	knownBlocks knownHashes // Set of block hashes known to be known by this peer
 }
 
 func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
 	id := p.ID()
 
 	r := &peer{
-		Peer:    p,
-		rw:      rw,
-		version: version,
-		id:      fmt.Sprintf("%x", id[:8]),
+		Peer:        p,
+		rw:          rw,
+		version:     version,
+		id:          fmt.Sprintf("%x", id[:8]),
+		knownTxs:    knownHashes{cap: maxKnownTxs, forgetInterval: forgetTxsInterval},
+		knownBlocks: knownHashes{cap: maxKnownBlocks},
 	}
-	r.knownTxs.m = make(map[common.Hash]struct{}, maxKnownTxs)
-	r.knownBlocks.m = make(map[common.Hash]struct{}, maxKnownBlocks)
+
 	return r
 }
 
@@ -149,23 +182,19 @@ func (p *peer) SetHead(hash common.Hash, td *big.Int) {
 // MarkBlock marks a block as known for the peer, ensuring that the block will
 // never be propagated to this particular peer.
 func (p *peer) MarkBlock(hash common.Hash) {
-	p.knownBlocks.AddCapped(hash, maxKnownBlocks)
+	p.knownBlocks.AddCapped(hash)
 }
 
 // MarkTransaction marks a transaction as known for the peer, ensuring that it
 // will never be propagated to this particular peer.
 func (p *peer) MarkTransaction(hash common.Hash) {
-	p.knownTxs.AddCapped(hash, maxKnownTxs)
+	p.knownTxs.AddCapped(hash)
 }
 
 // SendTransactions sends transactions to the peer and includes the hashes
 // in its transaction hash set for future reference.
 func (p *peer) SendTransactions(txs types.Transactions) error {
-	p.knownTxs.Lock()
-	for _, tx := range txs {
-		p.knownTxs.m[tx.Hash()] = struct{}{}
-	}
-	p.knownTxs.Unlock()
+	p.knownTxs.AddAll(txs)
 	return p2p.Send(p.rw, TxMsg, txs)
 }
 
