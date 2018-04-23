@@ -35,6 +35,14 @@ type Database interface {
 	NewBatch() Batch
 }
 
+// NewDatabaseFunc represents a function for generating a new database.
+type NewDatabaseFunc func(NewDatabaseOptions) (Database, error)
+
+// NewDatabaseOptions represents options passed to NewDatabaseFunc.
+type NewDatabaseOptions struct {
+	Path string // on-disk path
+}
+
 // Batch is a write-only database that commits changes to its host database
 // when Write is called. Batch cannot be used concurrently.
 type Batch interface {
