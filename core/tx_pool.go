@@ -111,6 +111,7 @@ var (
 	journalInsertTimer   = metrics.NewTimer("txpool/journal/insert")
 	chainHeadGauge       = metrics.NewGauge("txpool/chain/head")
 	chainHeadTxsGauge    = metrics.NewGauge("txpool/chain/head/txs")
+	poolLimitCounter     = metrics.NewCounter("txpool/full")
 )
 
 // TxStatus is the current status of a transaction as seen by the pool.
@@ -664,6 +665,7 @@ func (pool *TxPool) add(ctx context.Context, tx *types.Transaction, local bool) 
 	}
 	// If the transaction pool is full, reject.
 	if uint64(len(pool.all)) >= pool.config.GlobalSlots+pool.config.GlobalQueue {
+		poolLimitCounter.Inc(1)
 		return false, ErrPoolLimit
 	}
 	// If the transaction is replacing an already pending one, do directly
