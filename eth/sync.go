@@ -18,7 +18,6 @@ package eth
 
 import (
 	"context"
-	"math/rand"
 	"sync/atomic"
 	"time"
 
@@ -35,7 +34,8 @@ const (
 
 	// This is the target size for the packs of transactions sent by txsyncLoop.
 	// A pack can get larger than this if a single transactions exceeds this size.
-	txsyncPackSize = 1000 * 1024
+	txsyncPackSize   = 1000 * 1024
+	txResyncInterval = 5 * time.Minute // How often to re-sync pending txs with peers.
 )
 
 type txsync struct {
@@ -53,6 +53,35 @@ func (pm *ProtocolManager) syncTransactions(p *peer) {
 	select {
 	case pm.txsyncCh <- &txsync{p, txs}:
 	case <-pm.quitSync:
+	}
+}
+
+// syncTransactionsAllPeers syncs pending txs to all peers.
+func (pm *ProtocolManager) syncTransactionsAllPeers() {
+	ctx := context.TODO()
+	txs := pm.txpool.PendingList(ctx)
+	if len(txs) == 0 {
+		return
+	}
+	for _, p := range pm.peers.All() {
+		select {
+		case pm.txsyncCh <- &txsync{p, txs}:
+		case <-pm.quitSync:
+		}
+	}
+}
+
+// txResyncLoop periodically re-syncs transactions to all peers.
+func (pm *ProtocolManager) txResyncLoop() {
+	t := time.NewTicker(txResyncInterval)
+	defer t.Stop()
+	for {
+		select {
+		case <-t.C:
+			pm.syncTransactionsAllPeers()
+		case <-pm.quitSync:
+			return
+		}
 	}
 }
 
@@ -91,14 +120,8 @@ func (pm *ProtocolManager) txsyncLoop() {
 
 	// pick chooses the next pending sync.
 	pick := func() *txsync {
-		if len(pending) == 0 {
-			return nil
-		}
-		n := rand.Intn(len(pending)) + 1
 		for _, s := range pending {
-			if n--; n == 0 {
-				return s
-			}
+			return s
 		}
 		return nil
 	}
@@ -114,7 +137,7 @@ func (pm *ProtocolManager) txsyncLoop() {
 			sending = false
 			// Stop tracking peers that cause send failures.
 			if err != nil {
-				pack.p.Log().Debug("Transaction send failed", "err", err)
+				pack.p.Log().Warn("Transaction send failed", "err", err)
 				delete(pending, pack.p.ID())
 			}
 			// Schedule the next send.
