@@ -412,6 +412,18 @@ func (ps *peerSet) Len() int {
 	return len(ps.peers)
 }
 
+// All returns all current peers.
+func (ps *peerSet) All() []*peer {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+	all := make([]*peer, 0, ps.Len())
+	for _, p := range ps.peers {
+		all = append(all, p)
+	}
+	return all
+}
+
 // PeersWithoutBlock retrieves a list of peers that do not have a given block in
 // their set of known hashes.
 func (ps *peerSet) PeersWithoutBlock(hash common.Hash) []*peer {

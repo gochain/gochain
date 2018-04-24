@@ -215,6 +215,7 @@ func (pm *ProtocolManager) Start(ctx context.Context, maxPeers int) {
 	// start sync handlers
 	go pm.syncer(ctx)
 	go pm.txsyncLoop()
+	go pm.txResyncLoop()
 }
 
 func (pm *ProtocolManager) Stop() {
