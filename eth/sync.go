@@ -35,7 +35,7 @@ const (
 	// This is the target size for the packs of transactions sent by txsyncLoop.
 	// A pack can get larger than this if a single transactions exceeds this size.
 	txsyncPackSize   = 1000 * 1024
-	txResyncInterval = 5 * time.Minute // How often to re-sync pending txs with peers.
+	txResyncInterval = 1 * time.Minute // How often to re-sync pending txs with peers.
 )
 
 type txsync struct {
