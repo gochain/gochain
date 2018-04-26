@@ -4,6 +4,7 @@ package eth
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/hexutil"
@@ -16,69 +17,80 @@ import (
 
 var _ = (*configMarshaling)(nil)
 
+// MarshalTOML marshals as TOML.
 func (c Config) MarshalTOML() (interface{}, error) {
 	type Config struct {
 		Genesis                 *core.Genesis `toml:",omitempty"`
 		NetworkId               uint64
 		SyncMode                downloader.SyncMode
+		NoPruning               bool
 		LightServ               int  `toml:",omitempty"`
 		LightPeers              int  `toml:",omitempty"`
 		SkipBcVersionCheck      bool `toml:"-"`
 		DatabaseHandles         int  `toml:"-"`
 		DatabaseCache           int
+		TrieCache               int
+		TrieTimeout             time.Duration
 		Etherbase               common.Address `toml:",omitempty"`
 		MinerThreads            int            `toml:",omitempty"`
 		ExtraData               hexutil.Bytes  `toml:",omitempty"`
 		GasPrice                *big.Int
 		Ethash                  ethash.Config
 		TxPool                  core.TxPoolConfig
-		Archive                 archive.Config `toml:",omitempty"`
 		GPO                     gasprice.Config
 		EnablePreimageRecording bool
-		DocRoot                 string `toml:"-"`
+		DocRoot                 string         `toml:"-"`
+		Archive                 archive.Config `toml:",omitempty"`
 	}
 	var enc Config
 	enc.Genesis = c.Genesis
 	enc.NetworkId = c.NetworkId
 	enc.SyncMode = c.SyncMode
+	enc.NoPruning = c.NoPruning
 	enc.LightServ = c.LightServ
 	enc.LightPeers = c.LightPeers
 	enc.SkipBcVersionCheck = c.SkipBcVersionCheck
 	enc.DatabaseHandles = c.DatabaseHandles
 	enc.DatabaseCache = c.DatabaseCache
+	enc.TrieCache = c.TrieCache
+	enc.TrieTimeout = c.TrieTimeout
 	enc.Etherbase = c.Etherbase
 	enc.MinerThreads = c.MinerThreads
 	enc.ExtraData = c.ExtraData
 	enc.GasPrice = c.GasPrice
 	enc.Ethash = c.Ethash
 	enc.TxPool = c.TxPool
-	enc.Archive = c.Archive
 	enc.GPO = c.GPO
 	enc.EnablePreimageRecording = c.EnablePreimageRecording
 	enc.DocRoot = c.DocRoot
+	enc.Archive = c.Archive
 	return &enc, nil
 }
 
+// UnmarshalTOML unmarshals from TOML.
 func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	type Config struct {
 		Genesis                 *core.Genesis `toml:",omitempty"`
 		NetworkId               *uint64
 		SyncMode                *downloader.SyncMode
+		NoPruning               *bool
 		LightServ               *int  `toml:",omitempty"`
 		LightPeers              *int  `toml:",omitempty"`
 		SkipBcVersionCheck      *bool `toml:"-"`
 		DatabaseHandles         *int  `toml:"-"`
 		DatabaseCache           *int
+		TrieCache               *int
+		TrieTimeout             *time.Duration
 		Etherbase               *common.Address `toml:",omitempty"`
 		MinerThreads            *int            `toml:",omitempty"`
 		ExtraData               *hexutil.Bytes  `toml:",omitempty"`
 		GasPrice                *big.Int
 		Ethash                  *ethash.Config
 		TxPool                  *core.TxPoolConfig
-		Archive                 *archive.Config `toml:",omitempty"`
 		GPO                     *gasprice.Config
 		EnablePreimageRecording *bool
-		DocRoot                 *string `toml:"-"`
+		DocRoot                 *string         `toml:"-"`
+		Archive                 *archive.Config `toml:",omitempty"`
 	}
 	var dec Config
 	if err := unmarshal(&dec); err != nil {
@@ -92,6 +104,9 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.SyncMode != nil {
 		c.SyncMode = *dec.SyncMode
+	}
+	if dec.NoPruning != nil {
+		c.NoPruning = *dec.NoPruning
 	}
 	if dec.LightServ != nil {
 		c.LightServ = *dec.LightServ
@@ -107,6 +122,12 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.DatabaseCache != nil {
 		c.DatabaseCache = *dec.DatabaseCache
+	}
+	if dec.TrieCache != nil {
+		c.TrieCache = *dec.TrieCache
+	}
+	if dec.TrieTimeout != nil {
+		c.TrieTimeout = *dec.TrieTimeout
 	}
 	if dec.Etherbase != nil {
 		c.Etherbase = *dec.Etherbase
@@ -126,9 +147,6 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	if dec.TxPool != nil {
 		c.TxPool = *dec.TxPool
 	}
-	if dec.Archive != nil {
-		c.Archive = *dec.Archive
-	}
 	if dec.GPO != nil {
 		c.GPO = *dec.GPO
 	}
@@ -137,6 +155,9 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.DocRoot != nil {
 		c.DocRoot = *dec.DocRoot
+	}
+	if dec.Archive != nil {
+		c.Archive = *dec.Archive
 	}
 	return nil
 }
