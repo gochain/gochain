@@ -72,7 +72,7 @@ This command will:
 Transitioning towards developers, if you'd like to play around with creating GoChain contracts, you
 almost certainly would like to do that without any real money involved until you get the hang of the
 entire system. In other words, instead of attaching to the main network, you want to join the **test**
-network with your node, which is fully equivalent to the main network, but with play-Ether only.
+network with your node, which is fully equivalent to the main network, but with play-GOC only.
 
 ```
 $ gochain --testnet console
@@ -110,8 +110,6 @@ To get an idea how the file should look like you can use the `dumpconfig` subcom
 $ gochain --your-favourite-flags dumpconfig
 ```
 
-*Note: This works only with geth v1.6.0 and above.*
-
 #### Docker quick start
 
 One of the quickest ways to get GoChain up and running on your machine is by using Docker:
@@ -119,10 +117,10 @@ One of the quickest ways to get GoChain up and running on your machine is by usi
 ```
 docker run -d --name gochain-node -v /Users/alice/GoChain:/root \
            -p 8545:8545 -p 30303:30303 \
-           gochain-io/client-go
+           gochain-io/gochain
 ```
 
-This will start GoChain in fast-sync mode with a DB memory allowance of 1GB just as the above command does.  It will also create a persistent volume in your home directory for saving your blockchain as well as map the default ports. There is also an `alpine` tag available for a slim version of the image.
+This will start GoChain in fast-sync mode with a DB memory allowance of 1GB just as the above command does.  It will also create a persistent volume in your home directory for saving your blockchain as well as map the default ports.
 
 Do not forget `--rpcaddr 0.0.0.0`, if you want to access RPC from other containers and/or hosts. By default, `gochain` binds to the local interface and RPC endpoints is not accessible from the outside.
 

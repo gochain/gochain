@@ -24,9 +24,8 @@ import (
 )
 
 var (
-	MainnetGenesisHash        = common.HexToHash("0x03e43b36e734240240ab517dad42cc964a79122a487b9744fc4c7ff61a4c5c28") // Mainnet genesis hash to enforce below configs on
-	TestnetGenesisHash        = common.HexToHash("0xa8a134fa3b1e1028a7811807fdd689c1cc0886e85012b2833cad4f72f532e2c6") // Testnet genesis hash to enforce below configs on
-	GochainTestnetGenesisHash = common.HexToHash("0x7ffe5aa939fb8baead5fe72411b41a9b36847e300fa6ae9467c35fea053720d8") // Gochain Testnet genesis hash to enforce below configs on
+	MainnetGenesisHash = common.HexToHash("0x03e43b36e734240240ab517dad42cc964a79122a487b9744fc4c7ff61a4c5c28") // Mainnet genesis hash to enforce below configs on
+	TestnetGenesisHash = common.HexToHash("0x7ffe5aa939fb8baead5fe72411b41a9b36847e300fa6ae9467c35fea053720d8") // Testnet genesis hash to enforce below configs on
 )
 
 var (
@@ -43,21 +42,8 @@ var (
 		Ethash: new(EthashConfig),
 	}
 
-	// TestnetChainConfig contains the chain parameters to run a node on the Ropsten test network.
+	// TestnetChainConfig contains the chain parameters to run a node on the test network.
 	TestnetChainConfig = &ChainConfig{
-		ChainId:        big.NewInt(3),
-		HomesteadBlock: big.NewInt(0),
-		EIP150Block:    big.NewInt(0),
-		EIP150Hash:     common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d"),
-		EIP155Block:    big.NewInt(10),
-		EIP158Block:    big.NewInt(10),
-		ByzantiumBlock: big.NewInt(1700000),
-
-		Ethash: new(EthashConfig),
-	}
-
-	// GochainTestnetChainConfig contains the chain parameters to run a node on the Gochain test network.
-	GochainTestnetChainConfig = &ChainConfig{
 		ChainId:        big.NewInt(31337),
 		HomesteadBlock: big.NewInt(1),
 		EIP150Block:    big.NewInt(2),
@@ -68,7 +54,7 @@ var (
 
 		Clique: &CliqueConfig{
 			Period: 5,
-			Epoch:  30000,
+			Epoch:  3000,
 		},
 	}
 

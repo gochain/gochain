@@ -32,18 +32,9 @@ func MainnetGenesis() string {
 	return ""
 }
 
-// TestnetGenesis returns the JSON spec to use for the Ethereum test network.
+// TestnetGenesis returns the JSON spec to use for the Gochain test network
 func TestnetGenesis() string {
 	enc, err := json.Marshal(core.DefaultTestnetGenesisBlock())
-	if err != nil {
-		panic(err)
-	}
-	return string(enc)
-}
-
-// GochainTestnetGenesis returns the JSON spec to use for the Gochain test network
-func GochainTestnetGenesis() string {
-	enc, err := json.Marshal(core.DefaultGochainTestnetGenesisBlock())
 	if err != nil {
 		panic(err)
 	}
