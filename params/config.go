@@ -24,23 +24,14 @@ import (
 )
 
 var (
-	MainnetGenesisHash = common.HexToHash("0x03e43b36e734240240ab517dad42cc964a79122a487b9744fc4c7ff61a4c5c28") // Mainnet genesis hash to enforce below configs on
+	//TODO update
+	MainnetGenesisHash = TestnetGenesisHash                                                                     // Mainnet genesis hash to enforce below configs on
 	TestnetGenesisHash = common.HexToHash("0x7ffe5aa939fb8baead5fe72411b41a9b36847e300fa6ae9467c35fea053720d8") // Testnet genesis hash to enforce below configs on
 )
 
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
-	MainnetChainConfig = &ChainConfig{
-		ChainId:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(1150000),
-		EIP150Block:    big.NewInt(2463000),
-		EIP150Hash:     common.HexToHash("0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0"),
-		EIP155Block:    big.NewInt(2675000),
-		EIP158Block:    big.NewInt(2675000),
-		ByzantiumBlock: big.NewInt(4370000),
-
-		Ethash: new(EthashConfig),
-	}
+	MainnetChainConfig = TestnetChainConfig //TODO update
 
 	// TestnetChainConfig contains the chain parameters to run a node on the test network.
 	TestnetChainConfig = &ChainConfig{
