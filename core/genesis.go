@@ -218,8 +218,6 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 		return params.MainnetChainConfig
 	case ghash == params.TestnetGenesisHash:
 		return params.TestnetChainConfig
-	case ghash == params.GochainTestnetGenesisHash:
-		return params.GochainTestnetChainConfig
 	default:
 		return params.AllEthashProtocolChanges
 	}
@@ -317,34 +315,15 @@ func GenesisBlockForTesting(db ethdb.Database, addr common.Address, balance *big
 	return g.MustCommit(db)
 }
 
-// DefaultGenesisBlock returns the Ethereum main net genesis block.
+// DefaultGenesisBlock returns the Gochain main net genesis block.
 func DefaultGenesisBlock() *Genesis {
-	return &Genesis{
-		Config:     params.MainnetChainConfig,
-		Nonce:      66,
-		ExtraData:  hexutil.MustDecode("0x11bbe8db4e347b4e8c937c1c8370e4b5ed33adb3db69cbdb7a38e1e50b1b82fa"),
-		GasLimit:   5000,
-		Difficulty: big.NewInt(17179869184),
-		Alloc:      decodePrealloc(mainnetAllocData),
-	}
+	return nil
 }
 
-// DefaultTestnetGenesisBlock returns the Ropsten network genesis block.
+// DefaultTestnetGenesisBlock returns the Gochain Testnet network genesis block.
 func DefaultTestnetGenesisBlock() *Genesis {
 	return &Genesis{
 		Config:     params.TestnetChainConfig,
-		Nonce:      66,
-		ExtraData:  hexutil.MustDecode("0x3535353535353535353535353535353535353535353535353535353535353535"),
-		GasLimit:   16777216,
-		Difficulty: big.NewInt(1048576),
-		Alloc:      decodePrealloc(testnetAllocData),
-	}
-}
-
-// DefaultGochainTestnetGenesisBlock returns the Gochain Testnet network genesis block.
-func DefaultGochainTestnetGenesisBlock() *Genesis {
-	return &Genesis{
-		Config:     params.GochainTestnetChainConfig,
 		Timestamp:  1518103741,
 		ExtraData:  hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000"),
 		GasLimit:   210284448,
@@ -358,7 +337,7 @@ func DefaultGochainTestnetGenesisBlock() *Genesis {
 			common.HexToAddress("0x7aeceb5d345a01f8014a4320ab1f3d467c0c086a"),
 		},
 		Signer: hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
-		Alloc:  decodePrealloc(gochainTestnetAllocData),
+		Alloc:  decodePrealloc(testnetAllocData),
 	}
 }
 
