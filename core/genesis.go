@@ -317,7 +317,8 @@ func GenesisBlockForTesting(db ethdb.Database, addr common.Address, balance *big
 
 // DefaultGenesisBlock returns the Gochain main net genesis block.
 func DefaultGenesisBlock() *Genesis {
-	return nil
+	//TODO update
+	return DefaultTestnetGenesisBlock()
 }
 
 // DefaultTestnetGenesisBlock returns the Gochain Testnet network genesis block.

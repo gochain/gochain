@@ -31,12 +31,11 @@ import (
 )
 
 func TestDefaultGenesisBlock(t *testing.T) {
-	// TODO Skip until mainnet launch
-	// block := DefaultGenesisBlock().ToBlock(nil)
-	//if block.Hash() != params.MainnetGenesisHash {
-	//	t.Errorf("wrong mainnet genesis hash, got %v, want %v", block.Hash(), params.MainnetGenesisHash)
-	//}
-	block := DefaultTestnetGenesisBlock().ToBlock(nil)
+	block := DefaultGenesisBlock().ToBlock(nil)
+	if block.Hash() != params.MainnetGenesisHash {
+		t.Errorf("wrong mainnet genesis hash, got %v, want %v", block.Hash(), params.MainnetGenesisHash)
+	}
+	block = DefaultTestnetGenesisBlock().ToBlock(nil)
 	if block.Hash() != params.TestnetGenesisHash {
 		t.Errorf("wrong testnet genesis hash, got %v, want %v", block.Hash(), params.TestnetGenesisHash)
 	}
@@ -70,24 +69,23 @@ func TestSetupGenesis(t *testing.T) {
 			wantErr:    errGenesisNoConfig,
 			wantConfig: params.AllEthashProtocolChanges,
 		},
-		// TODO Skip until mainnet launch
-		//{
-		//	name: "no block in DB, genesis == nil",
-		//	fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-		//		return SetupGenesisBlock(db, nil)
-		//	},
-		//	wantHash:   params.MainnetGenesisHash,
-		//	wantConfig: params.MainnetChainConfig,
-		//},
-		//{
-		//	name: "mainnet block in DB, genesis == nil",
-		//	fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-		//		DefaultGenesisBlock().MustCommit(db)
-		//		return SetupGenesisBlock(db, nil)
-		//	},
-		//	wantHash:   params.MainnetGenesisHash,
-		//	wantConfig: params.MainnetChainConfig,
-		//},
+		{
+			name: "no block in DB, genesis == nil",
+			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
+				return SetupGenesisBlock(db, nil)
+			},
+			wantHash:   params.MainnetGenesisHash,
+			wantConfig: params.MainnetChainConfig,
+		},
+		{
+			name: "mainnet block in DB, genesis == nil",
+			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
+				DefaultGenesisBlock().MustCommit(db)
+				return SetupGenesisBlock(db, nil)
+			},
+			wantHash:   params.MainnetGenesisHash,
+			wantConfig: params.MainnetChainConfig,
+		},
 		{
 			name: "custom block in DB, genesis == nil",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
