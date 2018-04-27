@@ -377,8 +377,8 @@ func testGetNodeData(t *testing.T, protocol int) {
 
 		for j, acc := range accounts {
 			state, _ := pm.blockchain.State()
-			bw := state.GetBalance(acc)
-			bh := trie.GetBalance(acc)
+			bw, _ := state.GetBalance(acc)
+			bh, _ := trie.GetBalance(acc)
 
 			if (bw != nil && bh == nil) || (bw == nil && bh != nil) {
 				t.Errorf("test %d, account %d: balance mismatch: have %v, want %v", i, j, bh, bw)

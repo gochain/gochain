@@ -117,7 +117,7 @@ func validateTxPoolInternals(pool *TxPool) error {
 				last = nonce
 			}
 		}
-		if nonce := pool.pendingState.GetNonce(addr); nonce != last+1 {
+		if nonce, _ := pool.pendingState.GetNonce(addr); nonce != last+1 {
 			return fmt.Errorf("pending nonce mismatch: have %v, want %v", nonce, last+1)
 		}
 	}
@@ -200,14 +200,14 @@ func TestStateChangeDuringTransactionPoolReset(t *testing.T) {
 	pool := NewTxPool(ctx, testTxPoolConfig, params.TestChainConfig, blockchain)
 	defer pool.Stop()
 
-	nonce := pool.State().GetNonce(address)
+	nonce, _ := pool.State().GetNonce(address)
 	if nonce != 0 {
 		t.Fatalf("Invalid nonce, want 0, got %d", nonce)
 	}
 
 	pool.AddRemotes(ctx, types.Transactions{tx0, tx1})
 
-	nonce = pool.State().GetNonce(address)
+	nonce, _ = pool.State().GetNonce(address)
 	if nonce != 2 {
 		t.Fatalf("Invalid nonce, want 2, got %d", nonce)
 	}
@@ -221,7 +221,7 @@ func TestStateChangeDuringTransactionPoolReset(t *testing.T) {
 		t.Logf("%0x: %d\n", addr, len(txs))
 	}
 
-	nonce = pool.State().GetNonce(address)
+	nonce, _ = pool.State().GetNonce(address)
 	if nonce != 2 {
 		t.Fatalf("Invalid nonce, want 2, got %d", nonce)
 	}
@@ -462,7 +462,7 @@ func TestTransactionNonceRecovery(t *testing.T) {
 	// simulate some weird re-order of transactions and missing nonce(s)
 	pool.currentState.SetNonce(addr, n-1)
 	pool.lockedReset(ctx, nil, nil)
-	if fn := pool.pendingState.GetNonce(addr); fn != n-1 {
+	if fn, _ := pool.pendingState.GetNonce(addr); fn != n-1 {
 		t.Errorf("expected nonce to be %d, got %d", n-1, fn)
 	}
 }

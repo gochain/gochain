@@ -117,8 +117,8 @@ func gasReturnDataCopy(gt params.GasTable, evm *EVM, contract *Contract, stack *
 
 func gasSStore(gt params.GasTable, evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
 	var (
-		y, x = stack.Back(1), stack.Back(0)
-		val  = evm.StateDB.GetState(contract.Address(), common.BigToHash(x))
+		y, x   = stack.Back(1), stack.Back(0)
+		val, _ = evm.StateDB.GetState(contract.Address(), common.BigToHash(x))
 	)
 	// This checks for 3 scenario's and calculates gas accordingly
 	// 1. From a zero-value address to a non-zero value         (NEW VALUE)
@@ -394,7 +394,8 @@ func gasSuicide(gt params.GasTable, evm *EVM, contract *Contract, stack *Stack, 
 
 		if eip158 {
 			// if empty and transfers value
-			if evm.StateDB.Empty(address) && evm.StateDB.GetBalance(contract.Address()).Sign() != 0 {
+			bal, _ := evm.StateDB.GetBalance(contract.Address())
+			if evm.StateDB.Empty(address) && bal.Sign() != 0 {
 				gas += gt.CreateBySuicide
 			}
 		} else if !evm.StateDB.Exist(address) {

@@ -30,7 +30,8 @@ func create() (*ManagedState, *account) {
 	statedb, _ := New(common.Hash{}, NewDatabase(db))
 	ms := ManageState(statedb)
 	ms.StateDB.SetNonce(addr, 100)
-	ms.accounts[addr] = newAccount(ms.StateDB.getStateObject(addr))
+	so, _ := ms.StateDB.getStateObject(addr)
+	ms.accounts[addr] = newAccount(so)
 	return ms, ms.accounts[addr]
 }
 
@@ -111,14 +112,14 @@ func TestSetNonce(t *testing.T) {
 	var addr common.Address
 	ms.SetNonce(addr, 10)
 
-	if ms.GetNonce(addr) != 10 {
-		t.Error("Expected nonce of 10, got", ms.GetNonce(addr))
+	if nonce, _ := ms.GetNonce(addr); nonce != 10 {
+		t.Error("Expected nonce of 10, got", nonce)
 	}
 
 	addr[0] = 1
 	ms.StateDB.SetNonce(addr, 1)
 
-	if ms.GetNonce(addr) != 1 {
-		t.Error("Expected nonce of 1, got", ms.GetNonce(addr))
+	if nonce, _ := ms.GetNonce(addr); nonce != 1 {
+		t.Error("Expected nonce of 1, got", nonce)
 	}
 }

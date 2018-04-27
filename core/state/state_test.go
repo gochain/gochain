@@ -98,7 +98,7 @@ func (s *StateSuite) TestNull(c *checker.C) {
 	var value common.Hash
 	s.state.SetState(address, common.Hash{}, value)
 	s.state.Commit(false)
-	value = s.state.GetState(address, common.Hash{})
+	value, _ = s.state.GetState(address, common.Hash{})
 	if !common.EmptyHash(value) {
 		c.Errorf("expected empty hash. got %x", value)
 	}
@@ -121,7 +121,7 @@ func (s *StateSuite) TestSnapshot(c *checker.C) {
 	s.state.RevertToSnapshot(snapshot)
 
 	// get state storage value
-	res := s.state.GetState(stateobjaddr, storageaddr)
+	res, _ := s.state.GetState(stateobjaddr, storageaddr)
 
 	c.Assert(data1, checker.DeepEquals, res)
 }
@@ -147,7 +147,7 @@ func TestSnapshot2(t *testing.T) {
 	state.SetState(stateobjaddr1, storageaddr, data1)
 
 	// db, trie are already non-empty values
-	so0 := state.getStateObject(stateobjaddr0)
+	so0, _ := state.getStateObject(stateobjaddr0)
 	so0.SetBalance(big.NewInt(42))
 	so0.SetNonce(43)
 	so0.SetCode(crypto.Keccak256Hash([]byte{'c', 'a', 'f', 'e'}), []byte{'c', 'a', 'f', 'e'})
@@ -159,7 +159,7 @@ func TestSnapshot2(t *testing.T) {
 	state.Reset(root)
 
 	// and one with deleted == true
-	so1 := state.getStateObject(stateobjaddr1)
+	so1, _ := state.getStateObject(stateobjaddr1)
 	so1.SetBalance(big.NewInt(52))
 	so1.SetNonce(53)
 	so1.SetCode(crypto.Keccak256Hash([]byte{'c', 'a', 'f', 'e', '2'}), []byte{'c', 'a', 'f', 'e', '2'})
@@ -167,7 +167,7 @@ func TestSnapshot2(t *testing.T) {
 	so1.deleted = true
 	state.setStateObject(so1)
 
-	so1 = state.getStateObject(stateobjaddr1)
+	so1, _ = state.getStateObject(stateobjaddr1)
 	if so1 != nil {
 		t.Fatalf("deleted object not nil when getting")
 	}
@@ -175,7 +175,7 @@ func TestSnapshot2(t *testing.T) {
 	snapshot := state.Snapshot()
 	state.RevertToSnapshot(snapshot)
 
-	so0Restored := state.getStateObject(stateobjaddr0)
+	so0Restored, _ := state.getStateObject(stateobjaddr0)
 	// Update lazily-loaded values before comparing.
 	so0Restored.GetState(state.db, storageaddr)
 	so0Restored.Code(state.db)
@@ -183,7 +183,7 @@ func TestSnapshot2(t *testing.T) {
 	compareStateObjects(so0Restored, so0, t)
 
 	// deleted should be nil, both before and after restore of state copy
-	so1Restored := state.getStateObject(stateobjaddr1)
+	so1Restored, _ := state.getStateObject(stateobjaddr1)
 	if so1Restored != nil {
 		t.Fatalf("deleted object not nil after restoring snapshot: %+v", so1Restored)
 	}

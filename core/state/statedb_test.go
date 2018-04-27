@@ -376,18 +376,30 @@ func (test *snapshotTest) checkEqual(state, checkstate *StateDB) error {
 		// Check basic accessor methods.
 		checkeq("Exist", state.Exist(addr), checkstate.Exist(addr))
 		checkeq("HasSuicided", state.HasSuicided(addr), checkstate.HasSuicided(addr))
-		checkeq("GetBalance", state.GetBalance(addr), checkstate.GetBalance(addr))
-		checkeq("GetNonce", state.GetNonce(addr), checkstate.GetNonce(addr))
-		checkeq("GetCode", state.GetCode(addr), checkstate.GetCode(addr))
-		checkeq("GetCodeHash", state.GetCodeHash(addr), checkstate.GetCodeHash(addr))
-		checkeq("GetCodeSize", state.GetCodeSize(addr), checkstate.GetCodeSize(addr))
+		sb, _ := state.GetBalance(addr)
+		csb, _ := checkstate.GetBalance(addr)
+		checkeq("GetBalance", sb, csb)
+		sn, _ := state.GetNonce(addr)
+		csn, _ := checkstate.GetNonce(addr)
+		checkeq("GetNonce", sn, csn)
+		sc, _ := state.GetCode(addr)
+		csc, _ := checkstate.GetCode(addr)
+		checkeq("GetCode", sc, csc)
+		sch, _ := state.GetCodeHash(addr)
+		csch, _ := checkstate.GetCodeHash(addr)
+		checkeq("GetCodeHash", sch, csch)
+		scs, _ := state.GetCodeSize(addr)
+		cscs, _ := checkstate.GetCodeSize(addr)
+		checkeq("GetCodeSize", scs, cscs)
 		// Check storage.
-		if obj := state.getStateObject(addr); obj != nil {
+		if obj, _ := state.getStateObject(addr); obj != nil {
 			state.ForEachStorage(addr, func(key, val common.Hash) bool {
-				return checkeq("GetState("+key.Hex()+")", val, checkstate.GetState(addr, key))
+				st, _ := checkstate.GetState(addr, key)
+				return checkeq("GetState("+key.Hex()+")", val, st)
 			})
 			checkstate.ForEachStorage(addr, func(key, checkval common.Hash) bool {
-				return checkeq("GetState("+key.Hex()+")", state.GetState(addr, key), checkval)
+				st, _ := state.GetState(addr, key)
+				return checkeq("GetState("+key.Hex()+")", st, checkval)
 			})
 		}
 		if err != nil {

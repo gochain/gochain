@@ -118,7 +118,8 @@ func (b *BlockGen) TxNonce(addr common.Address) uint64 {
 	if !b.statedb.Exist(addr) {
 		panic("account does not exist")
 	}
-	return b.statedb.GetNonce(addr)
+	nonce, _ := b.statedb.GetNonce(addr)
+	return nonce
 }
 
 // AddUncle adds an uncle header to the generated block.

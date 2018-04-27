@@ -179,7 +179,9 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	// Initialise a new contract and set the code that is to be used by the EVM.
 	// The contract is a scoped environment for this execution context only.
 	contract := NewContract(caller, to, value, gas)
-	contract.SetCallCode(&addr, evm.StateDB.GetCodeHash(addr), evm.StateDB.GetCode(addr))
+	hash, _ := evm.StateDB.GetCodeHash(addr)
+	code, _ := evm.StateDB.GetCode(addr)
+	contract.SetCallCode(&addr, hash, code)
 
 	start := time.Now()
 
@@ -234,7 +236,9 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	// E The contract is a scoped evmironment for this execution context
 	// only.
 	contract := NewContract(caller, to, value, gas)
-	contract.SetCallCode(&addr, evm.StateDB.GetCodeHash(addr), evm.StateDB.GetCode(addr))
+	hash, _ := evm.StateDB.GetCodeHash(addr)
+	code, _ := evm.StateDB.GetCode(addr)
+	contract.SetCallCode(&addr, hash, code)
 
 	ret, err = run(evm, contract, input)
 	if err != nil {
@@ -267,7 +271,9 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 
 	// Initialise a new contract and make initialise the delegate values
 	contract := NewContract(caller, to, nil, gas).AsDelegate()
-	contract.SetCallCode(&addr, evm.StateDB.GetCodeHash(addr), evm.StateDB.GetCode(addr))
+	hash, _ := evm.StateDB.GetCodeHash(addr)
+	code, _ := evm.StateDB.GetCode(addr)
+	contract.SetCallCode(&addr, hash, code)
 
 	ret, err = run(evm, contract, input)
 	if err != nil {
@@ -307,7 +313,9 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	// EVM. The contract is a scoped environment for this execution context
 	// only.
 	contract := NewContract(caller, to, new(big.Int), gas)
-	contract.SetCallCode(&addr, evm.StateDB.GetCodeHash(addr), evm.StateDB.GetCode(addr))
+	hash, _ := evm.StateDB.GetCodeHash(addr)
+	code, _ := evm.StateDB.GetCode(addr)
+	contract.SetCallCode(&addr, hash, code)
 
 	// When an error was returned by the EVM or when setting the creation code
 	// above we revert to the snapshot and consume any gas remaining. Additionally
@@ -334,12 +342,12 @@ func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.I
 		return nil, common.Address{}, gas, ErrInsufficientBalance
 	}
 	// Ensure there's no existing contract already at the designated address
-	nonce := evm.StateDB.GetNonce(caller.Address())
+	nonce, _ := evm.StateDB.GetNonce(caller.Address())
 	evm.StateDB.SetNonce(caller.Address(), nonce+1)
 
 	contractAddr = crypto.CreateAddress(caller.Address(), nonce)
-	contractHash := evm.StateDB.GetCodeHash(contractAddr)
-	if evm.StateDB.GetNonce(contractAddr) != 0 || (contractHash != (common.Hash{}) && contractHash != emptyCodeHash) {
+	contractHash, _ := evm.StateDB.GetCodeHash(contractAddr)
+	if nonce, _ := evm.StateDB.GetNonce(contractAddr); nonce != 0 || (contractHash != (common.Hash{}) && contractHash != emptyCodeHash) {
 		return nil, common.Address{}, 0, ErrContractAddressCollision
 	}
 	// Create a new account on the state
