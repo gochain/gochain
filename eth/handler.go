@@ -669,7 +669,9 @@ func (pm *ProtocolManager) BroadcastTx(hash common.Hash, tx *types.Transaction) 
 	peers := pm.peers.PeersWithoutTx(hash)
 	//FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
 	for _, peer := range peers {
-		peer.SendTransactions(types.Transactions{tx})
+		if err := peer.SendTransactions(types.Transactions{tx}); err != nil {
+			log.Error("Cannot send transaction", "hash", hash, "peer", peer.Name(), "err", err)
+		}
 	}
 	if log.Tracing() {
 		log.Trace("Broadcast transaction", "hash", hash, "recipients", len(peers))
