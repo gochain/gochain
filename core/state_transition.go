@@ -151,7 +151,11 @@ func (st *StateTransition) useGas(amount uint64) error {
 
 func (st *StateTransition) buyGas() error {
 	mgval := new(big.Int).Mul(new(big.Int).SetUint64(st.msg.Gas()), st.gasPrice)
-	if bal, _ := st.state.GetBalance(st.msg.From()); bal.Cmp(mgval) < 0 {
+	bal, err := st.state.GetBalance(st.msg.From())
+	if err != nil {
+		log.Error("Failed to get balance", "err", err)
+	}
+	if bal.Cmp(mgval) < 0 {
 		return errInsufficientBalanceForGas
 	}
 	if err := st.gp.SubGas(st.msg.Gas()); err != nil {
@@ -167,7 +171,10 @@ func (st *StateTransition) buyGas() error {
 func (st *StateTransition) preCheck() error {
 	// Make sure this transaction's nonce is correct.
 	if st.msg.CheckNonce() {
-		nonce, _ := st.state.GetNonce(st.msg.From())
+		nonce, err := st.state.GetNonce(st.msg.From())
+		if err != nil {
+			log.Error("Failed to get nonce", "err", err)
+		}
 		if nonce < st.msg.Nonce() {
 			return ErrNonceTooHigh
 		} else if nonce > st.msg.Nonce() {
@@ -209,7 +216,10 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		ret, _, st.gas, vmerr = evm.Create(sender, st.data, st.gas, st.value)
 	} else {
 		// Increment the nonce for the next transaction
-		nonce, _ := st.state.GetNonce(sender.Address())
+		nonce, err := st.state.GetNonce(sender.Address())
+		if err != nil {
+			log.Error("Failed to get nonce", "err", err)
+		}
 		st.state.SetNonce(msg.From(), nonce+1)
 		ret, st.gas, vmerr = evm.Call(sender, st.to(), st.data, st.gas, st.value)
 	}

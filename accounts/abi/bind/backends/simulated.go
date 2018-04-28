@@ -37,6 +37,7 @@ import (
 	"github.com/gochain-io/gochain/eth/filters"
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/event"
+	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 	"github.com/gochain-io/gochain/rpc"
 )
@@ -302,7 +303,10 @@ func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx *types.Transa
 	if err != nil {
 		panic(fmt.Errorf("invalid transaction: %v", err))
 	}
-	nonce, _ := b.pendingState.GetNonce(sender)
+	nonce, err := b.pendingState.GetNonce(sender)
+	if err != nil {
+		log.Error("Failed to get nonce", "err", err)
+	}
 	if tx.Nonce() != nonce {
 		panic(fmt.Errorf("invalid transaction nonce: got %d, want %d", tx.Nonce(), nonce))
 	}

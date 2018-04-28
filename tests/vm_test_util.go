@@ -30,6 +30,7 @@ import (
 	"github.com/gochain-io/gochain/core/vm"
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/ethdb"
+	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 )
 
@@ -101,7 +102,11 @@ func (t *VMTest) Run(vmconfig vm.Config) error {
 	}
 	for addr, account := range t.json.Post {
 		for k, wantV := range account.Storage {
-			if haveV, _ := statedb.GetState(addr, k); haveV != wantV {
+			haveV, err := statedb.GetState(addr, k)
+			if err != nil {
+				log.Error("Failed to get state", "err", err)
+			}
+			if haveV != wantV {
 				return fmt.Errorf("wrong storage value at %x:\n  got  %x\n  want %x", k, haveV, wantV)
 			}
 		}

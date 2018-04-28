@@ -158,14 +158,20 @@ func (db *StateDB) AddRefund(gas uint64) {
 // Exist reports whether the given account address exists in the state.
 // Notably this also returns true for suicided accounts.
 func (db *StateDB) Exist(addr common.Address) bool {
-	so, _ := db.getStateObject(addr)
+	so, err := db.getStateObject(addr)
+	if err != nil {
+		log.Error("Failed to get state object", "err", err)
+	}
 	return so != nil
 }
 
 // Empty returns whether the state object is either non-existent
 // or empty according to the EIP161 specification (balance = nonce = code = 0)
 func (db *StateDB) Empty(addr common.Address) bool {
-	so, _ := db.getStateObject(addr)
+	so, err := db.getStateObject(addr)
+	if err != nil {
+		log.Error("Failed to get state object", "err", err)
+	}
 	return so == nil || so.empty()
 }
 
@@ -248,7 +254,10 @@ func (db *StateDB) Database() Database {
 // StorageTrie returns the storage trie of an account.
 // The return value is a copy and is nil for non-existent accounts.
 func (db *StateDB) StorageTrie(a common.Address) Trie {
-	stateObject, _ := db.getStateObject(a)
+	stateObject, err := db.getStateObject(a)
+	if err != nil {
+		log.Error("Failed to get state object", "err", err)
+	}
 	if stateObject == nil {
 		return nil
 	}
@@ -257,7 +266,10 @@ func (db *StateDB) StorageTrie(a common.Address) Trie {
 }
 
 func (db *StateDB) HasSuicided(addr common.Address) bool {
-	stateObject, _ := db.getStateObject(addr)
+	stateObject, err := db.getStateObject(addr)
+	if err != nil {
+		log.Error("Failed to get state object", "err", err)
+	}
 	if stateObject != nil {
 		return stateObject.suicided
 	}
@@ -318,7 +330,10 @@ func (db *StateDB) SetState(addr common.Address, key common.Hash, value common.H
 // The account's state object is still available until the state is committed,
 // getStateObject will return a non-nil account after Suicide.
 func (db *StateDB) Suicide(addr common.Address) bool {
-	stateObject, _ := db.getStateObject(addr)
+	stateObject, err := db.getStateObject(addr)
+	if err != nil {
+		log.Error("Failed to get state object", "err", err)
+	}
 	if stateObject == nil {
 		return false
 	}
@@ -386,7 +401,10 @@ func (db *StateDB) setStateObject(object *stateObject) {
 
 // Retrieve a state object or create a new state object if nil
 func (db *StateDB) GetOrNewStateObject(addr common.Address) *stateObject {
-	stateObject, _ := db.getStateObject(addr)
+	stateObject, err := db.getStateObject(addr)
+	if err != nil {
+		log.Error("Failed to get state object", "err", err)
+	}
 	if stateObject == nil || stateObject.deleted {
 		stateObject, _ = db.createObject(addr)
 	}
@@ -401,9 +419,12 @@ func (db *StateDB) MarkStateObjectDirty(addr common.Address) {
 
 // createObject creates a new state object. If there is an existing account with
 // the given address, it is overwritten and returned as the second return value.
-func (db *StateDB) createObject(addr common.Address) (newobj, prev *stateObject) {
-	prev, _ = db.getStateObject(addr)
-	newobj = newObject(db, addr, Account{}, db.MarkStateObjectDirty)
+func (db *StateDB) createObject(addr common.Address) (*stateObject, *stateObject) {
+	prev, err := db.getStateObject(addr)
+	if err != nil {
+		log.Error("Failed to get state object", "err", err)
+	}
+	newobj := newObject(db, addr, Account{}, db.MarkStateObjectDirty)
 	newobj.setNonce(0) // sets the object to dirty
 	if prev == nil {
 		db.journal = append(db.journal, createObjectChange{account: &addr})
@@ -432,7 +453,10 @@ func (db *StateDB) CreateAccount(addr common.Address) {
 }
 
 func (db *StateDB) ForEachStorage(addr common.Address, cb func(key, value common.Hash) bool) {
-	so, _ := db.getStateObject(addr)
+	so, err := db.getStateObject(addr)
+	if err != nil {
+		log.Error("Failed to get state object", "err", err)
+	}
 	if so == nil {
 		return
 	}

@@ -23,6 +23,7 @@ import (
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/crypto"
+	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 )
 
@@ -179,8 +180,14 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	// Initialise a new contract and set the code that is to be used by the EVM.
 	// The contract is a scoped environment for this execution context only.
 	contract := NewContract(caller, to, value, gas)
-	hash, _ := evm.StateDB.GetCodeHash(addr)
-	code, _ := evm.StateDB.GetCode(addr)
+	hash, err := evm.StateDB.GetCodeHash(addr)
+	if err != nil {
+		log.Error("Failed to get code hash", "err", err)
+	}
+	code, err := evm.StateDB.GetCode(addr)
+	if err != nil {
+		log.Error("Failed to get code", "err", err)
+	}
 	contract.SetCallCode(&addr, hash, code)
 
 	start := time.Now()
@@ -236,8 +243,14 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	// E The contract is a scoped evmironment for this execution context
 	// only.
 	contract := NewContract(caller, to, value, gas)
-	hash, _ := evm.StateDB.GetCodeHash(addr)
-	code, _ := evm.StateDB.GetCode(addr)
+	hash, err := evm.StateDB.GetCodeHash(addr)
+	if err != nil {
+		log.Error("Failed to get code hash", "err", err)
+	}
+	code, err := evm.StateDB.GetCode(addr)
+	if err != nil {
+		log.Error("Failed to get code", "err", err)
+	}
 	contract.SetCallCode(&addr, hash, code)
 
 	ret, err = run(evm, contract, input)
@@ -271,8 +284,14 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 
 	// Initialise a new contract and make initialise the delegate values
 	contract := NewContract(caller, to, nil, gas).AsDelegate()
-	hash, _ := evm.StateDB.GetCodeHash(addr)
-	code, _ := evm.StateDB.GetCode(addr)
+	hash, err := evm.StateDB.GetCodeHash(addr)
+	if err != nil {
+		log.Error("Failed to get code hash", "err", err)
+	}
+	code, err := evm.StateDB.GetCode(addr)
+	if err != nil {
+		log.Error("Failed to get code", "err", err)
+	}
 	contract.SetCallCode(&addr, hash, code)
 
 	ret, err = run(evm, contract, input)
@@ -313,8 +332,14 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	// EVM. The contract is a scoped environment for this execution context
 	// only.
 	contract := NewContract(caller, to, new(big.Int), gas)
-	hash, _ := evm.StateDB.GetCodeHash(addr)
-	code, _ := evm.StateDB.GetCode(addr)
+	hash, err := evm.StateDB.GetCodeHash(addr)
+	if err != nil {
+		log.Error("Failed to get code hash", "err", err)
+	}
+	code, err := evm.StateDB.GetCode(addr)
+	if err != nil {
+		log.Error("Failed to get code", "err", err)
+	}
 	contract.SetCallCode(&addr, hash, code)
 
 	// When an error was returned by the EVM or when setting the creation code
@@ -342,12 +367,22 @@ func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.I
 		return nil, common.Address{}, gas, ErrInsufficientBalance
 	}
 	// Ensure there's no existing contract already at the designated address
-	nonce, _ := evm.StateDB.GetNonce(caller.Address())
+	nonce, err := evm.StateDB.GetNonce(caller.Address())
+	if err != nil {
+		log.Error("Failed to get nonce", "err", err)
+	}
 	evm.StateDB.SetNonce(caller.Address(), nonce+1)
 
 	contractAddr = crypto.CreateAddress(caller.Address(), nonce)
-	contractHash, _ := evm.StateDB.GetCodeHash(contractAddr)
-	if nonce, _ := evm.StateDB.GetNonce(contractAddr); nonce != 0 || (contractHash != (common.Hash{}) && contractHash != emptyCodeHash) {
+	contractHash, err := evm.StateDB.GetCodeHash(contractAddr)
+	if err != nil {
+		log.Error("Failed to get code hash", "err", err)
+	}
+	nonce, err = evm.StateDB.GetNonce(contractAddr)
+	if err != nil {
+		log.Error("Failed to get nonce", "err", err)
+	}
+	if nonce != 0 || (contractHash != (common.Hash{}) && contractHash != emptyCodeHash) {
 		return nil, common.Address{}, 0, ErrContractAddressCollision
 	}
 	// Create a new account on the state

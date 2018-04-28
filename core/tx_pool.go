@@ -681,12 +681,20 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction, local
 		return ErrUnderpriced
 	}
 	// Ensure the transaction adheres to nonce ordering
-	if nonce, _ := pool.currentState.GetNonce(from); nonce > tx.Nonce() {
+	nonce, err := pool.currentState.GetNonce(from)
+	if err != nil {
+		log.Error("Failed to get nonce", "err", err)
+	}
+	if nonce > tx.Nonce() {
 		return ErrNonceTooLow
 	}
 	// Transactor should have enough funds to cover the costs
 	// cost == V + GP * GL
-	if bal, _ := pool.currentState.GetBalance(from); bal.Cmp(tx.Cost()) < 0 {
+	bal, err := pool.currentState.GetBalance(from)
+	if err != nil {
+		log.Error("Failed to get balance", "err", err)
+	}
+	if bal.Cmp(tx.Cost()) < 0 {
 		return ErrInsufficientFunds
 	}
 	intrGas, err := IntrinsicGas(tx.Data(), tx.To() == nil, pool.homestead)
@@ -997,7 +1005,10 @@ func (pool *TxPool) removeTx(ctx context.Context, hash common.Hash) {
 				}
 			}
 			// Update the account nonce if needed
-			stNonce, _ := pool.pendingState.GetNonce(addr)
+			stNonce, err := pool.pendingState.GetNonce(addr)
+			if err != nil {
+				log.Error("Failed to get nonce", "err", err)
+			}
 			if nonce := tx.Nonce(); stNonce > nonce {
 				pool.pendingState.SetNonce(addr, nonce)
 			}
@@ -1039,7 +1050,10 @@ func (pool *TxPool) promoteExecutables(ctx context.Context, accounts ...common.A
 func (pool *TxPool) promoteExecutable(addr common.Address, list *txList) {
 	tracing := log.Tracing()
 	// Drop all transactions that are deemed too old (low nonce)
-	nonce, _ := pool.currentState.GetNonce(addr)
+	nonce, err := pool.currentState.GetNonce(addr)
+	if err != nil {
+		log.Error("Failed to get nonce", "err", err)
+	}
 	for _, tx := range list.Forward(nonce) {
 		hash := tx.Hash()
 		if tracing {
@@ -1048,7 +1062,10 @@ func (pool *TxPool) promoteExecutable(addr common.Address, list *txList) {
 		delete(pool.all, hash)
 	}
 	// Drop all transactions that are too costly (low balance or out of gas)
-	bal, _ := pool.currentState.GetBalance(addr)
+	bal, err := pool.currentState.GetBalance(addr)
+	if err != nil {
+		log.Error("Failed to get balance", "err", err)
+	}
 	drops, _ := list.Filter(bal, pool.currentMaxGas)
 	for _, tx := range drops {
 		hash := tx.Hash()
@@ -1059,7 +1076,10 @@ func (pool *TxPool) promoteExecutable(addr common.Address, list *txList) {
 		queuedNofundsCounter.Inc(1)
 	}
 	// Gather all executable transactions and promote them
-	nonce, _ = pool.pendingState.GetNonce(addr)
+	nonce, err = pool.pendingState.GetNonce(addr)
+	if err != nil {
+		log.Error("Failed to get nonce", "err", err)
+	}
 	for _, tx := range list.Ready(nonce) {
 		hash := tx.Hash()
 		if tracing {
@@ -1123,7 +1143,10 @@ func (pool *TxPool) finishPromotion(ctx context.Context) {
 							delete(pool.all, hash)
 
 							// Update the account nonce to the dropped transaction
-							stNonce, _ := pool.pendingState.GetNonce(offenders[i])
+							stNonce, err := pool.pendingState.GetNonce(offenders[i])
+							if err != nil {
+								log.Error("Failed to get nonce", "err", err)
+							}
 							if nonce := tx.Nonce(); stNonce > nonce {
 								pool.pendingState.SetNonce(offenders[i], nonce)
 							}
@@ -1147,7 +1170,10 @@ func (pool *TxPool) finishPromotion(ctx context.Context) {
 						delete(pool.all, hash)
 
 						// Update the account nonce to the dropped transaction
-						stNonce, _ := pool.pendingState.GetNonce(addr)
+						stNonce, err := pool.pendingState.GetNonce(addr)
+						if err != nil {
+							log.Error("Failed to get nonce", "err", err)
+						}
 						if nonce := tx.Nonce(); stNonce > nonce {
 							pool.pendingState.SetNonce(addr, nonce)
 						}
@@ -1210,7 +1236,10 @@ func (pool *TxPool) finishPromotion(ctx context.Context) {
 func (pool *TxPool) demoteUnexecutables(ctx context.Context) {
 	// Iterate over all accounts and demote any non-executable transactions
 	for addr, list := range pool.pending {
-		nonce, _ := pool.currentState.GetNonce(addr)
+		nonce, err := pool.currentState.GetNonce(addr)
+		if err != nil {
+			log.Error("Failed to get nonce", "err", err)
+		}
 
 		// Drop all transactions that are deemed too old (low nonce)
 		tracing := log.Tracing()
@@ -1222,7 +1251,10 @@ func (pool *TxPool) demoteUnexecutables(ctx context.Context) {
 			delete(pool.all, hash)
 		}
 		// Drop all transactions that are too costly (low balance or out of gas), and queue any invalids back for later
-		bal, _ := pool.currentState.GetBalance(addr)
+		bal, err := pool.currentState.GetBalance(addr)
+		if err != nil {
+			log.Error("Failed to get balance", "err", err)
+		}
 		drops, invalids := list.Filter(bal, pool.currentMaxGas)
 		for _, tx := range drops {
 			hash := tx.Hash()

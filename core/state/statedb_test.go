@@ -376,34 +376,47 @@ func (test *snapshotTest) checkEqual(state, checkstate *StateDB) error {
 		// Check basic accessor methods.
 		checkeq("Exist", state.Exist(addr), checkstate.Exist(addr))
 		checkeq("HasSuicided", state.HasSuicided(addr), checkstate.HasSuicided(addr))
-		sb, _ := state.GetBalance(addr)
-		csb, _ := checkstate.GetBalance(addr)
+		sb, err := state.GetBalance(addr)
+		csb, cerr := checkstate.GetBalance(addr)
 		checkeq("GetBalance", sb, csb)
-		sn, _ := state.GetNonce(addr)
-		csn, _ := checkstate.GetNonce(addr)
+		checkeq("GetBalanceErr", err, cerr)
+		sn, err := state.GetNonce(addr)
+		csn, cerr := checkstate.GetNonce(addr)
 		checkeq("GetNonce", sn, csn)
-		sc, _ := state.GetCode(addr)
-		csc, _ := checkstate.GetCode(addr)
+		checkeq("GetNonce", err, cerr)
+		sc, err := state.GetCode(addr)
+		csc, cerr := checkstate.GetCode(addr)
 		checkeq("GetCode", sc, csc)
-		sch, _ := state.GetCodeHash(addr)
-		csch, _ := checkstate.GetCodeHash(addr)
+		checkeq("GetCodeErr", err, cerr)
+		sch, err := state.GetCodeHash(addr)
+		csch, cerr := checkstate.GetCodeHash(addr)
 		checkeq("GetCodeHash", sch, csch)
-		scs, _ := state.GetCodeSize(addr)
-		cscs, _ := checkstate.GetCodeSize(addr)
+		checkeq("GetCodeHashErr", err, cerr)
+		scs, err := state.GetCodeSize(addr)
+		cscs, cerr := checkstate.GetCodeSize(addr)
 		checkeq("GetCodeSize", scs, cscs)
+		checkeq("GetCodeSizeErr", err, cerr)
 		// Check storage.
-		if obj, _ := state.getStateObject(addr); obj != nil {
+		if obj, err := state.getStateObject(addr); err != nil {
+			return fmt.Errorf("failed to get state: %s", err)
+		} else if obj != nil {
+			var err error
 			state.ForEachStorage(addr, func(key, val common.Hash) bool {
-				st, _ := checkstate.GetState(addr, key)
+				var st common.Hash
+				st, err = checkstate.GetState(addr, key)
 				return checkeq("GetState("+key.Hex()+")", val, st)
 			})
+			if err != nil {
+				return fmt.Errorf("failed to get state: %s", err)
+			}
 			checkstate.ForEachStorage(addr, func(key, checkval common.Hash) bool {
-				st, _ := state.GetState(addr, key)
+				var st common.Hash
+				st, err = state.GetState(addr, key)
 				return checkeq("GetState("+key.Hex()+")", st, checkval)
 			})
-		}
-		if err != nil {
-			return err
+			if err != nil {
+				return fmt.Errorf("failed to get state: %s", err)
+			}
 		}
 	}
 

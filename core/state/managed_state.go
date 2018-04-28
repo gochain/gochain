@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/log"
 )
 
 type account struct {
@@ -128,7 +129,10 @@ func (ms *ManagedState) getAccount(addr common.Address) *account {
 	} else {
 		// Always make sure the state account nonce isn't actually higher
 		// than the tracked one.
-		so, _ := ms.StateDB.getStateObject(addr)
+		so, err := ms.StateDB.getStateObject(addr)
+		if err != nil {
+			log.Error("Failed to get state object", "err", err)
+		}
 		if so != nil && uint64(len(account.nonces))+account.nstart < so.Nonce() {
 			ms.accounts[addr] = newAccount(so)
 		}

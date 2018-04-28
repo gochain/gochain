@@ -187,7 +187,10 @@ func (dw *dbWrapper) pushObject(vm *duktape.Context) {
 
 	// Push the wrapper for statedb.GetBalance
 	vm.PushGoFunction(func(ctx *duktape.Context) int {
-		bal, _ := dw.db.GetBalance(common.BytesToAddress(popSlice(ctx)))
+		bal, err := dw.db.GetBalance(common.BytesToAddress(popSlice(ctx)))
+		if err != nil {
+			log.Error("Failed to get balance", "err", err)
+		}
 		pushBigInt(bal, ctx)
 		return 1
 	})
@@ -195,7 +198,10 @@ func (dw *dbWrapper) pushObject(vm *duktape.Context) {
 
 	// Push the wrapper for statedb.GetNonce
 	vm.PushGoFunction(func(ctx *duktape.Context) int {
-		nonce, _ := dw.db.GetNonce(common.BytesToAddress(popSlice(ctx)))
+		nonce, err := dw.db.GetNonce(common.BytesToAddress(popSlice(ctx)))
+		if err != nil {
+			log.Error("Failed to get nonce", "err", err)
+		}
 		ctx.PushInt(int(nonce))
 		return 1
 	})
@@ -203,7 +209,10 @@ func (dw *dbWrapper) pushObject(vm *duktape.Context) {
 
 	// Push the wrapper for statedb.GetCode
 	vm.PushGoFunction(func(ctx *duktape.Context) int {
-		code, _ := dw.db.GetCode(common.BytesToAddress(popSlice(ctx)))
+		code, err := dw.db.GetCode(common.BytesToAddress(popSlice(ctx)))
+		if err != nil {
+			log.Error("Failed to get code", "err", err)
+		}
 
 		ptr := ctx.PushFixedBuffer(len(code))
 		copy(makeSlice(ptr, uint(len(code))), code[:])
@@ -216,7 +225,10 @@ func (dw *dbWrapper) pushObject(vm *duktape.Context) {
 		hash := popSlice(ctx)
 		addr := popSlice(ctx)
 
-		state, _ := dw.db.GetState(common.BytesToAddress(addr), common.BytesToHash(hash))
+		state, err := dw.db.GetState(common.BytesToAddress(addr), common.BytesToHash(hash))
+		if err != nil {
+			log.Error("Failed to get state", "err", err)
+		}
 
 		ptr := ctx.PushFixedBuffer(len(state))
 		copy(makeSlice(ptr, uint(len(state))), state[:])
