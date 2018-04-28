@@ -194,24 +194,32 @@ func (p *peer) MarkTransaction(hash common.Hash) {
 // SendTransactions sends transactions to the peer and includes the hashes
 // in its transaction hash set for future reference.
 func (p *peer) SendTransactions(txs types.Transactions) error {
-	p.knownTxs.AddAll(txs)
-	return p2p.Send(p.rw, TxMsg, txs)
+	err := p2p.Send(p.rw, TxMsg, txs)
+	if err == nil {
+		p.knownTxs.AddAll(txs)
+	}
+	return err
 }
 
 // SendNewBlockHash announces the availability of a number of blocks through
 // a hash notification.
 func (p *peer) SendNewBlockHash(hash common.Hash, number uint64) error {
-	p.knownBlocks.Add(hash)
-
 	data := newBlockHashesData{{Hash: hash, Number: number}}
 
-	return p2p.Send(p.rw, NewBlockHashesMsg, data)
+	err := p2p.Send(p.rw, NewBlockHashesMsg, data)
+	if err == nil {
+		p.knownBlocks.Add(hash)
+	}
+	return err
 }
 
 // SendNewBlock propagates an entire block to a remote peer.
 func (p *peer) SendNewBlock(block *types.Block, td *big.Int) error {
-	p.knownBlocks.Add(block.Hash())
-	return p2p.Send(p.rw, NewBlockMsg, []interface{}{block, td})
+	err := p2p.Send(p.rw, NewBlockMsg, []interface{}{block, td})
+	if err == nil {
+		p.knownBlocks.Add(block.Hash())
+	}
+	return err
 }
 
 // SendBlockHeaders sends a batch of block headers to the remote peer.
