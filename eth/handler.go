@@ -647,22 +647,20 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 		}
 		// Send the block to a subset of our peers
 		transfer := peers[:int(math.Sqrt(float64(len(peers))))]
-		for _, peer := range transfer {
-			if err := peer.SendNewBlock(block, td); err != nil {
-				log.Error("Cannot send new block", "hash", hash, "number", block.NumberU64(), "peer", peer.Name(), "err", err)
-			}
+		if err := parallelPeers(transfer).SendNewBlock(block, td); err != nil {
+			log.Error("Cannot send new block", "hash", hash, "number", block.NumberU64(), "err", err)
+		} else {
+			log.Trace("Propagated block", "hash", hash, "recipients", len(transfer), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 		}
-		log.Trace("Propagated block", "hash", hash, "recipients", len(transfer), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 		return
 	}
 	// Otherwise if the block is indeed in out own chain, announce it
 	if pm.blockchain.HasBlock(hash, block.NumberU64()) {
-		for _, peer := range peers {
-			if err := peer.SendNewBlockHash(hash, block.NumberU64()); err != nil {
-				log.Error("Cannot send new block hash", "hash", hash, "number", block.NumberU64(), "peer", peer.Name(), "err", err)
-			}
+		if err := parallelPeers(peers).SendNewBlockHash(hash, block.NumberU64()); err != nil {
+			log.Error("Cannot send new block hash", "hash", hash, "number", block.NumberU64(), "err", err)
+		} else {
+			log.Trace("Announced block", "hash", hash, "recipients", len(peers), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 		}
-		log.Trace("Announced block", "hash", hash, "recipients", len(peers), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 	}
 }
 
@@ -672,12 +670,9 @@ func (pm *ProtocolManager) BroadcastTx(hash common.Hash, tx *types.Transaction) 
 	// Broadcast transaction to a batch of peers not knowing about it
 	peers := pm.peers.PeersWithoutTx(hash)
 	peers = peers[:int(math.Sqrt(float64(len(peers))))]
-	for _, peer := range peers {
-		if err := peer.SendTransactions(types.Transactions{tx}); err != nil {
-			log.Error("Cannot send transaction", "hash", hash, "peer", peer.Name(), "err", err)
-		}
-	}
-	if log.Tracing() {
+	if err := parallelPeers(peers).SendTransaction(tx); err != nil {
+		log.Error("Cannot send transaction", "hash", hash, "err", err)
+	} else if log.Tracing() {
 		log.Trace("Broadcast transaction", "hash", hash, "recipients", len(peers))
 	}
 }

@@ -17,6 +17,7 @@
 package eth
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/types"
+	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/rlp"
 )
@@ -201,35 +203,70 @@ func (p *peer) SendTransactions(txs types.Transactions) error {
 	return err
 }
 
-// SendNewBlockHash announces the availability of a number of blocks through
-// a hash notification.
-func (p *peer) SendNewBlockHash(hash common.Hash, number uint64) error {
-	data := newBlockHashesData{{Hash: hash, Number: number}}
+// parallelPeers coordinates efficient parallel sends.
+type parallelPeers []*peer
 
-	err := p2p.Send(p.rw, NewBlockHashesMsg, data)
-	if err == nil {
-		p.knownBlocks.Add(hash)
+// SendTransaction sends a single transaction to peers.
+func (pp parallelPeers) SendTransaction(tx *types.Transaction) error {
+	b, err := rlp.EncodeToBytes(types.Transactions{tx})
+	if err != nil {
+		return err
 	}
-	return err
+	for _, p := range pp {
+		go func(p *peer) {
+			msg := p2p.Msg{Code: TxMsg, Size: uint32(len(b)), Payload: bytes.NewReader(b)}
+			if err := p.rw.WriteMsg(msg); err != nil {
+				log.Error("Failed to send tx", "peer", p.Name(), "hash", tx.Hash(), "size", len(b), "err", err)
+			} else {
+				p.knownTxs.Add(tx.Hash())
+			}
+		}(p)
+	}
+	return nil
 }
 
-// SendNewBlock propagates an entire block to a remote peer.
-func (p *peer) SendNewBlock(block *types.Block, td *big.Int) error {
-	err := p2p.Send(p.rw, NewBlockMsg, []interface{}{block, td})
-	if err == nil {
-		p.knownBlocks.Add(block.Hash())
+// SendNewBlockHash announces the availability of a number of blocks through
+// a hash notification.
+func (pp parallelPeers) SendNewBlockHash(hash common.Hash, number uint64) error {
+	b, err := rlp.EncodeToBytes(newBlockHashesData{{Hash: hash, Number: number}})
+	if err != nil {
+		return err
 	}
-	return err
+	for _, p := range pp {
+		go func(p *peer) {
+			msg := p2p.Msg{Code: NewBlockHashesMsg, Size: uint32(len(b)), Payload: bytes.NewReader(b)}
+			if err := p.rw.WriteMsg(msg); err != nil {
+				log.Error("Failed to send new block hash", "peer", p.Name(), "hash", hash, "number", number, "size", len(b), "err", err)
+			} else {
+				p.knownBlocks.Add(hash)
+			}
+		}(p)
+	}
+	return nil
+}
+
+// SendNewBlock propagates an entire block to peers.
+func (pp parallelPeers) SendNewBlock(block *types.Block, td *big.Int) error {
+	b, err := rlp.EncodeToBytes([]interface{}{block, td})
+	if err != nil {
+		return err
+	}
+	for _, p := range pp {
+		go func(p *peer) {
+			msg := p2p.Msg{Code: NewBlockMsg, Size: uint32(len(b)), Payload: bytes.NewReader(b)}
+			if err := p.rw.WriteMsg(msg); err != nil {
+				log.Error("Failed to send new block hash", "peer", p.Name(), "hash", block.Hash(), "number", block.NumberU64(), "size", len(b), "err", err)
+			} else {
+				p.knownBlocks.Add(block.Hash())
+			}
+		}(p)
+	}
+	return nil
 }
 
 // SendBlockHeaders sends a batch of block headers to the remote peer.
 func (p *peer) SendBlockHeaders(headers []*types.Header) error {
 	return p2p.Send(p.rw, BlockHeadersMsg, headers)
-}
-
-// SendBlockBodies sends a batch of block contents to the remote peer.
-func (p *peer) SendBlockBodies(bodies []*blockBody) error {
-	return p2p.Send(p.rw, BlockBodiesMsg, blockBodiesData(bodies))
 }
 
 // SendBlockBodiesRLP sends a batch of block contents to the remote peer from
