@@ -648,7 +648,9 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 		// Send the block to a subset of our peers
 		transfer := peers[:int(math.Sqrt(float64(len(peers))))]
 		for _, peer := range transfer {
-			peer.SendNewBlock(block, td)
+			if err := peer.SendNewBlock(block, td); err != nil {
+				log.Error("Cannot send new block", "hash", hash, "number", block.NumberU64(), "peer", peer.Name(), "err", err)
+			}
 		}
 		log.Trace("Propagated block", "hash", hash, "recipients", len(transfer), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 		return
@@ -656,7 +658,9 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 	// Otherwise if the block is indeed in out own chain, announce it
 	if pm.blockchain.HasBlock(hash, block.NumberU64()) {
 		for _, peer := range peers {
-			peer.SendNewBlockHash(hash, block.NumberU64())
+			if err := peer.SendNewBlockHash(hash, block.NumberU64()); err != nil {
+				log.Error("Cannot send new block hash", "hash", hash, "number", block.NumberU64(), "peer", peer.Name(), "err", err)
+			}
 		}
 		log.Trace("Announced block", "hash", hash, "recipients", len(peers), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 	}
@@ -667,7 +671,7 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 func (pm *ProtocolManager) BroadcastTx(hash common.Hash, tx *types.Transaction) {
 	// Broadcast transaction to a batch of peers not knowing about it
 	peers := pm.peers.PeersWithoutTx(hash)
-	//FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
+	peers = peers[:int(math.Sqrt(float64(len(peers))))]
 	for _, peer := range peers {
 		if err := peer.SendTransactions(types.Transactions{tx}); err != nil {
 			log.Error("Cannot send transaction", "hash", hash, "peer", peer.Name(), "err", err)

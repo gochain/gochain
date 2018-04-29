@@ -18,6 +18,7 @@ package eth
 
 import (
 	"context"
+	"math"
 	"sync/atomic"
 	"time"
 
@@ -63,7 +64,9 @@ func (pm *ProtocolManager) syncTransactionsAllPeers() {
 	if len(txs) == 0 {
 		return
 	}
-	for _, p := range pm.peers.All() {
+	peers := pm.peers.All()
+	peers = peers[:int(math.Sqrt(float64(len(peers))))]
+	for _, p := range peers {
 		select {
 		case pm.txsyncCh <- &txsync{p, txs}:
 		case <-pm.quitSync:
