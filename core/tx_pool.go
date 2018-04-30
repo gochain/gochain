@@ -330,24 +330,28 @@ func (pool *TxPool) loop(ctx context.Context) {
 				return
 
 			case ev := <-pool.chainHeadCh:
-				if ev.Block != nil {
-					blockMu.RLock()
-					chain := latestBlock
-					blockMu.RUnlock()
-
-					if n := ev.Block.Number(); n.Cmp(chain.Number()) > 0 {
-						// Update latestBlock for eventual reset.
-						blockMu.Lock()
-						latestBlock = ev.Block
-						blockMu.Unlock()
-
-						if pool.chainconfig.IsHomestead(n) {
-							pool.mu.Lock()
-							pool.homestead = true
-							pool.mu.Unlock()
-						}
-					}
+				if ev.Block == nil {
+					continue
 				}
+				blockMu.RLock()
+				chain := latestBlock
+				blockMu.RUnlock()
+
+				n := ev.Block.Number()
+				if n.Cmp(chain.Number()) <= 0 {
+					continue
+				}
+				// Update latestBlock for next reset.
+				blockMu.Lock()
+				latestBlock = ev.Block
+				blockMu.Unlock()
+
+				if !pool.chainconfig.IsHomestead(n) {
+					continue
+				}
+				pool.mu.Lock()
+				pool.homestead = true
+				pool.mu.Unlock()
 			}
 		}
 	}()
@@ -358,7 +362,7 @@ func (pool *TxPool) loop(ctx context.Context) {
 		case <-pool.chainHeadSub.Err():
 			return
 
-		// Periodically reset to current chain head.
+		// Periodically reset to latest chain head.
 		case <-reset.C:
 			blockMu.RLock()
 			latest, current := latestBlock, currentBlock
