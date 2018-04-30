@@ -554,7 +554,7 @@ func TestTransactionStatusLes2(t *testing.T) {
 		panic(err)
 	}
 	// wait until TxPool processes the inserted block
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 200; i++ {
 		if pending, _ := txpool.Stats(); pending == 1 {
 			break
 		}
@@ -575,7 +575,7 @@ func TestTransactionStatusLes2(t *testing.T) {
 		panic(err)
 	}
 	// wait until TxPool processes the reorg
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 200; i++ {
 		if pending, _ := txpool.Stats(); pending == 3 {
 			break
 		}

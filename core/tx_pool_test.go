@@ -47,11 +47,11 @@ func init() {
 
 // lockedReset is a wrapper around reset to allow calling it in a thread safe
 // manner.
-func (pool *TxPool) lockedReset(ctx context.Context, oldHead, newHead *types.Header) {
+func (pool *TxPool) lockedReset(ctx context.Context, oldBlock, newBlock *types.Block) {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
-	pool.reset(ctx, oldHead, newHead)
+	pool.reset(ctx, oldBlock, newBlock)
 }
 
 type testBlockChain struct {
