@@ -38,7 +38,7 @@ import (
 
 const (
 	// chainHeadChanSize is the size of channel listening to ChainHeadEvent.
-	chainHeadChanSize = 100
+	chainHeadChanSize = 10
 )
 
 var (
@@ -85,6 +85,7 @@ var (
 var (
 	evictionInterval    = time.Minute     // Time interval to check for evictable transactions
 	statsReportInterval = 2 * time.Second // Time interval to report transaction pool stats
+	resetInterval       = 5 * time.Second // Time interval to reset the txpool
 )
 
 var (
@@ -264,7 +265,7 @@ func NewTxPool(ctx context.Context, config TxPoolConfig, chainconfig *params.Cha
 		gasPrice:    new(big.Int).SetUint64(config.PriceLimit),
 	}
 	pool.locals = newAccountSet(pool.signer)
-	pool.reset(ctx, nil, chain.CurrentBlock().Header())
+	pool.reset(ctx, nil, chain.CurrentBlock())
 
 	// If local transactions and journaling is enabled, load from disk
 	if !config.NoLocals && config.Journal != "" {
@@ -304,39 +305,77 @@ func (pool *TxPool) loop(ctx context.Context) {
 	evict := time.NewTicker(evictionInterval)
 	defer evict.Stop()
 
+	reset := time.NewTicker(resetInterval)
+	defer reset.Stop()
+
 	journal := time.NewTicker(pool.config.Rejournal)
 	defer journal.Stop()
 
-	// Track the previous head headers for transaction reorgs
-	head := pool.chain.CurrentBlock()
+	// Track the current and latest blocks for transaction reorgs.
+	var blockMu sync.RWMutex
+	currentBlock := pool.chain.CurrentBlock()
+	latestBlock := pool.chain.CurrentBlock()
 
-	chainHeadGauge.Update(int64(head.NumberU64()))
-	chainHeadTxsGauge.Update(int64(len(head.Transactions())))
+	chainHeadGauge.Update(int64(currentBlock.NumberU64()))
+	chainHeadTxsGauge.Update(int64(len(currentBlock.Transactions())))
 
 	globalSlotsGauge.Update(int64(pool.config.GlobalSlots))
 	globalQueueGauge.Update(int64(pool.config.GlobalQueue))
 
-	// Keep waiting for and reacting to the various events
+	// Handle ChainHeadEvents separately
+	go func() {
+		for {
+			select {
+			case <-pool.chainHeadSub.Err():
+				return
+
+			case ev := <-pool.chainHeadCh:
+				if ev.Block != nil {
+					blockMu.RLock()
+					chain := latestBlock
+					blockMu.RUnlock()
+
+					if n := ev.Block.Number(); n.Cmp(chain.Number()) > 0 {
+						// Update latestBlock for eventual reset.
+						blockMu.Lock()
+						latestBlock = ev.Block
+						blockMu.Unlock()
+
+						if pool.chainconfig.IsHomestead(n) {
+							pool.mu.Lock()
+							pool.homestead = true
+							pool.mu.Unlock()
+						}
+					}
+				}
+			}
+		}
+	}()
+
+	// Handle tickers.
 	for {
 		select {
-		// Handle ChainHeadEvent
-		case ev := <-pool.chainHeadCh:
-			if ev.Block != nil {
-				pool.mu.Lock()
-				number := ev.Block.Number()
-				if pool.chainconfig.IsHomestead(number) {
-					pool.homestead = true
-				}
-				pool.reset(ctx, head.Header(), ev.Block.Header())
-				head = ev.Block
-				pool.mu.Unlock()
-
-				chainHeadGauge.Update(number.Int64())
-				chainHeadTxsGauge.Update(int64(len(ev.Block.Transactions())))
-			}
-		// Be unsubscribed due to system stopped
 		case <-pool.chainHeadSub.Err():
 			return
+
+		// Periodically reset to current chain head.
+		case <-reset.C:
+			blockMu.RLock()
+			latest, current := latestBlock, currentBlock
+			blockMu.RUnlock()
+
+			if latest.NumberU64() > current.NumberU64() {
+				pool.mu.Lock()
+				pool.reset(ctx, current, latest)
+				pool.mu.Unlock()
+
+				blockMu.Lock()
+				currentBlock = latest
+				blockMu.Unlock()
+
+				chainHeadGauge.Update(int64(latest.NumberU64()))
+				chainHeadTxsGauge.Update(int64(len(latest.Transactions())))
+			}
 
 		// Handle stats reporting ticks
 		case <-report.C:
@@ -386,14 +425,14 @@ func (pool *TxPool) loop(ctx context.Context) {
 
 // reset retrieves the current state of the blockchain and ensures the content
 // of the transaction pool is valid with regard to the chain state.
-func (pool *TxPool) reset(ctx context.Context, oldHead, newHead *types.Header) {
+func (pool *TxPool) reset(ctx context.Context, oldBlock, newBlock *types.Block) {
 	// If we're reorging an old state, reinject all dropped transactions
 	var reinject types.Transactions
 
-	if oldHead != nil && oldHead.Hash() != newHead.ParentHash {
+	if oldBlock != nil && oldBlock.Hash() != newBlock.ParentHash() {
 		// If the reorg is too deep, avoid doing it (will happen during fast sync)
-		oldNum := oldHead.Number.Uint64()
-		newNum := newHead.Number.Uint64()
+		oldNum := oldBlock.Number().Uint64()
+		newNum := newBlock.Number().Uint64()
 
 		if depth := uint64(math.Abs(float64(oldNum) - float64(newNum))); depth > 64 {
 			log.Debug("Skipping deep transaction reorg", "depth", depth)
@@ -403,13 +442,13 @@ func (pool *TxPool) reset(ctx context.Context, oldHead, newHead *types.Header) {
 			included := make(map[common.Hash]struct{})
 
 			var (
-				rem = pool.chain.GetBlock(oldHead.Hash(), oldHead.Number.Uint64())
-				add = pool.chain.GetBlock(newHead.Hash(), newHead.Number.Uint64())
+				rem = oldBlock
+				add = newBlock
 			)
 			for rem.NumberU64() > add.NumberU64() {
 				discarded = append(discarded, rem.Transactions()...)
 				if rem = pool.chain.GetBlock(rem.ParentHash(), rem.NumberU64()-1); rem == nil {
-					log.Error("Unrooted old chain seen by tx pool", "block", oldHead.Number, "hash", oldHead.Hash())
+					log.Error("Unrooted old chain seen by tx pool", "block", oldNum, "hash", oldBlock.Hash())
 					return
 				}
 			}
@@ -418,21 +457,21 @@ func (pool *TxPool) reset(ctx context.Context, oldHead, newHead *types.Header) {
 					included[tx.Hash()] = struct{}{}
 				}
 				if add = pool.chain.GetBlock(add.ParentHash(), add.NumberU64()-1); add == nil {
-					log.Error("Unrooted new chain seen by tx pool", "block", newHead.Number, "hash", newHead.Hash())
+					log.Error("Unrooted new chain seen by tx pool", "block", newNum, "hash", newBlock.Hash())
 					return
 				}
 			}
 			for rem.Hash() != add.Hash() {
 				discarded = append(discarded, rem.Transactions()...)
 				if rem = pool.chain.GetBlock(rem.ParentHash(), rem.NumberU64()-1); rem == nil {
-					log.Error("Unrooted old chain seen by tx pool", "block", oldHead.Number, "hash", oldHead.Hash())
+					log.Error("Unrooted old chain seen by tx pool", "block", oldNum, "hash", oldBlock.Hash())
 					return
 				}
 				for _, tx := range add.Transactions() {
 					included[tx.Hash()] = struct{}{}
 				}
 				if add = pool.chain.GetBlock(add.ParentHash(), add.NumberU64()-1); add == nil {
-					log.Error("Unrooted new chain seen by tx pool", "block", newHead.Number, "hash", newHead.Hash())
+					log.Error("Unrooted new chain seen by tx pool", "block", newNum, "hash", newBlock.Hash())
 					return
 				}
 			}
@@ -444,17 +483,17 @@ func (pool *TxPool) reset(ctx context.Context, oldHead, newHead *types.Header) {
 		}
 	}
 	// Initialize the internal state to the current head
-	if newHead == nil {
-		newHead = pool.chain.CurrentBlock().Header() // Special case during testing
+	if newBlock == nil {
+		newBlock = pool.chain.CurrentBlock() // Special case during testing
 	}
-	statedb, err := pool.chain.StateAt(newHead.Root)
+	statedb, err := pool.chain.StateAt(newBlock.Root())
 	if err != nil {
 		log.Error("Failed to reset txpool state", "err", err)
 		return
 	}
 	pool.currentState = statedb
 	pool.pendingState = state.ManageState(statedb)
-	pool.currentMaxGas = newHead.GasLimit
+	pool.currentMaxGas = newBlock.GasLimit()
 
 	// Inject any transactions discarded due to reorgs
 	log.Debug("Reinjecting stale transactions", "count", len(reinject))
