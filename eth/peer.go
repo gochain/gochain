@@ -203,16 +203,13 @@ func (p *peer) SendTransactions(txs types.Transactions) error {
 	return err
 }
 
-// parallelPeers coordinates efficient parallel sends.
-type parallelPeers []*peer
-
-// SendTransaction sends a single transaction to peers.
-func (pp parallelPeers) SendTransaction(tx *types.Transaction) error {
+// SendTransactionParallel sends a single transaction to peers in parallel.
+func SendTransactionParallel(peers []*peer, tx *types.Transaction) error {
 	b, err := rlp.EncodeToBytes(types.Transactions{tx})
 	if err != nil {
 		return err
 	}
-	for _, p := range pp {
+	for _, p := range peers {
 		go func(p *peer) {
 			msg := p2p.Msg{Code: TxMsg, Size: uint32(len(b)), Payload: bytes.NewReader(b)}
 			if err := p.rw.WriteMsg(msg); err != nil {
@@ -225,14 +222,14 @@ func (pp parallelPeers) SendTransaction(tx *types.Transaction) error {
 	return nil
 }
 
-// SendNewBlockHash announces the availability of a number of blocks through
-// a hash notification.
-func (pp parallelPeers) SendNewBlockHash(hash common.Hash, number uint64) error {
+// SendNewBlockHashParallel announces the availability of a number of blocks through
+// a hash notification to peers in parallel.
+func SendNewBlockHashParallel(peers []*peer, hash common.Hash, number uint64) error {
 	b, err := rlp.EncodeToBytes(newBlockHashesData{{Hash: hash, Number: number}})
 	if err != nil {
 		return err
 	}
-	for _, p := range pp {
+	for _, p := range peers {
 		go func(p *peer) {
 			msg := p2p.Msg{Code: NewBlockHashesMsg, Size: uint32(len(b)), Payload: bytes.NewReader(b)}
 			if err := p.rw.WriteMsg(msg); err != nil {
@@ -245,13 +242,13 @@ func (pp parallelPeers) SendNewBlockHash(hash common.Hash, number uint64) error 
 	return nil
 }
 
-// SendNewBlock propagates an entire block to peers.
-func (pp parallelPeers) SendNewBlock(block *types.Block, td *big.Int) error {
+// SendNewBlockParallel propagates an entire block to peers.
+func SendNewBlockParallel(peers []*peer, block *types.Block, td *big.Int) error {
 	b, err := rlp.EncodeToBytes([]interface{}{block, td})
 	if err != nil {
 		return err
 	}
-	for _, p := range pp {
+	for _, p := range peers {
 		go func(p *peer) {
 			msg := p2p.Msg{Code: NewBlockMsg, Size: uint32(len(b)), Payload: bytes.NewReader(b)}
 			if err := p.rw.WriteMsg(msg); err != nil {
