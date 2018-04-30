@@ -406,7 +406,9 @@ func (c *ChainIndexer) setValidSections(sections uint64) {
 	// Set the current number of valid sections in the database
 	var data [8]byte
 	binary.BigEndian.PutUint64(data[:], sections)
-	c.indexDb.Put([]byte("count"), data[:])
+	if err := c.indexDb.Put([]byte("count"), data[:]); err != nil {
+		log.Error("Cannot set chain indexer valid sections count", "sections", sections, "err", err)
+	}
 
 	// Remove any reorged sections, caching the valids in the mean time
 	for c.storedSections > sections {
@@ -435,7 +437,9 @@ func (c *ChainIndexer) setSectionHead(section uint64, hash common.Hash) {
 	var data [8]byte
 	binary.BigEndian.PutUint64(data[:], section)
 
-	c.indexDb.Put(append([]byte("shead"), data[:]...), hash.Bytes())
+	if err := c.indexDb.Put(append([]byte("shead"), data[:]...), hash.Bytes()); err != nil {
+		log.Error("Cannot set chain indexer section head", "section", section, "err", err)
+	}
 }
 
 // removeSectionHead removes the reference to a processed section from the index
@@ -444,5 +448,7 @@ func (c *ChainIndexer) removeSectionHead(section uint64) {
 	var data [8]byte
 	binary.BigEndian.PutUint64(data[:], section)
 
-	c.indexDb.Delete(append([]byte("shead"), data[:]...))
+	if err := c.indexDb.Delete(append([]byte("shead"), data[:]...)); err != nil {
+		log.Error("Cannot remove chain indexer section head", "section", section, "err", err)
+	}
 }

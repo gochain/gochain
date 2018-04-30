@@ -220,13 +220,25 @@ func (api *PrivateAdminAPI) ExportChain(file string) (bool, error) {
 	defer out.Close()
 
 	var writer io.Writer = out
+	var gz *gzip.Writer
 	if strings.HasSuffix(file, ".gz") {
-		writer = gzip.NewWriter(writer)
-		defer writer.(*gzip.Writer).Close()
+		gz = gzip.NewWriter(writer)
+		defer gz.Close()
+		writer = gz
 	}
 
 	// Export the blockchain
 	if err := api.eth.BlockChain().Export(writer); err != nil {
+		return false, err
+	}
+
+	// Ensure file flushes and closes.
+	if gz != nil {
+		if err := gz.Close(); err != nil {
+			return false, err
+		}
+	}
+	if err := out.Close(); err != nil {
 		return false, err
 	}
 	return true, nil

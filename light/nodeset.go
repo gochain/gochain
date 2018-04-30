@@ -23,6 +23,7 @@ import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/ethdb"
+	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/rlp"
 )
 
@@ -111,7 +112,9 @@ func (db *NodeSet) Store(target ethdb.Putter) {
 	defer db.lock.RUnlock()
 
 	for key, value := range db.nodes {
-		target.Put([]byte(key), value)
+		if err := target.Put([]byte(key), value); err != nil {
+			log.Error("Cannot write node set", "err", err)
+		}
 	}
 }
 
@@ -121,7 +124,9 @@ type NodeList []rlp.RawValue
 // Store writes the contents of the list to the given database
 func (n NodeList) Store(db ethdb.Putter) {
 	for _, node := range n {
-		db.Put(crypto.Keccak256(node), node)
+		if err := db.Put(crypto.Keccak256(node), node); err != nil {
+			log.Error("Cannot write node list", "err", err)
+		}
 	}
 }
 

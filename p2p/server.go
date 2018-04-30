@@ -347,7 +347,9 @@ func (srv *Server) Stop() {
 	srv.running = false
 	if srv.listener != nil {
 		// this unblocks listener Accept
-		srv.listener.Close()
+		if err := srv.listener.Close(); err != nil {
+			log.Error("Cannot close p2p server listener", "err", err)
+		}
 	}
 	close(srv.quit)
 	srv.loopWG.Wait()
@@ -774,7 +776,9 @@ func (srv *Server) listenLoop() {
 		if srv.NetRestrict != nil {
 			if tcp, ok := fd.RemoteAddr().(*net.TCPAddr); ok && !srv.NetRestrict.Contains(tcp.IP) {
 				srv.log.Debug("Rejected conn (not whitelisted in NetRestrict)", "addr", fd.RemoteAddr())
-				fd.Close()
+				if err := fd.Close(); err != nil {
+					log.Error("Cannot close p2p server connection", "err", err)
+				}
 				slots <- struct{}{}
 				continue
 			}
@@ -783,7 +787,9 @@ func (srv *Server) listenLoop() {
 		fd = newMeteredConn(fd, true)
 		srv.log.Trace("Accepted connection", "addr", fd.RemoteAddr())
 		go func() {
-			srv.SetupConn(fd, inboundConn, nil)
+			if err := srv.SetupConn(fd, inboundConn, nil); err != nil {
+				log.Error("Cannot setup p2p server connection", "err", err)
+			}
 			slots <- struct{}{}
 		}()
 	}

@@ -78,8 +78,8 @@ func (rh *RefHasher) hash(d []byte, s int) []byte {
 		}
 	}
 	defer rh.h.Reset()
-	rh.h.Write(left)
-	rh.h.Write(right)
+	_, _ = rh.h.Write(left)
+	_, _ = rh.h.Write(right)
 	h := rh.h.Sum(nil)
 	return h
 }

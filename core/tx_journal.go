@@ -107,6 +107,11 @@ func (journal *txJournal) load(add func(types.Transactions) []error) error {
 	}
 	log.Info("Loaded local transaction journal", "transactions", total, "dropped", dropped)
 
+	// Verify input closes without error.
+	if err := input.Close(); err != nil {
+		return err
+	}
+
 	return failure
 }
 
@@ -138,11 +143,13 @@ func (journal *txJournal) rotate(acts int, all types.Transactions) error {
 	}
 	for _, tx := range all {
 		if err = rlp.Encode(replacement, tx); err != nil {
-			replacement.Close()
+			_ = replacement.Close()
 			return err
 		}
 	}
-	replacement.Close()
+	if err := replacement.Close(); err != nil {
+		return err
+	}
 
 	// Replace the live journal with the newly generated one
 	if err = os.Rename(journal.path+".new", journal.path); err != nil {

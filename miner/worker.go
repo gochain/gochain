@@ -333,7 +333,9 @@ func (self *worker) wait(ctx context.Context) {
 				mustCommitNewWork = false
 			}
 			// Broadcast the block and announce chain insertion event
-			self.mux.Post(core.NewMinedBlockEvent{Block: block})
+			if err := self.mux.Post(core.NewMinedBlockEvent{Block: block}); err != nil {
+				log.Error("Cannot post new mined block event", "err", err)
+			}
 			var (
 				events []interface{}
 				logs   = work.state.Logs()
@@ -607,10 +609,14 @@ func (env *Work) commitTransactions(ctx context.Context, mux *event.TypeMux, txs
 		}
 		go func(logs []*types.Log, tcount int) {
 			if len(logs) > 0 {
-				mux.Post(core.PendingLogsEvent{Logs: logs})
+				if err := mux.Post(core.PendingLogsEvent{Logs: logs}); err != nil {
+					log.Error("Cannot post pending logs event", "err", err)
+				}
 			}
 			if tcount > 0 {
-				mux.Post(core.PendingStateEvent{})
+				if err := mux.Post(core.PendingStateEvent{}); err != nil {
+					log.Error("Cannot post pending state event", "err", err)
+				}
 			}
 		}(cpy, env.tcount)
 	}

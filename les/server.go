@@ -132,7 +132,9 @@ func (s *LesServer) SetBloomBitsIndexer(bloomIndexer *core.ChainIndexer) {
 
 // Stop stops the LES service
 func (s *LesServer) Stop() {
-	s.chtIndexer.Close()
+	if err := s.chtIndexer.Close(); err != nil {
+		log.Error("Cannot close les chain indexer", "err", err)
+	}
 	// bloom trie indexer is closed by parent bloombits indexer
 	s.fcCostStats.store()
 	s.fcManager.Stop()
@@ -276,7 +278,9 @@ func (s *requestCostStats) store() {
 	}
 
 	if data, err := rlp.EncodeToBytes(statsRlp); err == nil {
-		s.db.Put(rcStatsKey, data)
+		if err := s.db.Put(rcStatsKey, data); err != nil {
+			log.Error("Cannot put les req cost stats", "err", err)
+		}
 	}
 }
 

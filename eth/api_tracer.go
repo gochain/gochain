@@ -321,7 +321,9 @@ func (api *PrivateDebugAPI) traceChain(ctx context.Context, start, end *types.Bl
 			// Stream completed traces to the user, aborting on the first error
 			for result, ok := done[next]; ok; result, ok = done[next] {
 				if len(result.Traces) > 0 || next == end.NumberU64() {
-					notifier.Notify(sub.ID, result)
+					if err := notifier.Notify(sub.ID, result); err != nil {
+						log.Error("Debug api cannot notify", "id", sub.ID, "err", err)
+					}
 				}
 				delete(done, next)
 				next++

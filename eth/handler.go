@@ -190,7 +190,9 @@ func (pm *ProtocolManager) removePeer(id string) {
 	log.Debug("Removing GoChain peer", "peer", id)
 
 	// Unregister the peer from the downloader and GoChain peer set
-	pm.downloader.UnregisterPeer(id)
+	if err := pm.downloader.UnregisterPeer(id); err != nil {
+		log.Error("Cannot unregister peer from downloader", "id", id, "err", err)
+	}
 	if err := pm.peers.Unregister(id); err != nil {
 		log.Error("Peer removal failed", "peer", id, "err", err)
 	}
@@ -570,7 +572,9 @@ func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 			}
 		}
 		for _, block := range unknown {
-			pm.fetcher.Notify(p.id, block.Hash, block.Number, time.Now(), p.RequestOneHeader, p.RequestBodies)
+			if err := pm.fetcher.Notify(p.id, block.Hash, block.Number, time.Now(), p.RequestOneHeader, p.RequestBodies); err != nil {
+				log.Error("Cannot notify fetcher of new block hashes", "err", err)
+			}
 		}
 
 	case msg.Code == NewBlockMsg:
@@ -584,7 +588,9 @@ func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 
 		// Mark the peer as owning the block and schedule it for import
 		p.MarkBlock(request.Block.Hash())
-		pm.fetcher.Enqueue(p.id, request.Block)
+		if err := pm.fetcher.Enqueue(p.id, request.Block); err != nil {
+			log.Error("Cannot enqueue new block to fetcher", "id", p.id, "err", err)
+		}
 
 		// Assuming the block is importable by the peer, but possibly not yet done so,
 		// calculate the head hash and TD that the peer truly must have.

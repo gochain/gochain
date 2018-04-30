@@ -134,7 +134,9 @@ func wsDialContext(ctx context.Context, config *websocket.Config) (*websocket.Co
 	}
 	ws, err := websocket.NewClient(config, conn)
 	if err != nil {
-		conn.Close()
+		if e := conn.Close(); e != nil {
+			log.Error("Cannot close websocket connection on error", "err", err)
+		}
 		return nil, err
 	}
 	return ws, err

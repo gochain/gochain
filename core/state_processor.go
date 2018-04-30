@@ -27,6 +27,7 @@ import (
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
 	"github.com/gochain-io/gochain/crypto"
+	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 )
 
@@ -69,7 +70,9 @@ func (p *StateProcessor) Process(ctx context.Context, block *types.Block, stated
 		go func() {
 			for i := atomic.AddInt32(&wi, 1); i < l32; i = atomic.AddInt32(&wi, 1) {
 				txs[i].Hash()
-				types.Sender(ctx, signer, txs[i])
+				if _, err := types.Sender(ctx, signer, txs[i]); err != nil {
+					log.Error("Cannot derive address from signature")
+				}
 			}
 		}()
 	}

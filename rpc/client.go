@@ -446,7 +446,9 @@ func (c *Client) write(ctx context.Context, msg interface{}) error {
 			return err
 		}
 	}
-	c.writeConn.SetWriteDeadline(deadline)
+	if err := c.writeConn.SetWriteDeadline(deadline); err != nil {
+		log.Error("Cannot set rpc client write deadline", "err", err)
+	}
 	err := json.NewEncoder(c.writeConn).Encode(msg)
 	if err != nil {
 		c.writeConn = nil
@@ -465,7 +467,9 @@ func (c *Client) reconnect(ctx context.Context) error {
 		c.writeConn = newconn
 		return nil
 	case <-c.didQuit:
-		newconn.Close()
+		if err := newconn.Close(); err != nil {
+			log.Error("Cannot close rpc client connection on reconnect", "err", err)
+		}
 		return ErrClientQuit
 	}
 }
@@ -475,7 +479,11 @@ func (c *Client) reconnect(ctx context.Context) error {
 // and subscription notifications to registered subscriptions.
 func (c *Client) dispatch(conn net.Conn) {
 	// Spawn the initial read loop.
-	go c.read(conn)
+	go func() {
+		if err := c.read(conn); err != nil {
+			log.Error("Cannot read dispatch from connection", "err", err)
+		}
+	}()
 
 	var (
 		lastOp        *requestOp    // tracks last send operation
@@ -485,7 +493,9 @@ func (c *Client) dispatch(conn net.Conn) {
 	defer close(c.didQuit)
 	defer func() {
 		c.closeRequestOps(ErrClientQuit)
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			log.Error("Cannot close dispatch connection", "err", err)
+		}
 		if reading {
 			// Empty read channels until read is dead.
 			for {
@@ -532,17 +542,25 @@ func (c *Client) dispatch(conn net.Conn) {
 		case err := <-c.readErr:
 			log.Debug(fmt.Sprintf("<-readErr: %v", err))
 			c.closeRequestOps(err)
-			conn.Close()
+			if err := conn.Close(); err != nil {
+				log.Error("Cannot close connection on read error", "err", err)
+			}
 			reading = false
 
 		case newconn := <-c.reconnected:
 			log.Debug(fmt.Sprintf("<-reconnected: (reading=%t) %v", reading, conn.RemoteAddr()))
 			if reading {
 				// Wait for the previous read loop to exit. This is a rare case.
-				conn.Close()
+				if err := conn.Close(); err != nil {
+					log.Error("Cannot close connection on reconnect", "err", err)
+				}
 				<-c.readErr
 			}
-			go c.read(newconn)
+			go func() {
+				if err := c.read(newconn); err != nil {
+					log.Error("Cannot read from reconnected connection", "err", err)
+				}
+			}()
 			reading = true
 			conn = newconn
 
@@ -636,7 +654,6 @@ func (c *Client) handleResponse(msg *jsonrpcMessage) {
 }
 
 // Reading happens on a dedicated goroutine.
-
 func (c *Client) read(conn net.Conn) error {
 	var (
 		buf json.RawMessage
@@ -722,7 +739,9 @@ func (sub *ClientSubscription) quitWithError(err error, unsubscribeServer bool) 
 		// unblocks deliver.
 		close(sub.quit)
 		if unsubscribeServer {
-			sub.requestUnsubscribe()
+			if err := sub.requestUnsubscribe(); err != nil {
+				log.Error("Cannot request unsubscribe", "err", err)
+			}
 		}
 		if err != nil {
 			if err == ErrClientQuit {

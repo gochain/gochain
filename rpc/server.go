@@ -53,7 +53,9 @@ func NewServer() *Server {
 	// register a default service which will provide meta information about the RPC service such as the services and
 	// methods it offers.
 	rpcService := &RPCService{server}
-	server.RegisterName(MetadataApi, rpcService)
+	if err := server.RegisterName(MetadataApi, rpcService); err != nil {
+		log.Error("Cannot register server name", "err", err)
+	}
 
 	return server
 }
@@ -164,7 +166,9 @@ func (s *Server) serveRequest(codec ServerCodec, singleShot bool, options CodecO
 			// If a parsing error occurred, send an error
 			if err.Error() != "EOF" {
 				log.Debug(fmt.Sprintf("read error %v\n", err))
-				codec.Write(codec.CreateErrorResponse(nil, err))
+				if err := codec.Write(codec.CreateErrorResponse(nil, err)); err != nil {
+					log.Error("Cannot write codec error response", "err", err)
+				}
 			}
 			// Error or end of stream, wait for requests and tear down
 			pend.Wait()
@@ -180,9 +184,13 @@ func (s *Server) serveRequest(codec ServerCodec, singleShot bool, options CodecO
 				for i, r := range reqs {
 					resps[i] = codec.CreateErrorResponse(&r.id, err)
 				}
-				codec.Write(resps)
+				if err := codec.Write(resps); err != nil {
+					log.Error("Cannot write codec responses", "err", err)
+				}
 			} else {
-				codec.Write(codec.CreateErrorResponse(&reqs[0].id, err))
+				if err := codec.Write(codec.CreateErrorResponse(&reqs[0].id, err)); err != nil {
+					log.Error("Cannot write codec error response on shutdown", "err", err)
+				}
 			}
 			return nil
 		}
@@ -215,14 +223,18 @@ func (s *Server) serveRequest(codec ServerCodec, singleShot bool, options CodecO
 // stopped. In either case the codec is closed.
 func (s *Server) ServeCodec(codec ServerCodec, options CodecOption) {
 	defer codec.Close()
-	s.serveRequest(codec, false, options)
+	if err := s.serveRequest(codec, false, options); err != nil {
+		log.Error("Cannot serve codec request", "err", err)
+	}
 }
 
 // ServeSingleRequest reads and processes a single RPC request from the given codec. It will not
 // close the codec unless a non-recoverable error has occurred. Note, this method will return after
 // a single request has been processed!
 func (s *Server) ServeSingleRequest(codec ServerCodec, options CodecOption) {
-	s.serveRequest(codec, true, options)
+	if err := s.serveRequest(codec, true, options); err != nil {
+		log.Error("Cannot serve single request", "err", err)
+	}
 }
 
 // Stop will stop reading new requests, wait for stopPendingRequestTimeout to allow pending requests to finish,

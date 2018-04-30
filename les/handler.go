@@ -215,7 +215,9 @@ func NewProtocolManager(ctx context.Context, chainConfig *params.ChainConfig, li
 
 // removePeer initiates disconnection from a peer by removing it from the peer set
 func (pm *ProtocolManager) removePeer(id string) {
-	pm.peers.Unregister(id)
+	if err := pm.peers.Unregister(id); err != nil {
+		log.Error("Cannot unregister peer", "id", id, "err", err)
+	}
 }
 
 func (pm *ProtocolManager) Start(maxPeers int) {
@@ -315,7 +317,9 @@ func (pm *ProtocolManager) handle(ctx context.Context, p *peer) error {
 		for {
 			select {
 			case announce := <-p.announceChn:
-				p.SendAnnounce(announce)
+				if err := p.SendAnnounce(announce); err != nil {
+					log.Error("Cannot send announce", "id", p.id, "err", err)
+				}
 			case <-stop:
 				return
 			}
@@ -723,7 +727,9 @@ func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 				}
 				if trie != nil {
 					var proof light.NodeList
-					trie.Prove(req.Key, 0, &proof)
+					if err := trie.Prove(req.Key, 0, &proof); err != nil {
+						log.Error("Cannot prove v1", "key", req.Key, "err", err)
+					}
 
 					proofs = append(proofs, proof)
 					if bytes += proof.DataSize(); bytes >= softResponseLimit {
@@ -787,7 +793,9 @@ func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 				continue
 			}
 			// Prove the user's request from the account or stroage trie
-			trie.Prove(req.Key, req.FromLevel, nodes)
+			if err := trie.Prove(req.Key, req.FromLevel, nodes); err != nil {
+				log.Error("Cannot prove v2", "key", req.Key, "err", err)
+			}
 			if nodes.DataSize() >= softResponseLimit {
 				break
 			}
@@ -870,7 +878,9 @@ func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 					binary.BigEndian.PutUint64(encNumber[:], req.BlockNum)
 
 					var proof light.NodeList
-					trie.Prove(encNumber[:], 0, &proof)
+					if err := trie.Prove(encNumber[:], 0, &proof); err != nil {
+						log.Error("Cannot prove header proof", "key", encNumber[:], "err", err)
+					}
 
 					proofs = append(proofs, ChtResp{Header: header, Proof: proof})
 					if bytes += proof.DataSize() + estHeaderRlpSize; bytes >= softResponseLimit {
@@ -928,7 +938,9 @@ func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 				auxBytes += len(data)
 			} else {
 				if auxTrie != nil {
-					auxTrie.Prove(req.Key, req.FromLevel, nodes)
+					if err := auxTrie.Prove(req.Key, req.FromLevel, nodes); err != nil {
+						log.Error("Cannot prove helper trie proof", "key", req.Key, "err", err)
+					}
 				}
 				if req.AuxReq != 0 {
 					data := pm.getHelperTrieAuxData(req)
@@ -1202,7 +1214,11 @@ func (pc *peerConnection) RequestHeadersByHash(origin common.Hash, amount int, s
 			peer := dp.(*peer)
 			cost := peer.GetRequestCost(GetBlockHeadersMsg, amount)
 			peer.fcServer.QueueRequest(reqID, cost)
-			return func() { peer.RequestHeadersByHash(reqID, cost, origin, amount, skip, reverse) }
+			return func() {
+				if err := peer.RequestHeadersByHash(reqID, cost, origin, amount, skip, reverse); err != nil {
+					log.Error("Cannot recursively request headers by hash", "req_id", reqID, "err", err)
+				}
+			}
 		},
 	}
 	_, ok := <-pc.manager.reqDist.queue(rq)
@@ -1226,7 +1242,11 @@ func (pc *peerConnection) RequestHeadersByNumber(origin uint64, amount int, skip
 			peer := dp.(*peer)
 			cost := peer.GetRequestCost(GetBlockHeadersMsg, amount)
 			peer.fcServer.QueueRequest(reqID, cost)
-			return func() { peer.RequestHeadersByNumber(reqID, cost, origin, amount, skip, reverse) }
+			return func() {
+				if err := peer.RequestHeadersByNumber(reqID, cost, origin, amount, skip, reverse); err != nil {
+					log.Error("Cannot recursively request headers by number", "req_id", reqID, "err", err)
+				}
+			}
 		},
 	}
 	_, ok := <-pc.manager.reqDist.queue(rq)
@@ -1242,10 +1262,14 @@ func (d *downloaderPeerNotify) registerPeer(p *peer) {
 		manager: pm,
 		peer:    p,
 	}
-	pm.downloader.RegisterLightPeer(p.id, ethVersion, pc)
+	if err := pm.downloader.RegisterLightPeer(p.id, ethVersion, pc); err != nil {
+		log.Error("Cannot register light peer", "id", p.id, "err", err)
+	}
 }
 
 func (d *downloaderPeerNotify) unregisterPeer(p *peer) {
 	pm := (*ProtocolManager)(d)
-	pm.downloader.UnregisterPeer(p.id)
+	if err := pm.downloader.UnregisterPeer(p.id); err != nil {
+		log.Error("Cannot unregister peer", "id", p.id, "err", err)
+	}
 }

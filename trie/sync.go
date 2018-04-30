@@ -22,6 +22,7 @@ import (
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/ethdb"
+	"github.com/gochain-io/gochain/log"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
@@ -182,7 +183,9 @@ func (s *TrieSync) Process(results []SyncResult) (bool, int, error) {
 		// If the item is a raw entry request, commit directly
 		if request.raw {
 			request.data = item.Data
-			s.commit(request)
+			if err := s.commit(request); err != nil {
+				log.Error("Cannot raw commit trie sync", "err", err)
+			}
 			committed = true
 			continue
 		}
@@ -199,7 +202,9 @@ func (s *TrieSync) Process(results []SyncResult) (bool, int, error) {
 			return committed, i, err
 		}
 		if len(requests) == 0 && request.deps == 0 {
-			s.commit(request)
+			if err := s.commit(request); err != nil {
+				log.Error("Cannot commit trie sync", "err", err)
+			}
 			committed = true
 			continue
 		}

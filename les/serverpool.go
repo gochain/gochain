@@ -412,8 +412,12 @@ func (pool *serverPool) saveNodes() {
 		list[i] = pool.knownQueue.fetchOldest()
 	}
 	enc, err := rlp.EncodeToBytes(list)
-	if err == nil {
-		pool.db.Put(pool.dbKey, enc)
+	if err != nil {
+		log.Error("Cannot encode server pool known queue", "err", err)
+		return
+	}
+	if err := pool.db.Put(pool.dbKey, enc); err != nil {
+		log.Error("Cannot put server pool known queue", "err", err)
 	}
 }
 
