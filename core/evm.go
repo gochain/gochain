@@ -23,6 +23,7 @@ import (
 	"github.com/gochain-io/gochain/consensus"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
+	"github.com/gochain-io/gochain/log"
 )
 
 // ChainContext supports retrieving headers and consensus parameters from the
@@ -95,7 +96,11 @@ func GetHashFn(ref *types.Header, chain ChainContext) func(n uint64) common.Hash
 // CanTransfer checks wether there are enough funds in the address' account to make a transfer.
 // This does not take the necessary gas in to account to make the transfer valid.
 func CanTransfer(db vm.StateDB, addr common.Address, amount *big.Int) bool {
-	return db.GetBalance(addr).Cmp(amount) >= 0
+	bal, err := db.GetBalance(addr)
+	if err != nil {
+		log.Error("Failed to get balance", "err", err)
+	}
+	return bal.Cmp(amount) >= 0
 }
 
 // Transfer subtracts amount from sender and adds amount to recipient using the given Db

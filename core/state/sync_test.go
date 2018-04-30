@@ -79,13 +79,19 @@ func checkStateAccounts(t *testing.T, db ethdb.Database, root common.Hash, accou
 		t.Fatalf("inconsistent state trie at %x: %v", root, err)
 	}
 	for i, acc := range accounts {
-		if balance := state.GetBalance(acc.address); balance.Cmp(acc.balance) != 0 {
+		if balance, err := state.GetBalance(acc.address); err != nil {
+			t.Fatal(err)
+		} else if balance.Cmp(acc.balance) != 0 {
 			t.Errorf("account %d: balance mismatch: have %v, want %v", i, balance, acc.balance)
 		}
-		if nonce := state.GetNonce(acc.address); nonce != acc.nonce {
+		if nonce, err := state.GetNonce(acc.address); err != nil {
+			t.Fatal(err)
+		} else if nonce != acc.nonce {
 			t.Errorf("account %d: nonce mismatch: have %v, want %v", i, nonce, acc.nonce)
 		}
-		if code := state.GetCode(acc.address); !bytes.Equal(code, acc.code) {
+		if code, err := state.GetCode(acc.address); err != nil {
+			t.Fatal(err)
+		} else if !bytes.Equal(code, acc.code) {
 			t.Errorf("account %d: code mismatch: have %x, want %x", i, code, acc.code)
 		}
 	}

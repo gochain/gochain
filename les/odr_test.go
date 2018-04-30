@@ -96,7 +96,7 @@ func odrAccounts(ctx context.Context, db ethdb.Database, config *params.ChainCon
 			st = light.NewState(ctx, header, lc.Odr())
 		}
 		if err == nil {
-			bal := st.GetBalance(addr)
+			bal, _ := st.GetBalance(addr)
 			rlp, _ := rlp.EncodeToBytes(bal)
 			res = append(res, rlp...)
 		}
@@ -146,8 +146,8 @@ func odrContractCall(ctx context.Context, db ethdb.Database, config *params.Chai
 			context := core.NewEVMContext(&msg, header, lc, nil)
 			vmenv := vm.NewEVM(context, state, config, vm.Config{})
 			gp := new(core.GasPool).AddGas(math.MaxUint64)
-			ret, _, _, _ := core.ApplyMessage(vmenv, &msg, gp)
-			if state.Error() == nil {
+			ret, _, _, err := core.ApplyMessage(vmenv, &msg, gp)
+			if err == nil {
 				res = append(res, ret...)
 			}
 		}

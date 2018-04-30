@@ -499,8 +499,7 @@ func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Add
 	if state == nil || err != nil {
 		return nil, err
 	}
-	b := state.GetBalance(address)
-	return b, state.Error()
+	return state.GetBalance(address)
 }
 
 // GetBlockByNumber returns the requested block. When blockNr is -1 the chain head is returned. When fullTx is true all
@@ -586,8 +585,7 @@ func (s *PublicBlockChainAPI) GetCode(ctx context.Context, address common.Addres
 	if state == nil || err != nil {
 		return nil, err
 	}
-	code := state.GetCode(address)
-	return code, state.Error()
+	return state.GetCode(address)
 }
 
 // GetStorageAt returns the storage from the state at the given address, key and
@@ -598,8 +596,8 @@ func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, address common.A
 	if state == nil || err != nil {
 		return nil, err
 	}
-	res := state.GetState(address, common.HexToHash(key))
-	return res[:], state.Error()
+	st, err := state.GetState(address, common.HexToHash(key))
+	return st[:], err
 }
 
 // CallArgs represents the arguments for a call.
@@ -619,6 +617,7 @@ func (s *PublicBlockChainAPI) doCall(ctx context.Context, args CallArgs, blockNr
 	if state == nil || err != nil {
 		return nil, 0, false, err
 	}
+	state = state.Copy()
 	// Set sender address or use a default if none specified
 	addr := args.From
 	if addr == (common.Address{}) {
@@ -653,7 +652,7 @@ func (s *PublicBlockChainAPI) doCall(ctx context.Context, args CallArgs, blockNr
 	defer func() { cancel() }()
 
 	// Get a new instance of the EVM.
-	evm, vmError, err := s.b.GetEVM(ctx, msg, state, header, vmCfg)
+	evm, err := s.b.GetEVM(ctx, msg, state, header, vmCfg)
 	if err != nil {
 		return nil, 0, false, err
 	}
@@ -667,11 +666,7 @@ func (s *PublicBlockChainAPI) doCall(ctx context.Context, args CallArgs, blockNr
 	// Setup the gas pool (also for unmetered requests)
 	// and apply the message.
 	gp := new(core.GasPool).AddGas(math.MaxUint64)
-	res, gas, failed, err := core.ApplyMessage(evm, msg, gp)
-	if err := vmError(); err != nil {
-		return nil, 0, false, err
-	}
-	return res, gas, failed, err
+	return core.ApplyMessage(evm, msg, gp)
 }
 
 // Call executes the given transaction on the state for the given block number.
@@ -1002,8 +997,8 @@ func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, addr
 	if state == nil || err != nil {
 		return nil, err
 	}
-	nonce := state.GetNonce(address)
-	return (*hexutil.Uint64)(&nonce), state.Error()
+	nonce, err := state.GetNonce(address)
+	return (*hexutil.Uint64)(&nonce), err
 }
 
 // GetTransactionByHash returns the transaction for the given hash

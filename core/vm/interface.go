@@ -29,20 +29,20 @@ type StateDB interface {
 
 	SubBalance(common.Address, *big.Int)
 	AddBalance(common.Address, *big.Int)
-	GetBalance(common.Address) *big.Int
+	GetBalance(common.Address) (*big.Int, error)
 
-	GetNonce(common.Address) uint64
+	GetNonce(common.Address) (uint64, error)
 	SetNonce(common.Address, uint64)
 
-	GetCodeHash(common.Address) common.Hash
-	GetCode(common.Address) []byte
+	GetCodeHash(common.Address) (common.Hash, error)
+	GetCode(common.Address) ([]byte, error)
 	SetCode(common.Address, []byte)
-	GetCodeSize(common.Address) int
+	GetCodeSize(common.Address) (int, error)
 
 	AddRefund(uint64)
 	GetRefund() uint64
 
-	GetState(common.Address, common.Hash) common.Hash
+	GetState(common.Address, common.Hash) (common.Hash, error)
 	SetState(common.Address, common.Hash, common.Hash)
 
 	Suicide(common.Address) bool

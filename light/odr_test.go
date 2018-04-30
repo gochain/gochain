@@ -136,11 +136,17 @@ func odrAccounts(ctx context.Context, db ethdb.Database, bc *core.BlockChain, lc
 
 	var res []byte
 	for _, addr := range acc {
-		bal := st.GetBalance(addr)
-		rlp, _ := rlp.EncodeToBytes(bal)
+		bal, err := st.GetBalance(addr)
+		if err != nil {
+			return nil, err
+		}
+		rlp, err := rlp.EncodeToBytes(bal)
+		if err != nil {
+			return nil, err
+		}
 		res = append(res, rlp...)
 	}
-	return res, st.Error()
+	return res, nil
 }
 
 func TestOdrContractCallLes1(t *testing.T) { testChainOdr(t, 1, odrContractCall) }
@@ -180,10 +186,10 @@ func odrContractCall(ctx context.Context, db ethdb.Database, bc *core.BlockChain
 		context := core.NewEVMContext(&msg, header, chain, nil)
 		vmenv := vm.NewEVM(context, st, config, vm.Config{})
 		gp := new(core.GasPool).AddGas(math.MaxUint64)
-		ret, _, _, _ := core.ApplyMessage(vmenv, &msg, gp)
+		ret, _, _, err := core.ApplyMessage(vmenv, &msg, gp)
 		res = append(res, ret...)
-		if st.Error() != nil {
-			return res, st.Error()
+		if err != nil {
+			return res, err
 		}
 	}
 	return res, nil

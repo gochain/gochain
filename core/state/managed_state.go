@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/log"
 )
 
 type account struct {
@@ -85,13 +86,13 @@ func (ms *ManagedState) NewNonce(addr common.Address) uint64 {
 // GetNonce returns the canonical nonce for the managed or unmanaged account.
 //
 // Because GetNonce mutates the DB, we must take a write lock.
-func (ms *ManagedState) GetNonce(addr common.Address) uint64 {
+func (ms *ManagedState) GetNonce(addr common.Address) (uint64, error) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 
 	if ms.hasAccount(addr) {
 		account := ms.getAccount(addr)
-		return uint64(len(account.nonces)) + account.nstart
+		return uint64(len(account.nonces)) + account.nstart, nil
 	} else {
 		return ms.StateDB.GetNonce(addr)
 	}
@@ -128,11 +129,13 @@ func (ms *ManagedState) getAccount(addr common.Address) *account {
 	} else {
 		// Always make sure the state account nonce isn't actually higher
 		// than the tracked one.
-		so := ms.StateDB.getStateObject(addr)
+		so, err := ms.StateDB.getStateObject(addr)
+		if err != nil {
+			log.Error("Failed to get state object", "err", err)
+		}
 		if so != nil && uint64(len(account.nonces))+account.nstart < so.Nonce() {
 			ms.accounts[addr] = newAccount(so)
 		}
-
 	}
 
 	return ms.accounts[addr]

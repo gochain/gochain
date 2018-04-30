@@ -20,6 +20,7 @@ import (
 	"math/big"
 
 	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/log"
 )
 
 type journalEntry interface {
@@ -88,7 +89,10 @@ func (ch resetObjectChange) undo(s *StateDB) {
 }
 
 func (ch suicideChange) undo(s *StateDB) {
-	obj := s.getStateObject(*ch.account)
+	obj, err := s.getStateObject(*ch.account)
+	if err != nil {
+		log.Error("Failed to get state object", "err", err)
+	}
 	if obj != nil {
 		obj.suicided = ch.prev
 		obj.setBalance(ch.prevbalance)
@@ -99,7 +103,11 @@ var ripemd = common.HexToAddress("0000000000000000000000000000000000000003")
 
 func (ch touchChange) undo(s *StateDB) {
 	if !ch.prev && *ch.account != ripemd {
-		s.getStateObject(*ch.account).touched = ch.prev
+		so, err := s.getStateObject(*ch.account)
+		if err != nil {
+			log.Error("Failed to get state object", "err", err)
+		}
+		so.touched = ch.prev
 		if !ch.prevDirty {
 			delete(s.stateObjectsDirty, *ch.account)
 		}
@@ -107,19 +115,35 @@ func (ch touchChange) undo(s *StateDB) {
 }
 
 func (ch balanceChange) undo(s *StateDB) {
-	s.getStateObject(*ch.account).setBalance(ch.prev)
+	so, err := s.getStateObject(*ch.account)
+	if err != nil {
+		log.Error("Failed to get state object", "err", err)
+	}
+	so.setBalance(ch.prev)
 }
 
 func (ch nonceChange) undo(s *StateDB) {
-	s.getStateObject(*ch.account).setNonce(ch.prev)
+	so, err := s.getStateObject(*ch.account)
+	if err != nil {
+		log.Error("Failed to get state object", "err", err)
+	}
+	so.setNonce(ch.prev)
 }
 
 func (ch codeChange) undo(s *StateDB) {
-	s.getStateObject(*ch.account).setCode(ch.prevhash, ch.prevcode)
+	so, err := s.getStateObject(*ch.account)
+	if err != nil {
+		log.Error("Failed to get state object", "err", err)
+	}
+	so.setCode(ch.prevhash, ch.prevcode)
 }
 
 func (ch storageChange) undo(s *StateDB) {
-	s.getStateObject(*ch.account).setState(ch.key, ch.prevalue)
+	so, err := s.getStateObject(*ch.account)
+	if err != nil {
+		log.Error("Failed to get state object", "err", err)
+	}
+	so.setState(ch.key, ch.prevalue)
 }
 
 func (ch refundChange) undo(s *StateDB) {
