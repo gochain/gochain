@@ -213,7 +213,7 @@ func SendTransactionParallel(peers []*peer, tx *types.Transaction) error {
 		go func(p *peer) {
 			msg := p2p.Msg{Code: TxMsg, Size: uint32(len(b)), Payload: bytes.NewReader(b)}
 			if err := p.rw.WriteMsg(msg); err != nil {
-				log.Error("Failed to send tx", "peer", p.Name(), "hash", tx.Hash(), "size", len(b), "err", err)
+				log.Error("Failed to send tx", "peer", p.ID(), "hash", tx.Hash(), "size", len(b), "err", err)
 			} else {
 				p.knownTxs.Add(tx.Hash())
 			}
@@ -233,7 +233,7 @@ func SendNewBlockHashParallel(peers []*peer, hash common.Hash, number uint64) er
 		go func(p *peer) {
 			msg := p2p.Msg{Code: NewBlockHashesMsg, Size: uint32(len(b)), Payload: bytes.NewReader(b)}
 			if err := p.rw.WriteMsg(msg); err != nil {
-				log.Error("Failed to send new block hash", "peer", p.Name(), "hash", hash, "number", number, "size", len(b), "err", err)
+				log.Error("Failed to send new block hash", "peer", p.ID(), "hash", hash, "number", number, "size", len(b), "err", err)
 			} else {
 				p.knownBlocks.Add(hash)
 			}
@@ -252,7 +252,7 @@ func SendNewBlockParallel(peers []*peer, block *types.Block, td *big.Int) error 
 		go func(p *peer) {
 			msg := p2p.Msg{Code: NewBlockMsg, Size: uint32(len(b)), Payload: bytes.NewReader(b)}
 			if err := p.rw.WriteMsg(msg); err != nil {
-				log.Error("Failed to send new block hash", "peer", p.Name(), "hash", block.Hash(), "number", block.NumberU64(), "size", len(b), "err", err)
+				log.Error("Failed to send new block hash", "peer", p.ID(), "hash", block.Hash(), "number", block.NumberU64(), "size", len(b), "err", err)
 			} else {
 				p.knownBlocks.Add(block.Hash())
 			}
