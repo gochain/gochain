@@ -408,11 +408,11 @@ func (pool *TxPool) loop(ctx context.Context) {
 				}
 				// Any non-locals old enough should be removed
 				if time.Since(pool.beats[addr]) > pool.config.Lifetime {
-					list := pool.queue[addr]
-					list.txs.ensureCache()
-					for _, tx := range list.txs.cache {
-						pool.removeTx(ctx, tx.Hash())
+					queued := pool.queue[addr]
+					for _, tx := range queued.txs.items {
+						delete(pool.all, tx.Hash())
 					}
+					delete(pool.queue, addr)
 				}
 			}
 			pool.mu.Unlock()
@@ -514,8 +514,7 @@ func (pool *TxPool) reset(ctx context.Context, oldBlock, newBlock *types.Block) 
 
 	// Update all accounts to the latest known pending nonce
 	for addr, list := range pool.pending {
-		txs := list.Flatten() // Heavy but will be cached and is needed by the miner anyway
-		pool.pendingState.SetNonce(addr, txs[len(txs)-1].Nonce()+1)
+		pool.pendingState.SetNonce(addr, list.Last().Nonce()+1)
 	}
 	// Check the queue and move transactions over to the pending if possible
 	// or remove those that have become invalid
@@ -744,9 +743,9 @@ func (pool *TxPool) add(ctx context.Context, tx *types.Transaction, local bool) 
 	}
 	// If the transaction is replacing an already pending one, do directly
 	from, _ := types.Sender(ctx, pool.signer, tx) // already validated
-	if list := pool.pending[from]; list != nil && list.Overlaps(tx) {
+	if pending := pool.pending[from]; pending != nil && pending.Overlaps(tx) {
 		// Nonce already pending, check if required price bump is met
-		inserted, old := list.Add(tx, pool.config.PriceBump)
+		inserted, old := pending.Add(tx, pool.config.PriceBump)
 		if !inserted {
 			pendingDiscardCounter.Inc(1)
 			return false, ErrReplaceUnderpriced
@@ -836,9 +835,7 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 	if pool.pending[addr] == nil {
 		pool.pending[addr] = newTxList(true)
 	}
-	list := pool.pending[addr]
-
-	inserted, old := list.Add(tx, pool.config.PriceBump)
+	inserted, old := pool.pending[addr].Add(tx, pool.config.PriceBump)
 	if !inserted {
 		// An older transaction was better, discard this
 		delete(pool.all, hash)
@@ -998,7 +995,10 @@ func (pool *TxPool) removeTx(ctx context.Context, hash common.Hash) {
 
 	// Remove the transaction from the pending lists and reset the account nonce
 	if pending := pool.pending[addr]; pending != nil {
-		if removed, invalids := pending.Remove(tx); removed {
+		var invalids types.Transactions
+		if pending.Remove(tx, func(tx *types.Transaction) {
+			invalids = append(invalids, tx)
+		}) {
 			// If no more transactions are left, remove the list
 			if pending.Empty() {
 				delete(pool.pending, addr)
@@ -1024,7 +1024,7 @@ func (pool *TxPool) removeTx(ctx context.Context, hash common.Hash) {
 	}
 	// Transaction is in the future queue
 	if future := pool.queue[addr]; future != nil {
-		future.Remove(tx)
+		_ = future.Remove(tx, func(tx *types.Transaction) {})
 		if future.Empty() {
 			delete(pool.queue, addr)
 		}
@@ -1033,8 +1033,8 @@ func (pool *TxPool) removeTx(ctx context.Context, hash common.Hash) {
 
 // promoteExecutablesAll is like promoteExecutables, but for the entire queue.
 func (pool *TxPool) promoteExecutablesAll(ctx context.Context) {
-	for addr, list := range pool.queue {
-		pool.promoteExecutable(addr, list)
+	for addr, queued := range pool.queue {
+		pool.promoteExecutable(addr, queued)
 	}
 	pool.finishPromotion(ctx)
 }
@@ -1045,68 +1045,90 @@ func (pool *TxPool) promoteExecutablesAll(ctx context.Context) {
 func (pool *TxPool) promoteExecutables(ctx context.Context, accounts ...common.Address) {
 	// Iterate over all accounts and promote any executable transactions
 	for _, addr := range accounts {
-		list := pool.queue[addr]
-		if list == nil {
+		queued := pool.queue[addr]
+		if queued == nil {
 			continue // Just in case someone calls with a non existing account
 		}
-		pool.promoteExecutable(addr, list)
+		pool.promoteExecutable(addr, queued)
 	}
 	pool.finishPromotion(ctx)
 }
 
-func (pool *TxPool) promoteExecutable(addr common.Address, list *txList) {
+func (pool *TxPool) promoteExecutable(addr common.Address, queued *txList) {
 	tracing := log.Tracing()
+
 	// Drop all transactions that are deemed too old (low nonce)
 	nonce, err := pool.currentState.GetNonce(addr)
 	if err != nil {
 		log.Error("Failed to get nonce", "err", err)
 	}
-	for _, tx := range list.Forward(nonce) {
-		hash := tx.Hash()
-		if tracing {
+	remove := func(tx *types.Transaction) {
+		delete(pool.all, tx.Hash())
+	}
+	if tracing {
+		remove = func(tx *types.Transaction) {
+			hash := tx.Hash()
+			delete(pool.all, hash)
 			log.Trace("Removed old queued transaction", "hash", hash)
 		}
-		delete(pool.all, hash)
 	}
+	queued.Forward(nonce, remove)
+
 	// Drop all transactions that are too costly (low balance or out of gas)
 	bal, err := pool.currentState.GetBalance(addr)
 	if err != nil {
 		log.Error("Failed to get balance", "err", err)
 	}
-	drops, _ := list.Filter(bal, pool.currentMaxGas)
-	for _, tx := range drops {
-		hash := tx.Hash()
-		if tracing {
-			log.Trace("Removed unpayable queued transaction", "hash", hash)
-		}
-		delete(pool.all, hash)
+	remove = func(tx *types.Transaction) {
+		delete(pool.all, tx.Hash())
 		queuedNofundsCounter.Inc(1)
 	}
+	if tracing {
+		remove = func(tx *types.Transaction) {
+			hash := tx.Hash()
+			delete(pool.all, hash)
+			queuedNofundsCounter.Inc(1)
+			log.Trace("Removed unpayable queued transaction", "hash", hash)
+		}
+	}
+	queued.Filter(bal, pool.currentMaxGas, remove, func(*types.Transaction) {})
+
 	// Gather all executable transactions and promote them
 	nonce, err = pool.pendingState.GetNonce(addr)
 	if err != nil {
 		log.Error("Failed to get nonce", "err", err)
 	}
-	for _, tx := range list.Ready(nonce) {
-		hash := tx.Hash()
-		if tracing {
-			log.Trace("Promoting queued transaction", "hash", hash)
-		}
-		pool.promoteTx(addr, hash, tx)
+	promote := func(tx *types.Transaction) {
+		pool.promoteTx(addr, tx.Hash(), tx)
 	}
+	if tracing {
+		promote = func(tx *types.Transaction) {
+			hash := tx.Hash()
+			pool.promoteTx(addr, hash, tx)
+			log.Trace("Removed old queued transaction", "hash", hash)
+		}
+	}
+	queued.Ready(nonce, promote)
+
 	// Drop all transactions over the allowed limit
 	if !pool.locals.contains(addr) {
-		for _, tx := range list.Cap(int(pool.config.AccountQueue)) {
-			hash := tx.Hash()
-			delete(pool.all, hash)
+		remove := func(tx *types.Transaction) {
+			delete(pool.all, tx.Hash())
 			queuedRateLimitCounter.Inc(1)
-			if tracing {
+		}
+		if tracing {
+			remove = func(tx *types.Transaction) {
+				hash := tx.Hash()
+				delete(pool.all, hash)
+				queuedRateLimitCounter.Inc(1)
 				log.Trace("Removed cap-exceeding queued transaction", "hash", hash)
 			}
 		}
+		queued.Cap(int(pool.config.AccountQueue), remove)
 	}
-	// Delete the entire queue entry if it became empty.
-	if list.Empty() {
+
+	// Delete the entire queued entry if it became empty.
+	if queued.Empty() {
 		delete(pool.queue, addr)
 	}
 }
@@ -1142,54 +1164,14 @@ func (pool *TxPool) finishPromotion(ctx context.Context) {
 
 				// Iteratively reduce all offenders until below limit or threshold reached
 				for pending > pool.config.GlobalSlots && pool.pending[offenders[len(offenders)-2]].Len() > threshold {
-					for i := 0; i < len(offenders)-1; i++ {
-						list := pool.pending[offenders[i]]
-						for _, tx := range list.Cap(list.Len() - 1) {
-							// Drop the transaction from the global pools too
-							hash := tx.Hash()
-							delete(pool.all, hash)
-
-							// Update the account nonce to the dropped transaction
-							stNonce, err := pool.pendingState.GetNonce(offenders[i])
-							if err != nil {
-								log.Error("Failed to get nonce", "err", err)
-							}
-							if nonce := tx.Nonce(); stNonce > nonce {
-								pool.pendingState.SetNonce(offenders[i], nonce)
-							}
-							if tracing {
-								log.Trace("Removed fairness-exceeding pending transaction", "hash", hash)
-							}
-						}
-						pending--
-					}
+					pending -= pool.limitOffenders(offenders, tracing)
 				}
 			}
 		}
 		// If still above threshold, reduce to limit or min allowance
 		if pending > pool.config.GlobalSlots && len(offenders) > 0 {
 			for pending > pool.config.GlobalSlots && uint64(pool.pending[offenders[len(offenders)-1]].Len()) > pool.config.AccountSlots {
-				for _, addr := range offenders {
-					list := pool.pending[addr]
-					for _, tx := range list.Cap(list.Len() - 1) {
-						// Drop the transaction from the global pools too
-						hash := tx.Hash()
-						delete(pool.all, hash)
-
-						// Update the account nonce to the dropped transaction
-						stNonce, err := pool.pendingState.GetNonce(addr)
-						if err != nil {
-							log.Error("Failed to get nonce", "err", err)
-						}
-						if nonce := tx.Nonce(); stNonce > nonce {
-							pool.pendingState.SetNonce(addr, nonce)
-						}
-						if tracing {
-							log.Trace("Removed fairness-exceeding pending transaction", "hash", hash)
-						}
-					}
-					pending--
-				}
+				pending -= pool.limitOffenders(offenders, tracing)
 			}
 		}
 		pendingRateLimitCounter.Inc(int64(pendingBeforeCap - pending))
@@ -1218,23 +1200,58 @@ func (pool *TxPool) finishPromotion(ctx context.Context) {
 
 			// Drop all transactions if they are less than the overflow
 			if size := uint64(list.Len()); size <= drop {
-				list.txs.ensureCache()
-				for _, tx := range list.txs.cache {
-					pool.removeTx(ctx, tx.Hash())
+				for _, tx := range list.txs.items {
+					delete(pool.all, tx.Hash())
 				}
+				delete(pool.queue, addr.address)
 				drop -= size
 				queuedRateLimitCounter.Inc(int64(size))
 				continue
 			}
 			// Otherwise drop only last few transactions
-			txs := list.Flatten()
-			for i := len(txs) - 1; i >= 0 && drop > 0; i-- {
-				pool.removeTx(ctx, txs[i].Hash())
+			list.ForLast(int(drop), func(tx *types.Transaction) {
+				delete(pool.all, tx.Hash())
 				drop--
 				queuedRateLimitCounter.Inc(1)
-			}
+			})
 		}
 	}
+}
+
+func (pool *TxPool) limitOffenders(offenders []common.Address, tracing bool) (removed uint64) {
+	var nonce uint64
+	remove := func(tx *types.Transaction) {
+		delete(pool.all, tx.Hash())
+		if tx.Nonce() < nonce {
+			nonce = tx.Nonce()
+		}
+	}
+	if tracing {
+		remove = func(tx *types.Transaction) {
+			hash := tx.Hash()
+			delete(pool.all, hash)
+			if tx.Nonce() < nonce {
+				nonce = tx.Nonce()
+			}
+			log.Trace("Removed fairness-exceeding pending transaction", "hash", hash)
+		}
+	}
+	for _, addr := range offenders {
+		removed++
+		pending := pool.pending[addr]
+		nonce = math.MaxUint64
+		pending.Cap(pending.Len()-1, remove)
+		// Update the account nonce to the dropped transaction
+		stNonce, err := pool.pendingState.GetNonce(addr)
+		if err != nil {
+			log.Error("Failed to get nonce", "err", err)
+			continue
+		}
+		if stNonce > nonce {
+			pool.pendingState.SetNonce(addr, nonce)
+		}
+	}
+	return
 }
 
 // demoteUnexecutables removes invalid and processed transactions from the pools
@@ -1242,7 +1259,7 @@ func (pool *TxPool) finishPromotion(ctx context.Context) {
 // are moved back into the future queue.
 func (pool *TxPool) demoteUnexecutables(ctx context.Context) {
 	// Iterate over all accounts and demote any non-executable transactions
-	for addr, list := range pool.pending {
+	for addr, pending := range pool.pending {
 		nonce, err := pool.currentState.GetNonce(addr)
 		if err != nil {
 			log.Error("Failed to get nonce", "err", err)
@@ -1250,48 +1267,63 @@ func (pool *TxPool) demoteUnexecutables(ctx context.Context) {
 
 		// Drop all transactions that are deemed too old (low nonce)
 		tracing := log.Tracing()
-		for _, tx := range list.Forward(nonce) {
-			hash := tx.Hash()
-			if tracing {
+		remove := func(tx *types.Transaction) {
+			delete(pool.all, tx.Hash())
+		}
+		if tracing {
+			remove = func(tx *types.Transaction) {
+				hash := tx.Hash()
+				delete(pool.all, hash)
 				log.Trace("Removed old pending transaction", "hash", hash)
 			}
-			delete(pool.all, hash)
 		}
+		pending.Forward(nonce, remove)
+
 		// Drop all transactions that are too costly (low balance or out of gas), and queue any invalids back for later
 		bal, err := pool.currentState.GetBalance(addr)
 		if err != nil {
 			log.Error("Failed to get balance", "err", err)
 		}
-		drops, invalids := list.Filter(bal, pool.currentMaxGas)
-		for _, tx := range drops {
-			hash := tx.Hash()
-			if tracing {
-				log.Trace("Removed unpayable pending transaction", "hash", hash)
-			}
-			delete(pool.all, hash)
+		remove = func(tx *types.Transaction) {
+			delete(pool.all, tx.Hash())
 			pendingNofundsCounter.Inc(1)
 		}
-		for _, tx := range invalids {
-			hash := tx.Hash()
-			if tracing {
-				log.Trace("Demoting pending transaction", "hash", hash)
-			}
-			if _, err := pool.enqueueTx(ctx, hash, tx); err != nil {
-				log.Error("Cannot enqueue tx to pool during demotion", "hash", hash, "err", err)
+		invalid := func(tx *types.Transaction) {
+			if _, err := pool.enqueueTx(ctx, tx.Hash(), tx); err != nil {
+				log.Error("Cannot enqueue tx to pool during demotion", "hash", tx.Hash(), "err", err)
 			}
 		}
+		if tracing {
+			remove = func(tx *types.Transaction) {
+				hash := tx.Hash()
+				delete(pool.all, hash)
+				pendingNofundsCounter.Inc(1)
+				log.Trace("Removed unpayable pending transaction", "hash", hash)
+			}
+			invalid = func(tx *types.Transaction) {
+				hash := tx.Hash()
+				log.Trace("Demoting pending transaction", "hash", hash)
+				if _, err := pool.enqueueTx(ctx, hash, tx); err != nil {
+					log.Error("Cannot enqueue tx to pool during demotion", "hash", hash, "err", err)
+				}
+			}
+		}
+		pending.Filter(bal, pool.currentMaxGas, remove, invalid)
+
 		// If there's a gap in front, warn (should never happen) and postpone all transactions
-		if list.Len() > 0 && list.txs.Get(nonce) == nil {
-			for _, tx := range list.Cap(0) {
+		if pending.Len() > 0 && pending.txs.Get(nonce) == nil {
+			for _, tx := range pending.txs.items {
 				hash := tx.Hash()
 				log.Error("Demoting invalidated transaction", "hash", hash)
 				if _, err := pool.enqueueTx(ctx, hash, tx); err != nil {
 					log.Error("Cannot enqueue invalid tx to pool during demotion", "hash", hash, "err", err)
 				}
 			}
+			delete(pool.pending, addr)
+			delete(pool.beats, addr)
 		}
 		// Delete the entire queue entry if it became empty.
-		if list.Empty() {
+		if pending.Empty() {
 			delete(pool.pending, addr)
 			delete(pool.beats, addr)
 		}
