@@ -49,8 +49,9 @@ type Backend interface {
 	SetHead(number uint64)
 	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error)
 	BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error)
-	// StateAndHeaderByNumber returns a read-only state.StateDB, which must be copied via Copy() before modifying.
 	StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.StateDB, *types.Header, error)
+	// StateQuery calls fn with a read-only state.StateDB.
+	StateQuery(ctx context.Context, blockNr rpc.BlockNumber, fn func(db *state.StateDB) error) error
 	GetBlock(ctx context.Context, blockHash common.Hash) (*types.Block, error)
 	GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error)
 	GetTd(blockHash common.Hash) *big.Int

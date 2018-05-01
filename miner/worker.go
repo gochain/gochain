@@ -178,12 +178,25 @@ func (self *worker) pending() (*types.Block, *state.StateDB) {
 		// return a snapshot to avoid contention on currentMu mutex
 		self.snapshotMu.RLock()
 		defer self.snapshotMu.RUnlock()
-		return self.snapshotBlock, self.snapshotState
+		return self.snapshotBlock, self.snapshotState.Copy()
 	}
 
 	self.currentMu.Lock()
 	defer self.currentMu.Unlock()
 	return self.current.Block, self.current.state.Copy()
+}
+
+func (self *worker) pendingQuery(fn func(*state.StateDB) error) error {
+	if atomic.LoadInt32(&self.mining) == 0 {
+		// query a snapshot to avoid contention on currentMu mutex
+		self.snapshotMu.RLock()
+		defer self.snapshotMu.RUnlock()
+		return fn(self.snapshotState)
+	}
+
+	self.currentMu.Lock()
+	defer self.currentMu.Unlock()
+	return fn(self.current.state)
 }
 
 func (self *worker) pendingBlock() *types.Block {
@@ -493,6 +506,7 @@ func (*worker) commitUncle(work *Work, uncle *types.Header) error {
 	return nil
 }
 
+// updateSnapshot updates snapshotState. Caller must hold currentMu.
 func (self *worker) updateSnapshot() {
 	self.snapshotMu.Lock()
 	defer self.snapshotMu.Unlock()

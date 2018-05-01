@@ -170,6 +170,11 @@ func (self *Miner) Pending() (*types.Block, *state.StateDB) {
 	return self.worker.pending()
 }
 
+// PendingQuery calls fn with the pending (ready-only) state.
+func (self *Miner) PendingQuery(fn func(*state.StateDB) error) error {
+	return self.worker.pendingQuery(fn)
+}
+
 // PendingBlock returns the currently pending block.
 //
 // Note, to access both the pending block and the pending state
