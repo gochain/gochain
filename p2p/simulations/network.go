@@ -299,7 +299,7 @@ func (self *Network) Disconnect(oneID, otherID discover.NodeID) error {
 	if conn == nil {
 		return fmt.Errorf("connection between %v and %v does not exist", oneID, otherID)
 	}
-	if !conn.Up {
+	if !conn.Up() {
 		return fmt.Errorf("%v and %v already disconnected", oneID, otherID)
 	}
 	client, err := conn.one.Client()
@@ -316,10 +316,10 @@ func (self *Network) DidConnect(one, other discover.NodeID) error {
 	if err != nil {
 		return fmt.Errorf("connection between %v and %v does not exist", one, other)
 	}
-	if conn.Up {
+	if conn.Up() {
 		return fmt.Errorf("%v and %v already connected", one, other)
 	}
-	conn.Up = true
+	conn.SetUp(true)
 	self.events.Send(NewEvent(conn))
 	return nil
 }
@@ -331,11 +331,14 @@ func (self *Network) DidDisconnect(one, other discover.NodeID) error {
 	if conn == nil {
 		return fmt.Errorf("connection between %v and %v does not exist", one, other)
 	}
-	if !conn.Up {
+	if !conn.Up() {
 		return fmt.Errorf("%v and %v already disconnected", one, other)
 	}
-	conn.Up = false
+
+	conn.mu.Lock()
+	conn.up = false
 	conn.initiated = time.Now().Add(-dialBanTimeout)
+	conn.mu.Unlock()
 	self.events.Send(NewEvent(conn))
 	return nil
 }
@@ -479,14 +482,16 @@ func (self *Network) InitConn(oneID, otherID discover.NodeID) (*Conn, error) {
 	if time.Since(conn.initiated) < dialBanTimeout {
 		return nil, fmt.Errorf("connection between %v and %v recently attempted", oneID, otherID)
 	}
-	if conn.Up {
+	if conn.Up() {
 		return nil, fmt.Errorf("%v and %v already connected", oneID, otherID)
 	}
 	err = conn.nodesUp()
 	if err != nil {
 		return nil, fmt.Errorf("nodes not up: %v", err)
 	}
+	conn.mu.Lock()
 	conn.initiated = time.Now()
+	conn.mu.Unlock()
 	return conn, nil
 }
 
@@ -565,18 +570,19 @@ func (self *Node) MarshalJSON() ([]byte, error) {
 // Conn represents a connection between two nodes in the network
 type Conn struct {
 	// One is the node which initiated the connection
-	One discover.NodeID `json:"one"`
+	One discover.NodeID
 
 	// Other is the node which the connection was made to
-	Other discover.NodeID `json:"other"`
-
-	// Up tracks whether or not the connection is active
-	Up bool `json:"up"`
-	// Registers when the connection was grabbed to dial
-	initiated time.Time
+	Other discover.NodeID
 
 	one   *Node
 	other *Node
+
+	mu sync.RWMutex
+	// Up tracks whether or not the connection is active
+	up bool
+	// Registers when the connection was grabbed to dial
+	initiated time.Time
 }
 
 // nodesUp returns whether both nodes are currently up
@@ -593,6 +599,50 @@ func (self *Conn) nodesUp() error {
 // String returns a log-friendly string
 func (self *Conn) String() string {
 	return fmt.Sprintf("Conn %v->%v", self.One.TerminalString(), self.Other.TerminalString())
+}
+
+func (self *Conn) Up() bool {
+	self.mu.RLock()
+	up := self.up
+	self.mu.RUnlock()
+	return up
+}
+
+func (self *Conn) SetUp(up bool) {
+	self.mu.Lock()
+	self.up = up
+	self.mu.Unlock()
+}
+
+func (self *Conn) MarshalJSON() ([]byte, error) {
+	type t struct {
+		One   discover.NodeID `json:"one"`
+		Other discover.NodeID `json:"other"`
+		Up    bool            `json:"up"`
+	}
+	cp := &t{
+		One:   self.One,
+		Other: self.Other,
+		Up:    self.Up(),
+	}
+	return json.Marshal(cp)
+}
+
+func (self *Conn) UnmarshalJSON(data []byte) error {
+	type t struct {
+		One   discover.NodeID `json:"one"`
+		Other discover.NodeID `json:"other"`
+		Up    bool            `json:"up"`
+	}
+	var cp t
+	err := json.Unmarshal(data, &cp)
+	if err != nil {
+		return err
+	}
+	self.One = cp.One
+	self.Other = cp.Other
+	self.SetUp(cp.Up)
+	return nil
 }
 
 // Msg represents a p2p message sent between two nodes in the network
@@ -659,7 +709,16 @@ func (self *Network) Snapshot() (*Snapshot, error) {
 		snap.Nodes[i].Snapshots = snapshots
 	}
 	for i, conn := range self.Conns {
-		snap.Conns[i] = *conn
+		conn.mu.RLock()
+		snap.Conns[i] = Conn{
+			One:       conn.One,
+			Other:     conn.Other,
+			one:       conn.one,
+			other:     conn.other,
+			up:        conn.up,
+			initiated: conn.initiated,
+		}
+		conn.mu.RUnlock()
 	}
 	return snap, nil
 }
@@ -736,7 +795,7 @@ func (self *Network) executeNodeEvent(e *Event) error {
 }
 
 func (self *Network) executeConnEvent(e *Event) error {
-	if e.Conn.Up {
+	if e.Conn.Up() {
 		return self.Connect(e.Conn.One, e.Conn.Other)
 	} else {
 		return self.Disconnect(e.Conn.One, e.Conn.Other)
