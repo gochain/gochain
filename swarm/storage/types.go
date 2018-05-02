@@ -198,14 +198,14 @@ type Splitter interface {
 	   The caller gets returned an error channel, if an error is encountered during splitting, it is fed to errC error channel.
 	   A closed error signals process completion at which point the key can be considered final if there were no errors.
 	*/
-	Split(io.Reader, int64, chan *Chunk, *sync.WaitGroup, *sync.WaitGroup) (Key, error)
+	Split(io.Reader, int64, chan *Chunk, *sync.WaitGroup) (Key, error)
 
 	/* This is the first step in making files mutable (not chunks)..
 	   Append allows adding more data chunks to the end of the already existsing file.
 	   The key for the root chunk is supplied to load the respective tree.
 	   Rest of the parameters behave like Split.
 	*/
-	Append(Key, io.Reader, chan *Chunk, *sync.WaitGroup, *sync.WaitGroup) (Key, error)
+	Append(Key, io.Reader, chan *Chunk, *sync.WaitGroup) (Key, error)
 }
 
 type Joiner interface {

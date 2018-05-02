@@ -94,10 +94,10 @@ func (self *Chunk) String() string {
 }
 
 type hashJob struct {
-	key      Key
-	chunk    []byte
-	size     int64
-	parentWg *sync.WaitGroup
+	key   Key
+	chunk []byte
+	size  int64
+	done  func()
 }
 
 func (self *TreeChunker) incrementWorkerCount() {
@@ -118,7 +118,7 @@ func (self *TreeChunker) decrementWorkerCount() {
 	self.workerCount -= 1
 }
 
-func (self *TreeChunker) Split(data io.Reader, size int64, chunkC chan *Chunk, swg, wwg *sync.WaitGroup) (Key, error) {
+func (self *TreeChunker) Split(data io.Reader, size int64, chunkC chan *Chunk, swg *sync.WaitGroup) (Key, error) {
 	if self.chunkSize <= 0 {
 		panic("chunker must be initialised")
 	}
@@ -128,13 +128,11 @@ func (self *TreeChunker) Split(data io.Reader, size int64, chunkC chan *Chunk, s
 	errC := make(chan error)
 	quitC := make(chan bool)
 
-	// wwg = workers waitgroup keeps track of hashworkers spawned by this split call
-	if wwg != nil {
-		wwg.Add(1)
+	if swg != nil {
+		swg.Add(1)
 	}
-
 	self.incrementWorkerCount()
-	go self.hashWorker(jobC, chunkC, errC, quitC, swg, wwg)
+	go self.hashWorker(jobC, chunkC, errC, quitC, swg)
 
 	depth := 0
 	treeSize := self.chunkSize
@@ -149,16 +147,12 @@ func (self *TreeChunker) Split(data io.Reader, size int64, chunkC chan *Chunk, s
 	// this waitgroup member is released after the root hash is calculated
 	wg.Add(1)
 	//launch actual recursive function passing the waitgroups
-	go self.split(depth, treeSize/self.branches, key, data, size, jobC, chunkC, errC, quitC, wg, swg, wwg)
+	go self.split(depth, treeSize/self.branches, key, data, size, jobC, chunkC, errC, quitC, wg.Done, swg)
 
 	// closes internal error channel if all subprocesses in the workgroup finished
 	go func() {
 		// waiting for all threads to finish
 		wg.Wait()
-		// if storage waitgroup is non-nil, we wait for storage to finish too
-		if swg != nil {
-			swg.Wait()
-		}
 		close(errC)
 	}()
 
@@ -175,10 +169,7 @@ func (self *TreeChunker) Split(data io.Reader, size int64, chunkC chan *Chunk, s
 	return key, nil
 }
 
-func (self *TreeChunker) split(depth int, treeSize int64, key Key, data io.Reader, size int64, jobC chan *hashJob, chunkC chan *Chunk, errC chan error, quitC chan bool, parentWg, swg, wwg *sync.WaitGroup) {
-
-	//
-
+func (self *TreeChunker) split(depth int, treeSize int64, key Key, data io.Reader, size int64, jobC chan *hashJob, chunkC chan *Chunk, errC chan error, quitC chan bool, hashDone func(), swg *sync.WaitGroup) {
 	for depth > 0 && size < treeSize {
 		treeSize /= self.branches
 		depth--
@@ -198,7 +189,7 @@ func (self *TreeChunker) split(depth int, treeSize int64, key Key, data io.Reade
 			}
 		}
 		select {
-		case jobC <- &hashJob{key, chunkData, size, parentWg}:
+		case jobC <- &hashJob{key, chunkData, size, hashDone}:
 		case <-quitC:
 		}
 		return
@@ -225,7 +216,7 @@ func (self *TreeChunker) split(depth int, treeSize int64, key Key, data io.Reade
 		subTreeKey := chunk[8+i*self.hashSize : 8+(i+1)*self.hashSize]
 
 		childrenWg.Add(1)
-		self.split(depth-1, treeSize/self.branches, subTreeKey, data, secSize, jobC, chunkC, errC, quitC, childrenWg, swg, wwg)
+		self.split(depth-1, treeSize/self.branches, subTreeKey, data, secSize, jobC, chunkC, errC, quitC, childrenWg.Done, swg)
 
 		i++
 		pos += treeSize
@@ -237,26 +228,25 @@ func (self *TreeChunker) split(depth int, treeSize int64, key Key, data io.Reade
 
 	worker := self.getWorkerCount()
 	if int64(len(jobC)) > worker && worker < ChunkProcessors {
-		if wwg != nil {
-			wwg.Add(1)
+		if swg != nil {
+			swg.Add(1)
 		}
 		self.incrementWorkerCount()
-		go self.hashWorker(jobC, chunkC, errC, quitC, swg, wwg)
-
+		go self.hashWorker(jobC, chunkC, errC, quitC, swg)
 	}
 	select {
-	case jobC <- &hashJob{key, chunk, size, parentWg}:
+	case jobC <- &hashJob{key, chunk, size, hashDone}:
 	case <-quitC:
 	}
 }
 
-func (self *TreeChunker) hashWorker(jobC chan *hashJob, chunkC chan *Chunk, errC chan error, quitC chan bool, swg, wwg *sync.WaitGroup) {
+func (self *TreeChunker) hashWorker(jobC chan *hashJob, chunkC chan *Chunk, errC chan error, quitC chan bool, swg *sync.WaitGroup) {
 	defer self.decrementWorkerCount()
+	if swg != nil {
+		defer swg.Done()
+	}
 
 	hasher := self.hashFunc()
-	if wwg != nil {
-		defer wwg.Done()
-	}
 	for {
 		select {
 
@@ -276,33 +266,24 @@ func (self *TreeChunker) hashWorker(jobC chan *hashJob, chunkC chan *Chunk, errC
 // - the size (of the subtree encoded in the Chunk)
 // - the Chunk, ie. the contents read from the input reader
 func (self *TreeChunker) hashChunk(hasher SwarmHash, job *hashJob, chunkC chan *Chunk, swg *sync.WaitGroup) {
+	defer job.done()
 	hasher.ResetWithLength(job.chunk[:8]) // 8 bytes of length
 	hasher.Write(job.chunk[8:])           // minus 8 []byte length
 	h := hasher.Sum(nil)
 
-	newChunk := &Chunk{
-		Key:   h,
-		SData: job.chunk,
-		Size:  job.size,
-		wg:    swg,
-	}
-
 	// report hash of this chunk one level up (keys corresponds to the proper subslice of the parent chunk)
 	copy(job.key, h)
+
 	// send off new chunk to storage
 	if chunkC != nil {
 		if swg != nil {
 			swg.Add(1)
 		}
-	}
-	job.parentWg.Done()
-
-	if chunkC != nil {
-		chunkC <- newChunk
+		chunkC <- &Chunk{Key: h, SData: job.chunk, Size: job.size, wg: swg}
 	}
 }
 
-func (self *TreeChunker) Append(key Key, data io.Reader, chunkC chan *Chunk, swg, wwg *sync.WaitGroup) (Key, error) {
+func (self *TreeChunker) Append(key Key, data io.Reader, chunkC chan *Chunk, swg *sync.WaitGroup) (Key, error) {
 	return nil, errAppendOppNotSuported
 }
 
