@@ -314,7 +314,7 @@ func testHasherCorrectness(bmt hash.Hash, hasher BaseHasher, d []byte, n, count 
 		}
 	}()
 	select {
-	case <-time.After(5 * time.Second):
+	case <-time.After(20 * time.Second):
 		err = fmt.Errorf("BMT hash calculation timed out")
 	case err = <-c:
 	}

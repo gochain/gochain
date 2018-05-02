@@ -216,7 +216,7 @@ func newTestNode(t *testing.T, dir string) *testNode {
 	}()
 
 	// wait for the node to start
-	for start := time.Now(); time.Since(start) < 10*time.Second; time.Sleep(50 * time.Millisecond) {
+	for start := time.Now(); time.Since(start) < 30*time.Second; time.Sleep(50 * time.Millisecond) {
 		node.Client, err = rpc.Dial(conf.IPCEndpoint())
 		if err == nil {
 			break
