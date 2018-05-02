@@ -464,9 +464,10 @@
   name = "golang.org/x/tools"
   packages = [
     "go/ast/astutil",
-    "imports"
+    "imports",
+    "internal/fastwalk"
   ]
-  revision = "77106db15f689a60e7d4e085d967ac557b918fb2"
+  revision = "5c8013c5617234a9515f1b1379aba7e03e846479"
 
 [[projects]]
   branch = "v1"
