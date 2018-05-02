@@ -85,9 +85,10 @@ func mountDir(t *testing.T, api *api.Api, files map[string]fileInfo, bzzHash str
 	mi := swarmfs.Listmounts()
 	for _, minfo := range mi {
 		if minfo.MountPoint == mountDir {
-			if minfo.StartManifest != bzzHash ||
-				minfo.LatestManifest != bzzHash ||
-				minfo.fuseConnection == nil {
+			minfo.LatestManifestMu.RLock()
+			lm := minfo.LatestManifest
+			minfo.LatestManifestMu.RUnlock()
+			if minfo.StartManifest != bzzHash || lm != bzzHash || minfo.fuseConnection == nil {
 				t.Fatalf("Error mounting: exp(%s): act(%s)", bzzHash, minfo.StartManifest)
 			}
 			found = true
@@ -423,7 +424,10 @@ func (ta *testAPI) createNewFile(t *testing.T) {
 
 	// mount again and see if things are okay
 	files["2.txt"] = fileInfo{0700, 333, 444, contents}
-	swarmfs2 := mountDir(t, ta.api, files, mi.LatestManifest, testMountDir)
+	mi.LatestManifestMu.RLock()
+	lm := mi.LatestManifest
+	mi.LatestManifestMu.RUnlock()
+	swarmfs2 := mountDir(t, ta.api, files, lm, testMountDir)
 	defer swarmfs2.Stop()
 
 	checkFile(t, testMountDir, "2.txt", contents)
@@ -459,7 +463,10 @@ func (ta *testAPI) createNewFileInsideDirectory(t *testing.T) {
 
 	// mount again and see if things are okay
 	files["one/2.txt"] = fileInfo{0700, 333, 444, contents}
-	swarmfs2 := mountDir(t, ta.api, files, mi.LatestManifest, testMountDir)
+	mi.LatestManifestMu.RLock()
+	lm := mi.LatestManifest
+	mi.LatestManifestMu.RUnlock()
+	swarmfs2 := mountDir(t, ta.api, files, lm, testMountDir)
 	defer swarmfs2.Stop()
 
 	checkFile(t, testMountDir, "one/2.txt", contents)
@@ -496,7 +503,10 @@ func (ta *testAPI) createNewFileInsideNewDirectory(t *testing.T) {
 
 	// mount again and see if things are okay
 	files["one/2.txt"] = fileInfo{0700, 333, 444, contents}
-	swarmfs2 := mountDir(t, ta.api, files, mi.LatestManifest, testMountDir)
+	mi.LatestManifestMu.RLock()
+	lm := mi.LatestManifest
+	mi.LatestManifestMu.RUnlock()
+	swarmfs2 := mountDir(t, ta.api, files, lm, testMountDir)
 	defer swarmfs2.Stop()
 
 	checkFile(t, testMountDir, "one/2.txt", contents)
@@ -526,7 +536,10 @@ func (ta *testAPI) removeExistingFile(t *testing.T) {
 
 	// mount again and see if things are okay
 	delete(files, "five.txt")
-	swarmfs2 := mountDir(t, ta.api, files, mi.LatestManifest, testMountDir)
+	mi.LatestManifestMu.RLock()
+	lm := mi.LatestManifest
+	mi.LatestManifestMu.RUnlock()
+	swarmfs2 := mountDir(t, ta.api, files, lm, testMountDir)
 	defer swarmfs2.Stop()
 }
 
@@ -554,7 +567,10 @@ func (ta *testAPI) removeExistingFileInsideDir(t *testing.T) {
 
 	// mount again and see if things are okay
 	delete(files, "one/five.txt")
-	swarmfs2 := mountDir(t, ta.api, files, mi.LatestManifest, testMountDir)
+	mi.LatestManifestMu.RLock()
+	lm := mi.LatestManifest
+	mi.LatestManifestMu.RUnlock()
+	swarmfs2 := mountDir(t, ta.api, files, lm, testMountDir)
 	defer swarmfs2.Stop()
 }
 
@@ -595,11 +611,14 @@ func (ta *testAPI) removeNewlyAddedFile(t *testing.T) {
 	}
 
 	// mount again and see if things are okay
-	swarmfs2 := mountDir(t, ta.api, files, mi.LatestManifest, testMountDir)
+	mi.LatestManifestMu.RLock()
+	lm := mi.LatestManifest
+	mi.LatestManifestMu.RUnlock()
+	swarmfs2 := mountDir(t, ta.api, files, lm, testMountDir)
 	defer swarmfs2.Stop()
 
-	if bzzHash != mi.LatestManifest {
-		t.Fatalf("same contents different hash orig(%v): new(%v)", bzzHash, mi.LatestManifest)
+	if bzzHash != lm {
+		t.Fatalf("same contents different hash orig(%v): new(%v)", bzzHash, lm)
 	}
 }
 
@@ -634,7 +653,10 @@ func (ta *testAPI) addNewFileAndModifyContents(t *testing.T) {
 
 	// mount again and see if things are okay
 	files["2.txt"] = fileInfo{0700, 333, 444, line1}
-	swarmfs2 := mountDir(t, ta.api, files, mi1.LatestManifest, testMountDir)
+	mi1.LatestManifestMu.RLock()
+	lm := mi1.LatestManifest
+	mi1.LatestManifestMu.RUnlock()
+	swarmfs2 := mountDir(t, ta.api, files, lm, testMountDir)
 	defer swarmfs2.Stop()
 
 	checkFile(t, testMountDir, "2.txt", line1)
@@ -645,7 +667,10 @@ func (ta *testAPI) addNewFileAndModifyContents(t *testing.T) {
 	}
 
 	// mount again and modify
-	swarmfs3 := mountDir(t, ta.api, files, mi2.LatestManifest, testMountDir)
+	mi2.LatestManifestMu.RLock()
+	lm = mi2.LatestManifest
+	mi2.LatestManifestMu.RUnlock()
+	swarmfs3 := mountDir(t, ta.api, files, lm, testMountDir)
 	defer swarmfs3.Stop()
 
 	fd, err4 := os.OpenFile(actualPath, os.O_RDWR|os.O_APPEND, os.FileMode(0665))
@@ -667,7 +692,10 @@ func (ta *testAPI) addNewFileAndModifyContents(t *testing.T) {
 	b := [][]byte{line1, line2}
 	line1and2 := bytes.Join(b, []byte(""))
 	files["2.txt"] = fileInfo{0700, 333, 444, line1and2}
-	swarmfs4 := mountDir(t, ta.api, files, mi3.LatestManifest, testMountDir)
+	mi3.LatestManifestMu.RLock()
+	lm = mi3.LatestManifest
+	mi3.LatestManifestMu.RUnlock()
+	swarmfs4 := mountDir(t, ta.api, files, lm, testMountDir)
 	defer swarmfs4.Stop()
 
 	checkFile(t, testMountDir, "2.txt", line1and2)
@@ -692,8 +720,11 @@ func (ta *testAPI) removeEmptyDir(t *testing.T) {
 	if err3 != nil {
 		t.Fatalf("Could not unmount %v", err3)
 	}
-	if bzzHash != mi.LatestManifest {
-		t.Fatalf("same contents different hash orig(%v): new(%v)", bzzHash, mi.LatestManifest)
+	mi.LatestManifestMu.RLock()
+	lm := mi.LatestManifest
+	mi.LatestManifestMu.RUnlock()
+	if bzzHash != lm {
+		t.Fatalf("same contents different hash orig(%v): new(%v)", bzzHash, lm)
 	}
 }
 
@@ -722,7 +753,10 @@ func (ta *testAPI) removeDirWhichHasFiles(t *testing.T) {
 	delete(files, "two/five.txt")
 	delete(files, "two/six.txt")
 
-	swarmfs2 := mountDir(t, ta.api, files, mi.LatestManifest, testMountDir)
+	mi.LatestManifestMu.RLock()
+	lm := mi.LatestManifest
+	mi.LatestManifestMu.RUnlock()
+	swarmfs2 := mountDir(t, ta.api, files, lm, testMountDir)
 	defer swarmfs2.Stop()
 }
 
@@ -758,7 +792,10 @@ func (ta *testAPI) removeDirWhichHasSubDirs(t *testing.T) {
 	delete(files, "two/four/6.txt")
 	delete(files, "two/four/six/7.txt")
 
-	swarmfs2 := mountDir(t, ta.api, files, mi.LatestManifest, testMountDir)
+	mi.LatestManifestMu.RLock()
+	lm := mi.LatestManifest
+	mi.LatestManifestMu.RUnlock()
+	swarmfs2 := mountDir(t, ta.api, files, lm, testMountDir)
 	defer swarmfs2.Stop()
 }
 
@@ -795,7 +832,10 @@ func (ta *testAPI) appendFileContentsToEnd(t *testing.T) {
 	b := [][]byte{line1, line2}
 	line1and2 := bytes.Join(b, []byte(""))
 	files["1.txt"] = fileInfo{0700, 333, 444, line1and2}
-	swarmfs2 := mountDir(t, ta.api, files, mi1.LatestManifest, testMountDir)
+	mi1.LatestManifestMu.RLock()
+	lm := mi1.LatestManifest
+	mi1.LatestManifestMu.RUnlock()
+	swarmfs2 := mountDir(t, ta.api, files, lm, testMountDir)
 	defer swarmfs2.Stop()
 
 	checkFile(t, testMountDir, "1.txt", line1and2)
