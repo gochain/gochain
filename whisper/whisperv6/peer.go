@@ -21,6 +21,8 @@ import (
 	"math"
 	"time"
 
+	"sync"
+
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/p2p"
@@ -34,6 +36,7 @@ type Peer struct {
 	peer *p2p.Peer
 	ws   p2p.MsgReadWriter
 
+	mu             sync.RWMutex
 	trusted        bool
 	powRequirement float64
 	bloomFilter    []byte
@@ -113,7 +116,9 @@ func (peer *Peer) handshake() error {
 		if math.IsInf(pow, 0) || math.IsNaN(pow) || pow < 0.0 {
 			return fmt.Errorf("peer [%x] sent bad status message: invalid pow", peer.ID())
 		}
+		peer.mu.Lock()
 		peer.powRequirement = pow
+		peer.mu.Unlock()
 
 		var bloom []byte
 		err = s.Decode(&bloom)
@@ -189,7 +194,10 @@ func (peer *Peer) broadcast() error {
 	envelopes := peer.host.Envelopes()
 	bundle := make([]*Envelope, 0, len(envelopes))
 	for _, envelope := range envelopes {
-		if !peer.marked(envelope) && envelope.PoW() >= peer.powRequirement && peer.bloomMatch(envelope) {
+		peer.mu.RLock()
+		pow := peer.powRequirement
+		peer.mu.RUnlock()
+		if !peer.marked(envelope) && envelope.PoW() >= pow && peer.bloomMatch(envelope) {
 			bundle = append(bundle, envelope)
 		}
 	}
@@ -226,10 +234,15 @@ func (peer *Peer) notifyAboutBloomFilterChange(bloom []byte) error {
 }
 
 func (peer *Peer) bloomMatch(env *Envelope) bool {
-	return peer.fullNode || bloomFilterMatch(peer.bloomFilter, env.Bloom())
+	peer.mu.RLock()
+	bf := peer.bloomFilter
+	peer.mu.RUnlock()
+	return peer.fullNode || bloomFilterMatch(bf, env.Bloom())
 }
 
 func (peer *Peer) setBloomFilter(bloom []byte) {
+	peer.mu.Lock()
+	defer peer.mu.Unlock()
 	peer.bloomFilter = bloom
 	peer.fullNode = isFullNode(bloom)
 	if peer.fullNode && peer.bloomFilter == nil {

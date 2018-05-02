@@ -334,7 +334,9 @@ func (whisper *Whisper) AllowP2PMessagesFromPeer(peerID []byte) error {
 	if err != nil {
 		return err
 	}
+	p.mu.Lock()
 	p.trusted = true
+	p.mu.Unlock()
 	return nil
 }
 
@@ -348,7 +350,9 @@ func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelop
 	if err != nil {
 		return err
 	}
+	p.mu.Lock()
 	p.trusted = true
+	p.mu.Unlock()
 	return p2p.Send(p.ws, p2pRequestCode, envelope)
 }
 
@@ -699,7 +703,9 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				log.Warn("invalid value in powRequirementCode message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 				return errors.New("invalid value in powRequirementCode message")
 			}
+			p.mu.Lock()
 			p.powRequirement = f
+			p.mu.Unlock()
 		case bloomFilterExCode:
 			var bloom []byte
 			err := packet.Decode(&bloom)
@@ -717,7 +723,10 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			// this message is not supposed to be forwarded to other peers, and
 			// therefore might not satisfy the PoW, expiry and other requirements.
 			// these messages are only accepted from the trusted peer.
-			if p.trusted {
+			p.mu.RLock()
+			trusted := p.trusted
+			p.mu.RUnlock()
+			if trusted {
 				var envelope Envelope
 				if err := packet.Decode(&envelope); err != nil {
 					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
