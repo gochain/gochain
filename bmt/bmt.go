@@ -79,7 +79,6 @@ type Hasher struct {
 	segment     []byte      // the rightmost open segment (not complete)
 	depth       int         // index of last level
 	result      chan []byte // result channel
-	hash        []byte      // to record the result
 	max         int32       // max segments for SegmentWriter interface
 	blockLength []byte      // The block length that needes to be added in Sum
 }
@@ -102,13 +101,13 @@ func New(p *TreePool) *Hasher {
 // it allows for continued writes after a Sum
 // and is left in completely reusable state after Reset
 type Node struct {
-	level, index int   // position of node for information/logging only
-	initial      bool  // first and last node
-	root         bool  // whether the node is root to a smaller BMT
-	isLeft       bool  // whether it is left side of the parent double segment
-	unbalanced   bool  // indicates if a node has only the left segment
-	parent       *Node // BMT connections
-	state        int32 // atomic increment impl concurrent boolean toggle
+	level, index int    // position of node for information/logging only
+	initial      bool   // first and last node
+	root         bool   // whether the node is root to a smaller BMT
+	isLeft       bool   // whether it is left side of the parent double segment
+	unbalanced   uint32 // atomic - indicates if a node has only the left segment
+	parent       *Node  // BMT connections
+	state        int32  // atomic increment impl concurrent boolean toggle
 	left, right  []byte
 }
 
@@ -425,7 +424,7 @@ func (self *Hasher) releaseTree() {
 	if self.bmt != nil {
 		n := self.bmt.leaves[self.cur]
 		for ; n != nil; n = n.parent {
-			n.unbalanced = false
+			atomic.StoreUint32(&n.unbalanced, 0)
 			if n.parent != nil {
 				n.root = false
 			}
@@ -467,10 +466,11 @@ func (self *Hasher) run(n *Node, h hash.Hash, d int, i int, s []byte) {
 		} else {
 			n.right = s
 		}
-		if !n.unbalanced && n.toggle() {
+		unbalanced := atomic.LoadUint32(&n.unbalanced) != 0
+		if !unbalanced && n.toggle() {
 			return
 		}
-		if !n.unbalanced || !isLeft || i == 0 && d == 0 {
+		if !unbalanced || !isLeft || i == 0 && d == 0 {
 			h.Reset()
 			_, _ = h.Write(n.left)
 			_, _ = h.Write(n.right)
@@ -480,7 +480,6 @@ func (self *Hasher) run(n *Node, h hash.Hash, d int, i int, s []byte) {
 			s = append(n.left, n.right...)
 		}
 
-		self.hash = s
 		if n.root {
 			self.result <- s
 			return
@@ -533,7 +532,11 @@ func (self *Hasher) finalise(n *Node, i int) (d int) {
 		// the incoming data is pushed to the parent upon pulling the left
 		// we do not need toogle the state since this condition is
 		// detectable
-		n.unbalanced = isLeft
+		var v uint32
+		if isLeft {
+			v = 1
+		}
+		atomic.StoreUint32(&n.unbalanced, v)
 		n.right = nil
 		if n.initial {
 			n.root = true
