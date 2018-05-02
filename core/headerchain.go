@@ -169,7 +169,9 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 			headHeader = hc.GetHeader(headHash, headNumber)
 		)
 		for GetCanonicalHash(hc.chainDb, headNumber) != headHash {
-			WriteCanonicalHash(hc.chainDb, headHash, headNumber)
+			if err := WriteCanonicalHash(hc.chainDb, headHash, headNumber); err != nil {
+				log.Error("Cannot write canonical hash", "hash", headHash, "number", headNumber)
+			}
 
 			headHash = headHeader.ParentHash
 			headNumber = headHeader.Number.Uint64() - 1

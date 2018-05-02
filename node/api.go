@@ -24,6 +24,7 @@ import (
 
 	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/crypto"
+	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/p2p/discover"
 	"github.com/gochain-io/gochain/rpc"
@@ -99,7 +100,9 @@ func (api *PrivateAdminAPI) PeerEvents(ctx context.Context) (*rpc.Subscription, 
 		for {
 			select {
 			case event := <-events:
-				notifier.Notify(rpcSub.ID, event)
+				if err := notifier.Notify(rpcSub.ID, event); err != nil {
+					log.Error("Cannot notify peer event", "id", rpcSub.ID)
+				}
 			case <-sub.Err():
 				return
 			case <-rpcSub.Err():

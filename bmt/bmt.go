@@ -312,8 +312,8 @@ func (self *Hasher) Sum(b []byte) (r []byte) {
 	}
 	res := self.pool.hasher()
 	res.Reset()
-	res.Write(self.blockLength)
-	res.Write(c)
+	_, _ = res.Write(self.blockLength)
+	_, _ = res.Write(c)
 	return res.Sum(nil)
 }
 
@@ -445,7 +445,7 @@ func (self *Hasher) writeSegment(i int, s []byte, d int) {
 	if len(s) > self.size && n.parent != nil {
 		go func() {
 			h.Reset()
-			h.Write(s)
+			_, _ = h.Write(s)
 			s = h.Sum(nil)
 
 			if n.root {
@@ -472,8 +472,8 @@ func (self *Hasher) run(n *Node, h hash.Hash, d int, i int, s []byte) {
 		}
 		if !n.unbalanced || !isLeft || i == 0 && d == 0 {
 			h.Reset()
-			h.Write(n.left)
-			h.Write(n.right)
+			_, _ = h.Write(n.left)
+			_, _ = h.Write(n.right)
 			s = h.Sum(nil)
 
 		} else {

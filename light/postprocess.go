@@ -113,7 +113,9 @@ func GetChtV2Root(db ethdb.Database, sectionIdx uint64, sectionHead common.Hash)
 func StoreChtRoot(db ethdb.Database, sectionIdx uint64, sectionHead, root common.Hash) {
 	var encNumber [8]byte
 	binary.BigEndian.PutUint64(encNumber[:], sectionIdx)
-	db.Put(append(append(chtPrefix, encNumber[:]...), sectionHead.Bytes()...), root.Bytes())
+	if err := db.Put(append(append(chtPrefix, encNumber[:]...), sectionHead.Bytes()...), root.Bytes()); err != nil {
+		log.Error("Cannot store cht root", "err", err)
+	}
 }
 
 // ChtIndexerBackend implements core.ChainIndexerBackend
@@ -177,7 +179,9 @@ func (c *ChtIndexerBackend) Commit() error {
 	if err != nil {
 		return err
 	}
-	c.triedb.Commit(root, false)
+	if err := c.triedb.Commit(root, false); err != nil {
+		log.Error("Cannot commit cht indexer backend", "err", err)
+	}
 
 	if ((c.section+1)*c.sectionSize)%CHTFrequencyClient == 0 {
 		log.Info("Storing CHT", "section", c.section*c.sectionSize/CHTFrequencyClient, "head", c.lastHash, "root", root)
@@ -209,7 +213,9 @@ func GetBloomTrieRoot(db ethdb.Database, sectionIdx uint64, sectionHead common.H
 func StoreBloomTrieRoot(db ethdb.Database, sectionIdx uint64, sectionHead, root common.Hash) {
 	var encNumber [8]byte
 	binary.BigEndian.PutUint64(encNumber[:], sectionIdx)
-	db.Put(append(append(bloomTriePrefix, encNumber[:]...), sectionHead.Bytes()...), root.Bytes())
+	if err := db.Put(append(append(bloomTriePrefix, encNumber[:]...), sectionHead.Bytes()...), root.Bytes()); err != nil {
+		log.Error("Cannot store bloom trie root", "err", err)
+	}
 }
 
 // BloomTrieIndexerBackend implements core.ChainIndexerBackend
@@ -296,7 +302,9 @@ func (b *BloomTrieIndexerBackend) Commit() error {
 	if err != nil {
 		return err
 	}
-	b.triedb.Commit(root, false)
+	if err := b.triedb.Commit(root, false); err != nil {
+		log.Error("Cannot store bloom trie indexer trie db", "err", err)
+	}
 
 	sectionHead := b.sectionHeads[b.bloomTrieRatio-1]
 	log.Info("Storing bloom trie", "section", b.section, "head", sectionHead, "root", root, "compression", float64(compSize)/float64(decompSize))

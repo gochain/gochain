@@ -203,7 +203,9 @@ func (n *Node) Start(ctx context.Context) error {
 		// Start the next service, stopping all previous upon failure
 		if err := service.Start(ctx, running); err != nil {
 			for _, kind := range started {
-				services[kind].Stop()
+				if err := services[kind].Stop(); err != nil {
+					log.Error("Cannot stop node service", "err", err)
+				}
 			}
 			running.Stop()
 
@@ -215,7 +217,9 @@ func (n *Node) Start(ctx context.Context) error {
 	// Lastly start the configured RPC interfaces
 	if err := n.startRPC(services); err != nil {
 		for _, service := range services {
-			service.Stop()
+			if err := service.Stop(); err != nil {
+				log.Error("Cannot stop node service", "err", err)
+			}
 		}
 		running.Stop()
 		return err
@@ -354,7 +358,9 @@ func (n *Node) startIPC(apis []rpc.API) error {
 // stopIPC terminates the IPC RPC endpoint.
 func (n *Node) stopIPC() {
 	if n.ipcListener != nil {
-		n.ipcListener.Close()
+		if err := n.ipcListener.Close(); err != nil {
+			log.Error("Cannot stop ipc listener", "err", err)
+		}
 		n.ipcListener = nil
 
 		n.log.Info("IPC endpoint closed", "endpoint", n.ipcEndpoint)
@@ -407,7 +413,9 @@ func (n *Node) startHTTP(endpoint string, apis []rpc.API, modules []string, cors
 // stopHTTP terminates the HTTP RPC endpoint.
 func (n *Node) stopHTTP() {
 	if n.httpListener != nil {
-		n.httpListener.Close()
+		if err := n.httpListener.Close(); err != nil {
+			log.Error("Cannot stop node http listener", "err", err)
+		}
 		n.httpListener = nil
 
 		n.log.Info("HTTP endpoint closed", "url", fmt.Sprintf("http://%s", n.httpEndpoint))
@@ -461,7 +469,9 @@ func (n *Node) startWS(endpoint string, apis []rpc.API, modules []string, wsOrig
 // stopWS terminates the websocket RPC endpoint.
 func (n *Node) stopWS() {
 	if n.wsListener != nil {
-		n.wsListener.Close()
+		if err := n.wsListener.Close(); err != nil {
+			log.Error("Cannot stop node ws listener", "err", err)
+		}
 		n.wsListener = nil
 
 		n.log.Info("WebSocket endpoint closed", "url", fmt.Sprintf("ws://%s", n.wsEndpoint))

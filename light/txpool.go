@@ -441,7 +441,9 @@ func (self *TxPool) Add(ctx context.Context, tx *types.Transaction) error {
 	//fmt.Println("Send", tx.Hash())
 	self.relay.Send(types.Transactions{tx})
 
-	self.chainDb.Put(tx.Hash().Bytes(), data)
+	if err := self.chainDb.Put(tx.Hash().Bytes(), data); err != nil {
+		log.Error("Cannot add to tx pool chain db", err)
+	}
 	return nil
 }
 
@@ -513,7 +515,9 @@ func (self *TxPool) RemoveTransactions(txs types.Transactions) {
 		//self.RemoveTx(tx.Hash())
 		hash := tx.Hash()
 		delete(self.pending, hash)
-		self.chainDb.Delete(hash[:])
+		if err := self.chainDb.Delete(hash[:]); err != nil {
+			log.Error("Cannot remove txs from tx pool chain db", err)
+		}
 		hashes = append(hashes, hash)
 	}
 	self.relay.Discard(hashes)
@@ -525,6 +529,8 @@ func (pool *TxPool) RemoveTx(hash common.Hash) {
 	defer pool.mu.Unlock()
 	// delete from pending pool
 	delete(pool.pending, hash)
-	pool.chainDb.Delete(hash[:])
+	if err := pool.chainDb.Delete(hash[:]); err != nil {
+		log.Error("Cannot remove tx from tx pool chain db", err)
+	}
 	pool.relay.Discard([]common.Hash{hash})
 }

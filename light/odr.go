@@ -26,6 +26,7 @@ import (
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/ethdb"
+	"github.com/gochain-io/gochain/log"
 )
 
 // NoOdr is the default context passed to an ODR capable function when the ODR
@@ -99,7 +100,9 @@ type CodeRequest struct {
 
 // StoreResult stores the retrieved data in local database
 func (req *CodeRequest) StoreResult(db ethdb.Database) {
-	db.Put(req.Hash[:], req.Data)
+	if err := db.Put(req.Hash[:], req.Data); err != nil {
+		log.Error("Cannot store code request result", "err", err)
+	}
 }
 
 // BlockRequest is the ODR request type for retrieving block bodies
@@ -112,7 +115,9 @@ type BlockRequest struct {
 
 // StoreResult stores the retrieved data in local database
 func (req *BlockRequest) StoreResult(db ethdb.Database) {
-	core.WriteBodyRLP(db, req.Hash, req.Number, req.Rlp)
+	if err := core.WriteBodyRLP(db, req.Hash, req.Number, req.Rlp); err != nil {
+		log.Error("Cannot store block request result", "err", err)
+	}
 }
 
 // ReceiptsRequest is the ODR request type for retrieving block bodies
@@ -125,7 +130,9 @@ type ReceiptsRequest struct {
 
 // StoreResult stores the retrieved data in local database
 func (req *ReceiptsRequest) StoreResult(db ethdb.Database) {
-	core.WriteBlockReceipts(db, req.Hash, req.Number, req.Receipts)
+	if err := core.WriteBlockReceipts(db, req.Hash, req.Number, req.Receipts); err != nil {
+		log.Error("Cannot store receipts request result", "err", err)
+	}
 }
 
 // ChtRequest is the ODR request type for state/storage trie entries
@@ -141,10 +148,16 @@ type ChtRequest struct {
 // StoreResult stores the retrieved data in local database
 func (req *ChtRequest) StoreResult(db ethdb.Database) {
 	// if there is a canonical hash, there is a header too
-	core.WriteHeader(db, req.Header)
+	if err := core.WriteHeader(db, req.Header); err != nil {
+		log.Error("Cannot store cht request header result", "err", err)
+	}
 	hash, num := req.Header.Hash(), req.Header.Number.Uint64()
-	core.WriteTd(db, hash, num, req.Td)
-	core.WriteCanonicalHash(db, hash, num)
+	if err := core.WriteTd(db, hash, num, req.Td); err != nil {
+		log.Error("Cannot store cht request td result", "err", err)
+	}
+	if err := core.WriteCanonicalHash(db, hash, num); err != nil {
+		log.Error("Cannot store cht request canonical hash result", "err", err)
+	}
 }
 
 // BloomRequest is the ODR request type for retrieving bloom filters from a CHT structure

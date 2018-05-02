@@ -123,7 +123,9 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *eth.Config) (*L
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
 		leth.blockchain.SetHead(compat.RewindTo)
-		core.WriteChainConfig(chainDb, genesisHash, chainConfig)
+		if err := core.WriteChainConfig(chainDb, genesisHash, chainConfig); err != nil {
+			log.Error("Cannot write chain config during rewind", "hash", genesisHash, "err", err)
+		}
 	}
 
 	leth.txPool = light.NewTxPool(leth.chainConfig, leth.blockchain, leth.relay)
@@ -237,13 +239,19 @@ func (s *LightGoChain) Start(ctx context.Context, srvr *p2p.Server) error {
 func (s *LightGoChain) Stop() error {
 	s.odr.Stop()
 	if s.bloomIndexer != nil {
-		s.bloomIndexer.Close()
+		if err := s.bloomIndexer.Close(); err != nil {
+			log.Error("cannot close bloom indexer", "err", err)
+		}
 	}
 	if s.chtIndexer != nil {
-		s.chtIndexer.Close()
+		if err := s.chtIndexer.Close(); err != nil {
+			log.Error("cannot close chain indexer", "err", err)
+		}
 	}
 	if s.bloomTrieIndexer != nil {
-		s.bloomTrieIndexer.Close()
+		if err := s.bloomTrieIndexer.Close(); err != nil {
+			log.Error("cannot close bloom trie indexer", "err", err)
+		}
 	}
 	s.blockchain.Stop()
 	s.protocolManager.Stop()

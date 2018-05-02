@@ -32,6 +32,7 @@ import (
 	"github.com/gochain-io/gochain/eth/gasprice"
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/event"
+	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 	"github.com/gochain-io/gochain/rpc"
 )
@@ -52,7 +53,9 @@ func (b *EthApiBackend) CurrentBlock() *types.Block {
 
 func (b *EthApiBackend) SetHead(number uint64) {
 	b.eth.protocolManager.downloader.Cancel()
-	b.eth.blockchain.SetHead(number)
+	if err := b.eth.blockchain.SetHead(number); err != nil {
+		log.Error("Cannot set eth api backend head", "number", number, "err", err)
+	}
 }
 
 func (b *EthApiBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error) {

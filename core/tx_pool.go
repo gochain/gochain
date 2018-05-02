@@ -529,7 +529,9 @@ func (pool *TxPool) Stop() {
 	pool.wg.Wait()
 
 	if pool.journal != nil {
-		pool.journal.close()
+		if err := pool.journal.close(); err != nil {
+			log.Error("Cannot close tx pool journal", "err", err)
+		}
 	}
 	log.Info("Transaction pool stopped")
 }
@@ -1001,7 +1003,9 @@ func (pool *TxPool) removeTx(ctx context.Context, hash common.Hash) {
 			} else {
 				// Otherwise postpone any invalidated transactions
 				for _, tx := range invalids {
-					pool.enqueueTx(ctx, tx.Hash(), tx)
+					if _, err := pool.enqueueTx(ctx, tx.Hash(), tx); err != nil {
+						log.Error("cannot enqueue invalid tx to pool", "hash", tx.Hash(), "err", err)
+					}
 				}
 			}
 			// Update the account nonce if needed
@@ -1269,14 +1273,18 @@ func (pool *TxPool) demoteUnexecutables(ctx context.Context) {
 			if tracing {
 				log.Trace("Demoting pending transaction", "hash", hash)
 			}
-			pool.enqueueTx(ctx, hash, tx)
+			if _, err := pool.enqueueTx(ctx, hash, tx); err != nil {
+				log.Error("Cannot enqueue tx to pool during demotion", "hash", hash, "err", err)
+			}
 		}
 		// If there's a gap in front, warn (should never happen) and postpone all transactions
 		if list.Len() > 0 && list.txs.Get(nonce) == nil {
 			for _, tx := range list.Cap(0) {
 				hash := tx.Hash()
 				log.Error("Demoting invalidated transaction", "hash", hash)
-				pool.enqueueTx(ctx, hash, tx)
+				if _, err := pool.enqueueTx(ctx, hash, tx); err != nil {
+					log.Error("Cannot enqueue invalid tx to pool during demotion", "hash", hash, "err", err)
+				}
 			}
 		}
 		// Delete the entire queue entry if it became empty.

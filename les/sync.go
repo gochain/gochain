@@ -23,6 +23,7 @@ import (
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/eth/downloader"
 	"github.com/gochain-io/gochain/light"
+	"github.com/gochain-io/gochain/log"
 )
 
 const (
@@ -80,5 +81,7 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	pm.blockchain.(*light.LightChain).SyncCht(ctx)
-	pm.downloader.Synchronise(ctx, peer.id, peer.Head(), peer.Td(), downloader.LightSync)
+	if err := pm.downloader.Synchronise(ctx, peer.id, peer.Head(), peer.Td(), downloader.LightSync); err != nil {
+		log.Error("Cannot synchronise downloader", "id", peer.id, "head", peer.Head(), "err", err)
+	}
 }

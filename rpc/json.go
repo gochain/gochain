@@ -345,7 +345,9 @@ func (c *jsonCodec) Write(res interface{}) error {
 func (c *jsonCodec) Close() {
 	c.closer.Do(func() {
 		close(c.closed)
-		c.rw.Close()
+		if err := c.rw.Close(); err != nil {
+			log.Error("Cannot close json codec rw", "err", err)
+		}
 	})
 }
 

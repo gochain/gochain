@@ -270,12 +270,18 @@ func (p *Peer) handle(msg Msg) error {
 	switch {
 	case msg.Code == pingMsg:
 		msg.Discard()
-		go SendItems(p.rw, pongMsg)
+		go func() {
+			if err := SendItems(p.rw, pongMsg); err != nil {
+				log.Error("Cannot send items", "err", err)
+			}
+		}()
 	case msg.Code == discMsg:
 		var reason [1]DiscReason
 		// This is the last message. We don't need to discard or
 		// check errors because, the connection will be closed after it.
-		rlp.Decode(msg.Payload, &reason)
+		if err := rlp.Decode(msg.Payload, &reason); err != nil {
+			log.Error("Cannot decode disc msg payload", err)
+		}
 		return reason[0]
 	case msg.Code < baseProtocolLength:
 		// ignore other base protocol messages

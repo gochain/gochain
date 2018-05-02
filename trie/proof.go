@@ -81,7 +81,9 @@ func (t *Trie) Prove(key []byte, fromLevel uint, proofDb ethdb.Putter) error {
 				if !ok {
 					hash = crypto.Keccak256(enc)
 				}
-				proofDb.Put(hash, enc)
+				if err := proofDb.Put(hash, enc); err != nil {
+					log.Error("Cannot insert into proof db", "err", err)
+				}
 			}
 		}
 	}

@@ -25,6 +25,7 @@ import (
 	"github.com/gochain-io/gochain/core/bloombits"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/ethdb"
+	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 )
 
@@ -123,7 +124,9 @@ func (b *BloomIndexer) Reset(section uint64, lastSectionHead common.Hash) error 
 // Process implements core.ChainIndexerBackend, adding a new header's bloom into
 // the index.
 func (b *BloomIndexer) Process(header *types.Header) {
-	b.gen.AddBloom(uint(header.Number.Uint64()-b.section*b.size), header.Bloom)
+	if err := b.gen.AddBloom(uint(header.Number.Uint64()-b.section*b.size), header.Bloom); err != nil {
+		log.Error("Cannot add bloom to indexer")
+	}
 	b.head = header.Hash()
 }
 

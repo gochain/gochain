@@ -300,7 +300,9 @@ func (t *dialTask) Do(srv *Server) {
 		// Try resolving the ID of static nodes if dialing failed.
 		if _, ok := err.(*dialError); ok && t.flags&staticDialedConn != 0 {
 			if t.resolve(srv) {
-				t.dial(srv, t.dest)
+				if err := t.dial(srv, t.dest); err != nil {
+					log.Error("Cannot dial static node", "err", err)
+				}
 			}
 		}
 	}

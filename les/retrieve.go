@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/gochain-io/gochain/common/mclock"
+	"github.com/gochain-io/gochain/log"
 )
 
 var (
@@ -319,7 +320,9 @@ func (r *sentReq) tryRequest() {
 		if hrto {
 			pp.Log().Debug("Request timed out hard")
 			if r.rm.peers != nil {
-				r.rm.peers.Unregister(pp.id)
+				if err := r.rm.peers.Unregister(pp.id); err != nil {
+					log.Error("Cannot unregister peer after request attempt", "id", pp.id, "err", err)
+				}
 			}
 		}
 

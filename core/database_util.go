@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 
 	"github.com/gochain-io/gochain/common"
@@ -528,23 +529,32 @@ func WriteBloomBits(db ethdb.Putter, bit uint, section uint64, head common.Hash,
 
 // DeleteCanonicalHash removes the number to hash canonical mapping.
 func DeleteCanonicalHash(db DatabaseDeleter, number uint64) {
-	db.Delete(numKey(number))
+	if err := db.Delete(numKey(number)); err != nil {
+		log.Error("Cannot delete canonical hash", "number", number, "err", err)
+	}
 }
 
 // DeleteHeader removes all block header data associated with a hash.
 func DeleteHeader(db DatabaseDeleter, hash common.Hash, number uint64) {
-	db.Delete(hashKey(blockHashPrefix, hash))
-	db.Delete(numHashKey(headerPrefix, number, hash))
+	if err := db.Delete(hashKey(blockHashPrefix, hash)); err != nil {
+		log.Error("Cannot delete block hash", "hash", hash, "err", err)
+	} else if err := db.Delete(numHashKey(headerPrefix, number, hash)); err != nil {
+		log.Error("Cannot delete header", "hash", hash, "number", number, "err", err)
+	}
 }
 
 // DeleteBody removes all block body data associated with a hash.
 func DeleteBody(db DatabaseDeleter, hash common.Hash, number uint64) {
-	db.Delete(numHashKey(bodyPrefix, number, hash))
+	if err := db.Delete(numHashKey(bodyPrefix, number, hash)); err != nil {
+		log.Error("Cannot delete body", "hash", hash, "number", number, "err", err)
+	}
 }
 
 // DeleteTd removes all block total difficulty data associated with a hash.
 func DeleteTd(db DatabaseDeleter, hash common.Hash, number uint64) {
-	db.Delete(tdKey(number, hash))
+	if err := db.Delete(tdKey(number, hash)); err != nil {
+		log.Error("Cannot delete td", "hash", hash, "number", number, "err", err)
+	}
 }
 
 // DeleteBlock removes all block data associated with a hash.
@@ -557,12 +567,16 @@ func DeleteBlock(db DatabaseDeleter, hash common.Hash, number uint64) {
 
 // DeleteBlockReceipts removes all receipt data associated with a block hash.
 func DeleteBlockReceipts(db DatabaseDeleter, hash common.Hash, number uint64) {
-	db.Delete(numHashKey(blockReceiptsPrefix, number, hash))
+	if err := db.Delete(numHashKey(blockReceiptsPrefix, number, hash)); err != nil {
+		log.Error("Cannot delete block receipts", "hash", hash, "number", number, "err", err)
+	}
 }
 
 // DeleteTxLookupEntry removes all transaction data associated with a hash.
 func DeleteTxLookupEntry(db DatabaseDeleter, hash common.Hash) {
-	db.Delete(hashKey(lookupPrefix, hash))
+	if err := db.Delete(hashKey(lookupPrefix, hash)); err != nil {
+		log.Error("Cannot delete tx lookup entry", "hash", hash, "err", err)
+	}
 }
 
 // PreimageTable returns a Database instance with the key prefix for preimage entries.
@@ -578,7 +592,9 @@ func WritePreimages(db ethdb.Database, number uint64, preimages map[common.Hash]
 	hitCount := 0
 	for hash, preimage := range preimages {
 		if _, err := table.Get(hash.Bytes()); err != nil {
-			batch.Put(hash.Bytes(), preimage)
+			if err := batch.Put(hash.Bytes(), preimage); err != nil {
+				return err
+			}
 			hitCount++
 		}
 	}
@@ -596,14 +612,18 @@ func WritePreimages(db ethdb.Database, number uint64, preimages map[common.Hash]
 func GetBlockChainVersion(db DatabaseReader) int {
 	var vsn uint
 	enc, _ := db.Get([]byte("BlockchainVersion"))
-	rlp.DecodeBytes(enc, &vsn)
+	if err := rlp.DecodeBytes(enc, &vsn); err != nil && err != io.EOF {
+		log.Error("Cannot decode block chain version", "err", err)
+	}
 	return int(vsn)
 }
 
 // WriteBlockChainVersion writes vsn as the version number to db.
 func WriteBlockChainVersion(db ethdb.Putter, vsn int) {
 	enc, _ := rlp.EncodeToBytes(uint(vsn))
-	db.Put([]byte("BlockchainVersion"), enc)
+	if err := db.Put([]byte("BlockchainVersion"), enc); err != nil {
+		log.Error("Cannot write block chain version", "err", err)
+	}
 }
 
 // WriteChainConfig writes the chain config settings to the database.

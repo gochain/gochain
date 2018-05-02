@@ -183,8 +183,12 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *Config) (*GoCha
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
-		eth.blockchain.SetHead(compat.RewindTo)
-		core.WriteChainConfig(chainDb, genesisHash, chainConfig)
+		if err := eth.blockchain.SetHead(compat.RewindTo); err != nil {
+			log.Error("Cannot set head during chain rewind", "rewind_to", compat.RewindTo, "err", err)
+		}
+		if err := core.WriteChainConfig(chainDb, genesisHash, chainConfig); err != nil {
+			log.Error("Cannot write chain config during rewind", "hash", genesisHash, "err", err)
+		}
 	}
 	eth.bloomIndexer.Start(eth.blockchain)
 
@@ -197,7 +201,9 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *Config) (*GoCha
 		return nil, err
 	}
 	eth.miner = miner.New(ctx, eth, eth.chainConfig, eth.EventMux(), eth.engine)
-	eth.miner.SetExtra(makeExtraData(config.ExtraData))
+	if err := eth.miner.SetExtra(makeExtraData(config.ExtraData)); err != nil {
+		log.Error("Cannot set extra chain data", "err", err)
+	}
 
 	eth.ApiBackend = &EthApiBackend{eth, nil}
 	gpoParams := config.GPO
@@ -327,7 +333,9 @@ func (s *GoChain) APIs() []rpc.API {
 }
 
 func (s *GoChain) ResetWithGenesisBlock(gb *types.Block) {
-	s.blockchain.ResetWithGenesisBlock(gb)
+	if err := s.blockchain.ResetWithGenesisBlock(gb); err != nil {
+		log.Error("Cannot reset with genesis block", "err", err)
+	}
 }
 
 func (s *GoChain) Etherbase() (eb common.Address, err error) {
@@ -440,9 +448,13 @@ func (s *GoChain) Start(ctx context.Context, srvr *p2p.Server) error {
 // GoChain protocol.
 func (s *GoChain) Stop() error {
 	if s.stopDbUpgrade != nil {
-		s.stopDbUpgrade()
+		if err := s.stopDbUpgrade(); err != nil {
+			log.Error("Cannot stop db upgrade", "err", err)
+		}
 	}
-	s.bloomIndexer.Close()
+	if err := s.bloomIndexer.Close(); err != nil {
+		log.Error("Cannot stop bloom indexer", "err", err)
+	}
 	s.blockchain.Stop()
 	s.protocolManager.Stop()
 	if s.lesServer != nil {

@@ -185,7 +185,9 @@ func NewBlockChain(ctx context.Context, db ethdb.Database, cacheConfig *CacheCon
 			// make sure the headerByNumber (if present) is in our current canonical chain
 			if headerByNumber != nil && headerByNumber.Hash() == header.Hash() {
 				log.Error("Found bad hash, rewinding chain", "number", header.Number, "hash", header.ParentHash)
-				bc.SetHead(header.Number.Uint64() - 1)
+				if err := bc.SetHead(header.Number.Uint64() - 1); err != nil {
+					log.Error("Cannot set blockchain head", "err", err)
+				}
 				log.Error("Chain rewind was successful, resuming normal operation")
 			}
 		}
@@ -688,7 +690,9 @@ func (bc *BlockChain) procFutureBlocks(ctx context.Context) {
 
 		// Insert one by one as chain insertion needs contiguous ancestry between blocks
 		for i := range blocks {
-			bc.InsertChain(ctx, blocks[i:i+1])
+			if n, err := bc.InsertChain(ctx, blocks[i:i+1]); err != nil {
+				log.Error("Cannot insert future blocks into chain", "n", n, "err", err)
+			}
 		}
 	}
 }
@@ -717,11 +721,15 @@ func (bc *BlockChain) Rollback(chain []common.Hash) {
 		}
 		if bc.currentFastBlock.Hash() == hash {
 			bc.currentFastBlock = bc.GetBlock(bc.currentFastBlock.ParentHash(), bc.currentFastBlock.NumberU64()-1)
-			WriteHeadFastBlockHash(bc.db, bc.currentFastBlock.Hash())
+			if err := WriteHeadFastBlockHash(bc.db, bc.currentFastBlock.Hash()); err != nil {
+				log.Error("Cannot write head fast during rollback", "err", err)
+			}
 		}
 		if bc.currentBlock.Hash() == hash {
 			bc.currentBlock = bc.GetBlock(bc.currentBlock.ParentHash(), bc.currentBlock.NumberU64()-1)
-			WriteHeadBlockHash(bc.db, bc.currentBlock.Hash())
+			if err := WriteHeadBlockHash(bc.db, bc.currentBlock.Hash()); err != nil {
+				log.Error("Cannot write head during rollback", "err", err)
+			}
 		}
 	}
 }
@@ -933,7 +941,9 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 				}
 				// If optimum or critical limits reached, write to disk
 				if chosen >= lastWrite+triesInMemory || size >= 2*limit || bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {
-					triedb.Commit(header.Root, true)
+					if err := triedb.Commit(header.Root, true); err != nil {
+						log.Error("Cannot commit trie db", "err", err)
+					}
 					lastWrite = chosen
 					bc.gcproc = 0
 				}

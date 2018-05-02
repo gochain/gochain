@@ -21,6 +21,7 @@ import (
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/types"
+	"github.com/gochain-io/gochain/log"
 )
 
 type ltrInfo struct {
@@ -127,7 +128,11 @@ func (self *LesTxRelay) send(txs types.Transactions, count int) {
 				peer := dp.(*peer)
 				cost := peer.GetRequestCost(SendTxMsg, len(ll))
 				peer.fcServer.QueueRequest(reqID, cost)
-				return func() { peer.SendTxs(reqID, cost, ll) }
+				return func() {
+					if err := peer.SendTxs(reqID, cost, ll); err != nil {
+						log.Error("Cannot send txs in relay", "req_id", reqID, "err", err)
+					}
+				}
 			},
 		}
 		self.reqDist.queue(rq)

@@ -39,6 +39,7 @@ import (
 	"github.com/gochain-io/gochain/crypto/ecies"
 	"github.com/gochain-io/gochain/crypto/secp256k1"
 	"github.com/gochain-io/gochain/crypto/sha3"
+	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/p2p/discover"
 	"github.com/gochain-io/gochain/rlp"
 	"github.com/golang/snappy"
@@ -84,21 +85,27 @@ type rlpx struct {
 }
 
 func newRLPX(fd net.Conn) transport {
-	fd.SetDeadline(time.Now().Add(handshakeTimeout))
+	if err := fd.SetDeadline(time.Now().Add(handshakeTimeout)); err != nil {
+		log.Error("Cannot set rlpx deadline", "err", err)
+	}
 	return &rlpx{fd: fd}
 }
 
 func (t *rlpx) ReadMsg() (Msg, error) {
 	t.rmu.Lock()
 	defer t.rmu.Unlock()
-	t.fd.SetReadDeadline(time.Now().Add(frameReadTimeout))
+	if err := t.fd.SetReadDeadline(time.Now().Add(frameReadTimeout)); err != nil {
+		log.Error("Cannot set rlpx read deadline", "err", err)
+	}
 	return t.rw.ReadMsg()
 }
 
 func (t *rlpx) WriteMsg(msg Msg) error {
 	t.wmu.Lock()
 	defer t.wmu.Unlock()
-	t.fd.SetWriteDeadline(time.Now().Add(frameWriteTimeout))
+	if err := t.fd.SetWriteDeadline(time.Now().Add(frameWriteTimeout)); err != nil {
+		log.Error("Cannot set rlpx write deadline", "err", err)
+	}
 	return t.rw.WriteMsg(msg)
 }
 
@@ -108,11 +115,17 @@ func (t *rlpx) close(err error) {
 	// Tell the remote end why we're disconnecting if possible.
 	if t.rw != nil {
 		if r, ok := err.(DiscReason); ok && r != DiscNetworkError {
-			t.fd.SetWriteDeadline(time.Now().Add(discWriteTimeout))
-			SendItems(t.rw, discMsg, r)
+			if err := t.fd.SetWriteDeadline(time.Now().Add(discWriteTimeout)); err != nil {
+				log.Error("Cannot set rlpx write deadline while closing", "err", err)
+			}
+			if err := SendItems(t.rw, discMsg, r); err != nil {
+				log.Error("Cannot send rlpx disc msg while closing", "err", err)
+			}
 		}
 	}
-	t.fd.Close()
+	if err := t.fd.Close(); err != nil {
+		log.Error("Cannot close rlpx file descriptor", "err", err)
+	}
 }
 
 // doEncHandshake runs the protocol handshake using authenticated
@@ -153,7 +166,9 @@ func readProtocolHandshake(rw MsgReader, our *protoHandshake) (*protoHandshake, 
 		// We can't return the reason directly, though, because it is echoed
 		// back otherwise. Wrap it in a string instead.
 		var reason [1]DiscReason
-		rlp.Decode(msg.Payload, &reason)
+		if err := rlp.Decode(msg.Payload, &reason); err != nil {
+			log.Error("Cannot decode rlpx disc msg", "err", err)
+		}
 		return nil, reason[0]
 	}
 	if msg.Code != handshakeMsg {

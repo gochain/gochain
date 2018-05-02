@@ -482,7 +482,11 @@ func (f *lightFetcher) nextRequest() (*distReq, uint64) {
 					time.Sleep(hardRequestTimeout)
 					f.timeoutChn <- reqID
 				}()
-				return func() { p.RequestHeadersByHash(reqID, cost, bestHash, int(bestAmount), 0, true) }
+				return func() {
+					if err := p.RequestHeadersByHash(reqID, cost, bestHash, int(bestAmount), 0, true); err != nil {
+						log.Error("Cannot request headers by hash", "req_id", reqID, "err", err)
+					}
+				}
 			},
 		}
 	}

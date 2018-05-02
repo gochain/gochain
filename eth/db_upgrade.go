@@ -41,7 +41,9 @@ func upgradeDeduplicateData(db ethdb.Database) func() error {
 		return nil
 	}
 	if data, _ := db.Get([]byte("LastHeader")); len(data) == 0 {
-		db.Put(deduplicateData, []byte{42})
+		if err := db.Put(deduplicateData, []byte{42}); err != nil {
+			log.Error("Cannot update deduplicate data key", "err", err)
+		}
 		return nil
 	}
 	// Start the deduplication upgrade on a new goroutine
@@ -116,7 +118,9 @@ func upgradeDeduplicateData(db ethdb.Database) func() error {
 		// Upgrade finished, mark a such and terminate
 		if failed == nil {
 			log.Info("Database deduplication successful", "deduped", converted)
-			db.Put(deduplicateData, []byte{42})
+			if err := db.Put(deduplicateData, []byte{42}); err != nil {
+				log.Error("Cannot update deduplicate data key on success", "err", err)
+			}
 		} else {
 			log.Error("Database deduplication failed", "deduped", converted, "err", failed)
 		}

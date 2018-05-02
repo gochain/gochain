@@ -166,7 +166,9 @@ func (bc *LightChain) SetHead(head uint64) {
 	defer bc.mu.Unlock()
 
 	bc.hc.SetHead(head, nil)
-	bc.loadLastState()
+	if err := bc.loadLastState(); err != nil {
+		log.Error("Cannot load last state while setting head", "err", err)
+	}
 }
 
 // GasLimit returns the gas limit of the current HEAD block.

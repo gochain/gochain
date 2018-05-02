@@ -23,6 +23,8 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+
+	"github.com/gochain-io/gochain/log"
 )
 
 // ipcListen will create a Unix socket on the given endpoint.
@@ -31,12 +33,16 @@ func ipcListen(endpoint string) (net.Listener, error) {
 	if err := os.MkdirAll(filepath.Dir(endpoint), 0751); err != nil {
 		return nil, err
 	}
-	os.Remove(endpoint)
+	if err := os.Remove(endpoint); err != nil && !os.IsNotExist(err) {
+		log.Error("Cannot remove ipc endpoint", "err", err)
+	}
 	l, err := net.Listen("unix", endpoint)
 	if err != nil {
 		return nil, err
 	}
-	os.Chmod(endpoint, 0600)
+	if err := os.Chmod(endpoint, 0600); err != nil {
+		log.Error("Cannot chmod ipc endpoint", "err", err)
+	}
 	return l, nil
 }
 
