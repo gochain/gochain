@@ -69,9 +69,7 @@ func testStore(m ChunkStore, l int64, branches int64, t *testing.T) {
 	go func() {
 		for chunk := range chunkC {
 			m.Put(chunk)
-			if chunk.wg != nil {
-				chunk.wg.Done()
-			}
+			chunk.Done()
 		}
 	}()
 	chunker := NewTreeChunker(&ChunkerParams{

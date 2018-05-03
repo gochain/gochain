@@ -149,18 +149,24 @@ func newRequestStatus(key Key) *RequestStatus {
 // but the size of the subtree encoded in the chunk
 // 0 if request, to be supplied by the dpa
 type Chunk struct {
-	Key      Key             // always
-	SData    []byte          // nil if request, to be supplied by dpa
-	Size     int64           // size of the data covered by the subtree encoded in this chunk
-	Source   Peer            // peer
-	C        chan bool       // to signal data delivery by the dpa
-	Req      *RequestStatus  // request Status needed by netStore
-	wg       *sync.WaitGroup // wg to synchronize
-	dbStored chan bool       // never remove a chunk from memStore before it is written to dbStore
+	Key      Key            // always
+	SData    []byte         // nil if request, to be supplied by dpa
+	Size     int64          // size of the data covered by the subtree encoded in this chunk
+	Source   Peer           // peer
+	C        chan bool      // to signal data delivery by the dpa
+	Req      *RequestStatus // request Status needed by netStore
+	wg       *sync.WaitGroup
+	dbStored chan bool // never remove a chunk from memStore before it is written to dbStore
 }
 
 func NewChunk(key Key, rs *RequestStatus) *Chunk {
 	return &Chunk{Key: key, Req: rs}
+}
+
+func (c *Chunk) Done() {
+	if c.wg != nil {
+		c.wg.Done()
+	}
 }
 
 /*

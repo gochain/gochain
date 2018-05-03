@@ -60,7 +60,6 @@ The hashing itself does use extra copies and allocation though, since it does ne
 
 var (
 	errAppendOppNotSuported = errors.New("Append operation not supported")
-	errOperationTimedOut    = errors.New("operation timed out")
 )
 
 type TreeChunker struct {
@@ -124,15 +123,15 @@ func (self *TreeChunker) Split(data io.Reader, size int64, chunkC chan *Chunk, s
 	}
 
 	jobC := make(chan *hashJob, 2*ChunkProcessors)
-	wg := &sync.WaitGroup{}
-	errC := make(chan error)
+	var rootHash sync.WaitGroup
 	quitC := make(chan bool)
+	defer close(quitC)
 
+	self.incrementWorkerCount()
 	if swg != nil {
 		swg.Add(1)
 	}
-	self.incrementWorkerCount()
-	go self.hashWorker(jobC, chunkC, errC, quitC, swg)
+	go self.hashWorker(jobC, chunkC, quitC, swg)
 
 	depth := 0
 	treeSize := self.chunkSize
@@ -144,32 +143,32 @@ func (self *TreeChunker) Split(data io.Reader, size int64, chunkC chan *Chunk, s
 	}
 
 	key := make([]byte, self.hashFunc().Size())
-	// this waitgroup member is released after the root hash is calculated
-	wg.Add(1)
-	//launch actual recursive function passing the waitgroups
-	go self.split(depth, treeSize/self.branches, key, data, size, jobC, chunkC, errC, quitC, wg.Done, swg)
+	rootHash.Add(1)
+	err := self.split(depth, treeSize/self.branches, key, data, size, jobC, chunkC, quitC, rootHash.Done, swg)
+	close(jobC)
+	if err != nil {
+		return nil, err
+	}
 
-	// closes internal error channel if all subprocesses in the workgroup finished
+	done := make(chan struct{})
 	go func() {
-		// waiting for all threads to finish
-		wg.Wait()
-		close(errC)
+		rootHash.Wait()
+		if swg != nil {
+			swg.Wait()
+		}
+		close(done)
 	}()
 
-	defer close(quitC)
 	select {
-	case err := <-errC:
-		if err != nil {
-			return nil, err
-		}
-	case <-time.NewTimer(splitTimeout).C:
-		return nil, errOperationTimedOut
+	case <-done:
+	case <-time.After(splitTimeout):
+		return nil, timeoutErr
 	}
 
 	return key, nil
 }
 
-func (self *TreeChunker) split(depth int, treeSize int64, key Key, data io.Reader, size int64, jobC chan *hashJob, chunkC chan *Chunk, errC chan error, quitC chan bool, hashDone func(), swg *sync.WaitGroup) {
+func (self *TreeChunker) split(depth int, treeSize int64, key Key, data io.Reader, size int64, jobC chan *hashJob, chunkC chan *Chunk, quitC chan bool, hashDone func(), swg *sync.WaitGroup) error {
 	for depth > 0 && size < treeSize {
 		treeSize /= self.branches
 		depth--
@@ -184,15 +183,14 @@ func (self *TreeChunker) split(depth int, treeSize int64, key Key, data io.Reade
 			n, err := data.Read(chunkData[8+readBytes:])
 			readBytes += int64(n)
 			if err != nil && !(err == io.EOF && readBytes == size) {
-				errC <- err
-				return
+				return err
 			}
 		}
 		select {
 		case jobC <- &hashJob{key, chunkData, size, hashDone}:
 		case <-quitC:
 		}
-		return
+		return nil
 	}
 	// dept > 0
 	// intermediate chunk containing child nodes hashes
@@ -203,7 +201,7 @@ func (self *TreeChunker) split(depth int, treeSize int64, key Key, data io.Reade
 
 	binary.LittleEndian.PutUint64(chunk[0:8], uint64(size))
 
-	childrenWg := &sync.WaitGroup{}
+	var childHashes sync.WaitGroup
 	var secSize int64
 	for i < branchCnt {
 		// the last item can have shorter data
@@ -215,41 +213,41 @@ func (self *TreeChunker) split(depth int, treeSize int64, key Key, data io.Reade
 		// the hash of that data
 		subTreeKey := chunk[8+i*self.hashSize : 8+(i+1)*self.hashSize]
 
-		childrenWg.Add(1)
-		self.split(depth-1, treeSize/self.branches, subTreeKey, data, secSize, jobC, chunkC, errC, quitC, childrenWg.Done, swg)
+		childHashes.Add(1)
+		err := self.split(depth-1, treeSize/self.branches, subTreeKey, data, secSize, jobC, chunkC, quitC, childHashes.Done, swg)
+		if err != nil {
+			return err
+		}
 
 		i++
 		pos += treeSize
 	}
-	// wait for all the children to complete calculating their hashes and copying them onto sections of the chunk
-	// parentWg.Add(1)
-	// go func() {
-	childrenWg.Wait()
+	childHashes.Wait()
 
 	worker := self.getWorkerCount()
 	if int64(len(jobC)) > worker && worker < ChunkProcessors {
+		self.incrementWorkerCount()
 		if swg != nil {
 			swg.Add(1)
 		}
-		self.incrementWorkerCount()
-		go self.hashWorker(jobC, chunkC, errC, quitC, swg)
+		go self.hashWorker(jobC, chunkC, quitC, swg)
 	}
 	select {
 	case jobC <- &hashJob{key, chunk, size, hashDone}:
 	case <-quitC:
 	}
+	return nil
 }
 
-func (self *TreeChunker) hashWorker(jobC chan *hashJob, chunkC chan *Chunk, errC chan error, quitC chan bool, swg *sync.WaitGroup) {
+func (self *TreeChunker) hashWorker(jobC <-chan *hashJob, chunkC chan *Chunk, quitC chan bool, swg *sync.WaitGroup) {
 	defer self.decrementWorkerCount()
 	if swg != nil {
-		defer swg.Done()
+		swg.Done()
 	}
 
 	hasher := self.hashFunc()
 	for {
 		select {
-
 		case job, ok := <-jobC:
 			if !ok {
 				return
@@ -373,9 +371,6 @@ func (self *LazyChunkReader) ReadAt(b []byte, off int64) (read int, err error) {
 
 func (self *LazyChunkReader) join(b []byte, off int64, eoff int64, depth int, treeSize int64, chunk *Chunk, parentWg *sync.WaitGroup, errC chan error, quitC chan bool) {
 	defer parentWg.Done()
-	// return NewDPA(&LocalStore{})
-
-	// chunk.Size = int64(binary.LittleEndian.Uint64(chunk.SData[0:8]))
 
 	// find appropriate block level
 	for chunk.Size < treeSize && depth > 0 {

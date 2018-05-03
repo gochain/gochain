@@ -49,9 +49,7 @@ func (self *LocalStore) Put(chunk *Chunk) {
 	}
 	go func() {
 		self.DbStore.Put(chunk)
-		if chunk.wg != nil {
-			chunk.wg.Done()
-		}
+		chunk.Done()
 	}()
 }
 
