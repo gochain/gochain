@@ -309,6 +309,6 @@ type Info struct {
 	*chequebook.Params
 }
 
-func (self *Info) Info() *Info {
-	return self
+func (i *Info) Info() *Info {
+	return i
 }

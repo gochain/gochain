@@ -47,36 +47,36 @@ func NewLDBDatabase(file string) (*LDBDatabase, error) {
 	return database, nil
 }
 
-func (self *LDBDatabase) Put(key []byte, value []byte) {
-	if self.comp {
+func (ldb *LDBDatabase) Put(key []byte, value []byte) {
+	if ldb.comp {
 		value = rle.Compress(value)
 	}
 
-	err := self.db.Put(key, value, nil)
+	err := ldb.db.Put(key, value, nil)
 	if err != nil {
 		fmt.Println("Error put", err)
 	}
 }
 
-func (self *LDBDatabase) Get(key []byte) ([]byte, error) {
-	dat, err := self.db.Get(key, nil)
+func (ldb *LDBDatabase) Get(key []byte) ([]byte, error) {
+	dat, err := ldb.db.Get(key, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	if self.comp {
+	if ldb.comp {
 		return rle.Decompress(dat)
 	}
 
 	return dat, nil
 }
 
-func (self *LDBDatabase) Delete(key []byte) error {
-	return self.db.Delete(key, nil)
+func (ldb *LDBDatabase) Delete(key []byte) error {
+	return ldb.db.Delete(key, nil)
 }
 
-func (self *LDBDatabase) LastKnownTD() []byte {
-	data, _ := self.Get([]byte("LTD"))
+func (ldb *LDBDatabase) LastKnownTD() []byte {
+	data, _ := ldb.Get([]byte("LTD"))
 
 	if len(data) == 0 {
 		data = []byte{0x0}
@@ -85,15 +85,15 @@ func (self *LDBDatabase) LastKnownTD() []byte {
 	return data
 }
 
-func (self *LDBDatabase) NewIterator() iterator.Iterator {
-	return self.db.NewIterator(nil, nil)
+func (ldb *LDBDatabase) NewIterator() iterator.Iterator {
+	return ldb.db.NewIterator(nil, nil)
 }
 
-func (self *LDBDatabase) Write(batch *leveldb.Batch) error {
-	return self.db.Write(batch, nil)
+func (ldb *LDBDatabase) Write(batch *leveldb.Batch) error {
+	return ldb.db.Write(batch, nil)
 }
 
-func (self *LDBDatabase) Close() {
+func (ldb *LDBDatabase) Close() {
 	// Close the leveldb database
-	self.db.Close()
+	ldb.db.Close()
 }
