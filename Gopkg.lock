@@ -9,7 +9,7 @@
     "fs",
     "fuseutil"
   ]
-  revision = "371fbbdaa8987b715bdd21d6adc4c9b20155f748"
+  revision = "65cc252bf6691cb3c7014bcb2c8dc29de91e3a7e"
 
 [[projects]]
   name = "github.com/Azure/azure-sdk-for-go"
@@ -17,8 +17,8 @@
     "storage",
     "version"
   ]
-  revision = "56a0b1d2af3b65d5f1f7a330e02faaf48b473c5a"
-  version = "v14.6.0"
+  revision = "52423c14f13e2567193ec7d2fde122a959739f91"
+  version = "v16.2.0"
 
 [[projects]]
   name = "github.com/Azure/go-autorest"
@@ -28,8 +28,8 @@
     "autorest/azure",
     "autorest/date"
   ]
-  revision = "ed4b7f5bf1ec0c9ede1fda2681d96771282f2862"
-  version = "v10.4.0"
+  revision = "eaa7994b2278094c904d31993d26f56324db3052"
+  version = "v10.8.1"
 
 [[projects]]
   name = "github.com/StackExchange/wmi"
@@ -41,13 +41,13 @@
   branch = "master"
   name = "github.com/aristanetworks/goarista"
   packages = ["monotime"]
-  revision = "c4abbbe01ef7ae5ffd295b3a85493582e704cfa2"
+  revision = "70dca2f27708bcf7323c078bad4af7e71eb0fc24"
 
 [[projects]]
   branch = "master"
   name = "github.com/btcsuite/btcd"
   packages = ["btcec"]
-  revision = "2be2f12b358dc57d70b8f501b00be450192efbc3"
+  revision = "675abc5df3c5531bc741b56a765e35623459da6d"
 
 [[projects]]
   name = "github.com/cespare/cp"
@@ -77,7 +77,7 @@
   branch = "master"
   name = "github.com/dustin/go-humanize"
   packages = ["."]
-  revision = "bb3d318650d48840a39aa21a027c6630e198e626"
+  revision = "02af3965c54e8cacf948b97fef38925c4120652c"
 
 [[projects]]
   branch = "master"
@@ -92,7 +92,7 @@
     ".",
     "sys/windows"
   ]
-  revision = "1784bf412e8794999ebc58e5e39a108d7d4fe565"
+  revision = "37f05ff46ffa7a825d1b24cf2b62d4a4c1a9d2e8"
 
 [[projects]]
   name = "github.com/fatih/color"
@@ -109,8 +109,8 @@
 [[projects]]
   name = "github.com/go-ini/ini"
   packages = ["."]
-  revision = "6333e38ac20b8949a8dd68baa3650f4dee8f39f0"
-  version = "v1.33.0"
+  revision = "6529cf7c58879c08d927016dde4477f18a0634cb"
+  version = "v1.36.0"
 
 [[projects]]
   name = "github.com/go-ole/go-ole"
@@ -133,8 +133,8 @@
     "proto",
     "protoc-gen-go/descriptor"
   ]
-  revision = "925541529c1fa6821df4e44ce2723319eb2be768"
-  version = "v1.0.0"
+  revision = "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+  version = "v1.1.0"
 
 [[projects]]
   branch = "master"
@@ -163,7 +163,7 @@
     "soap",
     "ssdp"
   ]
-  revision = "167b9766e52022410644dfc64e8aadd57ee36858"
+  revision = "1395d1447324cbea88d249fbfcfd70ea878fdfca"
 
 [[projects]]
   name = "github.com/jackpal/go-nat-pmp"
@@ -181,7 +181,7 @@
   branch = "master"
   name = "github.com/karalabe/hid"
   packages = ["."]
-  revision = "93a94ab6671087f0768f1d4e701c0ec14f449df9"
+  revision = "2b4488a37358b7283de4f9622553e85ebbe73125"
 
 [[projects]]
   name = "github.com/marstr/guid"
@@ -219,13 +219,12 @@
     ".",
     "pkg/credentials",
     "pkg/encrypt",
-    "pkg/policy",
     "pkg/s3signer",
     "pkg/s3utils",
     "pkg/set"
   ]
-  revision = "66252c2a3c15f7b90cc8493d497a04ac3b6e3606"
-  version = "5.0.0"
+  revision = "c6108c47ba5d86548404ebf9e51c5ca18769fe79"
+  version = "6.0.1"
 
 [[projects]]
   branch = "master"
@@ -258,13 +257,13 @@
   branch = "master"
   name = "github.com/nsf/termbox-go"
   packages = ["."]
-  revision = "e2050e41c8847748ec5288741c0b19a8cb26d084"
+  revision = "5a49b82160547cc98fca189a677a1c14eff796f8"
 
 [[projects]]
   branch = "master"
   name = "github.com/olekukonko/tablewriter"
   packages = ["."]
-  revision = "b8a9be070da40449e501c3c4730a889e42d87a9e"
+  revision = "d5dd8a50526aadb3d5f2c9b5233277bc2db90e88"
 
 [[projects]]
   name = "github.com/pborman/uuid"
@@ -303,7 +302,7 @@
     ".",
     "exp"
   ]
-  revision = "8732c616f52954686704c8645fe1a9d59e9df7c1"
+  revision = "e2704e165165ec55d062f5919b4b29494e9fa790"
 
 [[projects]]
   branch = "master"
@@ -369,7 +368,7 @@
     "leveldb/table",
     "leveldb/util"
   ]
-  revision = "169b1b37be738edb2813dab48c97a549bcf99bb5"
+  revision = "ae970a0732be3a1f5311da86118d37b9f4bd2a5a"
 
 [[projects]]
   branch = "master"
@@ -395,7 +394,7 @@
     "ssh",
     "ssh/terminal"
   ]
-  revision = "88942b9c40a4c9d203b82b3731787b672d6e809b"
+  revision = "76a954637dfa3223c13edb4529f981f0d62cfa26"
 
 [[projects]]
   branch = "master"
@@ -409,7 +408,7 @@
     "lex/httplex",
     "websocket"
   ]
-  revision = "6078986fec03a1dcc236c34816c71b0e05018fda"
+  revision = "640f4622ab692b87c2f3a94265e6f579fe38263d"
 
 [[projects]]
   branch = "master"
@@ -421,10 +420,11 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = [
+    "cpu",
     "unix",
     "windows"
   ]
-  revision = "13d03a9a82fba647c21a0ef8fba44a795d0f0835"
+  revision = "78d5f264b493f125018180c204871ecf58a2dce1"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -467,7 +467,7 @@
     "imports",
     "internal/fastwalk"
   ]
-  revision = "5c8013c5617234a9515f1b1379aba7e03e846479"
+  revision = "ae8027637c91c400af8a3e006c35c7011b3ca1fe"
 
 [[projects]]
   branch = "v1"
