@@ -453,7 +453,7 @@ func bzzd(ctx *cli.Context) error {
 // version and genesis hash using the client and matching them to either
 // mainnet or testnet addresses
 func detectEnsAddr(client *rpc.Client) (common.Address, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	var version string
