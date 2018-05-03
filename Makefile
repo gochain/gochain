@@ -45,7 +45,7 @@ ios:
 
 test:
 # build/env.sh go run build/ci.go test
-	go test -race ./...
+	go test ./...
 
 clean:
 	rm -fr build/_workspace/pkg/ $(GOBIN)/*
