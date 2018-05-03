@@ -279,7 +279,7 @@ var testServices = adapters.Services{
 	"test": newTestService,
 }
 
-func testHTTPServer(t *testing.T) (*Network, *httptest.Server) {
+func testHTTPServer() (*Network, *httptest.Server) {
 	adapter := adapters.NewSimAdapter(testServices)
 	network := NewNetwork(adapter, &NetworkConfig{
 		DefaultService: "test",
@@ -291,7 +291,7 @@ func testHTTPServer(t *testing.T) (*Network, *httptest.Server) {
 // API
 func TestHTTPNetwork(t *testing.T) {
 	// start the server
-	network, s := testHTTPServer(t)
+	network, s := testHTTPServer()
 	defer s.Close()
 
 	// subscribe to events so we can check them later
@@ -422,7 +422,7 @@ func (t *expectEvents) connEvent(one, other string, up bool) *Event {
 		Conn: &Conn{
 			One:   discover.MustHexID(one),
 			Other: discover.MustHexID(other),
-			Up:    up,
+			up:    up,
 		},
 	}
 }
@@ -499,8 +499,8 @@ func (t *expectEvents) expect(events ...*Event) {
 				if event.Conn.Other != expected.Conn.Other {
 					t.Fatalf("expected conn event %d to have other=%q, got other=%q", i, expected.Conn.Other.TerminalString(), event.Conn.Other.TerminalString())
 				}
-				if event.Conn.Up != expected.Conn.Up {
-					t.Fatalf("expected conn event %d to have up=%t, got up=%t", i, expected.Conn.Up, event.Conn.Up)
+				if event.Conn.Up() != expected.Conn.Up() {
+					t.Fatalf("expected conn event %d to have up=%t, got up=%t", i, expected.Conn.Up(), event.Conn.Up())
 				}
 
 			}
@@ -522,7 +522,7 @@ func (t *expectEvents) expect(events ...*Event) {
 // TestHTTPNodeRPC tests calling RPC methods on nodes via the HTTP API
 func TestHTTPNodeRPC(t *testing.T) {
 	// start the server
-	_, s := testHTTPServer(t)
+	_, s := testHTTPServer()
 	defer s.Close()
 
 	// start a node in the network
@@ -581,7 +581,7 @@ func TestHTTPNodeRPC(t *testing.T) {
 // TestHTTPSnapshot tests creating and loading network snapshots
 func TestHTTPSnapshot(t *testing.T) {
 	// start the server
-	_, s := testHTTPServer(t)
+	_, s := testHTTPServer()
 	defer s.Close()
 
 	// create a two-node network
@@ -630,7 +630,7 @@ func TestHTTPSnapshot(t *testing.T) {
 	}
 
 	// create another network
-	_, s = testHTTPServer(t)
+	_, s = testHTTPServer()
 	defer s.Close()
 	client = NewClient(s.URL)
 
@@ -705,7 +705,7 @@ func TestHTTPSnapshot(t *testing.T) {
 // with multiple protocols
 func TestMsgFilterPassMultiple(t *testing.T) {
 	// start the server
-	_, s := testHTTPServer(t)
+	_, s := testHTTPServer()
 	defer s.Close()
 
 	// subscribe to events with a message filter
@@ -735,7 +735,7 @@ func TestMsgFilterPassMultiple(t *testing.T) {
 // with a code wildcard
 func TestMsgFilterPassWildcard(t *testing.T) {
 	// start the server
-	_, s := testHTTPServer(t)
+	_, s := testHTTPServer()
 	defer s.Close()
 
 	// subscribe to events with a message filter
@@ -767,7 +767,7 @@ func TestMsgFilterPassWildcard(t *testing.T) {
 // with a single protocol and code
 func TestMsgFilterPassSingle(t *testing.T) {
 	// start the server
-	_, s := testHTTPServer(t)
+	_, s := testHTTPServer()
 	defer s.Close()
 
 	// subscribe to events with a message filter
@@ -796,7 +796,7 @@ func TestMsgFilterPassSingle(t *testing.T) {
 // filter
 func TestMsgFilterFailBadParams(t *testing.T) {
 	// start the server
-	_, s := testHTTPServer(t)
+	_, s := testHTTPServer()
 	defer s.Close()
 
 	client := NewClient(s.URL)

@@ -75,7 +75,7 @@ func (self *chunkerTester) Split(chunker Splitter, data io.Reader, size int64, c
 		}()
 	}
 
-	key, err = chunker.Split(data, size, chunkC, swg, nil)
+	key, err = chunker.Split(data, size, chunkC, swg)
 	if err != nil && expectedError == nil {
 		err = fmt.Errorf("Split error: %v", err)
 	}
@@ -121,7 +121,7 @@ func (self *chunkerTester) Append(chunker Splitter, rootKey Key, data io.Reader,
 		}()
 	}
 
-	key, err = chunker.Append(rootKey, data, chunkC, swg, nil)
+	key, err = chunker.Append(rootKey, data, chunkC, swg)
 	if err != nil && expectedError == nil {
 		err = fmt.Errorf("Append error: %v", err)
 	}
@@ -205,9 +205,8 @@ func testRandomData(splitter Splitter, n int, tester *chunkerTester) Key {
 	}
 
 	chunkC := make(chan *Chunk, 1000)
-	swg := &sync.WaitGroup{}
 
-	key, err := tester.Split(splitter, data, int64(n), chunkC, swg, nil)
+	key, err := tester.Split(splitter, data, int64(n), chunkC, &sync.WaitGroup{}, nil)
 	if err != nil {
 		tester.t.Fatalf(err.Error())
 	}
@@ -248,9 +247,8 @@ func testRandomDataAppend(splitter Splitter, n, m int, tester *chunkerTester) {
 	}
 
 	chunkC := make(chan *Chunk, 1000)
-	swg := &sync.WaitGroup{}
 
-	key, err := tester.Split(splitter, data, int64(n), chunkC, swg, nil)
+	key, err := tester.Split(splitter, data, int64(n), chunkC, &sync.WaitGroup{}, nil)
 	if err != nil {
 		tester.t.Fatalf(err.Error())
 	}
@@ -267,9 +265,8 @@ func testRandomDataAppend(splitter Splitter, n, m int, tester *chunkerTester) {
 	}
 
 	chunkC = make(chan *Chunk, 1000)
-	swg = &sync.WaitGroup{}
 
-	newKey, err := tester.Append(splitter, key, appendData, chunkC, swg, nil)
+	newKey, err := tester.Append(splitter, key, appendData, chunkC, &sync.WaitGroup{}, nil)
 	if err != nil {
 		tester.t.Fatalf(err.Error())
 	}
@@ -388,9 +385,8 @@ func benchmarkJoin(n int, t *testing.B) {
 		data := testDataReader(n)
 
 		chunkC := make(chan *Chunk, 1000)
-		swg := &sync.WaitGroup{}
 
-		key, err := tester.Split(chunker, data, int64(n), chunkC, swg, nil)
+		key, err := tester.Split(chunker, data, int64(n), chunkC, &sync.WaitGroup{}, nil)
 		if err != nil {
 			tester.t.Fatalf(err.Error())
 		}
@@ -468,16 +464,14 @@ func benchmarkAppendPyramid(n, m int, t *testing.B) {
 		data1 := testDataReader(m)
 
 		chunkC := make(chan *Chunk, 1000)
-		swg := &sync.WaitGroup{}
-		key, err := tester.Split(chunker, data, int64(n), chunkC, swg, nil)
+		key, err := tester.Split(chunker, data, int64(n), chunkC, &sync.WaitGroup{}, nil)
 		if err != nil {
 			tester.t.Fatalf(err.Error())
 		}
 
 		chunkC = make(chan *Chunk, 1000)
-		swg = &sync.WaitGroup{}
 
-		_, err = tester.Append(chunker, key, data1, chunkC, swg, nil)
+		_, err = tester.Append(chunker, key, data1, chunkC, &sync.WaitGroup{}, nil)
 		if err != nil {
 			tester.t.Fatalf(err.Error())
 		}

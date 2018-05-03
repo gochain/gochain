@@ -262,19 +262,20 @@ func TestHasherConcurrency(t *testing.T) {
 	defer pool.Drain(0)
 	wg := sync.WaitGroup{}
 	cycles := 100
-	wg.Add(maxproccnt * cycles)
-	errc := make(chan error)
+	n := maxproccnt * cycles
+	wg.Add(n)
+	errc := make(chan error, n)
 
 	for p := 0; p < maxproccnt; p++ {
 		for i := 0; i < cycles; i++ {
 			go func() {
+				defer wg.Done()
 				bmt := New(pool)
 				n := rand.Intn(4096)
 				tdata := testDataReader(n)
 				data := make([]byte, n)
 				tdata.Read(data)
 				err := testHasherCorrectness(bmt, hasher, data, n, 128)
-				wg.Done()
 				if err != nil {
 					errc <- err
 				}
@@ -285,14 +286,8 @@ func TestHasherConcurrency(t *testing.T) {
 		wg.Wait()
 		close(errc)
 	}()
-	var err error
-	select {
-	case <-time.NewTimer(5 * time.Second).C:
-		err = fmt.Errorf("timed out")
-	case err = <-errc:
-	}
-	if err != nil {
-		t.Fatal(err)
+	for err := range errc {
+		t.Error(err)
 	}
 }
 
@@ -307,20 +302,19 @@ func testHasherCorrectness(bmt hash.Hash, hasher BaseHasher, d []byte, n, count 
 	data := d[:n]
 	rbmt := NewRefHasher(hasher, count)
 	exp := rbmt.Hash(data)
-	timeout := time.NewTimer(time.Second)
 	c := make(chan error)
 
 	go func() {
+		defer close(c)
 		bmt.Reset()
 		bmt.Write(data)
 		got := bmt.Sum(nil)
 		if !bytes.Equal(got, exp) {
 			c <- fmt.Errorf("wrong hash: expected %x, got %x", exp, got)
 		}
-		close(c)
 	}()
 	select {
-	case <-timeout.C:
+	case <-time.After(20 * time.Second):
 		err = fmt.Errorf("BMT hash calculation timed out")
 	case err = <-c:
 	}

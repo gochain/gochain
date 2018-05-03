@@ -25,6 +25,8 @@ import (
 	"testing"
 	"time"
 
+	"sync"
+
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/swarm/storage"
@@ -36,13 +38,15 @@ func init() {
 
 type testSyncDb struct {
 	*syncDb
-	c         int
-	t         *testing.T
-	fromDb    chan bool
-	delivered [][]byte
-	sent      []int
-	dbdir     string
-	at        int
+	c      int
+	t      *testing.T
+	fromDb chan bool
+	sent   []int
+	dbdir  string
+	at     int
+
+	deliveredMu sync.RWMutex
+	delivered   [][]byte
 }
 
 func newTestSyncDb(priority, bufferSize, batchSize int, dbdir string, t *testing.T) *testSyncDb {
@@ -108,7 +112,9 @@ func (self *testSyncDb) deliver(req interface{}, quit chan bool) bool {
 	if err != nil {
 		self.t.Fatalf("unexpected error of key %v: %v", key, err)
 	}
+	self.deliveredMu.Lock()
 	self.delivered = append(self.delivered, key)
+	self.deliveredMu.Unlock()
 	select {
 	case self.fromDb <- db:
 		return true
@@ -122,10 +128,16 @@ func (self *testSyncDb) expect(n int, db bool) {
 	// for n items
 	for i := 0; i < n; i++ {
 		ok = <-self.fromDb
-		if self.at+1 > len(self.delivered) {
-			self.t.Fatalf("expected %v, got %v", self.at+1, len(self.delivered))
+		self.deliveredMu.RLock()
+		l := len(self.delivered)
+		self.deliveredMu.RUnlock()
+		if self.at+1 > l {
+			self.t.Fatalf("expected %v, got %v", self.at+1, l)
 		}
-		if len(self.sent) > self.at && !bytes.Equal(crypto.Keccak256([]byte{byte(self.sent[self.at])}), self.delivered[self.at]) {
+		self.deliveredMu.RLock()
+		data := self.delivered[self.at]
+		self.deliveredMu.RUnlock()
+		if len(self.sent) > self.at && !bytes.Equal(crypto.Keccak256([]byte{byte(self.sent[self.at])}), data) {
 			self.t.Fatalf("expected delivery %v/%v/%v to be hash of  %v, from db: %v = %v", i, n, self.at, self.sent[self.at], ok, db)
 			log.Debug(fmt.Sprintf("%v/%v/%v to be hash of  %v, from db: %v = %v", i, n, self.at, self.sent[self.at], ok, db))
 		}
@@ -193,21 +205,27 @@ func TestSaveSyncDb(t *testing.T) {
 	s = newTestSyncDb(priority, bufferSize, batchSize, s.dbdir, t)
 	go s.dbRead(false, 0, s.deliver)
 	s.expect(amount, true)
+	s.deliveredMu.RLock()
 	for i, key := range s.delivered {
 		expKey := crypto.Keccak256([]byte{byte(i)})
 		if !bytes.Equal(key, expKey) {
+			s.deliveredMu.RUnlock()
 			t.Fatalf("delivery %v expected to be key %x, got %x", i, expKey, key)
 		}
 	}
+	s.deliveredMu.RUnlock()
 	s.push(amount)
 	s.expect(amount, false)
+	s.deliveredMu.RLock()
 	for i := amount; i < 2*amount; i++ {
 		key := s.delivered[i]
 		expKey := crypto.Keccak256([]byte{byte(i - amount)})
 		if !bytes.Equal(key, expKey) {
+			s.deliveredMu.RUnlock()
 			t.Fatalf("delivery %v expected to be key %x, got %x", i, expKey, key)
 		}
 	}
+	s.deliveredMu.RUnlock()
 	s.stop()
 	s.db.Close()
 

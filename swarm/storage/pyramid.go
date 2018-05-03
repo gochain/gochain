@@ -164,7 +164,7 @@ func (self *PyramidChunker) decrementWorkerCount() {
 	self.workerCount -= 1
 }
 
-func (self *PyramidChunker) Split(data io.Reader, size int64, chunkC chan *Chunk, storageWG, processorWG *sync.WaitGroup) (Key, error) {
+func (self *PyramidChunker) Split(data io.Reader, size int64, chunkC chan *Chunk, storageWG *sync.WaitGroup) (Key, error) {
 	jobC := make(chan *chunkJob, 2*ChunkProcessors)
 	wg := &sync.WaitGroup{}
 	errC := make(chan error)
@@ -173,18 +173,13 @@ func (self *PyramidChunker) Split(data io.Reader, size int64, chunkC chan *Chunk
 	chunkLevel := make([][]*TreeEntry, self.branches)
 
 	wg.Add(1)
-	go self.prepareChunks(false, chunkLevel, data, rootKey, quitC, wg, jobC, processorWG, chunkC, errC, storageWG)
+	go self.prepareChunks(false, chunkLevel, data, rootKey, quitC, wg.Done, jobC, chunkC, errC, storageWG)
 
 	// closes internal error channel if all subprocesses in the workgroup finished
 	go func() {
 
 		// waiting for all chunks to finish
 		wg.Wait()
-
-		// if storage waitgroup is non-nil, we wait for storage to finish too
-		if storageWG != nil {
-			storageWG.Wait()
-		}
 		//We close errC here because this is passed down to 8 parallel routines underneath.
 		// if a error happens in one of them.. that particular routine raises error...
 		// once they all complete successfully, the control comes back and we can safely close this here.
@@ -204,7 +199,7 @@ func (self *PyramidChunker) Split(data io.Reader, size int64, chunkC chan *Chunk
 
 }
 
-func (self *PyramidChunker) Append(key Key, data io.Reader, chunkC chan *Chunk, storageWG, processorWG *sync.WaitGroup) (Key, error) {
+func (self *PyramidChunker) Append(key Key, data io.Reader, chunkC chan *Chunk, storageWG *sync.WaitGroup) (Key, error) {
 	quitC := make(chan bool)
 	rootKey := make([]byte, self.hashSize)
 	chunkLevel := make([][]*TreeEntry, self.branches)
@@ -217,18 +212,12 @@ func (self *PyramidChunker) Append(key Key, data io.Reader, chunkC chan *Chunk, 
 	errC := make(chan error)
 
 	wg.Add(1)
-	go self.prepareChunks(true, chunkLevel, data, rootKey, quitC, wg, jobC, processorWG, chunkC, errC, storageWG)
+	go self.prepareChunks(true, chunkLevel, data, rootKey, quitC, wg.Done, jobC, chunkC, errC, storageWG)
 
 	// closes internal error channel if all subprocesses in the workgroup finished
 	go func() {
-
 		// waiting for all chunks to finish
 		wg.Wait()
-
-		// if storage waitgroup is non-nil, we wait for storage to finish too
-		if storageWG != nil {
-			storageWG.Wait()
-		}
 		close(errC)
 	}()
 
@@ -245,13 +234,13 @@ func (self *PyramidChunker) Append(key Key, data io.Reader, chunkC chan *Chunk, 
 
 }
 
-func (self *PyramidChunker) processor(id int64, jobC chan *chunkJob, chunkC chan *Chunk, errC chan error, quitC chan bool, swg, wwg *sync.WaitGroup) {
+func (self *PyramidChunker) processor(id int64, jobC chan *chunkJob, chunkC chan *Chunk, errC chan error, quitC chan bool, swg *sync.WaitGroup) {
 	defer self.decrementWorkerCount()
+	if swg != nil {
+		defer swg.Done()
+	}
 
 	hasher := self.hashFunc()
-	if wwg != nil {
-		defer wwg.Done()
-	}
 	for {
 		select {
 
@@ -271,26 +260,16 @@ func (self *PyramidChunker) processChunk(id int64, hasher SwarmHash, job *chunkJ
 	hasher.Write(job.chunk[8:])           // minus 8 []byte length
 	h := hasher.Sum(nil)
 
-	newChunk := &Chunk{
-		Key:   h,
-		SData: job.chunk,
-		Size:  job.size,
-		wg:    swg,
-	}
-
 	// report hash of this chunk one level up (keys corresponds to the proper subslice of the parent chunk)
 	copy(job.key, h)
+	job.parentWg.Done()
 
 	// send off new chunk to storage
 	if chunkC != nil {
 		if swg != nil {
 			swg.Add(1)
 		}
-	}
-	job.parentWg.Done()
-
-	if chunkC != nil {
-		chunkC <- newChunk
+		chunkC <- &Chunk{Key: h, SData: job.chunk, Size: job.size, wg: swg}
 	}
 }
 
@@ -374,19 +353,17 @@ func (self *PyramidChunker) loadTree(chunkLevel [][]*TreeEntry, key Key, chunkC 
 	return nil
 }
 
-func (self *PyramidChunker) prepareChunks(isAppend bool, chunkLevel [][]*TreeEntry, data io.Reader, rootKey []byte, quitC chan bool, wg *sync.WaitGroup, jobC chan *chunkJob, processorWG *sync.WaitGroup, chunkC chan *Chunk, errC chan error, storageWG *sync.WaitGroup) {
-	defer wg.Done()
+func (self *PyramidChunker) prepareChunks(isAppend bool, chunkLevel [][]*TreeEntry, data io.Reader, rootKey []byte, quitC chan bool, done func(), jobC chan *chunkJob, chunkC chan *Chunk, errC chan error, storageWG *sync.WaitGroup) {
+	defer done()
 
 	chunkWG := &sync.WaitGroup{}
 	totalDataSize := 0
 
-	// processorWG keeps track of workers spawned for hashing chunks
-	if processorWG != nil {
-		processorWG.Add(1)
+	if storageWG != nil {
+		storageWG.Add(1)
 	}
-
 	self.incrementWorkerCount()
-	go self.processor(self.workerCount, jobC, chunkC, errC, quitC, storageWG, processorWG)
+	go self.processor(self.workerCount, jobC, chunkC, errC, quitC, storageWG)
 
 	parent := NewTreeEntry(self)
 	var unFinishedChunk *Chunk
@@ -486,15 +463,13 @@ func (self *PyramidChunker) prepareChunks(isAppend bool, chunkLevel [][]*TreeEnt
 
 		workers := self.getWorkerCount()
 		if int64(len(jobC)) > workers && workers < ChunkProcessors {
-			if processorWG != nil {
-				processorWG.Add(1)
+			if storageWG != nil {
+				storageWG.Add(1)
 			}
 			self.incrementWorkerCount()
-			go self.processor(self.workerCount, jobC, chunkC, errC, quitC, storageWG, processorWG)
+			go self.processor(self.workerCount, jobC, chunkC, errC, quitC, storageWG)
 		}
-
 	}
-
 }
 
 func (self *PyramidChunker) buildTree(isAppend bool, chunkLevel [][]*TreeEntry, ent *TreeEntry, chunkWG *sync.WaitGroup, jobC chan *chunkJob, quitC chan bool, last bool, rootKey []byte) {

@@ -1369,10 +1369,12 @@ func (d *Downloader) processFastSyncContent(ctx context.Context, latest *types.H
 	// the state of the pivot block.
 	stateSync := d.syncState(latest.Root)
 	defer stateSync.Cancel()
+	done := make(chan struct{})
 	go func() {
 		if err := stateSync.Wait(); err != nil && err != errCancelStateFetch {
 			d.queue.Close() // wake up WaitResults
 		}
+		close(done)
 	}()
 	// Figure out the ideal pivot block. Note, that this goalpost may move if the
 	// sync takes long enough for the chain head to move significantly.
@@ -1424,7 +1426,7 @@ func (d *Downloader) processFastSyncContent(ctx context.Context, latest *types.H
 			// If new pivot block found, cancel old state retrieval and restart
 			if oldPivot != P {
 				stateSync.Cancel()
-
+				<-done // Wait for cancel to be received.
 				stateSync = d.syncState(P.Header.Root)
 				defer stateSync.Cancel()
 				go func() {

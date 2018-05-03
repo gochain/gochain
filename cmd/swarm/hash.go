@@ -39,7 +39,7 @@ func hash(ctx *cli.Context) {
 
 	stat, _ := f.Stat()
 	chunker := storage.NewTreeChunker(storage.NewChunkerParams())
-	key, err := chunker.Split(f, stat.Size(), nil, nil, nil)
+	key, err := chunker.Split(f, stat.Size(), nil, nil)
 	if err != nil {
 		utils.Fatalf("%v\n", err)
 	} else {

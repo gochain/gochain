@@ -52,11 +52,12 @@ func isFUSEUnsupportedError(err error) bool {
 type MountInfo struct {
 	MountPoint     string
 	StartManifest  string
-	LatestManifest string
 	rootDir        *SwarmDir
 	fuseConnection *fuse.Conn
 	swarmApi       *api.Api
-	lock           *sync.RWMutex
+
+	LatestManifestMu sync.RWMutex
+	LatestManifest   string
 }
 
 func NewMountInfo(mhash, mpoint string, sapi *api.Api) *MountInfo {
@@ -67,7 +68,6 @@ func NewMountInfo(mhash, mpoint string, sapi *api.Api) *MountInfo {
 		rootDir:        nil,
 		fuseConnection: nil,
 		swarmApi:       sapi,
-		lock:           &sync.RWMutex{},
 	}
 	return newMountInfo
 }

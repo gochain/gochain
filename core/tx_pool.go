@@ -215,8 +215,9 @@ func (config *TxPoolConfig) sanitize() TxPoolConfig {
 // current state) and future transactions. Transactions move between those
 // two states over time as they are received and processed.
 type TxPool struct {
-	config       TxPoolConfig
-	chainconfig  *params.ChainConfig
+	config      TxPoolConfig
+	chainconfig *params.ChainConfig
+
 	chain        blockChain
 	gasPrice     *big.Int
 	txFeed       event.Feed
@@ -313,8 +314,10 @@ func (pool *TxPool) loop(ctx context.Context) {
 
 	// Track the current and latest blocks for transaction reorgs.
 	var blockMu sync.RWMutex
+	pool.mu.Lock()
 	currentBlock := pool.chain.CurrentBlock()
 	latestBlock := pool.chain.CurrentBlock()
+	pool.mu.Unlock()
 
 	chainHeadGauge.Update(int64(currentBlock.NumberU64()))
 	chainHeadTxsGauge.Update(int64(len(currentBlock.Transactions())))

@@ -47,8 +47,10 @@ func externalUnmount(mountPoint string) error {
 }
 
 func addFileToSwarm(sf *SwarmFile, content []byte, size int) error {
-
-	fkey, mhash, err := sf.mountInfo.swarmApi.AddFile(sf.mountInfo.LatestManifest, sf.path, sf.name, content, true)
+	sf.mountInfo.LatestManifestMu.RLock()
+	lm := sf.mountInfo.LatestManifest
+	sf.mountInfo.LatestManifestMu.RUnlock()
+	fkey, mhash, err := sf.mountInfo.swarmApi.AddFile(lm, sf.path, sf.name, content, true)
 	if err != nil {
 		return err
 	}
@@ -58,8 +60,8 @@ func addFileToSwarm(sf *SwarmFile, content []byte, size int) error {
 	sf.key = fkey
 	sf.fileSize = int64(size)
 
-	sf.mountInfo.lock.Lock()
-	defer sf.mountInfo.lock.Unlock()
+	sf.mountInfo.LatestManifestMu.Lock()
+	defer sf.mountInfo.LatestManifestMu.Unlock()
 	sf.mountInfo.LatestManifest = mhash
 
 	log.Info("Added new file:", "fname", sf.name, "New Manifest hash", mhash)
@@ -68,14 +70,16 @@ func addFileToSwarm(sf *SwarmFile, content []byte, size int) error {
 }
 
 func removeFileFromSwarm(sf *SwarmFile) error {
-
-	mkey, err := sf.mountInfo.swarmApi.RemoveFile(sf.mountInfo.LatestManifest, sf.path, sf.name, true)
+	sf.mountInfo.LatestManifestMu.RLock()
+	lm := sf.mountInfo.LatestManifest
+	sf.mountInfo.LatestManifestMu.RUnlock()
+	mkey, err := sf.mountInfo.swarmApi.RemoveFile(lm, sf.path, sf.name, true)
 	if err != nil {
 		return err
 	}
 
-	sf.mountInfo.lock.Lock()
-	defer sf.mountInfo.lock.Unlock()
+	sf.mountInfo.LatestManifestMu.Lock()
+	defer sf.mountInfo.LatestManifestMu.Unlock()
 	sf.mountInfo.LatestManifest = mkey
 
 	log.Info("Removed file:", "fname", sf.name, "New Manifest hash", mkey)
@@ -107,8 +111,10 @@ func removeDirectoryFromSwarm(sd *SwarmDir) error {
 }
 
 func appendToExistingFileInSwarm(sf *SwarmFile, content []byte, offset int64, length int64) error {
-
-	fkey, mhash, err := sf.mountInfo.swarmApi.AppendFile(sf.mountInfo.LatestManifest, sf.path, sf.name, sf.fileSize, content, sf.key, offset, length, true)
+	sf.mountInfo.LatestManifestMu.RLock()
+	lm := sf.mountInfo.LatestManifest
+	sf.mountInfo.LatestManifestMu.RUnlock()
+	fkey, mhash, err := sf.mountInfo.swarmApi.AppendFile(lm, sf.path, sf.name, sf.fileSize, content, sf.key, offset, length, true)
 	if err != nil {
 		return err
 	}
@@ -118,8 +124,8 @@ func appendToExistingFileInSwarm(sf *SwarmFile, content []byte, offset int64, le
 	sf.key = fkey
 	sf.fileSize = sf.fileSize + int64(len(content))
 
-	sf.mountInfo.lock.Lock()
-	defer sf.mountInfo.lock.Unlock()
+	sf.mountInfo.LatestManifestMu.Lock()
+	defer sf.mountInfo.LatestManifestMu.Unlock()
 	sf.mountInfo.LatestManifest = mhash
 
 	log.Info("Appended file:", "fname", sf.name, "New Manifest hash", mhash)

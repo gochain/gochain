@@ -32,7 +32,7 @@ import (
 
 func TestMocker(t *testing.T) {
 	//start the simulation HTTP server
-	_, s := testHTTPServer(t)
+	_, s := testHTTPServer()
 	defer s.Close()
 
 	//create a client
