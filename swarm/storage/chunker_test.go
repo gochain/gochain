@@ -40,35 +40,35 @@ type test interface {
 }
 
 type chunkerTester struct {
-	inputs map[uint64][]byte
-	chunks map[string]*Chunk
-	t      test
+	inputs   map[uint64][]byte
+	chunksMu sync.RWMutex
+	chunks   map[string]*Chunk
+	t        test
 }
 
 func (self *chunkerTester) Split(chunker Splitter, data io.Reader, size int64, chunkC chan *Chunk, swg *sync.WaitGroup, expectedError error) (key Key, err error) {
 	// reset
+	self.chunksMu.Lock()
 	self.chunks = make(map[string]*Chunk)
+	self.chunksMu.Unlock()
 
 	if self.inputs == nil {
 		self.inputs = make(map[uint64][]byte)
 	}
 
 	quitC := make(chan bool)
-	timeout := time.After(600 * time.Second)
+	defer close(quitC)
 	if chunkC != nil {
-		go func() error {
+		go func() {
 			for {
 				select {
-				case <-timeout:
-					return errors.New("Split timeout error")
 				case <-quitC:
-					return nil
+					return
 				case chunk := <-chunkC:
-					// self.chunks = append(self.chunks, chunk)
+					self.chunksMu.Lock()
 					self.chunks[chunk.Key.String()] = chunk
-					if chunk.wg != nil {
-						chunk.wg.Done()
-					}
+					self.chunksMu.Unlock()
+					chunk.Done()
 				}
 
 			}
@@ -78,13 +78,6 @@ func (self *chunkerTester) Split(chunker Splitter, data io.Reader, size int64, c
 	key, err = chunker.Split(data, size, chunkC, swg)
 	if err != nil && expectedError == nil {
 		err = fmt.Errorf("Split error: %v", err)
-	}
-
-	if chunkC != nil {
-		if swg != nil {
-			swg.Wait()
-		}
-		close(quitC)
 	}
 	return key, err
 }
@@ -102,13 +95,15 @@ func (self *chunkerTester) Append(chunker Splitter, rootKey Key, data io.Reader,
 					return nil
 				case chunk := <-chunkC:
 					if chunk != nil {
+						self.chunksMu.RLock()
 						stored, success := self.chunks[chunk.Key.String()]
+						self.chunksMu.RUnlock()
 						if !success {
 							// Requesting data
+							self.chunksMu.Lock()
 							self.chunks[chunk.Key.String()] = chunk
-							if chunk.wg != nil {
-								chunk.wg.Done()
-							}
+							self.chunksMu.Unlock()
+							chunk.Done()
 						} else {
 							// getting data
 							chunk.SData = stored.SData
@@ -153,7 +148,9 @@ func (self *chunkerTester) Join(chunker Chunker, key Key, c int, chunkC chan *Ch
 					return nil
 				}
 				// this just mocks the behaviour of a chunk store retrieval
+				self.chunksMu.RLock()
 				stored, success := self.chunks[chunk.Key.String()]
+				self.chunksMu.RUnlock()
 				if !success {
 					return errors.New("Not found")
 				}

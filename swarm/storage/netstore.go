@@ -111,7 +111,6 @@ func (self *NetStore) Put(entry *Chunk) {
 	} else {
 		log.Trace(fmt.Sprintf("NetStore.Put: localStore.Put %v stored locally", entry.Key.Log()))
 		// handle propagating store requests
-		// go self.cloud.Store(entry)
 		go self.cloud.Store(entry)
 	}
 }

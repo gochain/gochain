@@ -165,13 +165,11 @@ func (self *DPA) storeLoop() {
 }
 
 func (self *DPA) storeWorker() {
-
 	for chunk := range self.storeC {
 		self.Put(chunk)
 		if chunk.wg != nil {
 			log.Trace(fmt.Sprintf("dpa: store processor %v", chunk.Key.Log()))
 			chunk.wg.Done()
-
 		}
 		select {
 		case <-self.quitC:
