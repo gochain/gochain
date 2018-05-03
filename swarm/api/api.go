@@ -60,25 +60,25 @@ func NewApi(dpa *storage.DPA, dns Resolver) (self *Api) {
 }
 
 // to be used only in TEST
-func (self *Api) Upload(uploadDir, index string) (hash string, err error) {
-	fs := NewFileSystem(self)
+func (a *Api) Upload(uploadDir, index string) (hash string, err error) {
+	fs := NewFileSystem(a)
 	hash, err = fs.Upload(uploadDir, index)
 	return hash, err
 }
 
 // DPA reader API
-func (self *Api) Retrieve(key storage.Key) storage.LazySectionReader {
-	return self.dpa.Retrieve(key)
+func (a *Api) Retrieve(key storage.Key) storage.LazySectionReader {
+	return a.dpa.Retrieve(key)
 }
 
-func (self *Api) Store(data io.Reader, size int64, wg *sync.WaitGroup) (key storage.Key, err error) {
-	return self.dpa.Store(data, size, wg)
+func (a *Api) Store(data io.Reader, size int64, wg *sync.WaitGroup) (key storage.Key, err error) {
+	return a.dpa.Store(data, size, wg)
 }
 
 type ErrResolve error
 
 // DNS Resolver
-func (self *Api) Resolve(uri *URI) (storage.Key, error) {
+func (a *Api) Resolve(uri *URI) (storage.Key, error) {
 	log.Trace(fmt.Sprintf("Resolving : %v", uri.Addr))
 
 	// if the URI is immutable, check if the address is a hash
@@ -91,7 +91,7 @@ func (self *Api) Resolve(uri *URI) (storage.Key, error) {
 	}
 
 	// if DNS is not configured, check if the address is a hash
-	if self.dns == nil {
+	if a.dns == nil {
 		if !isHash {
 			return nil, fmt.Errorf("no DNS to resolve name: %q", uri.Addr)
 		}
@@ -99,7 +99,7 @@ func (self *Api) Resolve(uri *URI) (storage.Key, error) {
 	}
 
 	// try and resolve the address
-	resolved, err := self.dns.Resolve(uri.Addr)
+	resolved, err := a.dns.Resolve(uri.Addr)
 	if err == nil {
 		return resolved[:], nil
 	} else if !isHash {
@@ -109,16 +109,16 @@ func (self *Api) Resolve(uri *URI) (storage.Key, error) {
 }
 
 // Put provides singleton manifest creation on top of dpa store
-func (self *Api) Put(content, contentType string) (storage.Key, error) {
+func (a *Api) Put(content, contentType string) (storage.Key, error) {
 	r := strings.NewReader(content)
 	wg := &sync.WaitGroup{}
-	key, err := self.dpa.Store(r, int64(len(content)), wg)
+	key, err := a.dpa.Store(r, int64(len(content)), wg)
 	if err != nil {
 		return nil, err
 	}
 	manifest := fmt.Sprintf(`{"entries":[{"hash":"%v","contentType":"%s"}]}`, key, contentType)
 	r = strings.NewReader(manifest)
-	key, err = self.dpa.Store(r, int64(len(manifest)), wg)
+	key, err = a.dpa.Store(r, int64(len(manifest)), wg)
 	if err != nil {
 		return nil, err
 	}
@@ -129,8 +129,8 @@ func (self *Api) Put(content, contentType string) (storage.Key, error) {
 // Get uses iterative manifest retrieval and prefix matching
 // to resolve basePath to content using dpa retrieve
 // it returns a section reader, mimeType, status and an error
-func (self *Api) Get(key storage.Key, path string) (reader storage.LazySectionReader, mimeType string, status int, err error) {
-	trie, err := loadManifest(self.dpa, key, nil)
+func (a *Api) Get(key storage.Key, path string) (reader storage.LazySectionReader, mimeType string, status int, err error) {
+	trie, err := loadManifest(a.dpa, key, nil)
 	if err != nil {
 		status = http.StatusNotFound
 		log.Warn(fmt.Sprintf("loadManifestTrie error: %v", err))
@@ -149,7 +149,7 @@ func (self *Api) Get(key storage.Key, path string) (reader storage.LazySectionRe
 		} else {
 			mimeType = entry.ContentType
 			log.Trace(fmt.Sprintf("content lookup key: '%v' (%v)", key, mimeType))
-			reader = self.dpa.Retrieve(key)
+			reader = a.dpa.Retrieve(key)
 		}
 	} else {
 		status = http.StatusNotFound
@@ -159,9 +159,9 @@ func (self *Api) Get(key storage.Key, path string) (reader storage.LazySectionRe
 	return
 }
 
-func (self *Api) Modify(key storage.Key, path, contentHash, contentType string) (storage.Key, error) {
+func (a *Api) Modify(key storage.Key, path, contentHash, contentType string) (storage.Key, error) {
 	quitC := make(chan bool)
-	trie, err := loadManifest(self.dpa, key, quitC)
+	trie, err := loadManifest(a.dpa, key, quitC)
 	if err != nil {
 		return nil, err
 	}
@@ -182,13 +182,13 @@ func (self *Api) Modify(key storage.Key, path, contentHash, contentType string) 
 	return trie.hash, nil
 }
 
-func (self *Api) AddFile(mhash, path, fname string, content []byte, nameresolver bool) (storage.Key, string, error) {
+func (a *Api) AddFile(mhash, path, fname string, content []byte, nameresolver bool) (storage.Key, string, error) {
 
 	uri, err := Parse("bzz:/" + mhash)
 	if err != nil {
 		return nil, "", err
 	}
-	mkey, err := self.Resolve(uri)
+	mkey, err := a.Resolve(uri)
 	if err != nil {
 		return nil, "", err
 	}
@@ -206,7 +206,7 @@ func (self *Api) AddFile(mhash, path, fname string, content []byte, nameresolver
 		ModTime:     time.Now(),
 	}
 
-	mw, err := self.NewManifestWriter(mkey, nil)
+	mw, err := a.NewManifestWriter(mkey, nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -226,13 +226,13 @@ func (self *Api) AddFile(mhash, path, fname string, content []byte, nameresolver
 
 }
 
-func (self *Api) RemoveFile(mhash, path, fname string, nameresolver bool) (string, error) {
+func (a *Api) RemoveFile(mhash, path, fname string, nameresolver bool) (string, error) {
 
 	uri, err := Parse("bzz:/" + mhash)
 	if err != nil {
 		return "", err
 	}
-	mkey, err := self.Resolve(uri)
+	mkey, err := a.Resolve(uri)
 	if err != nil {
 		return "", err
 	}
@@ -242,7 +242,7 @@ func (self *Api) RemoveFile(mhash, path, fname string, nameresolver bool) (strin
 		path = path[1:]
 	}
 
-	mw, err := self.NewManifestWriter(mkey, nil)
+	mw, err := a.NewManifestWriter(mkey, nil)
 	if err != nil {
 		return "", err
 	}
@@ -261,7 +261,7 @@ func (self *Api) RemoveFile(mhash, path, fname string, nameresolver bool) (strin
 	return newMkey.String(), nil
 }
 
-func (self *Api) AppendFile(mhash, path, fname string, existingSize int64, content []byte, oldKey storage.Key, offset int64, addSize int64, nameresolver bool) (storage.Key, string, error) {
+func (a *Api) AppendFile(mhash, path, fname string, existingSize int64, content []byte, oldKey storage.Key, offset int64, addSize int64, nameresolver bool) (storage.Key, string, error) {
 
 	buffSize := offset + addSize
 	if buffSize < existingSize {
@@ -270,7 +270,7 @@ func (self *Api) AppendFile(mhash, path, fname string, existingSize int64, conte
 
 	buf := make([]byte, buffSize)
 
-	oldReader := self.Retrieve(oldKey)
+	oldReader := a.Retrieve(oldKey)
 	io.ReadAtLeast(oldReader, buf, int(offset))
 
 	newReader := bytes.NewReader(content)
@@ -292,7 +292,7 @@ func (self *Api) AppendFile(mhash, path, fname string, existingSize int64, conte
 	if err != nil {
 		return nil, "", err
 	}
-	mkey, err := self.Resolve(uri)
+	mkey, err := a.Resolve(uri)
 	if err != nil {
 		return nil, "", err
 	}
@@ -302,7 +302,7 @@ func (self *Api) AppendFile(mhash, path, fname string, existingSize int64, conte
 		path = path[1:]
 	}
 
-	mw, err := self.NewManifestWriter(mkey, nil)
+	mw, err := a.NewManifestWriter(mkey, nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -335,18 +335,18 @@ func (self *Api) AppendFile(mhash, path, fname string, existingSize int64, conte
 
 }
 
-func (self *Api) BuildDirectoryTree(mhash string, nameresolver bool) (key storage.Key, manifestEntryMap map[string]*manifestTrieEntry, err error) {
+func (a *Api) BuildDirectoryTree(mhash string, nameresolver bool) (key storage.Key, manifestEntryMap map[string]*manifestTrieEntry, err error) {
 	uri, err := Parse("bzz:/" + mhash)
 	if err != nil {
 		return nil, nil, err
 	}
-	key, err = self.Resolve(uri)
+	key, err = a.Resolve(uri)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	quitC := make(chan bool)
-	rootTrie, err := loadManifest(self.dpa, key, quitC)
+	rootTrie, err := loadManifest(a.dpa, key, quitC)
 	if err != nil {
 		return nil, nil, fmt.Errorf("can't load manifest %v: %v", key.String(), err)
 	}
