@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/gochain-io/gochain/log"
@@ -109,6 +110,7 @@ type task interface {
 // fields cannot be accessed while the task is running.
 type dialTask struct {
 	flags        connFlag
+	destMu       sync.RWMutex
 	dest         *discover.Node
 	lastResolved time.Time
 	resolveDelay time.Duration
@@ -148,7 +150,11 @@ func newDialState(static []*discover.Node, bootnodes []*discover.Node, ntab disc
 func (s *dialstate) addStatic(n *discover.Node) {
 	// This overwites the task instead of updating an existing
 	// entry, giving users the opportunity to force a resolve operation.
-	s.static[n.ID] = &dialTask{flags: staticDialedConn, dest: n}
+	dt := &dialTask{flags: staticDialedConn}
+	dt.destMu.Lock()
+	dt.dest = n
+	dt.destMu.Unlock()
+	s.static[n.ID] = dt
 }
 
 func (s *dialstate) removeStatic(n *discover.Node) {
@@ -193,11 +199,14 @@ func (s *dialstate) newTasks(nRunning int, peers map[discover.NodeID]*Peer, now 
 
 	// Create dials for static nodes if they are not connected.
 	for id, t := range s.static {
-		err := s.checkDial(t.dest, peers)
+		t.destMu.RLock()
+		dest := t.dest
+		t.destMu.RUnlock()
+		err := s.checkDial(dest, peers)
 		switch err {
 		case errNotWhitelisted, errSelf:
-			log.Warn("Removing static dial candidate", "id", t.dest.ID, "addr", &net.TCPAddr{IP: t.dest.IP, Port: int(t.dest.TCP)}, "err", err)
-			delete(s.static, t.dest.ID)
+			log.Warn("Removing static dial candidate", "id", dest.ID, "addr", &net.TCPAddr{IP: dest.IP, Port: int(dest.TCP)}, "err", err)
+			delete(s.static, dest.ID)
 		case nil:
 			s.dialing[id] = t.flags
 			newtasks = append(newtasks, t)
@@ -280,8 +289,11 @@ func (s *dialstate) checkDial(n *discover.Node, peers map[discover.NodeID]*Peer)
 func (s *dialstate) taskDone(t task, now time.Time) {
 	switch t := t.(type) {
 	case *dialTask:
-		s.hist.add(t.dest.ID, now.Add(dialHistoryExpiration))
-		delete(s.dialing, t.dest.ID)
+		t.destMu.RLock()
+		dest := t.dest
+		t.destMu.RUnlock()
+		s.hist.add(dest.ID, now.Add(dialHistoryExpiration))
+		delete(s.dialing, dest.ID)
 	case *discoverTask:
 		s.lookupRunning = false
 		s.lookupBuf = append(s.lookupBuf, t.results...)
@@ -289,18 +301,27 @@ func (s *dialstate) taskDone(t task, now time.Time) {
 }
 
 func (t *dialTask) Do(srv *Server) {
-	if t.dest.Incomplete() {
+	t.destMu.RLock()
+	dest := t.dest
+	t.destMu.RUnlock()
+	if dest.Incomplete() {
 		if !t.resolve(srv) {
 			return
 		}
 	}
-	err := t.dial(srv, t.dest)
+	t.destMu.RLock()
+	dest = t.dest
+	t.destMu.RUnlock()
+	err := t.dial(srv, dest)
 	if err != nil {
 		log.Trace("Dial error", "task", t, "err", err)
 		// Try resolving the ID of static nodes if dialing failed.
 		if _, ok := err.(*dialError); ok && t.flags&staticDialedConn != 0 {
 			if t.resolve(srv) {
-				if err := t.dial(srv, t.dest); err != nil {
+				t.destMu.RLock()
+				dest = t.dest
+				t.destMu.RUnlock()
+				if err := t.dial(srv, dest); err != nil {
 					log.Error("Cannot dial static node", "err", err)
 				}
 			}
@@ -315,8 +336,11 @@ func (t *dialTask) Do(srv *Server) {
 // discovery network with useless queries for nodes that don't exist.
 // The backoff delay resets when the node is found.
 func (t *dialTask) resolve(srv *Server) bool {
+	t.destMu.RLock()
+	dest := t.dest
+	t.destMu.RUnlock()
 	if srv.ntab == nil {
-		log.Debug("Can't resolve node", "id", t.dest.ID, "err", "discovery is disabled")
+		log.Debug("Can't resolve node", "id", dest.ID, "err", "discovery is disabled")
 		return false
 	}
 	if t.resolveDelay == 0 {
@@ -325,20 +349,22 @@ func (t *dialTask) resolve(srv *Server) bool {
 	if time.Since(t.lastResolved) < t.resolveDelay {
 		return false
 	}
-	resolved := srv.ntab.Resolve(t.dest.ID)
+	resolved := srv.ntab.Resolve(dest.ID)
 	t.lastResolved = time.Now()
 	if resolved == nil {
 		t.resolveDelay *= 2
 		if t.resolveDelay > maxResolveDelay {
 			t.resolveDelay = maxResolveDelay
 		}
-		log.Debug("Resolving node failed", "id", t.dest.ID, "newdelay", t.resolveDelay)
+		log.Debug("Resolving node failed", "id", dest.ID, "newdelay", t.resolveDelay)
 		return false
 	}
 	// The node was found.
 	t.resolveDelay = initialResolveDelay
+	t.destMu.Lock()
 	t.dest = resolved
-	log.Debug("Resolved node", "id", t.dest.ID, "addr", &net.TCPAddr{IP: t.dest.IP, Port: int(t.dest.TCP)})
+	t.destMu.Unlock()
+	log.Debug("Resolved node", "id", resolved.ID, "addr", &net.TCPAddr{IP: resolved.IP, Port: int(resolved.TCP)})
 	return true
 }
 
@@ -357,7 +383,10 @@ func (t *dialTask) dial(srv *Server, dest *discover.Node) error {
 }
 
 func (t *dialTask) String() string {
-	return fmt.Sprintf("%v %x %v:%d", t.flags, t.dest.ID[:8], t.dest.IP, t.dest.TCP)
+	t.destMu.RLock()
+	dest := t.dest
+	t.destMu.RUnlock()
+	return fmt.Sprintf("%v %x %v:%d", t.flags, dest.ID[:8], dest.IP, dest.TCP)
 }
 
 func (t *discoverTask) Do(srv *Server) {

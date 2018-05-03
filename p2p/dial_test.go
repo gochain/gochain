@@ -650,7 +650,11 @@ func TestDialResolve(t *testing.T) {
 
 	// Report it as done to the dialer, which should update the static node record.
 	state.taskDone(tasks[0], time.Now())
-	if state.static[uintID(1)].dest != resolved {
+	dt := state.static[uintID(1)]
+	dt.destMu.RLock()
+	dest = dt.dest
+	dt.destMu.RUnlock()
+	if dest != resolved {
 		t.Fatalf("state.dest not updated")
 	}
 }
