@@ -104,7 +104,7 @@ func (t *rlpx) WriteMsg(msg Msg) error {
 	t.wmu.Lock()
 	defer t.wmu.Unlock()
 	if err := t.fd.SetWriteDeadline(time.Now().Add(frameWriteTimeout)); err != nil {
-		log.Error("Cannot set rlpx write deadline", "err", err)
+		return err
 	}
 	return t.rw.WriteMsg(msg)
 }

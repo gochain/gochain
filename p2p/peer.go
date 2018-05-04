@@ -272,7 +272,7 @@ func (p *Peer) handle(msg Msg) error {
 		msg.Discard()
 		go func() {
 			if err := SendItems(p.rw, pongMsg); err != nil {
-				log.Error("Cannot send items", "err", err)
+				log.Trace("Cannot send items", "err", err)
 			}
 		}()
 	case msg.Code == discMsg:
