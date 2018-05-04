@@ -787,9 +787,7 @@ func (srv *Server) listenLoop() {
 		fd = newMeteredConn(fd, true)
 		srv.log.Trace("Accepted connection", "addr", fd.RemoteAddr())
 		go func() {
-			if err := srv.SetupConn(fd, inboundConn, nil); err != nil {
-				log.Error("Cannot setup p2p server connection", "err", err)
-			}
+			srv.SetupConn(fd, inboundConn, nil)
 			slots <- struct{}{}
 		}()
 	}
