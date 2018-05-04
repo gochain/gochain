@@ -27,10 +27,8 @@ import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/contracts/chequebook"
 	"github.com/gochain-io/gochain/contracts/ens"
-	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/ethclient"
 	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/node"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/p2p/discover"
 	"github.com/gochain-io/gochain/rpc"
@@ -66,17 +64,17 @@ type SwarmAPI struct {
 	PrvKey  *ecdsa.PrivateKey
 }
 
-func (self *Swarm) API() *SwarmAPI {
+func (s *Swarm) API() *SwarmAPI {
 	return &SwarmAPI{
-		Api:     self.api,
-		Backend: self.backend,
-		PrvKey:  self.privateKey,
+		Api:     s.api,
+		Backend: s.backend,
+		PrvKey:  s.privateKey,
 	}
 }
 
 // creates a new swarm service instance
 // implements node.Service
-func NewSwarm(ctx *node.ServiceContext, backend chequebook.Backend, ensClient *ethclient.Client, config *api.Config, swapEnabled, syncEnabled bool, cors string) (self *Swarm, err error) {
+func NewSwarm(backend chequebook.Backend, ensClient *ethclient.Client, config *api.Config, swapEnabled, syncEnabled bool, cors string) (self *Swarm, err error) {
 	if bytes.Equal(common.FromHex(config.PublicKey), storage.ZeroKey) {
 		return nil, fmt.Errorf("empty public key")
 	}
@@ -167,7 +165,7 @@ Start is called when the stack is started
 * TODO: start subservices like sword, swear, swarmdns
 */
 // implements the node.Service interface
-func (self *Swarm) Start(ctx context.Context, srv *p2p.Server) error {
+func (s *Swarm) Start(ctx context.Context, srv *p2p.Server) error {
 	connectPeer := func(url string) error {
 		node, err := discover.ParseNode(url)
 		if err != nil {
@@ -177,39 +175,39 @@ func (self *Swarm) Start(ctx context.Context, srv *p2p.Server) error {
 		return nil
 	}
 	// set chequebook
-	if self.swapEnabled {
+	if s.swapEnabled {
 		ctx := context.Background() // The initial setup has no deadline.
-		err := self.SetChequebook(ctx)
+		err := s.SetChequebook(ctx)
 		if err != nil {
 			return fmt.Errorf("Unable to set chequebook for SWAP: %v", err)
 		}
-		log.Debug(fmt.Sprintf("-> cheque book for SWAP: %v", self.config.Swap.Chequebook()))
+		log.Debug(fmt.Sprintf("-> cheque book for SWAP: %v", s.config.Swap.Chequebook()))
 	} else {
 		log.Debug(fmt.Sprintf("SWAP disabled: no cheque book set"))
 	}
 
 	log.Warn(fmt.Sprintf("Starting Swarm service"))
-	self.hive.Start(
+	s.hive.Start(
 		discover.PubkeyID(&srv.PrivateKey.PublicKey),
 		func() string { return srv.ListenAddr },
 		connectPeer,
 	)
-	log.Info(fmt.Sprintf("Swarm network started on bzz address: %v", self.hive.Addr()))
+	log.Info(fmt.Sprintf("Swarm network started on bzz address: %v", s.hive.Addr()))
 
-	self.dpa.Start()
+	s.dpa.Start()
 	log.Debug(fmt.Sprintf("Swarm DPA started"))
 
 	// start swarm http proxy server
-	if self.config.Port != "" {
-		addr := net.JoinHostPort(self.config.ListenAddr, self.config.Port)
-		go httpapi.StartHttpServer(self.api, &httpapi.ServerConfig{
+	if s.config.Port != "" {
+		addr := net.JoinHostPort(s.config.ListenAddr, s.config.Port)
+		go httpapi.StartHttpServer(s.api, &httpapi.ServerConfig{
 			Addr:       addr,
-			CorsString: self.corsString,
+			CorsString: s.corsString,
 		})
 		log.Info(fmt.Sprintf("Swarm http proxy started on %v", addr))
 
-		if self.corsString != "" {
-			log.Debug(fmt.Sprintf("Swarm http proxy started with corsdomain: %v", self.corsString))
+		if s.corsString != "" {
+			log.Debug(fmt.Sprintf("Swarm http proxy started with corsdomain: %v", s.corsString))
 		}
 	}
 
@@ -218,24 +216,24 @@ func (self *Swarm) Start(ctx context.Context, srv *p2p.Server) error {
 
 // implements the node.Service interface
 // stops all component services.
-func (self *Swarm) Stop() error {
-	self.dpa.Stop()
-	err := self.hive.Stop()
-	if ch := self.config.Swap.Chequebook(); ch != nil {
+func (s *Swarm) Stop() error {
+	s.dpa.Stop()
+	err := s.hive.Stop()
+	if ch := s.config.Swap.Chequebook(); ch != nil {
 		ch.Stop()
 		ch.Save()
 	}
 
-	if self.lstore != nil {
-		self.lstore.DbStore.Close()
+	if s.lstore != nil {
+		s.lstore.DbStore.Close()
 	}
-	self.sfs.Stop()
+	s.sfs.Stop()
 	return err
 }
 
 // implements the node.Service interface
-func (self *Swarm) Protocols() []p2p.Protocol {
-	proto, err := network.Bzz(self.depo, self.backend, self.hive, self.dbAccess, self.config.Swap, self.config.SyncParams, self.config.NetworkId)
+func (s *Swarm) Protocols() []p2p.Protocol {
+	proto, err := network.Bzz(s.depo, s.backend, s.hive, s.dbAccess, s.config.Swap, s.config.SyncParams, s.config.NetworkId)
 	if err != nil {
 		return nil
 	}
@@ -244,32 +242,32 @@ func (self *Swarm) Protocols() []p2p.Protocol {
 
 // implements node.Service
 // Apis returns the RPC Api descriptors the Swarm implementation offers
-func (self *Swarm) APIs() []rpc.API {
+func (s *Swarm) APIs() []rpc.API {
 	return []rpc.API{
 		// public APIs
 		{
 			Namespace: "bzz",
 			Version:   "0.1",
-			Service:   &Info{self.config, chequebook.ContractParams},
+			Service:   &Info{s.config, chequebook.ContractParams},
 			Public:    true,
 		},
 		// admin APIs
 		{
 			Namespace: "bzz",
 			Version:   "0.1",
-			Service:   api.NewControl(self.api, self.hive),
+			Service:   api.NewControl(s.api, s.hive),
 			Public:    false,
 		},
 		{
 			Namespace: "chequebook",
 			Version:   chequebook.Version,
-			Service:   chequebook.NewApi(self.config.Swap.Chequebook),
+			Service:   chequebook.NewApi(s.config.Swap.Chequebook),
 			Public:    false,
 		},
 		{
 			Namespace: "swarmfs",
 			Version:   fuse.Swarmfs_Version,
-			Service:   self.sfs,
+			Service:   s.sfs,
 			Public:    false,
 		},
 		// storage APIs
@@ -277,58 +275,32 @@ func (self *Swarm) APIs() []rpc.API {
 		{
 			Namespace: "bzz",
 			Version:   "0.1",
-			Service:   api.NewStorage(self.api),
+			Service:   api.NewStorage(s.api),
 			Public:    true,
 		},
 		{
 			Namespace: "bzz",
 			Version:   "0.1",
-			Service:   api.NewFileSystem(self.api),
+			Service:   api.NewFileSystem(s.api),
 			Public:    false,
 		},
-		// {Namespace, Version, api.NewAdmin(self), false},
+		// {Namespace, Version, api.NewAdmin(s), false},
 	}
 }
 
-func (self *Swarm) Api() *api.Api {
-	return self.api
+func (s *Swarm) Api() *api.Api {
+	return s.api
 }
 
 // SetChequebook ensures that the local checquebook is set up on chain.
-func (self *Swarm) SetChequebook(ctx context.Context) error {
-	err := self.config.Swap.SetChequebook(ctx, self.backend, self.config.Path)
+func (s *Swarm) SetChequebook(ctx context.Context) error {
+	err := s.config.Swap.SetChequebook(ctx, s.backend, s.config.Path)
 	if err != nil {
 		return err
 	}
-	log.Info(fmt.Sprintf("new chequebook set (%v): saving config file, resetting all connections in the hive", self.config.Swap.Contract.Hex()))
-	self.hive.DropAll()
+	log.Info(fmt.Sprintf("new chequebook set (%v): saving config file, resetting all connections in the hive", s.config.Swap.Contract.Hex()))
+	s.hive.DropAll()
 	return nil
-}
-
-// Local swarm without netStore
-func NewLocalSwarm(datadir, port string) (self *Swarm, err error) {
-
-	prvKey, err := crypto.GenerateKey()
-	if err != nil {
-		return
-	}
-
-	config := api.NewDefaultConfig()
-	config.Path = datadir
-	config.Init(prvKey)
-	config.Port = port
-
-	dpa, err := storage.NewLocalDPA(datadir)
-	if err != nil {
-		return
-	}
-
-	self = &Swarm{
-		api:    api.NewApi(dpa, nil),
-		config: config,
-	}
-
-	return
 }
 
 // serialisable info about swarm
@@ -337,6 +309,6 @@ type Info struct {
 	*chequebook.Params
 }
 
-func (self *Info) Info() *Info {
-	return self
+func (i *Info) Info() *Info {
+	return i
 }

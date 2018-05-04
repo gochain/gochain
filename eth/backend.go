@@ -96,9 +96,9 @@ type GoChain struct {
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
 }
 
-func (s *GoChain) AddLesServer(ls LesServer) {
-	s.lesServer = ls
-	ls.SetBloomBitsIndexer(s.bloomIndexer)
+func (gc *GoChain) AddLesServer(ls LesServer) {
+	gc.lesServer = ls
+	ls.SetBloomBitsIndexer(gc.bloomIndexer)
 }
 
 // New creates a new GoChain object (including the
@@ -277,82 +277,82 @@ func CreateConsensusEngine(ctx *node.ServiceContext, config *ethash.Config, chai
 
 // APIs returns the collection of RPC services the ethereum package offers.
 // NOTE, some of these services probably need to be moved to somewhere else.
-func (s *GoChain) APIs() []rpc.API {
-	apis := ethapi.GetAPIs(s.ApiBackend)
+func (gc *GoChain) APIs() []rpc.API {
+	apis := ethapi.GetAPIs(gc.ApiBackend)
 
 	// Append any APIs exposed explicitly by the consensus engine
-	apis = append(apis, s.engine.APIs(s.BlockChain())...)
+	apis = append(apis, gc.engine.APIs(gc.BlockChain())...)
 
 	// Append all the local APIs and return
 	return append(apis, []rpc.API{
 		{
 			Namespace: "eth",
 			Version:   "1.0",
-			Service:   NewPublicEthereumAPI(s),
+			Service:   NewPublicEthereumAPI(gc),
 			Public:    true,
 		}, {
 			Namespace: "eth",
 			Version:   "1.0",
-			Service:   NewPublicMinerAPI(s),
+			Service:   NewPublicMinerAPI(gc),
 			Public:    true,
 		}, {
 			Namespace: "eth",
 			Version:   "1.0",
-			Service:   downloader.NewPublicDownloaderAPI(s.protocolManager.downloader, s.eventMux),
+			Service:   downloader.NewPublicDownloaderAPI(gc.protocolManager.downloader, gc.eventMux),
 			Public:    true,
 		}, {
 			Namespace: "miner",
 			Version:   "1.0",
-			Service:   NewPrivateMinerAPI(s),
+			Service:   NewPrivateMinerAPI(gc),
 			Public:    false,
 		}, {
 			Namespace: "eth",
 			Version:   "1.0",
-			Service:   filters.NewPublicFilterAPI(s.ApiBackend, false),
+			Service:   filters.NewPublicFilterAPI(gc.ApiBackend, false),
 			Public:    true,
 		}, {
 			Namespace: "admin",
 			Version:   "1.0",
-			Service:   NewPrivateAdminAPI(s),
+			Service:   NewPrivateAdminAPI(gc),
 		}, {
 			Namespace: "debug",
 			Version:   "1.0",
-			Service:   NewPublicDebugAPI(s),
+			Service:   NewPublicDebugAPI(gc),
 			Public:    true,
 		}, {
 			Namespace: "debug",
 			Version:   "1.0",
-			Service:   NewPrivateDebugAPI(s.chainConfig, s),
+			Service:   NewPrivateDebugAPI(gc.chainConfig, gc),
 		}, {
 			Namespace: "net",
 			Version:   "1.0",
-			Service:   s.netRPCService,
+			Service:   gc.netRPCService,
 			Public:    true,
 		},
 	}...)
 }
 
-func (s *GoChain) ResetWithGenesisBlock(gb *types.Block) {
-	if err := s.blockchain.ResetWithGenesisBlock(gb); err != nil {
+func (gc *GoChain) ResetWithGenesisBlock(gb *types.Block) {
+	if err := gc.blockchain.ResetWithGenesisBlock(gb); err != nil {
 		log.Error("Cannot reset with genesis block", "err", err)
 	}
 }
 
-func (s *GoChain) Etherbase() (eb common.Address, err error) {
-	s.lock.RLock()
-	etherbase := s.etherbase
-	s.lock.RUnlock()
+func (gc *GoChain) Etherbase() (eb common.Address, err error) {
+	gc.lock.RLock()
+	etherbase := gc.etherbase
+	gc.lock.RUnlock()
 
 	if etherbase != (common.Address{}) {
 		return etherbase, nil
 	}
-	if wallets := s.AccountManager().Wallets(); len(wallets) > 0 {
+	if wallets := gc.AccountManager().Wallets(); len(wallets) > 0 {
 		if accounts := wallets[0].Accounts(); len(accounts) > 0 {
 			etherbase := accounts[0].Address
 
-			s.lock.Lock()
-			s.etherbase = etherbase
-			s.lock.Unlock()
+			gc.lock.Lock()
+			gc.etherbase = etherbase
+			gc.lock.Unlock()
 
 			log.Info("Etherbase automatically configured", "address", etherbase)
 			return etherbase, nil
@@ -362,22 +362,22 @@ func (s *GoChain) Etherbase() (eb common.Address, err error) {
 }
 
 // set in js console via admin interface or wrapper from cli flags
-func (self *GoChain) SetEtherbase(etherbase common.Address) {
-	self.lock.Lock()
-	self.etherbase = etherbase
-	self.lock.Unlock()
+func (gc *GoChain) SetEtherbase(etherbase common.Address) {
+	gc.lock.Lock()
+	gc.etherbase = etherbase
+	gc.lock.Unlock()
 
-	self.miner.SetEtherbase(etherbase)
+	gc.miner.SetEtherbase(etherbase)
 }
 
-func (s *GoChain) StartMining(ctx context.Context, local bool) error {
-	eb, err := s.Etherbase()
+func (gc *GoChain) StartMining(ctx context.Context, local bool) error {
+	eb, err := gc.Etherbase()
 	if err != nil {
 		log.Error("Cannot start mining without etherbase", "err", err)
 		return fmt.Errorf("etherbase missing: %v", err)
 	}
-	if clique, ok := s.engine.(*clique.Clique); ok {
-		wallet, err := s.accountManager.Find(accounts.Account{Address: eb})
+	if clique, ok := gc.engine.(*clique.Clique); ok {
+		wallet, err := gc.accountManager.Find(accounts.Account{Address: eb})
 		if wallet == nil || err != nil {
 			log.Error("Etherbase account unavailable locally", "err", err)
 			return fmt.Errorf("signer missing: %v", err)
@@ -389,83 +389,83 @@ func (s *GoChain) StartMining(ctx context.Context, local bool) error {
 		// mechanism introduced to speed sync times. CPU mining on mainnet is ludicrous
 		// so noone will ever hit this path, whereas marking sync done on CPU mining
 		// will ensure that private networks work in single miner mode too.
-		atomic.StoreUint32(&s.protocolManager.acceptTxs, 1)
+		atomic.StoreUint32(&gc.protocolManager.acceptTxs, 1)
 	}
-	go s.miner.Start(ctx, eb)
+	go gc.miner.Start(ctx, eb)
 	return nil
 }
 
-func (s *GoChain) StopMining()         { s.miner.Stop() }
-func (s *GoChain) IsMining() bool      { return s.miner.Mining() }
-func (s *GoChain) Miner() *miner.Miner { return s.miner }
+func (gc *GoChain) StopMining()         { gc.miner.Stop() }
+func (gc *GoChain) IsMining() bool      { return gc.miner.Mining() }
+func (gc *GoChain) Miner() *miner.Miner { return gc.miner }
 
-func (s *GoChain) AccountManager() *accounts.Manager  { return s.accountManager }
-func (s *GoChain) BlockChain() *core.BlockChain       { return s.blockchain }
-func (s *GoChain) TxPool() *core.TxPool               { return s.txPool }
-func (s *GoChain) EventMux() *event.TypeMux           { return s.eventMux }
-func (s *GoChain) Engine() consensus.Engine           { return s.engine }
-func (s *GoChain) ChainDb() ethdb.Database            { return s.chainDb }
-func (s *GoChain) IsListening() bool                  { return true } // Always listening
-func (s *GoChain) EthVersion() int                    { return int(s.protocolManager.SubProtocols[0].Version) }
-func (s *GoChain) NetVersion() uint64                 { return s.networkId }
-func (s *GoChain) Downloader() *downloader.Downloader { return s.protocolManager.downloader }
+func (gc *GoChain) AccountManager() *accounts.Manager  { return gc.accountManager }
+func (gc *GoChain) BlockChain() *core.BlockChain       { return gc.blockchain }
+func (gc *GoChain) TxPool() *core.TxPool               { return gc.txPool }
+func (gc *GoChain) EventMux() *event.TypeMux           { return gc.eventMux }
+func (gc *GoChain) Engine() consensus.Engine           { return gc.engine }
+func (gc *GoChain) ChainDb() ethdb.Database            { return gc.chainDb }
+func (gc *GoChain) IsListening() bool                  { return true } // Always listening
+func (gc *GoChain) EthVersion() int                    { return int(gc.protocolManager.SubProtocols[0].Version) }
+func (gc *GoChain) NetVersion() uint64                 { return gc.networkId }
+func (gc *GoChain) Downloader() *downloader.Downloader { return gc.protocolManager.downloader }
 
 // Protocols implements node.Service, returning all the currently configured
 // network protocols to start.
-func (s *GoChain) Protocols() []p2p.Protocol {
-	if s.lesServer == nil {
-		return s.protocolManager.SubProtocols
+func (gc *GoChain) Protocols() []p2p.Protocol {
+	if gc.lesServer == nil {
+		return gc.protocolManager.SubProtocols
 	}
-	return append(s.protocolManager.SubProtocols, s.lesServer.Protocols()...)
+	return append(gc.protocolManager.SubProtocols, gc.lesServer.Protocols()...)
 }
 
 // Start implements node.Service, starting all internal goroutines needed by the
 // GoChain protocol implementation.
-func (s *GoChain) Start(ctx context.Context, srvr *p2p.Server) error {
+func (gc *GoChain) Start(ctx context.Context, srvr *p2p.Server) error {
 	// Start the bloom bits servicing goroutines
-	s.startBloomHandlers()
+	gc.startBloomHandlers()
 
 	// Start the RPC service
-	s.netRPCService = ethapi.NewPublicNetAPI(srvr, s.NetVersion())
+	gc.netRPCService = ethapi.NewPublicNetAPI(srvr, gc.NetVersion())
 
 	// Figure out a max peers count based on the server limits
 	maxPeers := srvr.MaxPeers
-	if s.config.LightServ > 0 {
-		if s.config.LightPeers >= srvr.MaxPeers {
-			return fmt.Errorf("invalid peer config: light peer count (%d) >= total peer count (%d)", s.config.LightPeers, srvr.MaxPeers)
+	if gc.config.LightServ > 0 {
+		if gc.config.LightPeers >= srvr.MaxPeers {
+			return fmt.Errorf("invalid peer config: light peer count (%d) >= total peer count (%d)", gc.config.LightPeers, srvr.MaxPeers)
 		}
-		maxPeers -= s.config.LightPeers
+		maxPeers -= gc.config.LightPeers
 	}
 	// Start the networking layer and the light server if requested
-	s.protocolManager.Start(ctx, maxPeers)
-	if s.lesServer != nil {
-		s.lesServer.Start(srvr)
+	gc.protocolManager.Start(ctx, maxPeers)
+	if gc.lesServer != nil {
+		gc.lesServer.Start(srvr)
 	}
 	return nil
 }
 
 // Stop implements node.Service, terminating all internal goroutines used by the
 // GoChain protocol.
-func (s *GoChain) Stop() error {
-	if s.stopDbUpgrade != nil {
-		if err := s.stopDbUpgrade(); err != nil {
+func (gc *GoChain) Stop() error {
+	if gc.stopDbUpgrade != nil {
+		if err := gc.stopDbUpgrade(); err != nil {
 			log.Error("Cannot stop db upgrade", "err", err)
 		}
 	}
-	if err := s.bloomIndexer.Close(); err != nil {
+	if err := gc.bloomIndexer.Close(); err != nil {
 		log.Error("Cannot stop bloom indexer", "err", err)
 	}
-	s.blockchain.Stop()
-	s.protocolManager.Stop()
-	if s.lesServer != nil {
-		s.lesServer.Stop()
+	gc.blockchain.Stop()
+	gc.protocolManager.Stop()
+	if gc.lesServer != nil {
+		gc.lesServer.Stop()
 	}
-	s.txPool.Stop()
-	s.miner.Stop()
-	s.eventMux.Stop()
+	gc.txPool.Stop()
+	gc.miner.Stop()
+	gc.eventMux.Stop()
 
-	s.chainDb.Close()
-	close(s.shutdownChan)
+	gc.chainDb.Close()
+	close(gc.shutdownChan)
 
 	return nil
 }

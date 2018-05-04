@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"bazil.org/fuse"
-	"bazil.org/fuse/fs"
+	fusefs "bazil.org/fuse/fs"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/swarm/api"
@@ -72,7 +72,7 @@ func NewMountInfo(mhash, mpoint string, sapi *api.Api) *MountInfo {
 	return newMountInfo
 }
 
-func (self *SwarmFS) Mount(mhash, mountpoint string) (*MountInfo, error) {
+func (fs *SwarmFS) Mount(mhash, mountpoint string) (*MountInfo, error) {
 
 	if mountpoint == "" {
 		return nil, errEmptyMountPoint
@@ -82,25 +82,25 @@ func (self *SwarmFS) Mount(mhash, mountpoint string) (*MountInfo, error) {
 		return nil, err
 	}
 
-	self.swarmFsLock.Lock()
-	defer self.swarmFsLock.Unlock()
+	fs.swarmFsLock.Lock()
+	defer fs.swarmFsLock.Unlock()
 
-	noOfActiveMounts := len(self.activeMounts)
+	noOfActiveMounts := len(fs.activeMounts)
 	if noOfActiveMounts >= maxFuseMounts {
 		return nil, errMaxMountCount
 	}
 
-	if _, ok := self.activeMounts[cleanedMountPoint]; ok {
+	if _, ok := fs.activeMounts[cleanedMountPoint]; ok {
 		return nil, errAlreadyMounted
 	}
 
 	log.Info(fmt.Sprintf("Attempting to mount %s ", cleanedMountPoint))
-	_, manifestEntryMap, err := self.swarmApi.BuildDirectoryTree(mhash, true)
+	_, manifestEntryMap, err := fs.swarmApi.BuildDirectoryTree(mhash, true)
 	if err != nil {
 		return nil, err
 	}
 
-	mi := NewMountInfo(mhash, cleanedMountPoint, self.swarmApi)
+	mi := NewMountInfo(mhash, cleanedMountPoint, fs.swarmApi)
 
 	dirTree := map[string]*SwarmDir{}
 	rootDir := NewSwarmDir("/", mi)
@@ -152,7 +152,7 @@ func (self *SwarmFS) Mount(mhash, mountpoint string) (*MountInfo, error) {
 	go func() {
 		log.Info(fmt.Sprintf("Serving %s at %s", mhash, cleanedMountPoint))
 		filesys := &SwarmRoot{root: rootDir}
-		if err := fs.Serve(fconn, filesys); err != nil {
+		if err := fusefs.Serve(fconn, filesys); err != nil {
 			log.Warn(fmt.Sprintf("Could not Serve SwarmFileSystem error: %v", err))
 			serverr <- err
 		}
@@ -174,21 +174,21 @@ func (self *SwarmFS) Mount(mhash, mountpoint string) (*MountInfo, error) {
 		log.Info("Now serving swarm FUSE FS", "manifest", mhash, "mountpoint", cleanedMountPoint)
 	}
 
-	self.activeMounts[cleanedMountPoint] = mi
+	fs.activeMounts[cleanedMountPoint] = mi
 	return mi, nil
 }
 
-func (self *SwarmFS) Unmount(mountpoint string) (*MountInfo, error) {
+func (fs *SwarmFS) Unmount(mountpoint string) (*MountInfo, error) {
 
-	self.swarmFsLock.Lock()
-	defer self.swarmFsLock.Unlock()
+	fs.swarmFsLock.Lock()
+	defer fs.swarmFsLock.Unlock()
 
 	cleanedMountPoint, err := filepath.Abs(filepath.Clean(mountpoint))
 	if err != nil {
 		return nil, err
 	}
 
-	mountInfo := self.activeMounts[cleanedMountPoint]
+	mountInfo := fs.activeMounts[cleanedMountPoint]
 
 	if mountInfo == nil || mountInfo.MountPoint != cleanedMountPoint {
 		return nil, fmt.Errorf("%s is not mounted", cleanedMountPoint)
@@ -204,7 +204,7 @@ func (self *SwarmFS) Unmount(mountpoint string) (*MountInfo, error) {
 	}
 
 	mountInfo.fuseConnection.Close()
-	delete(self.activeMounts, cleanedMountPoint)
+	delete(fs.activeMounts, cleanedMountPoint)
 
 	succString := fmt.Sprintf("UnMounting %v succeeded", cleanedMountPoint)
 	log.Info(succString)
@@ -212,21 +212,21 @@ func (self *SwarmFS) Unmount(mountpoint string) (*MountInfo, error) {
 	return mountInfo, nil
 }
 
-func (self *SwarmFS) Listmounts() []*MountInfo {
-	self.swarmFsLock.RLock()
-	defer self.swarmFsLock.RUnlock()
+func (fs *SwarmFS) Listmounts() []*MountInfo {
+	fs.swarmFsLock.RLock()
+	defer fs.swarmFsLock.RUnlock()
 
-	rows := make([]*MountInfo, 0, len(self.activeMounts))
-	for _, mi := range self.activeMounts {
+	rows := make([]*MountInfo, 0, len(fs.activeMounts))
+	for _, mi := range fs.activeMounts {
 		rows = append(rows, mi)
 	}
 	return rows
 }
 
-func (self *SwarmFS) Stop() bool {
-	for mp := range self.activeMounts {
-		mountInfo := self.activeMounts[mp]
-		self.Unmount(mountInfo.MountPoint)
+func (fs *SwarmFS) Stop() bool {
+	for mp := range fs.activeMounts {
+		mountInfo := fs.activeMounts[mp]
+		fs.Unmount(mountInfo.MountPoint)
 	}
 	return true
 }

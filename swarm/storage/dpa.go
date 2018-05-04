@@ -90,53 +90,53 @@ func NewDPA(store ChunkStore, params *ChunkerParams) *DPA {
 // FS-aware API and httpaccess
 // Chunk retrieval blocks on netStore requests with a timeout so reader will
 // report error if retrieval of chunks within requested range time out.
-func (self *DPA) Retrieve(key Key) LazySectionReader {
-	return self.Chunker.Join(key, self.retrieveC)
+func (d *DPA) Retrieve(key Key) LazySectionReader {
+	return d.Chunker.Join(key, d.retrieveC)
 }
 
 // Public API. Main entry point for document storage directly. Used by the
 // FS-aware API and httpaccess
-func (self *DPA) Store(data io.Reader, size int64, swg *sync.WaitGroup) (key Key, err error) {
-	return self.Chunker.Split(data, size, self.storeC, swg)
+func (d *DPA) Store(data io.Reader, size int64, swg *sync.WaitGroup) (key Key, err error) {
+	return d.Chunker.Split(data, size, d.storeC, swg)
 }
 
-func (self *DPA) Start() {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-	if self.running {
+func (d *DPA) Start() {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	if d.running {
 		return
 	}
-	self.running = true
-	self.retrieveC = make(chan *Chunk, retrieveChanCapacity)
-	self.storeC = make(chan *Chunk, storeChanCapacity)
-	self.quitC = make(chan bool)
-	self.storeLoop()
-	self.retrieveLoop()
+	d.running = true
+	d.retrieveC = make(chan *Chunk, retrieveChanCapacity)
+	d.storeC = make(chan *Chunk, storeChanCapacity)
+	d.quitC = make(chan bool)
+	d.storeLoop()
+	d.retrieveLoop()
 }
 
-func (self *DPA) Stop() {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-	if !self.running {
+func (d *DPA) Stop() {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	if !d.running {
 		return
 	}
-	self.running = false
-	close(self.quitC)
+	d.running = false
+	close(d.quitC)
 }
 
 // retrieveLoop dispatches the parallel chunk retrieval requests received on the
 // retrieve channel to its ChunkStore  (NetStore or LocalStore)
-func (self *DPA) retrieveLoop() {
+func (d *DPA) retrieveLoop() {
 	for i := 0; i < maxRetrieveProcesses; i++ {
-		go self.retrieveWorker()
+		go d.retrieveWorker()
 	}
 	log.Trace(fmt.Sprintf("dpa: retrieve loop spawning %v workers", maxRetrieveProcesses))
 }
 
-func (self *DPA) retrieveWorker() {
-	for chunk := range self.retrieveC {
+func (d *DPA) retrieveWorker() {
+	for chunk := range d.retrieveC {
 		log.Trace(fmt.Sprintf("dpa: retrieve loop : chunk %v", chunk.Key.Log()))
-		storedChunk, err := self.Get(chunk.Key)
+		storedChunk, err := d.Get(chunk.Key)
 		if err == notFound {
 			log.Trace(fmt.Sprintf("chunk %v not found", chunk.Key.Log()))
 		} else if err != nil {
@@ -148,7 +148,7 @@ func (self *DPA) retrieveWorker() {
 		close(chunk.C)
 
 		select {
-		case <-self.quitC:
+		case <-d.quitC:
 			return
 		default:
 		}
@@ -157,22 +157,22 @@ func (self *DPA) retrieveWorker() {
 
 // storeLoop dispatches the parallel chunk store request processors
 // received on the store channel to its ChunkStore (NetStore or LocalStore)
-func (self *DPA) storeLoop() {
+func (d *DPA) storeLoop() {
 	for i := 0; i < maxStoreProcesses; i++ {
-		go self.storeWorker()
+		go d.storeWorker()
 	}
 	log.Trace(fmt.Sprintf("dpa: store spawning %v workers", maxStoreProcesses))
 }
 
-func (self *DPA) storeWorker() {
-	for chunk := range self.storeC {
-		self.Put(chunk)
+func (d *DPA) storeWorker() {
+	for chunk := range d.storeC {
+		d.Put(chunk)
 		if chunk.wg != nil {
 			log.Trace(fmt.Sprintf("dpa: store processor %v", chunk.Key.Log()))
 			chunk.wg.Done()
 		}
 		select {
-		case <-self.quitC:
+		case <-d.quitC:
 			return
 		default:
 		}
@@ -196,14 +196,14 @@ func NewDpaChunkStore(localStore, netStore ChunkStore) *dpaChunkStore {
 
 // Get is the entrypoint for local retrieve requests
 // waits for response or times out
-func (self *dpaChunkStore) Get(key Key) (chunk *Chunk, err error) {
-	chunk, err = self.netStore.Get(key)
+func (d *dpaChunkStore) Get(key Key) (chunk *Chunk, err error) {
+	chunk, err = d.netStore.Get(key)
 	// timeout := time.Now().Add(searchTimeout)
 	if chunk.SData != nil {
 		log.Trace(fmt.Sprintf("DPA.Get: %v found locally, %d bytes", key.Log(), len(chunk.SData)))
 		return
 	}
-	// TODO: use self.timer time.Timer and reset with defer disableTimer
+	// TODO: use d.timer time.Timer and reset with defer disableTimer
 	timer := time.After(searchTimeout)
 	select {
 	case <-timer:
@@ -216,8 +216,8 @@ func (self *dpaChunkStore) Get(key Key) (chunk *Chunk, err error) {
 }
 
 // Put is the entrypoint for local store requests coming from storeLoop
-func (self *dpaChunkStore) Put(entry *Chunk) {
-	chunk, err := self.localStore.Get(entry.Key)
+func (d *dpaChunkStore) Put(entry *Chunk) {
+	chunk, err := d.localStore.Get(entry.Key)
 	if err != nil {
 		log.Trace(fmt.Sprintf("DPA.Put: %v new chunk. call netStore.Put", entry.Key.Log()))
 		chunk = entry
@@ -230,10 +230,10 @@ func (self *dpaChunkStore) Put(entry *Chunk) {
 		return
 	}
 	// from this point on the storage logic is the same with network storage requests
-	log.Trace(fmt.Sprintf("DPA.Put %v: %v", self.n, chunk.Key.Log()))
-	self.n++
-	self.netStore.Put(chunk)
+	log.Trace(fmt.Sprintf("DPA.Put %v: %v", d.n, chunk.Key.Log()))
+	d.n++
+	d.netStore.Put(chunk)
 }
 
 // Close chunk store
-func (self *dpaChunkStore) Close() {}
+func (d *dpaChunkStore) Close() {}
