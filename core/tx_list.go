@@ -101,41 +101,41 @@ func (m *txSortedMap) Filter(filter func(*types.Transaction) bool, strict bool, 
 		// Iterate in order so we can slice off the higher nonces.
 		m.ensureCache()
 		for i, tx := range m.cache {
-			if filter(tx) {
-				delete(m.items, tx.Nonce())
-				removed(tx)
-
-				if len(m.cache) > i+1 {
-					for _, tx := range m.cache[i+1:] {
-						delete(m.items, tx.Nonce())
-						invalid(tx)
-					}
-				}
-
-				m.cache = m.cache[:i]
-
-				// Rebuild heap.
-				*m.index = make([]uint64, 0, len(m.items))
-				for nonce := range m.items {
-					*m.index = append(*m.index, nonce)
-				}
-				heap.Init(m.index)
-
-				return
+			if !filter(tx) {
+				continue
 			}
-		}
+			delete(m.items, tx.Nonce())
+			removed(tx)
 
+			if len(m.cache) > i+1 {
+				for _, tx := range m.cache[i+1:] {
+					delete(m.items, tx.Nonce())
+					invalid(tx)
+				}
+			}
+
+			m.cache = m.cache[:i]
+
+			// Rebuild heap.
+			*m.index = make([]uint64, 0, len(m.items))
+			for nonce := range m.items {
+				*m.index = append(*m.index, nonce)
+			}
+			heap.Init(m.index)
+
+			return
+		}
 		return
 	}
 
 	var matched bool
-	// Collect all the transactions to filter out
 	for nonce, tx := range m.items {
-		if filter(tx) {
-			matched = true
-			delete(m.items, nonce)
-			removed(tx)
+		if !filter(tx) {
+			continue
 		}
+		matched = true
+		delete(m.items, nonce)
+		removed(tx)
 	}
 
 	// If transactions were removed, the heap and cache are ruined
