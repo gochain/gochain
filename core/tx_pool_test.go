@@ -830,6 +830,7 @@ func testTransactionQueueGlobalLimiting(t *testing.T, nolocals bool) {
 
 	config := testTxPoolConfig
 	config.NoLocals = nolocals
+	config.AccountQueue = 5
 	config.GlobalQueue = config.AccountQueue*3 - 1 // reduce the queue limits to shorten test time (-1 to make it non divisible)
 
 	pool := NewTxPool(ctx, config, params.TestChainConfig, blockchain)
@@ -857,7 +858,11 @@ func testTransactionQueueGlobalLimiting(t *testing.T, nolocals bool) {
 		nonces[addr]++
 	}
 	// Import the batch and verify that limits have been enforced
-	pool.AddRemotes(ctx, txs)
+	if errs := pool.AddRemotes(ctx, txs); len(errs) > 0 {
+		for _, err := range errs {
+			t.Error(err)
+		}
+	}
 
 	pool.mu.Lock()
 	queued := 0
@@ -869,14 +874,18 @@ func testTransactionQueueGlobalLimiting(t *testing.T, nolocals bool) {
 	}
 	pool.mu.Unlock()
 	if queued > int(config.GlobalQueue) {
-		t.Fatalf("total transactions overflow allowance: %d > %d", queued, config.GlobalQueue)
+		t.Fatalf("queued transactions overflow allowance: %d > %d", queued, config.GlobalQueue)
 	}
 	// Generate a batch of transactions from the local account and import them
 	txs = txs[:0]
 	for i := uint64(0); i < 3*config.GlobalQueue; i++ {
 		txs = append(txs, transaction(i+1, 100000, local))
 	}
-	pool.AddLocals(ctx, txs)
+	if errs := pool.AddLocals(ctx, txs); len(errs) > 0 {
+		for _, err := range errs {
+			t.Error(err)
+		}
+	}
 
 	// If locals are disabled, the previous eviction algorithm should apply here too
 	if nolocals {
@@ -890,7 +899,7 @@ func testTransactionQueueGlobalLimiting(t *testing.T, nolocals bool) {
 		}
 		pool.mu.Unlock()
 		if queued > int(config.GlobalQueue) {
-			t.Fatalf("total transactions overflow allowance: %d > %d", queued, config.GlobalQueue)
+			t.Fatalf("queued transactions overflow allowance: %d > %d", queued, config.GlobalQueue)
 		}
 	} else {
 		pool.mu.Lock()
@@ -1281,11 +1290,8 @@ func TestTransactionPoolRepricing(t *testing.T) {
 	pool.AddLocal(ctx, ltx)
 
 	pending, queued := pool.Stats()
-	if pending != 4 {
-		t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 4)
-	}
-	if queued != 3 {
-		t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 3)
+	if pending != 4 || queued != 3 {
+		t.Errorf("transactions mismatched: want pending 4 queued 3, have pending %d queued %d", pending, queued)
 	}
 	if err := validateEvents(events, 4); err != nil {
 		t.Fatalf("original event firing failed: %v", err)
@@ -1297,11 +1303,8 @@ func TestTransactionPoolRepricing(t *testing.T) {
 	pool.SetGasPrice(ctx, big.NewInt(2))
 
 	pending, queued = pool.Stats()
-	if pending != 2 {
-		t.Fatalf("pending transactions mismatched: have %d, want %d", pending, 2)
-	}
-	if queued != 3 {
-		t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 3)
+	if pending != 2 || queued != 3 {
+		t.Fatalf("transactions mismatched: want pending 2 queued 3, have pending %d queued %d", pending, queued)
 	}
 	if err := validateEvents(events, 0); err != nil {
 		t.Fatalf("reprice event firing failed: %v", err)
