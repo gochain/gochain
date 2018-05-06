@@ -113,7 +113,7 @@ type worker struct {
 	coinbase common.Address
 	extra    []byte
 
-	currentMu sync.Mutex
+	currentMu sync.RWMutex
 	current   *Work
 
 	snapshotMu    sync.RWMutex
@@ -181,16 +181,17 @@ func (w *worker) pending() (*types.Block, *state.StateDB) {
 		return w.snapshotBlock, w.snapshotState.Copy()
 	}
 
-	w.currentMu.Lock()
-	defer w.currentMu.Unlock()
+	w.currentMu.RLock()
+	defer w.currentMu.RUnlock()
 	return w.current.Block, w.current.state.Copy()
 }
 
 func (w *worker) pendingQuery(fn func(*state.StateDB) error) error {
+	// Although the queries must be 'read-only', the internal state may be updated, so we have to write lock.
 	if atomic.LoadInt32(&w.mining) == 0 {
-		// query a snapshot to avoid contention on currentMu mutex
-		w.snapshotMu.RLock()
-		defer w.snapshotMu.RUnlock()
+		// Query a snapshot to avoid contention on currentMu mutex.
+		w.snapshotMu.Lock()
+		defer w.snapshotMu.Unlock()
 		return fn(w.snapshotState)
 	}
 
@@ -207,8 +208,8 @@ func (w *worker) pendingBlock() *types.Block {
 		return w.snapshotBlock
 	}
 
-	w.currentMu.Lock()
-	defer w.currentMu.Unlock()
+	w.currentMu.RLock()
+	defer w.currentMu.RUnlock()
 	return w.current.Block
 }
 
