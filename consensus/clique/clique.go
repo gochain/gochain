@@ -21,16 +21,16 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"math/rand"
 	"sync"
 	"time"
 
-	"github.com/gochain-io/gochain/common/perfutils"
-
 	"github.com/gochain-io/gochain/accounts"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/hexutil"
+	"github.com/gochain-io/gochain/common/perfutils"
 	"github.com/gochain-io/gochain/consensus"
 	"github.com/gochain-io/gochain/consensus/misc"
 	"github.com/gochain-io/gochain/core/types"
@@ -41,7 +41,7 @@ import (
 	"github.com/gochain-io/gochain/params"
 	"github.com/gochain-io/gochain/rlp"
 	"github.com/gochain-io/gochain/rpc"
-	lru "github.com/hashicorp/golang-lru"
+	"github.com/hashicorp/golang-lru"
 )
 
 const (
@@ -49,7 +49,7 @@ const (
 	inmemorySnapshots  = 128  // Number of recent vote snapshots to keep in memory
 	inmemorySignatures = 4096 // Number of recent block signatures to keep in memory
 
-	wiggleTime = 500 * time.Millisecond // Random delay (per signer) to allow concurrent signers
+	recentSignerDelay = 1 * time.Second // Full delay for most recent eligible signer.
 )
 
 // Clique proof-of-authority protocol constants.
@@ -69,9 +69,6 @@ var (
 	nonceDropVote = hexutil.MustDecode("0x0000000000000000") // Magic nonce number to vote on removing a signer.
 
 	uncleHash = types.CalcUncleHash(nil) // Always Keccak256(RLP([])) as uncles are meaningless outside of PoW.
-
-	diffInTurn = big.NewInt(2) // Block difficulty for in-turn signatures
-	diffNoTurn = big.NewInt(1) // Block difficulty for out-of-turn signatures
 )
 
 // Various error messages to mark blocks invalid. These should be private to
@@ -123,8 +120,8 @@ var (
 	// errInvalidUncleHash is returned if a block contains an non-empty uncle list.
 	errInvalidUncleHash = errors.New("non empty uncle hash")
 
-	// errInvalidDifficulty is returned if the difficulty of a block is not either
-	// of 1 or 2, or if the value does not match the turn of the signer.
+	// errInvalidDifficulty is returned if the difficulty of a block is missing or 0,
+	// or if the value does not match the turn of the signer.
 	errInvalidDifficulty = errors.New("invalid difficulty")
 
 	// ErrInvalidTimestamp is returned if the timestamp of a block is lower than
@@ -134,9 +131,6 @@ var (
 	// errInvalidVotingChain is returned if an authorization list is attempted to
 	// be modified via out-of-range or non-contiguous headers.
 	errInvalidVotingChain = errors.New("invalid voting chain")
-
-	// errUnauthorized is returned if a header is signed by a non-authorized entity.
-	errUnauthorized = errors.New("unauthorized")
 
 	// errWaitTransactions is returned if an empty block is attempted to be sealed
 	// on an instant chain (0 second period). It's important to refuse these as the
@@ -334,9 +328,9 @@ func (c *Clique) verifyHeader(ctx context.Context, chain consensus.ChainReader, 
 	if header.UncleHash != uncleHash {
 		return errInvalidUncleHash
 	}
-	// Ensure that the block's difficulty is meaningful (may not be correct at this point)
 	if number > 0 {
-		if header.Difficulty == nil || (header.Difficulty.Cmp(diffInTurn) != 0 && header.Difficulty.Cmp(diffNoTurn) != 0) {
+		// Ensure that the block's difficulty is meaningful (may not be correct at this point)
+		if header.Difficulty == nil || header.Difficulty.Uint64() == 0 {
 			return errInvalidDifficulty
 		}
 	}
@@ -423,7 +417,7 @@ func (c *Clique) snapshot(ctx context.Context, chain consensus.ChainReader, numb
 			if err := c.VerifyHeader(ctx, chain, genesis, false); err != nil {
 				return nil, err
 			}
-			snap = newSnapshot(c.config, c.signatures, 0, genesis.Hash(), genesis.Signers, genesis.Voters)
+			snap = newGenesisSnapshot(c.config, c.signatures, 0, genesis.Hash(), genesis.Signers, genesis.Voters)
 			if err := snap.store(c.db); err != nil {
 				return nil, err
 			}
@@ -508,25 +502,22 @@ func (c *Clique) verifySeal(ctx context.Context, chain consensus.ChainReader, he
 	if err != nil {
 		return err
 	}
-	if _, ok := snap.Signers[signer]; !ok {
-		return errUnauthorized
+	signed, authorized := snap.Signers[signer]
+	if !authorized {
+		return fmt.Errorf("%s not authorized to sign", signer.Hex())
 	}
-	for seen, recent := range snap.Recents {
-		if recent == signer {
-			// Signer is among recents, only fail if the current block doesn't shift it out
-			if limit := uint64(len(snap.Signers)/2 + 1); seen > number-limit {
-				return errUnauthorized
-			}
+
+	if signed > 0 {
+		limit := uint64(len(snap.Signers)/2 + 1)
+		if next := signed + limit; next > number {
+			return fmt.Errorf("%s not authorized to sign: signed %d, next eligible signature %d", signer.Hex(), signed, next)
 		}
 	}
-	// Ensure that the difficulty corresponds to the turn-ness of the signer
-	inturn := snap.inturn(header.Number.Uint64(), signer)
-	if inturn && header.Difficulty.Cmp(diffInTurn) != 0 {
+
+	if header.Difficulty.Uint64() != number-signed {
 		return errInvalidDifficulty
 	}
-	if !inturn && header.Difficulty.Cmp(diffNoTurn) != 0 {
-		return errInvalidDifficulty
-	}
+
 	return nil
 }
 
@@ -572,7 +563,7 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 		c.lock.RUnlock()
 	}
 	// Set the correct difficulty
-	header.Difficulty = CalcDifficulty(snap, c.signer)
+	header.Difficulty = new(big.Int).SetUint64(number - snap.Signers[c.signer])
 
 	if number%c.config.Epoch == 0 {
 		header.Signers = snap.signers()
@@ -631,38 +622,50 @@ func (c *Clique) Seal(ctx context.Context, chain consensus.ChainReader, block *t
 	if err != nil {
 		return nil, err
 	}
-	if _, authorized := snap.Signers[signer]; !authorized {
-		return nil, errUnauthorized
+	signed, authorized := snap.Signers[signer]
+	if !authorized {
+		return nil, fmt.Errorf("%s not authorized to sign", signer.Hex())
 	}
-	// If we're amongst the recent signers, wait for the next block
-	limit := uint64(len(snap.Signers)/2 + 1)
-	for seen, recent := range snap.Recents {
-		if recent != signer {
-			continue
-		}
-		if number >= seen+limit {
-			continue
-		}
-		log.Info("Signed recently, must wait for others", "number", number, "signed", seen, "next", seen+limit)
-		<-stop
-		return nil, nil
-	}
-	// Sweet, the protocol permits us to sign the block, wait for our time
-	delay := time.Unix(header.Time.Int64(), 0).Sub(time.Now()) // nolint: gosimple
-	if header.Difficulty.Cmp(diffNoTurn) == 0 {
-		// It's not our turn explicitly to sign, delay it a bit
-		wiggle := time.Duration(len(snap.Signers)/2+1) * wiggleTime
-		delay += time.Duration(rand.Int63n(int64(wiggle)))
 
-		log.Trace("Out-of-turn signing requested", "wiggle", common.PrettyDuration(wiggle))
-	}
-	log.Trace("Waiting for slot to sign and propagate", "delay", common.PrettyDuration(delay))
+	var delay time.Duration
+	if signed > 0 {
+		limit := uint64(len(snap.Signers)/2 + 1)
+		next := signed + limit
+		if number < next {
+			log.Info("Signed recently, must wait for others", "number", number, "signed", signed, "next", next)
+			<-stop
+			return nil, nil
+		}
 
-	select {
-	case <-stop:
-		return nil, nil
-	case <-time.After(delay):
+		// Allowed to sign, but delay first if signed recently.
+		// At least one signer will always be eligible to skip this delay.
+		n := uint64(len(header.Signers))
+		if diff := header.Difficulty.Uint64(); diff < n {
+			limit := n/2 + 1
+			// A difficulty <= limit would be too recent; limit+1 is the most recent eligible signer.
+			// So by subtracting limit, limit+1 becomes 1, which is a full delay.
+			fraction := diff - limit
+			delay = recentSignerDelay / time.Duration(fraction)
+		}
 	}
+	if until := time.Unix(header.Time.Int64(), delay.Nanoseconds()); time.Now().Before(until) {
+		// Need to wait.
+		if delay == 0 {
+			log.Trace("Waiting for slot to sign and propagate", "number", number, "until", header.Time.Int64())
+		} else {
+			log.Trace("Out-of-turn signing requested - waiting for slot to sign and propagate after delay",
+				"number", number, "until", header.Time.Int64(), "delay", common.PrettyDuration(delay))
+		}
+
+		if wait := until.Sub(time.Now()); wait > 0 {
+			select {
+			case <-stop:
+				return nil, nil
+			case <-time.After(wait):
+			}
+		}
+	}
+
 	// Sign all the things!
 	sighash, err := signFn(accounts.Account{Address: signer}, sigHash(header).Bytes())
 	if err != nil {
@@ -681,17 +684,7 @@ func (c *Clique) CalcDifficulty(ctx context.Context, chain consensus.ChainReader
 	if err != nil {
 		return nil
 	}
-	return CalcDifficulty(snap, c.signer)
-}
-
-// CalcDifficulty is the difficulty adjustment algorithm. It returns the difficulty
-// that a new block should have based on the previous blocks in the chain and the
-// current signer.
-func CalcDifficulty(snap *Snapshot, signer common.Address) *big.Int {
-	if snap.inturn(snap.Number+1, signer) {
-		return new(big.Int).Set(diffInTurn)
-	}
-	return new(big.Int).Set(diffNoTurn)
+	return new(big.Int).SetUint64(snap.Number + 1 - snap.Signers[c.signer])
 }
 
 // APIs implements consensus.Engine, returning the user facing RPC API to allow

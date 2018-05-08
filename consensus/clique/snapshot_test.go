@@ -90,24 +90,17 @@ func (r *testerChainReader) GetHeaderByNumber(number uint64) *types.Header {
 
 // Tests that voting is evaluated correctly for various simple and complex scenarios.
 func TestVoting(t *testing.T) {
-	ctx := context.Background()
 	// Define the various voting scenarios to test
-	tests := []struct {
-		epoch          uint64
-		signers        []string
-		voters         []string
-		votes          []testerVote
-		signersResults []string
-		votersResults  []string
-	}{
-		{
+	tests := map[string]votingTest{
+		"1-no-votes": {
 			// 0: Single signer, no votes cast
 			signers:        []string{"A"},
 			voters:         []string{"A"},
 			votes:          []testerVote{{signer: "A"}},
 			signersResults: []string{"A"},
 			votersResults:  []string{"A"},
-		}, {
+		},
+		"1-vote-2": {
 			// 1: Single signer, voting to add two others (only accept first)
 			signers: []string{"A"},
 			voters:  []string{"A"},
@@ -119,7 +112,8 @@ func TestVoting(t *testing.T) {
 			},
 			signersResults: []string{"A", "B"},
 			votersResults:  []string{"A"},
-		}, {
+		},
+		"1-vote-3": {
 			// 2: Two signers, voting to add three others (only accept first two)
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
@@ -134,7 +128,8 @@ func TestVoting(t *testing.T) {
 			},
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B"},
-		}, {
+		},
+		"1-drop": {
 			// 3: Single signer, dropping itself (weird, but one less cornercase by explicitly allowing this)
 			signers: []string{"A"},
 			voters:  []string{"A"},
@@ -143,7 +138,8 @@ func TestVoting(t *testing.T) {
 			},
 			signersResults: []string{"A"},
 			votersResults:  []string{},
-		}, {
+		},
+		"2-drop-fail": {
 			// 4: Two signers, actually needing mutual consent to drop either of them (not fulfilled)
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
@@ -152,7 +148,8 @@ func TestVoting(t *testing.T) {
 			},
 			signersResults: []string{"A", "B"},
 			votersResults:  []string{"A", "B"},
-		}, {
+		},
+		"2-drop": {
 			// 5: Two signers, actually needing mutual consent to drop either of them (fulfilled)
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
@@ -162,7 +159,8 @@ func TestVoting(t *testing.T) {
 			},
 			signersResults: []string{"A", "B"},
 			votersResults:  []string{"A"},
-		}, {
+		},
+		"3-drop": {
 			// 6: Three signers, two of them deciding to drop the third
 			signers: []string{"A", "B", "C"},
 			voters:  []string{"A", "B", "C"},
@@ -172,7 +170,8 @@ func TestVoting(t *testing.T) {
 			},
 			signersResults: []string{"A", "B", "C"},
 			votersResults:  []string{"A", "B"},
-		}, {
+		},
+		"4-drop-fail": {
 			// 7: Four signers, consensus of two not being enough to drop anyone
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
@@ -182,7 +181,8 @@ func TestVoting(t *testing.T) {
 			},
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B", "C", "D"},
-		}, {
+		},
+		"4-drop": {
 			// 8: Four signers, consensus of three already being enough to drop someone
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
@@ -193,7 +193,8 @@ func TestVoting(t *testing.T) {
 			},
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B", "C"},
-		}, {
+		},
+		"auth-count": {
 			// 9: Authorizations are counted once per signer per target
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
@@ -206,7 +207,8 @@ func TestVoting(t *testing.T) {
 			},
 			signersResults: []string{"A", "B"},
 			votersResults:  []string{"A", "B"},
-		}, {
+		},
+		"auth-mult": {
 			// 10: Authorizing multiple accounts concurrently is permitted
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
@@ -222,7 +224,8 @@ func TestVoting(t *testing.T) {
 			},
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B"},
-		}, {
+		},
+		"deauth-count": {
 			// 11: Deauthorizations are counted once per signer per target
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
@@ -235,7 +238,8 @@ func TestVoting(t *testing.T) {
 			},
 			signersResults: []string{"A", "B"},
 			votersResults:  []string{"A", "B"},
-		}, {
+		},
+		"deauth-mult": {
 			// 12: Deauthorizing multiple accounts concurrently is permitted
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
@@ -254,7 +258,8 @@ func TestVoting(t *testing.T) {
 			},
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B"},
-		}, {
+		},
+		"deauth-discard-deauth": {
 			// 13: Votes from deauthorized signers are discarded immediately (deauth votes)
 			signers: []string{"A", "B", "C"},
 			voters:  []string{"A", "B", "C"},
@@ -266,19 +271,21 @@ func TestVoting(t *testing.T) {
 			},
 			signersResults: []string{"A", "B", "C"},
 			votersResults:  []string{"A", "B"},
-		}, {
+		},
+		"deauth-discard-auth": {
 			// 14: Votes from deauthorized signers are discarded immediately (auth votes)
 			signers: []string{"A", "B", "C"},
 			voters:  []string{"A", "B", "C"},
 			votes: []testerVote{
-				{signer: "C", voted: "B", auth: false},
+				{signer: "C", voted: "D", auth: true},
 				{signer: "A", voted: "C", auth: false},
 				{signer: "B", voted: "C", auth: false},
-				{signer: "A", voted: "B", auth: false},
+				{signer: "A", voted: "D", auth: true},
 			},
 			signersResults: []string{"A", "B", "C"},
 			votersResults:  []string{"A", "B"},
-		}, {
+		},
+		"no-cascade": {
 			// 15: Cascading changes are not allowed, only the account being voted on may change
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
@@ -295,7 +302,8 @@ func TestVoting(t *testing.T) {
 			},
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B", "C"},
-		}, {
+		},
+		"out-of-bounds": {
 			// 16: Changes reaching consensus out of bounds (via a deauth) execute on touch
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
@@ -315,7 +323,8 @@ func TestVoting(t *testing.T) {
 			},
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B"},
-		}, {
+		},
+		"out-of-bounds-out": {
 			// 17: Changes reaching consensus out of bounds (via a deauth) may go out of consensus on first touch
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
@@ -334,7 +343,8 @@ func TestVoting(t *testing.T) {
 			},
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B", "C"},
-		}, {
+		},
+		"discard-pending": {
 			// 18: Ensure that pending votes don't survive authorization status changes. This
 			// corner case can only appear if a signer is quickly added, removed and then
 			// readded (or the inverse), while one of the original voters dropped. If a
@@ -361,7 +371,8 @@ func TestVoting(t *testing.T) {
 			//results: []string{"B", "C", "D", "E", "F"},
 			signersResults: []string{"A", "B", "C", "D", "E", "F"},
 			votersResults:  []string{"B", "C", "D", "E", "F"},
-		}, {
+		},
+		"epoch-reset": {
 			// 19: Epoch transitions reset all votes to allow chain checkpointing
 			epoch:   3,
 			signers: []string{"A", "B"},
@@ -377,112 +388,126 @@ func TestVoting(t *testing.T) {
 		},
 	}
 	// Run through the scenarios and test them
-	for i, tt := range tests {
-		// Create the account pool and generate the initial set of signers
-		accounts := newTesterAccountPool()
+	for name, tt := range tests {
+		t.Run(name, tt.run)
+	}
+}
 
-		signers := make([]common.Address, len(tt.signers))
-		voters := make([]common.Address, len(tt.voters))
-		for j, signer := range tt.signers {
-			signers[j] = accounts.address(signer)
-		}
-		for j, voter := range tt.voters {
-			voters[j] = accounts.address(voter)
-		}
-		for j := 0; j < len(signers); j++ {
-			for k := j + 1; k < len(signers); k++ {
-				if bytes.Compare(signers[j][:], signers[k][:]) > 0 {
-					signers[j], signers[k] = signers[k], signers[j]
-				}
-			}
-		}
-		for j := 0; j < len(voters); j++ {
-			for k := j + 1; k < len(voters); k++ {
-				if bytes.Compare(voters[j][:], voters[k][:]) > 0 {
-					voters[j], voters[k] = voters[k], voters[j]
-				}
-			}
-		}
-		// Create the genesis block with the initial set of signers
-		genesis := &core.Genesis{
-			ExtraData: make([]byte, extraVanity),
-			Signers:   signers,
-			Voters:    voters,
-			Signer:    make([]byte, signatureLength),
-		}
-		// Create a pristine blockchain with the genesis injected
-		db, _ := ethdb.NewMemDatabase()
-		genesis.Commit(db)
+type votingTest struct {
+	epoch          uint64
+	signers        []string
+	voters         []string
+	votes          []testerVote
+	signersResults []string
+	votersResults  []string
+}
 
-		// Assemble a chain of headers from the cast votes
-		headers := make([]*types.Header, len(tt.votes))
-		for j, vote := range tt.votes {
-			headers[j] = &types.Header{
-				Number: big.NewInt(int64(j) + 1),
-				Time:   big.NewInt(int64(j) * int64(blockPeriod)),
-				Signer: make([]byte, signatureLength),
-				Extra:  make([]byte, extraVanity),
-			}
-			if j > 0 {
-				headers[j].ParentHash = headers[j-1].Hash()
-			}
-			if vote.auth {
-				copy(headers[j].Nonce[:], nonceAuthVote)
-			}
-			headers[j].Extra = ExtraAppendVote(headers[j].Extra, accounts.address(vote.voted), vote.voterElection)
-			accounts.sign(headers[j], vote.signer)
-		}
-		// Pass all the headers through clique and ensure tallying succeeds
-		head := headers[len(headers)-1]
+func (tt *votingTest) run(t *testing.T) {
+	// Create the account pool and generate the initial set of signers
+	accounts := newTesterAccountPool()
 
-		snap, err := New(&params.CliqueConfig{Epoch: tt.epoch}, db).snapshot(ctx, &testerChainReader{db: db}, head.Number.Uint64(), head.Hash(), headers)
-		if err != nil {
-			t.Errorf("test %d: failed to create voting snapshot: %v", i, err)
-			continue
-		}
-		// Verify the final list of signers against the expected ones
-		signers = make([]common.Address, len(tt.signersResults))
-		for j, signer := range tt.signersResults {
-			signers[j] = accounts.address(signer)
-		}
-		for j := 0; j < len(signers); j++ {
-			for k := j + 1; k < len(signers); k++ {
-				if bytes.Compare(signers[j][:], signers[k][:]) > 0 {
-					signers[j], signers[k] = signers[k], signers[j]
-				}
+	signers := make([]common.Address, len(tt.signers))
+	voters := make([]common.Address, len(tt.voters))
+	for j, signer := range tt.signers {
+		signers[j] = accounts.address(signer)
+	}
+	for j, voter := range tt.voters {
+		voters[j] = accounts.address(voter)
+	}
+	for j := 0; j < len(signers); j++ {
+		for k := j + 1; k < len(signers); k++ {
+			if bytes.Compare(signers[j][:], signers[k][:]) > 0 {
+				signers[j], signers[k] = signers[k], signers[j]
 			}
 		}
-		signersResult := snap.signers()
-		if len(signersResult) != len(signers) {
-			t.Errorf("test %d: signers mismatch: have %x, want %x", i, signersResult, signers)
-			continue
-		}
-		for j := 0; j < len(signersResult); j++ {
-			if !bytes.Equal(signersResult[j][:], signers[j][:]) {
-				t.Errorf("test %d, signer %d: signer mismatch: have %x, want %x", i, j, signersResult[j], signers[j])
+	}
+	for j := 0; j < len(voters); j++ {
+		for k := j + 1; k < len(voters); k++ {
+			if bytes.Compare(voters[j][:], voters[k][:]) > 0 {
+				voters[j], voters[k] = voters[k], voters[j]
 			}
 		}
-		// Verify the final list of voters against the expected ones
-		voters = make([]common.Address, len(tt.votersResults))
-		for j, voter := range tt.votersResults {
-			voters[j] = accounts.address(voter)
+	}
+	// Create the genesis block with the initial set of signers
+	genesis := &core.Genesis{
+		ExtraData: make([]byte, extraVanity),
+		Signers:   signers,
+		Voters:    voters,
+		Signer:    make([]byte, signatureLength),
+	}
+	// Create a pristine blockchain with the genesis injected
+	db, _ := ethdb.NewMemDatabase()
+	genesis.Commit(db)
+
+	// Assemble a chain of headers from the cast votes
+	headers := make([]*types.Header, len(tt.votes))
+	for j, vote := range tt.votes {
+		headers[j] = &types.Header{
+			Number: big.NewInt(int64(j) + 1),
+			Time:   big.NewInt(int64(j) * int64(blockPeriod)),
+			Signer: make([]byte, signatureLength),
+			Extra:  make([]byte, extraVanity),
 		}
-		for j := 0; j < len(voters); j++ {
-			for k := j + 1; k < len(voters); k++ {
-				if bytes.Compare(voters[j][:], voters[k][:]) > 0 {
-					voters[j], voters[k] = voters[k], voters[j]
-				}
+		if j > 0 {
+			headers[j].ParentHash = headers[j-1].Hash()
+		}
+		if vote.auth {
+			copy(headers[j].Nonce[:], nonceAuthVote)
+		}
+		headers[j].Extra = ExtraAppendVote(headers[j].Extra, accounts.address(vote.voted), vote.voterElection)
+		accounts.sign(headers[j], vote.signer)
+	}
+	// Pass all the headers through clique and ensure tallying succeeds
+	head := headers[len(headers)-1]
+
+	snap, err := New(&params.CliqueConfig{Epoch: tt.epoch}, db).
+		snapshot(context.Background(), &testerChainReader{db: db}, head.Number.Uint64(), head.Hash(), headers)
+	if err != nil {
+		t.Errorf("failed to create voting snapshot: %v", err)
+		return
+	}
+	// Verify the final list of signers against the expected ones
+	signers = make([]common.Address, len(tt.signersResults))
+	for j, signer := range tt.signersResults {
+		signers[j] = accounts.address(signer)
+	}
+	for j := 0; j < len(signers); j++ {
+		for k := j + 1; k < len(signers); k++ {
+			if bytes.Compare(signers[j][:], signers[k][:]) > 0 {
+				signers[j], signers[k] = signers[k], signers[j]
 			}
 		}
-		votersResult := snap.voters()
-		if len(votersResult) != len(voters) {
-			t.Errorf("test %d: voters mismatch: have %x, want %x", i, votersResult, voters)
-			continue
+	}
+	signersResult := snap.signers()
+	if len(signersResult) != len(signers) {
+		t.Errorf("signers mismatch: have %x, want %x", signersResult, signers)
+		return
+	}
+	for j := 0; j < len(signersResult); j++ {
+		if !bytes.Equal(signersResult[j][:], signers[j][:]) {
+			t.Errorf("signer %d: signer mismatch: have %x, want %x", j, signersResult[j], signers[j])
 		}
-		for j := 0; j < len(votersResult); j++ {
-			if !bytes.Equal(votersResult[j][:], voters[j][:]) {
-				t.Errorf("test %d, voter %d: voter mismatch: have %x, want %x", i, j, votersResult[j], voters[j])
+	}
+	// Verify the final list of voters against the expected ones
+	voters = make([]common.Address, len(tt.votersResults))
+	for j, voter := range tt.votersResults {
+		voters[j] = accounts.address(voter)
+	}
+	for j := 0; j < len(voters); j++ {
+		for k := j + 1; k < len(voters); k++ {
+			if bytes.Compare(voters[j][:], voters[k][:]) > 0 {
+				voters[j], voters[k] = voters[k], voters[j]
 			}
+		}
+	}
+	votersResult := snap.voters()
+	if len(votersResult) != len(voters) {
+		t.Errorf("voters mismatch: have %x, want %x", votersResult, voters)
+		return
+	}
+	for j := 0; j < len(votersResult); j++ {
+		if !bytes.Equal(votersResult[j][:], voters[j][:]) {
+			t.Errorf("voter %d: voter mismatch: have %x, want %x", j, votersResult[j], voters[j])
 		}
 	}
 }
