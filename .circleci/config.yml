@@ -123,6 +123,8 @@ jobs:
   release-master:
     <<: *defaults
     steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
       - attach_workspace:
           at: .
       - deploy:
@@ -138,6 +140,8 @@ jobs:
   push-testnet:
     <<: *defaults
     steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
       - deploy:
           command: |
             if [[ "${CIRCLE_BRANCH}" == "testnet" && -z "${CIRCLE_PR_REPONAME}" ]]; then
@@ -153,6 +157,8 @@ jobs:
   push-stable:
     <<: *defaults
     steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
       - deploy:
           command: |
             if [[ "${CIRCLE_BRANCH}" == "stable" && -z "${CIRCLE_PR_REPONAME}" ]]; then
