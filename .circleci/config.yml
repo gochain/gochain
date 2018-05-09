@@ -119,6 +119,25 @@ jobs:
           paths:
               - /tmp/go/cache
 
+  megacheck:
+    <<: *defaults
+    steps:
+      - restore_cache:
+          keys:
+              - megacheck-cache-{{ .Branch }}-{{ .Environment.CIRCLE_PREVIOUS_BUILD_NUM }}
+              - megacheck-cache-{{ .Branch }}-
+              - megacheck-cache-
+          paths:
+              - /tmp/go/cache
+      - attach_workspace:
+          at: .
+      - run: go get -u honnef.co/go/tools/cmd/megacheck
+      - run: megacheck ./...
+      - save_cache:
+          key: megacheck-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
+          paths:
+              - /tmp/go/cache
+
   release-master:
     <<: *defaults
     steps:
@@ -192,6 +211,9 @@ workflows:
       - race:
           requires:
             - prepare
+      - megacheck:
+          requires:
+            - prepare
 
       - release-master:
           filters:
@@ -202,6 +224,7 @@ workflows:
             - test
             - test-fuse
             - race
+            - megacheck
 
       - approve-docker:
           type: approval
@@ -217,6 +240,7 @@ workflows:
             - build
             - test-fuse
             - race
+            - megacheck
 
       - docker:
           requires:
