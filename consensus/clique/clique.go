@@ -49,7 +49,7 @@ const (
 	inmemorySnapshots  = 128  // Number of recent vote snapshots to keep in memory
 	inmemorySignatures = 4096 // Number of recent block signatures to keep in memory
 
-	recentSignerDelay = 1 * time.Second // Full delay for most recent eligible signer.
+	wiggleTime = 200 * time.Millisecond // Delay step for out-of-turn signers.
 )
 
 // Clique proof-of-authority protocol constants.
@@ -641,11 +641,8 @@ func (c *Clique) Seal(ctx context.Context, chain consensus.ChainReader, block *t
 		// At least one signer will always be eligible to skip this delay.
 		n := uint64(len(header.Signers))
 		if diff := header.Difficulty.Uint64(); diff < n {
-			limit := n/2 + 1
-			// A difficulty <= limit would be too recent; limit+1 is the most recent eligible signer.
-			// So by subtracting limit, limit+1 becomes 1, which is a full delay.
-			fraction := diff - limit
-			delay = recentSignerDelay / time.Duration(fraction)
+			// Since diff is in the range (n/2,n), maximum delay is n/2*wiggleTime.
+			delay = time.Duration(n-diff) * wiggleTime
 		}
 	}
 	if until := time.Unix(header.Time.Int64(), delay.Nanoseconds()); time.Now().Before(until) {
