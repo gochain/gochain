@@ -125,6 +125,9 @@ jobs:
     steps:
       - setup_remote_docker:
           docker_layer_caching: true
+      - add_ssh_keys:
+          fingerprints:
+            - "17:f7:c7:d5:0a:34:b4:dd:10:a7:5c:d2:1f:f2:19:0a"
       - attach_workspace:
           at: .
       - deploy:
