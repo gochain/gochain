@@ -502,19 +502,18 @@ func (c *Clique) verifySeal(ctx context.Context, chain consensus.ChainReader, he
 	if err != nil {
 		return err
 	}
-	signed, authorized := snap.Signers[signer]
+	lastBlockSigned, authorized := snap.Signers[signer]
 	if !authorized {
 		return fmt.Errorf("%s not authorized to sign", signer.Hex())
 	}
 
-	if signed > 0 {
-		limit := uint64(len(snap.Signers)/2 + 1)
-		if next := signed + limit; next > number {
-			return fmt.Errorf("%s not authorized to sign: signed %d, next eligible signature %d", signer.Hex(), signed, next)
+	if lastBlockSigned > 0 {
+		if next := snap.nextSignableBlockNumber(lastBlockSigned); number < next {
+			return fmt.Errorf("%s not authorized to sign %d: signed recently %d, next eligible signature %d", signer.Hex(), number, lastBlockSigned, next)
 		}
 	}
 
-	if header.Difficulty.Uint64() != number-signed {
+	if header.Difficulty.Uint64() != number-lastBlockSigned {
 		return errInvalidDifficulty
 	}
 
@@ -622,17 +621,15 @@ func (c *Clique) Seal(ctx context.Context, chain consensus.ChainReader, block *t
 	if err != nil {
 		return nil, err
 	}
-	signed, authorized := snap.Signers[signer]
+	lastBlockSigned, authorized := snap.Signers[signer]
 	if !authorized {
 		return nil, fmt.Errorf("%s not authorized to sign", signer.Hex())
 	}
 
 	var delay time.Duration
-	if signed > 0 {
-		limit := uint64(len(snap.Signers)/2 + 1)
-		next := signed + limit
-		if number < next {
-			log.Info("Signed recently, must wait for others", "number", number, "signed", signed, "next", next)
+	if lastBlockSigned > 0 {
+		if next := snap.nextSignableBlockNumber(lastBlockSigned); number < next {
+			log.Info("Signed recently, must wait for others", "number", number, "signed", lastBlockSigned, "next", next)
 			<-stop
 			return nil, nil
 		}

@@ -91,17 +91,19 @@ func (r *testerChainReader) GetHeaderByNumber(number uint64) *types.Header {
 // Tests that voting is evaluated correctly for various simple and complex scenarios.
 func TestVoting(t *testing.T) {
 	// Define the various voting scenarios to test
-	tests := map[string]votingTest{
-		"1-no-votes": {
+	tests := []votingTest{
+		{
 			// 0: Single signer, no votes cast
+			name:           "1-no-votes",
 			signers:        []string{"A"},
 			voters:         []string{"A"},
 			votes:          []testerVote{{signer: "A"}},
 			signersResults: []string{"A"},
 			votersResults:  []string{"A"},
 		},
-		"1-vote-2": {
+		{
 			// 1: Single signer, voting to add two others (only accept first)
+			name:    "1-vote-2",
 			signers: []string{"A"},
 			voters:  []string{"A"},
 			votes: []testerVote{
@@ -113,8 +115,9 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B"},
 			votersResults:  []string{"A"},
 		},
-		"1-vote-3": {
+		{
 			// 2: Two signers, voting to add three others (only accept first two)
+			name:    "1-vote-3",
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
 			votes: []testerVote{
@@ -129,8 +132,9 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B"},
 		},
-		"1-drop": {
+		{
 			// 3: Single signer, dropping itself (weird, but one less cornercase by explicitly allowing this)
+			name:    "1-drop",
 			signers: []string{"A"},
 			voters:  []string{"A"},
 			votes: []testerVote{
@@ -139,8 +143,9 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A"},
 			votersResults:  []string{},
 		},
-		"2-drop-fail": {
+		{
 			// 4: Two signers, actually needing mutual consent to drop either of them (not fulfilled)
+			name:    "2-drop-fail",
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
 			votes: []testerVote{
@@ -149,8 +154,9 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B"},
 			votersResults:  []string{"A", "B"},
 		},
-		"2-drop": {
+		{
 			// 5: Two signers, actually needing mutual consent to drop either of them (fulfilled)
+			name:    "2-drop",
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
 			votes: []testerVote{
@@ -160,8 +166,9 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B"},
 			votersResults:  []string{"A"},
 		},
-		"3-drop": {
+		{
 			// 6: Three signers, two of them deciding to drop the third
+			name:    "3-drop",
 			signers: []string{"A", "B", "C"},
 			voters:  []string{"A", "B", "C"},
 			votes: []testerVote{
@@ -171,8 +178,9 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C"},
 			votersResults:  []string{"A", "B"},
 		},
-		"4-drop-fail": {
+		{
 			// 7: Four signers, consensus of two not being enough to drop anyone
+			name:    "4-drop-fail",
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
 			votes: []testerVote{
@@ -182,8 +190,9 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B", "C", "D"},
 		},
-		"4-drop": {
+		{
 			// 8: Four signers, consensus of three already being enough to drop someone
+			name:    "4-drop",
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
 			votes: []testerVote{
@@ -194,8 +203,9 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B", "C"},
 		},
-		"auth-count": {
+		{
 			// 9: Authorizations are counted once per signer per target
+			name:    "auth-count",
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
 			votes: []testerVote{
@@ -208,8 +218,9 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B"},
 			votersResults:  []string{"A", "B"},
 		},
-		"auth-mult": {
+		{
 			// 10: Authorizing multiple accounts concurrently is permitted
+			name:    "auth-mult",
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
 			votes: []testerVote{
@@ -225,8 +236,9 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B"},
 		},
-		"deauth-count": {
+		{
 			// 11: Deauthorizations are counted once per signer per target
+			name:    "deauth-count",
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
 			votes: []testerVote{
@@ -239,8 +251,9 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B"},
 			votersResults:  []string{"A", "B"},
 		},
-		"deauth-mult": {
+		{
 			// 12: Deauthorizing multiple accounts concurrently is permitted
+			name:    "deauth-mult",
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
 			votes: []testerVote{
@@ -259,8 +272,9 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B"},
 		},
-		"deauth-discard-deauth": {
+		{
 			// 13: Votes from deauthorized signers are discarded immediately (deauth votes)
+			name:    "deauth-discard-deauth",
 			signers: []string{"A", "B", "C"},
 			voters:  []string{"A", "B", "C"},
 			votes: []testerVote{
@@ -272,8 +286,9 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C"},
 			votersResults:  []string{"A", "B"},
 		},
-		"deauth-discard-auth": {
+		{
 			// 14: Votes from deauthorized signers are discarded immediately (auth votes)
+			name:    "deauth-discard-auth",
 			signers: []string{"A", "B", "C"},
 			voters:  []string{"A", "B", "C"},
 			votes: []testerVote{
@@ -285,8 +300,9 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C"},
 			votersResults:  []string{"A", "B"},
 		},
-		"no-cascade": {
+		{
 			// 15: Cascading changes are not allowed, only the account being voted on may change
+			name:    "no-cascade",
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
 			votes: []testerVote{
@@ -303,8 +319,9 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B", "C"},
 		},
-		"out-of-bounds": {
+		{
 			// 16: Changes reaching consensus out of bounds (via a deauth) execute on touch
+			name:    "out-of-bounds",
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
 			votes: []testerVote{
@@ -324,8 +341,9 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B"},
 		},
-		"out-of-bounds-out": {
+		{
 			// 17: Changes reaching consensus out of bounds (via a deauth) may go out of consensus on first touch
+			name:    "out-of-bounds-out",
 			signers: []string{"A", "B", "C", "D"},
 			voters:  []string{"A", "B", "C", "D"},
 			votes: []testerVote{
@@ -344,12 +362,13 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C", "D"},
 			votersResults:  []string{"A", "B", "C"},
 		},
-		"discard-pending": {
+		{
 			// 18: Ensure that pending votes don't survive authorization status changes. This
 			// corner case can only appear if a signer is quickly added, removed and then
 			// readded (or the inverse), while one of the original voters dropped. If a
 			// past vote is left cached in the system somewhere, this will interfere with
 			// the final signer outcome.
+			name:    "discard-pending",
 			signers: []string{"A", "B", "C", "D", "E", "F"},
 			voters:  []string{"A", "B", "C", "D", "E"},
 			votes: []testerVote{
@@ -372,8 +391,9 @@ func TestVoting(t *testing.T) {
 			signersResults: []string{"A", "B", "C", "D", "E", "F"},
 			votersResults:  []string{"B", "C", "D", "E", "F"},
 		},
-		"epoch-reset": {
+		{
 			// 19: Epoch transitions reset all votes to allow chain checkpointing
+			name:    "epoch-reset",
 			epoch:   3,
 			signers: []string{"A", "B"},
 			voters:  []string{"A", "B"},
@@ -388,12 +408,13 @@ func TestVoting(t *testing.T) {
 		},
 	}
 	// Run through the scenarios and test them
-	for name, tt := range tests {
-		t.Run(name, tt.run)
+	for _, tt := range tests {
+		t.Run(tt.name, tt.run)
 	}
 }
 
 type votingTest struct {
+	name           string
 	epoch          uint64
 	signers        []string
 	voters         []string

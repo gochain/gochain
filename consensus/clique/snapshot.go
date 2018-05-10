@@ -211,14 +211,13 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 		if err != nil {
 			return nil, err
 		}
-		signed, authorized := snap.Signers[signer]
+		lastBlockSigned, authorized := snap.Signers[signer]
 		if !authorized {
 			return nil, fmt.Errorf("%s not authorized to sign", signer.Hex())
 		}
-		if signed > 0 {
-			limit := uint64(len(snap.Signers)/2 + 1)
-			if next := limit + signed; number < next {
-				return nil, fmt.Errorf("%s not authorized to sign %d: signed %d, next eligible signature %d", signer.Hex(), number, signed, next)
+		if lastBlockSigned > 0 {
+			if next := snap.nextSignableBlockNumber(lastBlockSigned); number < next {
+				return nil, fmt.Errorf("%s not authorized to sign %d: signed recently %d, next eligible signature %d", signer.Hex(), number, lastBlockSigned, next)
 			}
 		}
 		snap.Signers[signer] = number
@@ -340,4 +339,11 @@ func (s *Snapshot) voters() []common.Address {
 		}
 	}
 	return voters
+}
+
+// nextSignableBlockNumber returns the number of the next block legal for signature by the signer of
+// lastSignedBlockNumber, based on the current number of signers.
+func (s *Snapshot) nextSignableBlockNumber(lastSignedBlockNumber uint64) uint64 {
+	n := uint64(len(s.Signers))
+	return lastSignedBlockNumber + n/2 + 1
 }
