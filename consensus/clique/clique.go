@@ -513,7 +513,7 @@ func (c *Clique) verifySeal(ctx context.Context, chain consensus.ChainReader, he
 		}
 	}
 
-	if header.Difficulty.Uint64() != number-lastBlockSigned {
+	if header.Difficulty.Uint64() != CalcDifficulty(snap.Signers, signer) {
 		return errInvalidDifficulty
 	}
 
@@ -562,7 +562,7 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 		c.lock.RUnlock()
 	}
 	// Set the correct difficulty
-	header.Difficulty = new(big.Int).SetUint64(number - snap.Signers[c.signer])
+	header.Difficulty = new(big.Int).SetUint64(CalcDifficulty(snap.Signers, c.signer))
 
 	if number%c.config.Epoch == 0 {
 		header.Signers = snap.signers()
@@ -626,21 +626,19 @@ func (c *Clique) Seal(ctx context.Context, chain consensus.ChainReader, block *t
 		return nil, fmt.Errorf("%s not authorized to sign", signer.Hex())
 	}
 
-	var delay time.Duration
-	if lastBlockSigned > 0 {
-		if next := snap.nextSignableBlockNumber(lastBlockSigned); number < next {
-			log.Info("Signed recently, must wait for others", "number", number, "signed", lastBlockSigned, "next", next)
-			<-stop
-			return nil, nil
-		}
+	if next := snap.nextSignableBlockNumber(lastBlockSigned); number < next {
+		log.Info("Signed recently, must wait for others", "number", number, "signed", lastBlockSigned, "next", next)
+		<-stop
+		return nil, nil
+	}
 
-		// Allowed to sign, but delay first if signed recently.
-		// At least one signer will always be eligible to skip this delay.
-		n := uint64(len(header.Signers))
-		if diff := header.Difficulty.Uint64(); diff < n {
-			// Since diff is in the range (n/2,n), maximum delay is n/2*wiggleTime.
-			delay = time.Duration(n-diff) * wiggleTime
-		}
+	// The in-turn signer, with difficulty n, will not delay.
+	var delay time.Duration
+	n := uint64(len(header.Signers))
+	if diff := header.Difficulty.Uint64(); diff < n {
+		// Out-of-turn to sign, delay it a bit.
+		// Since diff is in the range [n/2+1,n], delay is [wiggleTime,n/2*wiggleTime].
+		delay = time.Duration(n-diff) * wiggleTime
 	}
 	if until := time.Unix(header.Time.Int64(), delay.Nanoseconds()); time.Now().Before(until) {
 		// Need to wait.
@@ -678,7 +676,39 @@ func (c *Clique) CalcDifficulty(ctx context.Context, chain consensus.ChainReader
 	if err != nil {
 		return nil
 	}
-	return new(big.Int).SetUint64(snap.Number + 1 - snap.Signers[c.signer])
+	return new(big.Int).SetUint64(CalcDifficulty(snap.Signers, c.signer))
+}
+
+// CalcDifficulty returns the difficulty for signer, given all signers and their most recently signed block numbers,
+// with 0 meaning 'has not signed'. With n signers, it will always return values from n/2+1 to n, inclusive, or 0.
+//
+// Difficulty for ineligible signers (too recent) is always 0. For eligible signers, difficulty is defined as 1 plus the
+// number of lower priority signers, with more recent signers have lower priority. If multiple signers have not yet
+// signed (0), then addresses which lexicographically sort later have lower priority.
+func CalcDifficulty(lastSigned map[common.Address]uint64, signer common.Address) uint64 {
+	last := lastSigned[signer]
+	difficulty := 1
+	// Note that signer's entry is implicitly skipped by the condition in both loops, so it never counts itself.
+	if last > 0 {
+		for _, n := range lastSigned {
+			if n > last {
+				difficulty++
+			}
+		}
+	} else {
+		// Haven't signed yet. If there are others, fall back to address sort.
+		for addr, n := range lastSigned {
+			if n > 0 || bytes.Compare(addr[:], signer[:]) > 0 {
+				difficulty++
+			}
+		}
+	}
+	if difficulty <= len(lastSigned)/2 {
+		// [1,n/2]: Too recent to sign again.
+		return 0
+	}
+	// [n/2+1,n]
+	return uint64(difficulty)
 }
 
 // APIs implements consensus.Engine, returning the user facing RPC API to allow
