@@ -28,7 +28,6 @@ import (
 
 	"github.com/gochain-io/gochain/accounts"
 	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/consensus"
 	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/consensus/ethash"
@@ -48,7 +47,6 @@ import (
 	"github.com/gochain-io/gochain/node"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/params"
-	"github.com/gochain-io/gochain/rlp"
 	"github.com/gochain-io/gochain/rpc"
 )
 
@@ -215,19 +213,21 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *Config) (*GoCha
 	return eth, nil
 }
 
+// Example: 2.0.73/linux-amd64/go1.10.2
+var defaultExtraData []byte
+var defaultExtraDataOnce sync.Once
+
 func makeExtraData(extra []byte) []byte {
 	if len(extra) == 0 {
-		// create default extradata
-		extra, _ = rlp.EncodeToBytes([]interface{}{
-			params.Version,
-			"gochain",
-			runtime.Version(),
-			runtime.GOOS,
+		defaultExtraDataOnce.Do(func() {
+			defaultExtraData = []byte(fmt.Sprintf("%s/%s-%s/%s", params.Version, runtime.GOOS, runtime.GOARCH, runtime.Version()))
+			defaultExtraData = defaultExtraData[:params.MaximumExtraDataSize]
 		})
+		return defaultExtraData
 	}
 	if uint64(len(extra)) > params.MaximumExtraDataSize {
-		log.Warn("Miner extra data exceed limit", "extra", hexutil.Bytes(extra), "limit", params.MaximumExtraDataSize)
-		extra = nil
+		log.Warn("Miner extra data exceed limit", "extra", string(extra), "limit", params.MaximumExtraDataSize)
+		extra = extra[:params.MaximumExtraDataSize]
 	}
 	return extra
 }
