@@ -57,9 +57,13 @@ var (
 	epochLength = uint64(30000) // Default number of blocks after which to checkpoint and reset the pending votes
 	blockPeriod = uint64(5)     // Default minimum difference between two consecutive block's timestamps
 
-	extraVanity  = 32                       // Fixed number of extra-data prefix bytes reserved for signer vanity
-	extraSeal    = 65                       // Fixed number of extra-data suffix bytes reserved for signer seal
-	extraPropose = common.AddressLength + 1 // Number of extra-data suffix bytes reserver for propose
+	signatureLength = 65
+
+	extraVanity  = 32                       // Fixed number of extra-data prefix bytes reserved for signer vanity.
+	extraPropose = common.AddressLength + 1 // Number of extra-data suffix bytes reserved for a proposal vote.
+
+	voterElection  byte = 0xff
+	signerElection byte = 0x00
 
 	nonceAuthVote = hexutil.MustDecode("0xffffffffffffffff") // Magic nonce number to vote on adding a new signer
 	nonceDropVote = hexutil.MustDecode("0x0000000000000000") // Magic nonce number to vote on removing a signer.
@@ -185,7 +189,7 @@ func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, er
 		return address.(common.Address), nil
 	}
 	// Retrieve the signature from the header
-	if len(header.Signer) < extraSeal {
+	if len(header.Signer) < signatureLength {
 		return common.Address{}, errMissingSignature
 	}
 	signature := header.Signer
@@ -319,7 +323,7 @@ func (c *Clique) verifyHeader(ctx context.Context, chain consensus.ChainReader, 
 		}
 	}
 	// Check if block was signed
-	if len(header.Signer) < extraSeal {
+	if len(header.Signer) < signatureLength {
 		return errMissingSignature
 	}
 	// Ensure that the mix digest is zero as we don't have fork protection currently
@@ -541,11 +545,7 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 	if err != nil {
 		return err
 	}
-	// Ensure the extra data has all it's components
-	if len(header.Extra) < extraVanity {
-		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, extraVanity-len(header.Extra))...)
-	}
-	header.Extra = header.Extra[:extraVanity]
+	header.Extra = ExtraEnsureVanity(header.Extra)
 	//if not checkpoint
 	if number%c.config.Epoch != 0 {
 		c.lock.RLock()
@@ -560,17 +560,12 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 		// If there's pending proposals, cast a vote on them
 		if len(addresses) > 0 {
 			candidate := addresses[rand.Intn(len(addresses))]
-			header.Extra = append(header.Extra, candidate[:]...)
 			propose := c.proposals[candidate]
+			header.Extra = ExtraAppendVote(header.Extra, candidate, propose.VoterElection)
 			if propose.Authorize {
 				copy(header.Nonce[:], nonceAuthVote)
 			} else {
 				copy(header.Nonce[:], nonceDropVote)
-			}
-			if propose.VoterElection {
-				header.Extra = append(header.Extra, []byte{0xff}...)
-			} else {
-				header.Extra = append(header.Extra, []byte{0x00}...)
 			}
 			log.Info("propose", "Candidate", candidate, "vote", propose.Authorize, "voterElection", propose.VoterElection)
 		}
@@ -708,4 +703,58 @@ func (c *Clique) APIs(chain consensus.ChainReader) []rpc.API {
 		Service:   &API{chain: chain, clique: c},
 		Public:    false,
 	}}
+}
+
+// ExtraEnsureVanity returns a slice of length 32, trimming extra or filling with 0s as necessary.
+func ExtraEnsureVanity(extra []byte) []byte {
+	if len(extra) < extraVanity {
+		return append(extra, make([]byte, extraVanity-len(extra))...)
+	}
+	return extra[:extraVanity]
+}
+
+// ExtraVanity returns a slice of the vanity portion of extra (up to 32). It may still contain trailing 0s.
+func ExtraVanity(extra []byte) []byte {
+	if len(extra) < extraVanity {
+		return extra
+	}
+	return extra[:extraVanity]
+}
+
+// ExtraAppendVote appends a vote to extra data as 20 bytes of address and a single byte for voter or signer election.
+func ExtraAppendVote(extra []byte, candidate common.Address, voter bool) []byte {
+	extra = append(extra, candidate[:]...)
+	election := signerElection
+	if voter {
+		election = voterElection
+	}
+	return append(extra, election)
+}
+
+// ExtraHasVote returns true if extra contains a proposal vote.
+func ExtraHasVote(extra []byte) bool {
+	return len(extra) == extraVanity+extraPropose
+}
+
+// ExtraCandidate returns the candidate address of the proposal vote, or the zero value if one is not present.
+func ExtraCandidate(extra []byte) common.Address {
+	if len(extra) < extraVanity+common.AddressLength {
+		return common.Address{}
+	}
+	return common.BytesToAddress(extra[extraVanity : extraVanity+common.AddressLength])
+}
+
+// IsVoterElection returns true if extra votes on a voter election, or false if it votes on a signer election or does
+// not contain a vote.
+func ExtraIsVoterElection(extra []byte) bool {
+	if len(extra) < extraVanity+extraPropose {
+		return false
+	}
+	switch extra[extraVanity+common.AddressLength] {
+	case voterElection:
+		return true
+	case signerElection:
+		return false
+	}
+	return false
 }

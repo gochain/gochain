@@ -408,7 +408,7 @@ func TestVoting(t *testing.T) {
 			ExtraData: make([]byte, extraVanity),
 			Signers:   signers,
 			Voters:    voters,
-			Signer:    make([]byte, extraSeal),
+			Signer:    make([]byte, signatureLength),
 		}
 		// Create a pristine blockchain with the genesis injected
 		db, _ := ethdb.NewMemDatabase()
@@ -420,7 +420,7 @@ func TestVoting(t *testing.T) {
 			headers[j] = &types.Header{
 				Number: big.NewInt(int64(j) + 1),
 				Time:   big.NewInt(int64(j) * int64(blockPeriod)),
-				Signer: make([]byte, extraSeal),
+				Signer: make([]byte, signatureLength),
 				Extra:  make([]byte, extraVanity),
 			}
 			if j > 0 {
@@ -429,12 +429,7 @@ func TestVoting(t *testing.T) {
 			if vote.auth {
 				copy(headers[j].Nonce[:], nonceAuthVote)
 			}
-			headers[j].Extra = append(headers[j].Extra, accounts.address(vote.voted).Bytes()...)
-			if vote.voterElection {
-				headers[j].Extra = append(headers[j].Extra, []byte{0xff}...)
-			} else {
-				headers[j].Extra = append(headers[j].Extra, []byte{0x00}...)
-			}
+			headers[j].Extra = ExtraAppendVote(headers[j].Extra, accounts.address(vote.voted), vote.voterElection)
 			accounts.sign(headers[j], vote.signer)
 		}
 		// Pass all the headers through clique and ensure tallying succeeds

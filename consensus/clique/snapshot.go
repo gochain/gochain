@@ -21,11 +21,10 @@ import (
 	"encoding/json"
 
 	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/params"
-	lru "github.com/hashicorp/golang-lru"
+	"github.com/hashicorp/golang-lru"
 )
 
 // Vote represents a single vote that an authorized signer made to modify the
@@ -236,14 +235,9 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			var voterElection bool
 			var candidate common.Address
 
-			if len(header.Extra)-extraVanity == extraPropose {
-				candidate = common.BytesToAddress(header.Extra[extraVanity : extraVanity+common.AddressLength])
-				switch {
-				case bytes.Equal(header.Extra[extraVanity+common.AddressLength:extraVanity+extraPropose], hexutil.MustDecode("0xff")):
-					voterElection = true
-				case bytes.Equal(header.Extra[extraVanity+common.AddressLength:extraVanity+extraPropose], hexutil.MustDecode("0x00")):
-					voterElection = false
-				}
+			if ExtraHasVote(header.Extra) {
+				candidate = ExtraCandidate(header.Extra)
+				voterElection = ExtraIsVoterElection(header.Extra)
 			}
 			// Header authorized, discard any previous votes from the voter
 			for i, vote := range snap.Votes {
