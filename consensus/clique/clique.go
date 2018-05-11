@@ -626,10 +626,12 @@ func (c *Clique) Seal(ctx context.Context, chain consensus.ChainReader, block *t
 		return nil, fmt.Errorf("%s not authorized to sign", signer.Hex())
 	}
 
-	if next := snap.nextSignableBlockNumber(lastBlockSigned); number < next {
-		log.Info("Signed recently, must wait for others", "number", number, "signed", lastBlockSigned, "next", next)
-		<-stop
-		return nil, nil
+	if lastBlockSigned > 0 {
+		if next := snap.nextSignableBlockNumber(lastBlockSigned); number < next {
+			log.Info("Signed recently, must wait for others", "number", number, "signed", lastBlockSigned, "next", next)
+			<-stop
+			return nil, nil
+		}
 	}
 
 	// The in-turn signer, with difficulty n, will not delay.
