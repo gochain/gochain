@@ -25,8 +25,8 @@ import (
 
 var (
 	//TODO update
-	MainnetGenesisHash = TestnetGenesisHash                                                                     // Mainnet genesis hash to enforce below configs on
-	TestnetGenesisHash = common.HexToHash("0x7ffe5aa939fb8baead5fe72411b41a9b36847e300fa6ae9467c35fea053720d8") // Testnet genesis hash to enforce below configs on
+	MainnetGenesisHash = TestnetGenesisHash
+	TestnetGenesisHash = common.HexToHash("0x84337e882fad5883e2ed6e587ab5bdf711b7107a39abe8e080784bb30c8f047e")
 )
 
 var (
@@ -36,12 +36,12 @@ var (
 	// TestnetChainConfig contains the chain parameters to run a node on the test network.
 	TestnetChainConfig = &ChainConfig{
 		ChainId:        big.NewInt(31337),
-		HomesteadBlock: big.NewInt(1),
-		EIP150Block:    big.NewInt(2),
-		EIP150Hash:     common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"),
-		EIP155Block:    big.NewInt(3),
-		EIP158Block:    big.NewInt(3),
-		ByzantiumBlock: big.NewInt(4),
+		HomesteadBlock: big.NewInt(0),
+		EIP150Block:    big.NewInt(0),
+		EIP150Hash:     common.Hash{},
+		EIP155Block:    big.NewInt(0),
+		EIP158Block:    big.NewInt(0),
+		ByzantiumBlock: big.NewInt(0),
 
 		Clique: &CliqueConfig{
 			Period: 5,

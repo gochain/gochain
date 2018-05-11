@@ -17,7 +17,10 @@
 package core
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"io/ioutil"
 	"math/big"
 	"reflect"
 	"testing"
@@ -30,14 +33,17 @@ import (
 	"github.com/gochain-io/gochain/params"
 )
 
-func TestDefaultGenesisBlock(t *testing.T) {
-	block := DefaultGenesisBlock().ToBlock(nil)
-	if block.Hash() != params.MainnetGenesisHash {
-		t.Errorf("wrong mainnet genesis hash, got %v, want %v", block.Hash(), params.MainnetGenesisHash)
-	}
-	block = DefaultTestnetGenesisBlock().ToBlock(nil)
-	if block.Hash() != params.TestnetGenesisHash {
-		t.Errorf("wrong testnet genesis hash, got %v, want %v", block.Hash(), params.TestnetGenesisHash)
+func TestDefaultGenesisBlockHash(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		exp, got common.Hash
+	}{
+		{"mainnet", params.MainnetGenesisHash, DefaultGenesisBlock().ToBlock(nil).Hash()},
+		{"testnet", params.TestnetGenesisHash, DefaultTestnetGenesisBlock().ToBlock(nil).Hash()},
+	} {
+		if test.exp != test.got {
+			t.Errorf("wrong %s genesis hash, got %s, want %s", test.name, test.got.Hex(), test.exp.Hex())
+		}
 	}
 }
 
@@ -161,5 +167,20 @@ func TestSetupGenesis(t *testing.T) {
 				t.Errorf("%s: block in DB has hash %s, want %s", test.name, stored.Hash(), test.wantHash)
 			}
 		}
+	}
+}
+
+func TestDefaultGenesisBlock(t *testing.T) {
+	exp, err := ioutil.ReadFile("genesis-test.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp = bytes.TrimSpace(exp)
+	got, err := json.MarshalIndent(DefaultTestnetGenesisBlock(), "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(exp, got) {
+		t.Errorf("expected:\n%s\ngot:\n%s", string(exp), string(got))
 	}
 }

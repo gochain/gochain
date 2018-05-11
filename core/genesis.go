@@ -327,9 +327,13 @@ func DefaultGenesisBlock() *Genesis {
 
 // DefaultTestnetGenesisBlock returns the Gochain Testnet network genesis block.
 func DefaultTestnetGenesisBlock() *Genesis {
+	alloc, ok := new(big.Int).SetString("1000000000000000000000000000", 10)
+	if !ok {
+		panic("failed to parse big.Int string")
+	}
 	return &Genesis{
 		Config:     params.TestnetChainConfig,
-		Timestamp:  1518103741,
+		Timestamp:  1526048200,
 		ExtraData:  hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000"),
 		GasLimit:   210284448,
 		Difficulty: big.NewInt(1),
@@ -342,7 +346,11 @@ func DefaultTestnetGenesisBlock() *Genesis {
 			common.HexToAddress("0x7aeceb5d345a01f8014a4320ab1f3d467c0c086a"),
 		},
 		Signer: hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
-		Alloc:  decodePrealloc(testnetAllocData),
+		Alloc: GenesisAlloc{
+			common.HexToAddress("0x2Fe70F1Df222C85ad6Dd24a3376Eb5ac32136978"): {
+				Balance: alloc,
+			},
+		},
 	}
 }
 
