@@ -171,16 +171,25 @@ func TestSetupGenesis(t *testing.T) {
 }
 
 func TestDefaultGenesisBlock(t *testing.T) {
-	exp, err := ioutil.ReadFile("genesis-test.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	exp = bytes.TrimSpace(exp)
-	got, err := json.MarshalIndent(DefaultTestnetGenesisBlock(), "", "  ")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(exp, got) {
-		t.Errorf("expected:\n%s\ngot:\n%s", string(exp), string(got))
+	for _, test := range []struct {
+		name    string
+		file    string
+		genesis *Genesis
+	}{
+		{"mainnet", "genesis-main.json", DefaultGenesisBlock()},
+		{"testnet", "genesis-test.json", DefaultTestnetGenesisBlock()},
+	} {
+		exp, err := ioutil.ReadFile(test.file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		exp = bytes.TrimSpace(exp)
+		got, err := json.MarshalIndent(test.genesis, "", "  ")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(exp, got) {
+			t.Errorf("mismatched %s genesis, expected:\n%s\ngot:\n%s", test.name, string(exp), string(got))
+		}
 	}
 }
