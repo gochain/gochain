@@ -31,10 +31,10 @@ type MemDatabase struct {
 	lock sync.RWMutex
 }
 
-func NewMemDatabase() (*MemDatabase, error) {
+func NewMemDatabase() *MemDatabase {
 	return &MemDatabase{
 		db: make(map[string][]byte),
-	}, nil
+	}
 }
 
 func NewMemDatabaseWithCap(size int) (*MemDatabase, error) {
