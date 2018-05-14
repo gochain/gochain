@@ -64,6 +64,7 @@ type Work struct {
 	config *params.ChainConfig
 	signer types.Signer
 
+	stateMu   sync.RWMutex
 	state     *state.StateDB           // apply state changes here
 	ancestors map[common.Hash]struct{} // ancestor set (used for checking uncle parent validity)
 	family    map[common.Hash]struct{} // family set (used for checking uncle invalidity)
@@ -183,6 +184,8 @@ func (w *worker) pending() (*types.Block, *state.StateDB) {
 
 	w.currentMu.RLock()
 	defer w.currentMu.RUnlock()
+	w.current.stateMu.RLock()
+	defer w.current.stateMu.RUnlock()
 	return w.current.Block, w.current.state.Copy()
 }
 
@@ -197,6 +200,8 @@ func (w *worker) pendingQuery(fn func(*state.StateDB) error) error {
 
 	w.currentMu.Lock()
 	defer w.currentMu.Unlock()
+	w.current.stateMu.Lock()
+	defer w.current.stateMu.Unlock()
 	return fn(w.current.state)
 }
 
@@ -276,12 +281,16 @@ func (w *worker) update(ctx context.Context) {
 			// Apply transaction to the pending state if we're not mining
 			if atomic.LoadInt32(&w.mining) == 0 {
 				w.currentMu.Lock()
+				w.current.stateMu.Lock()
+
 				acc, _ := types.Sender(ctx, w.current.signer, ev.Tx)
 				txs := map[common.Address]types.Transactions{acc: {ev.Tx}}
 				txset := types.NewTransactionsByPriceAndNonce(ctx, w.current.signer, txs)
 
 				w.current.commitTransactions(ctx, w.mux, txset, w.chain, w.coinbase)
 				w.updateSnapshot()
+
+				w.current.stateMu.Unlock()
 				w.currentMu.Unlock()
 			} else {
 				// If we're mining, but nothing is being processed, wake on new transactions
@@ -320,10 +329,13 @@ func (w *worker) wait(ctx context.Context) {
 					l.BlockHash = block.Hash()
 				}
 			}
+
+			work.stateMu.Lock()
 			for _, log := range work.state.Logs() {
 				log.BlockHash = block.Hash()
 			}
 			stat, err := w.chain.WriteBlockWithState(block, work.receipts, work.state)
+			work.stateMu.Unlock()
 			if err != nil {
 				log.Error("Failed writing block to chain", "err", err)
 				continue
@@ -337,10 +349,13 @@ func (w *worker) wait(ctx context.Context) {
 			if err := w.mux.Post(core.NewMinedBlockEvent{Block: block}); err != nil {
 				log.Error("Cannot post new mined block event", "err", err)
 			}
-			var (
-				events []interface{}
-				logs   = work.state.Logs()
-			)
+
+			var events []interface{}
+
+			work.stateMu.Lock()
+			logs := work.state.Logs()
+			work.stateMu.Unlock()
+
 			events = append(events, core.ChainEvent{Block: block, Hash: block.Hash(), Logs: logs})
 			if stat == core.CanonStatTy {
 				events = append(events, core.ChainHeadEvent{Block: block})
@@ -410,6 +425,11 @@ func (w *worker) commitNewWork(ctx context.Context) {
 	defer w.uncleMu.Unlock()
 	w.currentMu.Lock()
 	defer w.currentMu.Unlock()
+
+	if w.current != nil {
+		w.current.stateMu.Lock()
+		defer w.current.stateMu.Unlock()
+	}
 
 	tstart := time.Now()
 	parent := w.chain.CurrentBlock()
