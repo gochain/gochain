@@ -24,14 +24,26 @@ import (
 )
 
 var (
-	//TODO update
-	MainnetGenesisHash = TestnetGenesisHash
+	MainnetGenesisHash = common.HexToHash("0x5b44a92a842a888b8b7cc1ff7eaac9800edf88a6a5f3d38850deb63d46acd880")
 	TestnetGenesisHash = common.HexToHash("0x84337e882fad5883e2ed6e587ab5bdf711b7107a39abe8e080784bb30c8f047e")
 )
 
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
-	MainnetChainConfig = TestnetChainConfig //TODO update
+	MainnetChainConfig = &ChainConfig{
+		ChainId:        big.NewInt(60),
+		HomesteadBlock: big.NewInt(0),
+		EIP150Block:    big.NewInt(0),
+		EIP150Hash:     common.Hash{},
+		EIP155Block:    big.NewInt(0),
+		EIP158Block:    big.NewInt(0),
+		ByzantiumBlock: big.NewInt(0),
+
+		Clique: &CliqueConfig{
+			Period: 5,
+			Epoch:  3000,
+		},
+	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the test network.
 	TestnetChainConfig = &ChainConfig{

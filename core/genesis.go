@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"strings"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/hexutil"
@@ -33,7 +32,6 @@ import (
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
-	"github.com/gochain-io/gochain/rlp"
 )
 
 //go:generate gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go
@@ -319,13 +317,36 @@ func GenesisBlockForTesting(db ethdb.Database, addr common.Address, balance *big
 	return g.MustCommit(db)
 }
 
-// DefaultGenesisBlock returns the Gochain main net genesis block.
+// DefaultGenesisBlock returns the GoChain main net genesis block.
 func DefaultGenesisBlock() *Genesis {
-	//TODO update
-	return DefaultTestnetGenesisBlock()
+	allocAddr := common.HexToAddress("0xF75B6E2D2d69Da07f2940e239E25229350f8103f")
+	alloc, ok := new(big.Int).SetString("1000000000000000000000000000", 10)
+	if !ok {
+		panic("failed to parse big.Int string")
+	}
+	var extra = []byte("GoChain")
+	return &Genesis{
+		Config:     params.MainnetChainConfig,
+		Timestamp:  1526400000,
+		ExtraData:  append(extra, make([]byte, 32-len(extra))...),
+		GasLimit:   210284448,
+		Difficulty: big.NewInt(1),
+		Signers: []common.Address{
+			common.HexToAddress("0xed7f2e81b0264177e0df8f275f97fd74fa51a896"),
+			common.HexToAddress("0x3ad14430951aba12068a8167cebe3ddd57614432"),
+			common.HexToAddress("0x3729d2e93e8037f87a2c9afe34cb84b7069e4dea"),
+			common.HexToAddress("0xf6290b7f9f871d21317acc259f2ae23c0aa69c73"),
+			common.HexToAddress("0xf7678aa7f42bc017f3d6011ca27aed400647960d"),
+		},
+		Voters: []common.Address{
+			common.HexToAddress("0xed7f2e81b0264177e0df8f275f97fd74fa51a896"),
+		},
+		Signer: hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		Alloc:  GenesisAlloc{allocAddr: {Balance: alloc}},
+	}
 }
 
-// DefaultTestnetGenesisBlock returns the Gochain Testnet network genesis block.
+// DefaultTestnetGenesisBlock returns the GoChain Testnet network genesis block.
 func DefaultTestnetGenesisBlock() *Genesis {
 	alloc, ok := new(big.Int).SetString("1000000000000000000000000000", 10)
 	if !ok {
@@ -354,8 +375,8 @@ func DefaultTestnetGenesisBlock() *Genesis {
 	}
 }
 
-// DeveloperGenesisBlock returns the 'geth --dev' genesis block. Note, this must
-// be seeded with the
+// DeveloperGenesisBlock returns the 'gochain --dev' genesis block. Note, this must
+// be seeded with the faucet address.
 func DeveloperGenesisBlock(period uint64, faucet common.Address) *Genesis {
 	// Override the default period to the user requested one
 	config := *params.AllCliqueProtocolChanges
@@ -379,16 +400,4 @@ func DeveloperGenesisBlock(period uint64, faucet common.Address) *Genesis {
 			faucet: {Balance: new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(9))},
 		},
 	}
-}
-
-func decodePrealloc(data string) GenesisAlloc {
-	var p []struct{ Addr, Balance *big.Int }
-	if err := rlp.Decode(strings.NewReader(data), &p); err != nil {
-		panic(err)
-	}
-	ga := make(GenesisAlloc, len(p))
-	for _, account := range p {
-		ga[common.BigToAddress(account.Addr)] = GenesisAccount{Balance: account.Balance}
-	}
-	return ga
 }

@@ -53,7 +53,7 @@ func TestConsoleWelcome(t *testing.T) {
 	geth.SetTemplateFunc("gover", runtime.Version)
 	geth.SetTemplateFunc("gethver", func() string { return params.Version })
 	geth.SetTemplateFunc("time", func() string {
-		return time.Unix(int64(core.DefaultTestnetGenesisBlock().Timestamp), 0).Format(time.RFC1123)
+		return time.Unix(int64(core.DefaultGenesisBlock().Timestamp), 0).Format(time.RFC1123)
 	})
 	geth.SetTemplateFunc("apis", func() string { return ipcAPIs })
 
@@ -139,7 +139,7 @@ func testAttachWelcome(t *testing.T, geth *testgeth, endpoint, apis string) {
 	attach.SetTemplateFunc("gethver", func() string { return params.Version })
 	attach.SetTemplateFunc("etherbase", func() string { return geth.Etherbase })
 	attach.SetTemplateFunc("time", func() string {
-		return time.Unix(int64(core.DefaultTestnetGenesisBlock().Timestamp), 0).Format(time.RFC1123)
+		return time.Unix(int64(core.DefaultGenesisBlock().Timestamp), 0).Format(time.RFC1123)
 	})
 	attach.SetTemplateFunc("ipc", func() bool { return strings.HasPrefix(endpoint, "ipc") })
 	attach.SetTemplateFunc("datadir", func() string { return geth.Datadir })
