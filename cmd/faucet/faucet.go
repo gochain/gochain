@@ -216,7 +216,7 @@ func newFaucet(genesis *core.Genesis, port int, enodes []*discv5.Node, network u
 	ctx := context.TODO()
 	// Assemble the raw devp2p protocol stack
 	stack, err := node.New(&node.Config{
-		Name:    "geth",
+		Name:    "gochain",
 		Version: params.Version,
 		DataDir: filepath.Join(os.Getenv("HOME"), ".faucet"),
 		P2P: p2p.Config{

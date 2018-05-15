@@ -65,7 +65,7 @@ This command will:
    (via the trailing `console` subcommand) through which you can invoke all official [`web3` methods](https://github.com/ethereum/wiki/wiki/JavaScript-API)
    as well as GoChain's own [management APIs](https://github.com/ethereum/go-ethereum/wiki/Management-APIs).
    This too is optional and if you leave it out you can always attach to an already running GoChain instance
-   with `geth attach`.
+   with `gochain attach`.
 
 ### Full node on the GoChain test network
 
@@ -87,7 +87,7 @@ Specifying the `--testnet` flag however will reconfigure your GoChain instance a
    itself one level deeper into a `testnet` subfolder (`~/.gochain/testnet` on Linux). Note, on OSX
    and Linux this also means that attaching to a running testnet node requires the use of a custom
    endpoint since `gochain attach` will try to attach to a production node endpoint by default. E.g.
-   `gochain attach <datadir>/testnet/geth.ipc`. Windows users are not affected by this.
+   `gochain attach <datadir>/testnet/gochain.ipc`. Windows users are not affected by this.
  * Instead of connecting the main GoChain network, the client will connect to the test network,
    which uses different P2P bootnodes, different network IDs and genesis states.
    
