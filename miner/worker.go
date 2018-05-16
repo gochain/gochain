@@ -426,11 +426,6 @@ func (w *worker) commitNewWork(ctx context.Context) {
 	w.currentMu.Lock()
 	defer w.currentMu.Unlock()
 
-	if w.current != nil {
-		w.current.stateMu.Lock()
-		defer w.current.stateMu.Unlock()
-	}
-
 	tstart := time.Now()
 	parent := w.chain.CurrentBlock()
 
@@ -467,6 +462,11 @@ func (w *worker) commitNewWork(ctx context.Context) {
 		log.Error("Failed to create mining context", "err", err)
 		return
 	}
+
+	// Obtain current work's state lock after we receive new work assignment.
+	w.current.stateMu.Lock()
+	defer w.current.stateMu.Unlock()
+
 	// Create the current work task and check any fork transitions needed
 	work := w.current
 	pending := w.eth.TxPool().Pending(ctx)
