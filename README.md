@@ -1,3 +1,5 @@
+![GoChain Logo](color_logo_transparent.png)
+
 ## GoChain
 
 Official golang implementation of the GoChain protocol.
