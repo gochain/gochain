@@ -179,8 +179,8 @@ func (b *EthApiBackend) TxPoolContent(ctx context.Context) (map[common.Address]t
 	return b.eth.TxPool().Content(ctx)
 }
 
-func (b *EthApiBackend) SubscribeTxPreEvent(ch chan<- core.TxPreEvent) event.Subscription {
-	return b.eth.TxPool().SubscribeTxPreEvent(ch)
+func (b *EthApiBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
+	return b.eth.TxPool().SubscribeNewTxsEvent(ch)
 }
 
 func (b *EthApiBackend) Downloader() *downloader.Downloader {

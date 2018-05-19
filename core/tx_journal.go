@@ -95,7 +95,7 @@ func (journal *txJournal) load(add func(types.Transactions) []error) error {
 			}
 			break
 		}
-		// Import the transaction and bump the appropriate progress counters
+		// New transaction parsed, queue up for later, import if threnshold is reached
 		total++
 		batch = append(batch, tx)
 		if len(batch) >= batchSize {
