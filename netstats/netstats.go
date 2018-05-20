@@ -82,14 +82,28 @@ type Service struct {
 	histCh chan []uint64 // History request block numbers are fed into this channel
 }
 
-// New returns a monitoring service ready for stats reporting.
-func New(url string, ethServ *eth.GoChain, lesServ *les.LightGoChain) (*Service, error) {
-	// Parse the netstats connection url
+type Config struct {
+	Name   string `toml:",omitempty"`
+	Secret string `toml:",omitempty"`
+	URL    string `toml:",omitempty"`
+}
+
+// ParseConfig parses the netstats flag. It has the form "nodename:secret@host:port".
+func ParseConfig(flag string) (Config, error) {
 	re := regexp.MustCompile("([^:@]*)(:([^@]*))?@(.+)")
-	parts := re.FindStringSubmatch(url)
+	parts := re.FindStringSubmatch(flag)
 	if len(parts) != 5 {
-		return nil, fmt.Errorf("invalid netstats url: \"%s\", should be nodename:secret@host:port", url)
+		return Config{}, fmt.Errorf("invalid netstats flag: \"%s\", should be nodename:secret@host:port", flag)
 	}
+	return Config{
+		Name:   parts[1],
+		Secret: parts[3],
+		URL:    parts[4],
+	}, nil
+}
+
+// New returns a monitoring service ready for stats reporting.
+func New(cfg Config, ethServ *eth.GoChain, lesServ *les.LightGoChain) *Service {
 	// Assemble and return the stats service
 	var engine consensus.Engine
 	if ethServ != nil {
@@ -101,12 +115,12 @@ func New(url string, ethServ *eth.GoChain, lesServ *les.LightGoChain) (*Service,
 		eth:    ethServ,
 		les:    lesServ,
 		engine: engine,
-		node:   parts[1],
-		pass:   parts[3],
-		host:   parts[4],
+		node:   cfg.Name,
+		pass:   cfg.Secret,
+		host:   cfg.URL,
 		pongCh: make(chan struct{}),
 		histCh: make(chan []uint64, 1),
-	}, nil
+	}
 }
 
 // Protocols implements node.Service, returning the P2P network protocols used

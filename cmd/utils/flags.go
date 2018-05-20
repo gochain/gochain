@@ -1164,7 +1164,7 @@ func RegisterShhService(stack *node.Node, cfg *whisper.Config) {
 
 // RegisterNetStatsService configures the GoChain Stats daemon and adds it to
 // the given node.
-func RegisterNetStatsService(stack *node.Node, url string) {
+func RegisterNetStatsService(stack *node.Node, cfg netstats.Config) {
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		// Retrieve both eth and les services
 		var ethServ *eth.GoChain
@@ -1173,7 +1173,7 @@ func RegisterNetStatsService(stack *node.Node, url string) {
 		var lesServ *les.LightGoChain
 		ctx.Service(&lesServ)
 
-		return netstats.New(url, ethServ, lesServ)
+		return netstats.New(cfg, ethServ, lesServ), nil
 	}); err != nil {
 		Fatalf("Failed to register the GoChain Stats service: %v", err)
 	}

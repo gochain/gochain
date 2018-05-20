@@ -246,7 +246,11 @@ func newFaucet(genesis *core.Genesis, port int, enodes []*discv5.Node, network u
 		if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 			var serv *les.LightGoChain
 			ctx.Service(&serv)
-			return netstats.New(stats, nil, serv)
+			cfg, err := netstats.ParseConfig(stats)
+			if err != nil {
+				return nil, err
+			}
+			return netstats.New(cfg, nil, serv), nil
 		}); err != nil {
 			return nil, err
 		}

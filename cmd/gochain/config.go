@@ -31,6 +31,7 @@ import (
 	"github.com/gochain-io/gochain/cmd/utils"
 	"github.com/gochain-io/gochain/dashboard"
 	"github.com/gochain-io/gochain/eth"
+	"github.com/gochain-io/gochain/netstats"
 	"github.com/gochain-io/gochain/node"
 	"github.com/gochain-io/gochain/params"
 	whisper "github.com/gochain-io/gochain/whisper/whisperv5"
@@ -71,15 +72,11 @@ var tomlSettings = toml.Config{
 	},
 }
 
-type netstatsConfig struct {
-	URL string `toml:",omitempty"`
-}
-
 type gochainConfig struct {
 	Eth       eth.Config
 	Shh       whisper.Config
 	Node      node.Config
-	Netstats  netstatsConfig
+	Netstats  netstats.Config
 	Dashboard dashboard.Config
 }
 
@@ -132,7 +129,10 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gochainConfig) {
 	}
 	utils.SetEthConfig(ctx, stack, &cfg.Eth)
 	if ctx.GlobalIsSet(utils.NetStatsURLFlag.Name) {
-		cfg.Netstats.URL = ctx.GlobalString(utils.NetStatsURLFlag.Name)
+		cfg.Netstats, err = netstats.ParseConfig(ctx.GlobalString(utils.NetStatsURLFlag.Name))
+		if err != nil {
+			utils.Fatalf("Failed to parse netstats flag: %v", err)
+		}
 	}
 
 	utils.SetShhConfig(ctx, stack, &cfg.Shh)
@@ -174,7 +174,7 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 
 	// Add the GoChain Stats daemon if requested.
 	if cfg.Netstats.URL != "" {
-		utils.RegisterNetStatsService(stack, cfg.Netstats.URL)
+		utils.RegisterNetStatsService(stack, cfg.Netstats)
 	}
 	return stack
 }

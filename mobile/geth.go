@@ -161,8 +161,11 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			if err := rawStack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 				var lesServ *les.LightGoChain
 				ctx.Service(&lesServ)
-
-				return netstats.New(config.EthereumNetStats, nil, lesServ)
+				cfg, err := netstats.ParseConfig(config.EthereumNetStats)
+				if err != nil {
+					return nil, err
+				}
+				return netstats.New(cfg, nil, lesServ), nil
 			}); err != nil {
 				return nil, fmt.Errorf("netstats init: %v", err)
 			}
