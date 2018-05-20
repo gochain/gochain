@@ -71,19 +71,19 @@ var tomlSettings = toml.Config{
 	},
 }
 
-type ethstatsConfig struct {
+type netstatsConfig struct {
 	URL string `toml:",omitempty"`
 }
 
-type gethConfig struct {
+type gochainConfig struct {
 	Eth       eth.Config
 	Shh       whisper.Config
 	Node      node.Config
-	Ethstats  ethstatsConfig
+	Netstats  netstatsConfig
 	Dashboard dashboard.Config
 }
 
-func loadConfig(file string, cfg *gethConfig) error {
+func loadConfig(file string, cfg *gochainConfig) error {
 	f, err := os.Open(file)
 	if err != nil {
 		return err
@@ -108,9 +108,9 @@ func defaultNodeConfig() node.Config {
 	return cfg
 }
 
-func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
+func makeConfigNode(ctx *cli.Context) (*node.Node, gochainConfig) {
 	// Load defaults.
-	cfg := gethConfig{
+	cfg := gochainConfig{
 		Eth:       eth.DefaultConfig,
 		Shh:       whisper.DefaultConfig,
 		Node:      defaultNodeConfig(),
@@ -131,8 +131,8 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 		utils.Fatalf("Failed to create the protocol stack: %v", err)
 	}
 	utils.SetEthConfig(ctx, stack, &cfg.Eth)
-	if ctx.GlobalIsSet(utils.EthStatsURLFlag.Name) {
-		cfg.Ethstats.URL = ctx.GlobalString(utils.EthStatsURLFlag.Name)
+	if ctx.GlobalIsSet(utils.NetStatsURLFlag.Name) {
+		cfg.Netstats.URL = ctx.GlobalString(utils.NetStatsURLFlag.Name)
 	}
 
 	utils.SetShhConfig(ctx, stack, &cfg.Shh)
@@ -173,8 +173,8 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 	}
 
 	// Add the GoChain Stats daemon if requested.
-	if cfg.Ethstats.URL != "" {
-		utils.RegisterEthStatsService(stack, cfg.Ethstats.URL)
+	if cfg.Netstats.URL != "" {
+		utils.RegisterNetStatsService(stack, cfg.Netstats.URL)
 	}
 	return stack
 }

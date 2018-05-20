@@ -46,10 +46,10 @@ import (
 	"github.com/gochain-io/gochain/eth/gasprice"
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/ethdb/archive"
-	"github.com/gochain-io/gochain/ethstats"
 	"github.com/gochain-io/gochain/les"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/metrics"
+	"github.com/gochain-io/gochain/netstats"
 	"github.com/gochain-io/gochain/node"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/p2p/discover"
@@ -358,9 +358,9 @@ var (
 		Usage: "Record information useful for VM and contract debugging",
 	}
 	// Logging and debug settings
-	EthStatsURLFlag = cli.StringFlag{
-		Name:  "ethstats",
-		Usage: "Reporting URL of a ethstats service (nodename:secret@host:port)",
+	NetStatsURLFlag = cli.StringFlag{
+		Name:  "netstats",
+		Usage: "Reporting URL of a netstats service (nodename:secret@host:port)",
 	}
 	MetricsEnabledFlag = cli.BoolFlag{
 		Name:  metrics.MetricsEnabledFlag,
@@ -1162,9 +1162,9 @@ func RegisterShhService(stack *node.Node, cfg *whisper.Config) {
 	}
 }
 
-// RegisterEthStatsService configures the GoChain Stats daemon and adds it to
-// th egiven node.
-func RegisterEthStatsService(stack *node.Node, url string) {
+// RegisterNetStatsService configures the GoChain Stats daemon and adds it to
+// the given node.
+func RegisterNetStatsService(stack *node.Node, url string) {
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		// Retrieve both eth and les services
 		var ethServ *eth.GoChain
@@ -1173,7 +1173,7 @@ func RegisterEthStatsService(stack *node.Node, url string) {
 		var lesServ *les.LightGoChain
 		ctx.Service(&lesServ)
 
-		return ethstats.New(url, ethServ, lesServ)
+		return netstats.New(url, ethServ, lesServ)
 	}); err != nil {
 		Fatalf("Failed to register the GoChain Stats service: %v", err)
 	}

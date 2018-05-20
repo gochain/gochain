@@ -56,7 +56,7 @@ func (w *wizard) deployFaucet() {
 	fmt.Printf("Which port should the faucet listen on? (default = %d)\n", infos.port)
 	infos.port = w.readDefaultInt(infos.port)
 
-	// Figure which virtual-host to deploy ethstats on
+	// Figure which virtual-host to deploy netstats on
 	if infos.host, err = w.ensureVirtualHost(client, infos.port, infos.host); err != nil {
 		log.Error("Failed to decide on faucet host", "err", err)
 		return
@@ -118,12 +118,12 @@ func (w *wizard) deployFaucet() {
 
 	// Set a proper name to report on the stats page
 	fmt.Println()
-	if infos.node.ethstats == "" {
+	if infos.node.netstats == "" {
 		fmt.Printf("What should the node be called on the stats page?\n")
-		infos.node.ethstats = w.readString() + ":" + w.conf.ethstats
+		infos.node.netstats = w.readString() + ":" + w.conf.netstats
 	} else {
-		fmt.Printf("What should the node be called on the stats page? (default = %s)\n", infos.node.ethstats)
-		infos.node.ethstats = w.readDefaultString(infos.node.ethstats) + ":" + w.conf.ethstats
+		fmt.Printf("What should the node be called on the stats page? (default = %s)\n", infos.node.netstats)
+		infos.node.netstats = w.readDefaultString(infos.node.netstats) + ":" + w.conf.netstats
 	}
 	// Load up the credential needed to release funds
 	if infos.node.keyJSON != "" {

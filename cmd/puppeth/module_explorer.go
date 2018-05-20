@@ -32,19 +32,19 @@ import (
 var explorerDockerfile = `
 FROM puppeth/explorer:latest
 
-ADD ethstats.json /ethstats.json
+ADD netstats.json /netstats.json
 ADD chain.json /chain.json
 
 RUN \
-  echo '(cd ../eth-net-intelligence-api && pm2 start /ethstats.json)' >  explorer.sh && \
+  echo '(cd ../eth-net-intelligence-api && pm2 start /netstats.json)' >  explorer.sh && \
 	echo '(cd ../etherchain-light && npm start &)'                      >> explorer.sh && \
 	echo '/parity/parity --chain=/chain.json --port={{.NodePort}} --tracing=on --fat-db=on --pruning=archive' >> explorer.sh
 
 ENTRYPOINT ["/bin/sh", "explorer.sh"]
 `
 
-// explorerEthstats is the configuration file for the ethstats javascript client.
-var explorerEthstats = `[
+// explorerNetstats is the configuration file for the netstats javascript client.
+var explorerNetstats = `[
   {
     "name"              : "node-app",
     "script"            : "app.js",
@@ -85,7 +85,7 @@ services:
       - {{.Datadir}}:/root/.local/share/io.parity.ethereum
     environment:
       - NODE_PORT={{.NodePort}}/tcp
-      - STATS={{.Ethstats}}{{if .VHost}}
+      - STATS={{.Netstats}}{{if .VHost}}
       - VIRTUAL_HOST={{.VHost}}
       - VIRTUAL_PORT=3000{{end}}
     logging:
@@ -110,14 +110,14 @@ func deployExplorer(client *sshClient, network string, chainspec []byte, config 
 	})
 	files[filepath.Join(workdir, "Dockerfile")] = dockerfile.Bytes()
 
-	ethstats := new(bytes.Buffer)
-	template.Must(template.New("").Parse(explorerEthstats)).Execute(ethstats, map[string]interface{}{
+	netstats := new(bytes.Buffer)
+	template.Must(template.New("").Parse(explorerNetstats)).Execute(netstats, map[string]interface{}{
 		"Port":   config.nodePort,
-		"Name":   config.ethstats[:strings.Index(config.ethstats, ":")],
-		"Secret": config.ethstats[strings.Index(config.ethstats, ":")+1 : strings.Index(config.ethstats, "@")],
-		"Host":   config.ethstats[strings.Index(config.ethstats, "@")+1:],
+		"Name":   config.netstats[:strings.Index(config.netstats, ":")],
+		"Secret": config.netstats[strings.Index(config.netstats, ":")+1 : strings.Index(config.netstats, "@")],
+		"Host":   config.netstats[strings.Index(config.netstats, "@")+1:],
 	})
-	files[filepath.Join(workdir, "ethstats.json")] = ethstats.Bytes()
+	files[filepath.Join(workdir, "netstats.json")] = netstats.Bytes()
 
 	composefile := new(bytes.Buffer)
 	template.Must(template.New("").Parse(explorerComposefile)).Execute(composefile, map[string]interface{}{
@@ -126,7 +126,7 @@ func deployExplorer(client *sshClient, network string, chainspec []byte, config 
 		"NodePort": config.nodePort,
 		"VHost":    config.webHost,
 		"WebPort":  config.webPort,
-		"Ethstats": config.ethstats[:strings.Index(config.ethstats, ":")],
+		"Netstats": config.netstats[:strings.Index(config.netstats, ":")],
 	})
 	files[filepath.Join(workdir, "docker-compose.yaml")] = composefile.Bytes()
 
@@ -149,7 +149,7 @@ func deployExplorer(client *sshClient, network string, chainspec []byte, config 
 // various configuration parameters.
 type explorerInfos struct {
 	datadir  string
-	ethstats string
+	netstats string
 	nodePort int
 	webHost  string
 	webPort  int
@@ -161,7 +161,7 @@ func (info *explorerInfos) Report() map[string]string {
 	report := map[string]string{
 		"Data directory":         info.datadir,
 		"Node listener port ":    strconv.Itoa(info.nodePort),
-		"Ethstats username":      info.ethstats,
+		"Netstats username":      info.netstats,
 		"Website address ":       info.webHost,
 		"Website listener port ": strconv.Itoa(info.webPort),
 	}
@@ -205,7 +205,7 @@ func checkExplorer(client *sshClient, network string) (*explorerInfos, error) {
 		nodePort: nodePort,
 		webHost:  host,
 		webPort:  webPort,
-		ethstats: infos.envvars["STATS"],
+		netstats: infos.envvars["STATS"],
 	}
 	return stats, nil
 }
