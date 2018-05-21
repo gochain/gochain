@@ -46,7 +46,7 @@ const (
 	softResponseLimit = 2 * 1024 * 1024 // Target maximum size of returned blocks, headers or node data.
 	estHeaderRlpSize  = 500             // Approximate size of an RLP encoded block header
 
-	// txChanSize is the size of channel listening to TxPreEvent.
+	// txChanSize is the size of channel listening to NewTxsEvent.
 	// The number is referenced from the size of tx pool.
 	txChanSize = 4096
 )
@@ -81,8 +81,8 @@ type ProtocolManager struct {
 	SubProtocols []p2p.Protocol
 
 	eventMux      *event.TypeMux
-	txCh          chan core.TxPreEvent
-	txSub         event.Subscription
+	txsCh         chan core.NewTxsEvent
+	txsSub        event.Subscription
 	minedBlockSub *event.TypeMuxSubscription
 
 	// channels for fetcher, syncer, txsyncLoop
@@ -206,8 +206,8 @@ func (pm *ProtocolManager) Start(ctx context.Context, maxPeers int) {
 	pm.maxPeers = maxPeers
 
 	// broadcast transactions
-	pm.txCh = make(chan core.TxPreEvent, txChanSize)
-	pm.txSub = pm.txpool.SubscribeTxPreEvent(pm.txCh)
+	pm.txsCh = make(chan core.NewTxsEvent, txChanSize)
+	pm.txsSub = pm.txpool.SubscribeNewTxsEvent(pm.txsCh)
 	go pm.txBroadcastLoop()
 
 	// broadcast mined blocks
@@ -223,7 +223,7 @@ func (pm *ProtocolManager) Start(ctx context.Context, maxPeers int) {
 func (pm *ProtocolManager) Stop() {
 	log.Info("Stopping GoChain protocol")
 
-	pm.txSub.Unsubscribe()         // quits txBroadcastLoop
+	pm.txsSub.Unsubscribe()        // quits txBroadcastLoop
 	pm.minedBlockSub.Unsubscribe() // quits blockBroadcastLoop
 
 	// Quit the sync loop.
@@ -671,16 +671,15 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 	}
 }
 
-// BroadcastTx will propagate a transaction to all peers which are not known to
-// already have the given transaction.
-func (pm *ProtocolManager) BroadcastTx(hash common.Hash, tx *types.Transaction) {
-	// Broadcast transaction to a batch of peers not knowing about it
-	peers := pm.peers.PeersWithoutTx(hash)
-	peers = peers[:int(math.Sqrt(float64(len(peers))))]
-	if err := SendTransactionParallel(peers, tx); err != nil {
-		log.Error("Cannot send transaction", "hash", hash, "err", err)
-	} else if log.Tracing() {
-		log.Trace("Broadcast transaction", "hash", hash, "recipients", len(peers))
+// BroadcastTxs propagates a batch of transactions to all peers which are not known to
+// already have them. Returns without blocking after launching each peer send in separate concurrent goroutines.
+func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
+	for p, txs := range pm.peers.PeersWithoutTxs(txs) {
+		go func(p *peer, txs types.Transactions) {
+			if err := p.SendTransactions(txs); err != nil {
+				log.Error("Failed to send txs", "peer", p.ID(), "len", len(txs), "err", err)
+			}
+		}(p, txs)
 	}
 }
 
@@ -699,11 +698,11 @@ func (pm *ProtocolManager) minedBroadcastLoop() {
 func (pm *ProtocolManager) txBroadcastLoop() {
 	for {
 		select {
-		case event := <-pm.txCh:
-			pm.BroadcastTx(event.Tx.Hash(), event.Tx)
+		case event := <-pm.txsCh:
+			pm.BroadcastTxs(event.Txs)
 
 		// Err() channel will be closed when unsubscribing.
-		case <-pm.txSub.Err():
+		case <-pm.txsSub.Err():
 			return
 		}
 	}

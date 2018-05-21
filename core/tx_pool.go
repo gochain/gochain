@@ -538,9 +538,9 @@ func (pool *TxPool) Stop() {
 	log.Info("Transaction pool stopped")
 }
 
-// SubscribeTxPreEvent registers a subscription of TxPreEvent and
+// SubscribeNewTxsEvent registers a subscription of NewTxsEvent and
 // starts sending event to the given channel.
-func (pool *TxPool) SubscribeTxPreEvent(ch chan<- TxPreEvent) event.Subscription {
+func (pool *TxPool) SubscribeNewTxsEvent(ch chan<- NewTxsEvent) event.Subscription {
 	return pool.scope.Track(pool.txFeed.Subscribe(ch))
 }
 
@@ -764,7 +764,7 @@ func (pool *TxPool) add(ctx context.Context, tx *types.Transaction, local bool) 
 		poolAddTimer.UpdateSince(t)
 
 		// We've directly injected a replacement transaction, notify subsystems
-		go pool.txFeed.Send(TxPreEvent{tx})
+		go pool.txFeed.Send(NewTxsEvent{types.Transactions{tx}})
 
 		return old != nil, nil
 	}
@@ -827,10 +827,11 @@ func (pool *TxPool) journalTx(from common.Address, tx *types.Transaction) {
 	journalInsertTimer.UpdateSince(t)
 }
 
-// promoteTx adds a transaction to the pending (processable) list of transactions.
+// promoteTx adds a transaction to the pending (processable) list of transactions
+// and returns whether it was inserted or an older was better.
 //
 // Note, this method assumes the pool lock is held!
-func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.Transaction) {
+func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.Transaction) bool {
 	// Try to insert the transaction into the pending queue
 	if pool.pending[addr] == nil {
 		pool.pending[addr] = newTxList(true)
@@ -841,7 +842,7 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 		delete(pool.all, hash)
 
 		pendingDiscardCounter.Inc(1)
-		return
+		return false
 	}
 	// Otherwise discard any previous transaction and mark this
 	if old != nil {
@@ -857,7 +858,7 @@ func (pool *TxPool) promoteTx(addr common.Address, hash common.Hash, tx *types.T
 	pool.beats[addr] = time.Now()
 	pool.pendingState.SetNonce(addr, tx.Nonce()+1)
 
-	go pool.txFeed.Send(TxPreEvent{tx})
+	return true
 }
 
 // AddLocal enqueues a single transaction into the pool if it is valid, marking
@@ -1033,8 +1034,17 @@ func (pool *TxPool) removeTx(ctx context.Context, hash common.Hash) {
 
 // promoteExecutablesAll is like promoteExecutables, but for the entire queue.
 func (pool *TxPool) promoteExecutablesAll(ctx context.Context) {
+	// Track the promoted transactions to broadcast them at once
+	var event NewTxsEvent
+	promoted := func(tx *types.Transaction) {
+		event.Txs = append(event.Txs, tx)
+	}
 	for addr, queued := range pool.queue {
-		pool.promoteExecutable(addr, queued)
+		pool.promoteExecutable(addr, queued, promoted)
+	}
+	// Notify subsystem for new promoted transactions.
+	if len(event.Txs) > 0 {
+		pool.txFeed.Send(event)
 	}
 	pool.finishPromotion(ctx)
 }
@@ -1043,20 +1053,27 @@ func (pool *TxPool) promoteExecutablesAll(ctx context.Context) {
 // future queue to the set of pending transactions. During this process, all
 // invalidated transactions (low nonce, low balance) are deleted.
 func (pool *TxPool) promoteExecutables(ctx context.Context, accounts ...common.Address) {
-	// Iterate over all accounts and promote any executable transactions
+	// Track the promoted transactions to broadcast them at once
+	var event NewTxsEvent
+	promoted := func(tx *types.Transaction) {
+		event.Txs = append(event.Txs, tx)
+	}
 	for _, addr := range accounts {
 		queued := pool.queue[addr]
 		if queued == nil {
 			continue // Just in case someone calls with a non existing account
 		}
-		pool.promoteExecutable(addr, queued)
+		pool.promoteExecutable(addr, queued, promoted)
+	}
+	// Notify subsystem for new promoted transactions.
+	if len(event.Txs) > 0 {
+		pool.txFeed.Send(event)
 	}
 	pool.finishPromotion(ctx)
 }
 
-func (pool *TxPool) promoteExecutable(addr common.Address, queued *txList) {
+func (pool *TxPool) promoteExecutable(addr common.Address, queued *txList, promoted func(*types.Transaction)) {
 	tracing := log.Tracing()
-
 	// Drop all transactions that are deemed too old (low nonce)
 	nonce, err := pool.currentState.GetNonce(addr)
 	if err != nil {
@@ -1099,13 +1116,19 @@ func (pool *TxPool) promoteExecutable(addr common.Address, queued *txList) {
 		log.Error("Failed to get nonce", "err", err)
 	}
 	promote := func(tx *types.Transaction) {
-		pool.promoteTx(addr, tx.Hash(), tx)
+		if pool.promoteTx(addr, tx.Hash(), tx) {
+			promoted(tx)
+		}
 	}
 	if tracing {
 		promote = func(tx *types.Transaction) {
 			hash := tx.Hash()
-			pool.promoteTx(addr, hash, tx)
-			log.Trace("Removed old queued transaction", "hash", hash)
+			if pool.promoteTx(addr, hash, tx) {
+				log.Trace("Promoting queued transaction", "hash", hash)
+				promoted(tx)
+			} else {
+				log.Trace("Removed old queued transaction", "hash", hash)
+			}
 		}
 	}
 	queued.Ready(nonce, promote)

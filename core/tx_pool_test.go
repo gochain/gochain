@@ -144,21 +144,29 @@ func validateTxPoolInternals(pool *TxPool) error {
 
 // validateEvents checks that the correct number of transaction addition events
 // were fired on the pool's event feed.
-func validateEvents(events chan TxPreEvent, count int) error {
-	for i := 0; i < count; i++ {
+func validateEvents(events chan NewTxsEvent, count int) error {
+	var received []*types.Transaction
+
+	var event int
+	for len(received) < count {
 		select {
-		case <-events:
+		case ev := <-events:
+			received = append(received, ev.Txs...)
+			event++
 		case <-time.After(time.Second):
-			return fmt.Errorf("event #%d not fired", i)
+			return fmt.Errorf("timed out waiting for event %d", event)
 		}
 	}
+	if len(received) > count {
+		return fmt.Errorf("more than %d events fired: %v", count, received[count:])
+	}
 	select {
-	case tx := <-events:
-		return fmt.Errorf("more than %d events fired: %v", count, tx.Tx)
+	case ev := <-events:
+		return fmt.Errorf("more than %d events fired: %v", count, ev.Txs)
 
 	case <-time.After(50 * time.Millisecond):
 		// This branch should be "default", but it's a data race between goroutines,
-		// reading the event channel and pushng into it, so better wait a bit ensuring
+		// reading the event channel and pushing into it, so better wait a bit ensuring
 		// really nothing gets injected.
 	}
 	return nil
@@ -721,7 +729,7 @@ func TestTransactionGapFilling(t *testing.T) {
 	pool.currentState.AddBalance(account, big.NewInt(1000000))
 
 	// Keep track of transaction events to ensure all executables get announced
-	events := make(chan TxPreEvent, testTxPoolConfig.AccountQueue+5)
+	events := make(chan NewTxsEvent, testTxPoolConfig.AccountQueue+5)
 	sub := pool.txFeed.Subscribe(events)
 	pool.mu.Unlock()
 	defer sub.Unsubscribe()
@@ -1005,7 +1013,7 @@ func TestTransactionPendingLimiting(t *testing.T) {
 	pool.currentState.AddBalance(account, big.NewInt(1000000))
 
 	// Keep track of transaction events to ensure all executables get announced
-	events := make(chan TxPreEvent, testTxPoolConfig.AccountQueue+5)
+	events := make(chan NewTxsEvent, testTxPoolConfig.AccountQueue+5)
 	sub := pool.txFeed.Subscribe(events)
 	pool.mu.Unlock()
 	defer sub.Unsubscribe()
@@ -1258,7 +1266,7 @@ func TestTransactionPoolRepricing(t *testing.T) {
 	defer pool.Stop()
 
 	// Keep track of transaction events to ensure all executables get announced
-	events := make(chan TxPreEvent, 32)
+	events := make(chan NewTxsEvent, 32)
 	pool.mu.Lock()
 	sub := pool.txFeed.Subscribe(events)
 	pool.mu.Unlock()
@@ -1420,13 +1428,15 @@ func TestTransactionPoolUnderpricing(t *testing.T) {
 
 	config := testTxPoolConfig
 	config.GlobalSlots = 2
+	config.AccountSlots = 2
 	config.GlobalQueue = 2
+	config.AccountQueue = 2
 
 	pool := NewTxPool(ctx, config, params.TestChainConfig, blockchain)
 	defer pool.Stop()
 
 	// Keep track of transaction events to ensure all executables get announced
-	events := make(chan TxPreEvent, 32)
+	events := make(chan NewTxsEvent, 32)
 	pool.mu.Lock()
 	sub := pool.txFeed.Subscribe(events)
 	pool.mu.Unlock()
@@ -1488,6 +1498,81 @@ func TestTransactionPoolUnderpricing(t *testing.T) {
 	}
 }
 
+// Tests that more expensive transactions push out cheap ones from the pool, but
+// without producing instability by creating gaps that start jumping transactions
+// back and forth between queued/pending.
+func TestTransactionPoolStableUnderpricing(t *testing.T) {
+	ctx := context.Background()
+	t.Parallel()
+
+	// Create the pool to test the pricing enforcement with
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	blockchain := &testBlockChain{statedb: statedb, gasLimit: 1000000, chainHeadFeed: new(event.Feed)}
+
+	config := testTxPoolConfig
+	config.GlobalSlots = 128
+	config.AccountSlots = config.GlobalSlots / 3
+	config.GlobalQueue = 0
+	config.AccountQueue = 0
+
+	pool := NewTxPool(ctx, config, params.TestChainConfig, blockchain)
+	defer pool.Stop()
+
+	// Keep track of transaction events to ensure all executables get announced
+	events := make(chan NewTxsEvent, 32)
+	sub := pool.txFeed.Subscribe(events)
+	defer sub.Unsubscribe()
+
+	// Create a number of test accounts and fund them
+	keys := make([]*ecdsa.PrivateKey, 2)
+	for i := 0; i < len(keys); i++ {
+		keys[i], _ = crypto.GenerateKey()
+		pool.currentState.AddBalance(crypto.PubkeyToAddress(keys[i].PublicKey), big.NewInt(1000000))
+	}
+	// Fill up the entire queue with the same transaction price points
+	txs := types.Transactions{}
+	for i := uint64(0); i < config.GlobalSlots; i++ {
+		txs = append(txs, pricedTransaction(i, 100000, big.NewInt(1), keys[0]))
+	}
+	if errs := pool.AddRemotes(ctx, txs); len(errs) > 0 {
+		for _, err := range errs {
+			t.Error(err)
+		}
+		t.FailNow()
+	}
+
+	pending, queued := pool.Stats()
+	if pending != int(config.GlobalSlots) {
+		t.Fatalf("pending transactions mismatched: have %d, want %d", pending, config.GlobalSlots)
+	}
+	if queued != 0 {
+		t.Fatalf("queued transactions mismatched: have %d, want %d", queued, 0)
+	}
+	if err := validateEvents(events, int(config.GlobalSlots)); err != nil {
+		t.Fatalf("original event firing failed: %v", err)
+	}
+	if err := validateTxPoolInternals(pool); err != nil {
+		t.Fatalf("pool internal state corrupted: %v", err)
+	}
+	// Ensure that adding high priced transactions drops a cheap, but doesn't produce a gap
+	if err := pool.AddRemote(ctx, pricedTransaction(0, 100000, big.NewInt(3), keys[1])); err != nil {
+		t.Fatalf("failed to add well priced transaction: %v", err)
+	}
+	pending, queued = pool.Stats()
+	if pending != int(config.GlobalSlots) {
+		t.Errorf("pending transactions mismatched: have %d, want %d", pending, config.GlobalSlots)
+	}
+	if queued != 0 {
+		t.Errorf("queued transactions mismatched: have %d, want %d", queued, 0)
+	}
+	if err := validateEvents(events, 1); err != nil {
+		t.Errorf("additional event firing failed: %v", err)
+	}
+	if err := validateTxPoolInternals(pool); err != nil {
+		t.Errorf("pool internal state corrupted: %v", err)
+	}
+}
+
 // Tests that the pool rejects replacement transactions that don't meet the minimum
 // price bump required.
 func TestTransactionReplacement(t *testing.T) {
@@ -1503,7 +1588,7 @@ func TestTransactionReplacement(t *testing.T) {
 	defer pool.Stop()
 
 	// Keep track of transaction events to ensure all executables get announced
-	events := make(chan TxPreEvent, 32)
+	events := make(chan NewTxsEvent, 32)
 	pool.mu.Lock()
 	sub := pool.txFeed.Subscribe(events)
 	defer sub.Unsubscribe()

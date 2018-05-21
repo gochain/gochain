@@ -203,25 +203,6 @@ func (p *peer) SendTransactions(txs types.Transactions) error {
 	return err
 }
 
-// SendTransactionParallel sends a single transaction to peers in parallel.
-func SendTransactionParallel(peers []*peer, tx *types.Transaction) error {
-	b, err := rlp.EncodeToBytes(types.Transactions{tx})
-	if err != nil {
-		return err
-	}
-	for _, p := range peers {
-		go func(p *peer) {
-			msg := p2p.Msg{Code: TxMsg, Size: uint32(len(b)), Payload: bytes.NewReader(b)}
-			if err := p.rw.WriteMsg(msg); err != nil {
-				log.Error("Failed to send tx", "peer", p.ID(), "hash", tx.Hash(), "size", len(b), "err", err)
-			} else {
-				p.knownTxs.Add(tx.Hash())
-			}
-		}(p)
-	}
-	return nil
-}
-
 // SendNewBlockHashParallel announces the availability of a number of blocks through
 // a hash notification to peers in parallel.
 func SendNewBlockHashParallel(peers []*peer, hash common.Hash, number uint64) error {
@@ -481,19 +462,30 @@ func (ps *peerSet) PeersWithoutBlock(hash common.Hash) []*peer {
 	return list
 }
 
-// PeersWithoutTx retrieves a list of peers that do not have a given transaction
-// in their set of known hashes.
-func (ps *peerSet) PeersWithoutTx(hash common.Hash) []*peer {
+// PeersWithoutTxs retrieves a map of peers to transactions from txs which are not in their set of known hashes.
+func (ps *peerSet) PeersWithoutTxs(txs types.Transactions) map[*peer]types.Transactions {
+	peerTxs := make(map[*peer]types.Transactions)
+	tracing := log.Tracing()
+
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
-	list := make([]*peer, 0, len(ps.peers))
-	for _, p := range ps.peers {
-		if !p.knownTxs.Has(hash) {
-			list = append(list, p)
+	for _, tx := range txs {
+		hash := tx.Hash()
+		var count int
+		for _, p := range ps.peers {
+			if p.knownTxs.Has(hash) {
+				continue
+			}
+			peerTxs[p] = append(peerTxs[p], tx)
+			count++
 		}
+		if !tracing || count == 0 {
+			continue
+		}
+		log.Trace("Broadcast transaction", "hash", hash, "recipients", count)
 	}
-	return list
+	return peerTxs
 }
 
 // BestPeer retrieves the known peer with the currently highest total difficulty.
