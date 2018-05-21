@@ -498,7 +498,7 @@ func (s *PublicBlockChainAPI) BlockNumber() *big.Int {
 func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*big.Int, error) {
 	var bal *big.Int
 	err := s.b.StateQuery(ctx, blockNr, func(state *state.StateDB) (err error) {
-		bal, err = state.GetBalance(address)
+		bal, err = state.GetBalanceErr(address)
 		return
 	})
 	return bal, err
@@ -585,7 +585,7 @@ func (s *PublicBlockChainAPI) GetUncleCountByBlockHash(ctx context.Context, bloc
 func (s *PublicBlockChainAPI) GetCode(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
 	var code hexutil.Bytes
 	err := s.b.StateQuery(ctx, blockNr, func(state *state.StateDB) (err error) {
-		code, err = state.GetCode(address)
+		code, err = state.GetCodeErr(address)
 		return
 	})
 	return code, err
@@ -597,7 +597,7 @@ func (s *PublicBlockChainAPI) GetCode(ctx context.Context, address common.Addres
 func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, address common.Address, key string, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
 	var st common.Hash
 	err := s.b.StateQuery(ctx, blockNr, func(state *state.StateDB) (err error) {
-		st, err = state.GetState(address, common.HexToHash(key))
+		st, err = state.GetStateErr(address, common.HexToHash(key))
 		return
 	})
 	return st[:], err
@@ -997,7 +997,7 @@ func (s *PublicTransactionPoolAPI) GetRawTransactionByBlockHashAndIndex(ctx cont
 func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*hexutil.Uint64, error) {
 	var nonce uint64
 	err := s.b.StateQuery(ctx, blockNr, func(state *state.StateDB) (err error) {
-		nonce, err = state.GetNonce(address)
+		nonce, err = state.GetNonceErr(address)
 		return
 	})
 	return (*hexutil.Uint64)(&nonce), err

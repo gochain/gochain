@@ -98,10 +98,7 @@ func (s *StateSuite) TestNull(c *checker.C) {
 	var value common.Hash
 	s.state.SetState(address, common.Hash{}, value)
 	s.state.Commit(false)
-	value, err := s.state.GetState(address, common.Hash{})
-	if err != nil {
-		c.Fatal(err)
-	}
+	value = s.state.GetState(address, common.Hash{})
 	if !common.EmptyHash(value) {
 		c.Errorf("expected empty hash. got %x", value)
 	}
@@ -124,11 +121,7 @@ func (s *StateSuite) TestSnapshot(c *checker.C) {
 	s.state.RevertToSnapshot(snapshot)
 
 	// get state storage value
-	res, err := s.state.GetState(stateobjaddr, storageaddr)
-	if err != nil {
-		c.Fatal(err)
-	}
-
+	res := s.state.GetState(stateobjaddr, storageaddr)
 	c.Assert(data1, checker.DeepEquals, res)
 }
 

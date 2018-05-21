@@ -136,14 +136,8 @@ func odrAccounts(ctx context.Context, db ethdb.Database, bc *core.BlockChain, lc
 
 	var res []byte
 	for _, addr := range acc {
-		bal, err := st.GetBalance(addr)
-		if err != nil {
-			return nil, err
-		}
-		rlp, err := rlp.EncodeToBytes(bal)
-		if err != nil {
-			return nil, err
-		}
+		bal := st.GetBalance(addr)
+		rlp, _ := rlp.EncodeToBytes(bal)
 		res = append(res, rlp...)
 	}
 	return res, nil

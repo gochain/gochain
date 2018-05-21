@@ -23,7 +23,6 @@ import (
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 )
 
@@ -180,15 +179,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	// Initialise a new contract and set the code that is to be used by the EVM.
 	// The contract is a scoped environment for this execution context only.
 	contract := NewContract(caller, to, value, gas)
-	hash, err := evm.StateDB.GetCodeHash(addr)
-	if err != nil {
-		log.Error("Failed to get code hash", "err", err)
-	}
-	code, err := evm.StateDB.GetCode(addr)
-	if err != nil {
-		log.Error("Failed to get code", "err", err)
-	}
-	contract.SetCallCode(&addr, hash, code)
+	contract.SetCallCode(&addr, evm.StateDB.GetCodeHash(addr), evm.StateDB.GetCode(addr))
 
 	start := time.Now()
 
@@ -243,15 +234,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	// E The contract is a scoped evmironment for this execution context
 	// only.
 	contract := NewContract(caller, to, value, gas)
-	hash, err := evm.StateDB.GetCodeHash(addr)
-	if err != nil {
-		log.Error("Failed to get code hash", "err", err)
-	}
-	code, err := evm.StateDB.GetCode(addr)
-	if err != nil {
-		log.Error("Failed to get code", "err", err)
-	}
-	contract.SetCallCode(&addr, hash, code)
+	contract.SetCallCode(&addr, evm.StateDB.GetCodeHash(addr), evm.StateDB.GetCode(addr))
 
 	ret, err = run(evm, contract, input)
 	if err != nil {
@@ -284,15 +267,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 
 	// Initialise a new contract and make initialise the delegate values
 	contract := NewContract(caller, to, nil, gas).AsDelegate()
-	hash, err := evm.StateDB.GetCodeHash(addr)
-	if err != nil {
-		log.Error("Failed to get code hash", "err", err)
-	}
-	code, err := evm.StateDB.GetCode(addr)
-	if err != nil {
-		log.Error("Failed to get code", "err", err)
-	}
-	contract.SetCallCode(&addr, hash, code)
+	contract.SetCallCode(&addr, evm.StateDB.GetCodeHash(addr), evm.StateDB.GetCode(addr))
 
 	ret, err = run(evm, contract, input)
 	if err != nil {
@@ -332,15 +307,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	// EVM. The contract is a scoped environment for this execution context
 	// only.
 	contract := NewContract(caller, to, new(big.Int), gas)
-	hash, err := evm.StateDB.GetCodeHash(addr)
-	if err != nil {
-		log.Error("Failed to get code hash", "err", err)
-	}
-	code, err := evm.StateDB.GetCode(addr)
-	if err != nil {
-		log.Error("Failed to get code", "err", err)
-	}
-	contract.SetCallCode(&addr, hash, code)
+	contract.SetCallCode(&addr, evm.StateDB.GetCodeHash(addr), evm.StateDB.GetCode(addr))
 
 	// When an error was returned by the EVM or when setting the creation code
 	// above we revert to the snapshot and consume any gas remaining. Additionally
@@ -367,22 +334,12 @@ func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.I
 		return nil, common.Address{}, gas, ErrInsufficientBalance
 	}
 	// Ensure there's no existing contract already at the designated address
-	nonce, err := evm.StateDB.GetNonce(caller.Address())
-	if err != nil {
-		log.Error("Failed to get nonce", "err", err)
-	}
+	nonce := evm.StateDB.GetNonce(caller.Address())
 	evm.StateDB.SetNonce(caller.Address(), nonce+1)
 
 	contractAddr = crypto.CreateAddress(caller.Address(), nonce)
-	contractHash, err := evm.StateDB.GetCodeHash(contractAddr)
-	if err != nil {
-		log.Error("Failed to get code hash", "err", err)
-	}
-	nonce, err = evm.StateDB.GetNonce(contractAddr)
-	if err != nil {
-		log.Error("Failed to get nonce", "err", err)
-	}
-	if nonce != 0 || (contractHash != (common.Hash{}) && contractHash != emptyCodeHash) {
+	contractHash := evm.StateDB.GetCodeHash(contractAddr)
+	if evm.StateDB.GetNonce(contractAddr) != 0 || (contractHash != (common.Hash{}) && contractHash != emptyCodeHash) {
 		return nil, common.Address{}, 0, ErrContractAddressCollision
 	}
 	// Create a new account on the state

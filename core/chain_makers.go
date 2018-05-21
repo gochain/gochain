@@ -27,7 +27,6 @@ import (
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
 	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 )
 
@@ -119,11 +118,7 @@ func (b *BlockGen) TxNonce(addr common.Address) uint64 {
 	if !b.statedb.Exist(addr) {
 		panic("account does not exist")
 	}
-	nonce, err := b.statedb.GetNonce(addr)
-	if err != nil {
-		log.Error("Failed to get nonce", "err", err)
-	}
-	return nonce
+	return b.statedb.GetNonce(addr)
 }
 
 // AddUncle adds an uncle header to the generated block.

@@ -86,13 +86,13 @@ func (ms *ManagedState) NewNonce(addr common.Address) uint64 {
 // GetNonce returns the canonical nonce for the managed or unmanaged account.
 //
 // Because GetNonce mutates the DB, we must take a write lock.
-func (ms *ManagedState) GetNonce(addr common.Address) (uint64, error) {
+func (ms *ManagedState) GetNonce(addr common.Address) uint64 {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 
 	if ms.hasAccount(addr) {
 		account := ms.getAccount(addr)
-		return uint64(len(account.nonces)) + account.nstart, nil
+		return uint64(len(account.nonces)) + account.nstart
 	} else {
 		return ms.StateDB.GetNonce(addr)
 	}

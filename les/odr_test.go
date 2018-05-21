@@ -96,7 +96,7 @@ func odrAccounts(ctx context.Context, db ethdb.Database, config *params.ChainCon
 			st = light.NewState(ctx, header, lc.Odr())
 		}
 		if err == nil {
-			bal, _ := st.GetBalance(addr)
+			bal := st.GetBalance(addr)
 			rlp, _ := rlp.EncodeToBytes(bal)
 			res = append(res, rlp...)
 		}

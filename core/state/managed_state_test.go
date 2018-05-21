@@ -115,18 +115,14 @@ func TestSetNonce(t *testing.T) {
 	var addr common.Address
 	ms.SetNonce(addr, 10)
 
-	if nonce, err := ms.GetNonce(addr); err != nil {
-		t.Fatal(err)
-	} else if nonce != 10 {
+	if nonce := ms.GetNonce(addr); nonce != 10 {
 		t.Error("Expected nonce of 10, got", nonce)
 	}
 
 	addr[0] = 1
 	ms.StateDB.SetNonce(addr, 1)
 
-	if nonce, err := ms.GetNonce(addr); err != nil {
-		t.Fatal(err)
-	} else if nonce != 1 {
+	if nonce := ms.GetNonce(addr); nonce != 1 {
 		t.Error("Expected nonce of 1, got", nonce)
 	}
 }
