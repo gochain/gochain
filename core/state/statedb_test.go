@@ -376,43 +376,24 @@ func (test *snapshotTest) checkEqual(state, checkstate *StateDB) error {
 		// Check basic accessor methods.
 		checkeq("Exist", state.Exist(addr), checkstate.Exist(addr))
 		checkeq("HasSuicided", state.HasSuicided(addr), checkstate.HasSuicided(addr))
-		sb, err := state.GetBalance(addr)
-		csb, cerr := checkstate.GetBalance(addr)
-		checkeq("GetBalance", sb, csb)
-		checkeq("GetBalanceErr", err, cerr)
-		sn, err := state.GetNonce(addr)
-		csn, cerr := checkstate.GetNonce(addr)
-		checkeq("GetNonce", sn, csn)
-		checkeq("GetNonce", err, cerr)
-		sc, err := state.GetCode(addr)
-		csc, cerr := checkstate.GetCode(addr)
-		checkeq("GetCode", sc, csc)
-		checkeq("GetCodeErr", err, cerr)
-		sch, err := state.GetCodeHash(addr)
-		csch, cerr := checkstate.GetCodeHash(addr)
-		checkeq("GetCodeHash", sch, csch)
-		checkeq("GetCodeHashErr", err, cerr)
-		scs, err := state.GetCodeSize(addr)
-		cscs, cerr := checkstate.GetCodeSize(addr)
-		checkeq("GetCodeSize", scs, cscs)
-		checkeq("GetCodeSizeErr", err, cerr)
+		checkeq("GetBalance", state.GetBalance(addr), checkstate.GetBalance(addr))
+		checkeq("GetNonce", state.GetNonce(addr), checkstate.GetNonce(addr))
+		checkeq("GetCode", state.GetCode(addr), checkstate.GetCode(addr))
+		checkeq("GetCodeHash", state.GetCodeHash(addr), checkstate.GetCodeHash(addr))
+		checkeq("GetCodeSize", state.GetCodeSize(addr), checkstate.GetCodeSize(addr))
 		// Check storage.
 		if obj, err := state.getStateObject(addr); err != nil {
 			return fmt.Errorf("failed to get state: %s", err)
 		} else if obj != nil {
 			var err error
 			state.ForEachStorage(addr, func(key, val common.Hash) bool {
-				var st common.Hash
-				st, err = checkstate.GetState(addr, key)
-				return checkeq("GetState("+key.Hex()+")", val, st)
+				return checkeq("GetState("+key.Hex()+")", val, checkstate.GetState(addr, key))
 			})
 			if err != nil {
 				return fmt.Errorf("failed to get state: %s", err)
 			}
 			checkstate.ForEachStorage(addr, func(key, checkval common.Hash) bool {
-				var st common.Hash
-				st, err = state.GetState(addr, key)
-				return checkeq("GetState("+key.Hex()+")", st, checkval)
+				return checkeq("GetState("+key.Hex()+")", state.GetState(addr, key), checkval)
 			})
 			if err != nil {
 				return fmt.Errorf("failed to get state: %s", err)

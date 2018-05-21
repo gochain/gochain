@@ -25,7 +25,6 @@ import (
 	"github.com/gochain-io/gochain/common/math"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 )
 
@@ -325,11 +324,7 @@ func opAddress(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *
 
 func opBalance(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
 	addr := common.BigToAddress(stack.pop())
-	balance, err := evm.StateDB.GetBalance(addr)
-	if err != nil {
-		log.Error("Failed to get balance", "err", err)
-	}
-
+	balance := evm.StateDB.GetBalance(addr)
 	stack.push(new(big.Int).Set(balance))
 	return nil, nil
 }
@@ -397,11 +392,7 @@ func opExtCodeSize(pc *uint64, evm *EVM, contract *Contract, memory *Memory, sta
 	a := stack.pop()
 
 	addr := common.BigToAddress(a)
-	size, err := evm.StateDB.GetCodeSize(addr)
-	if err != nil {
-		log.Error("Failed to get code size", "err", err)
-	}
-	a.SetInt64(int64(size))
+	a.SetInt64(int64(evm.StateDB.GetCodeSize(addr)))
 	stack.push(a)
 
 	return nil, nil
@@ -433,10 +424,7 @@ func opExtCodeCopy(pc *uint64, evm *EVM, contract *Contract, memory *Memory, sta
 		codeOffset = stack.pop()
 		length     = stack.pop()
 	)
-	code, err := evm.StateDB.GetCode(addr)
-	if err != nil {
-		log.Error("Failed to get code", "err", err)
-	}
+	code := evm.StateDB.GetCode(addr)
 	codeCopy := getDataBig(code, codeOffset, length)
 	memory.Set(memOffset.Uint64(), length.Uint64(), codeCopy)
 
@@ -520,10 +508,7 @@ func opMstore8(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *
 
 func opSload(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
 	loc := common.BigToHash(stack.pop())
-	st, err := evm.StateDB.GetState(contract.Address(), loc)
-	if err != nil {
-		log.Error("Failed to get state", "err", err)
-	}
+	st := evm.StateDB.GetState(contract.Address(), loc)
 	val := st.Big()
 	stack.push(val)
 	return nil, nil
@@ -747,10 +732,7 @@ func opStop(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Sta
 }
 
 func opSuicide(pc *uint64, evm *EVM, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
-	balance, err := evm.StateDB.GetBalance(contract.Address())
-	if err != nil {
-		log.Error("Failed to get balance", "err", err)
-	}
+	balance := evm.StateDB.GetBalance(contract.Address())
 	evm.StateDB.AddBalance(common.BigToAddress(stack.pop()), balance)
 
 	evm.StateDB.Suicide(contract.Address())

@@ -24,10 +24,9 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
+	"sync"
 	"testing"
 	"time"
-
-	"sync"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/state"
@@ -35,7 +34,6 @@ import (
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/event"
-	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 )
 
@@ -131,11 +129,7 @@ func validateTxPoolInternals(pool *TxPool) error {
 				last = nonce
 			}
 		}
-		nonce, err := pool.pendingState.GetNonce(addr)
-		if err != nil {
-			log.Error("Failed to get nonce", "err", err)
-		}
-		if nonce != last+1 {
+		if nonce := pool.pendingState.GetNonce(addr); nonce != last+1 {
 			return fmt.Errorf("pending nonce mismatch: have %v, want %v", nonce, last+1)
 		}
 	}
@@ -226,20 +220,14 @@ func TestStateChangeDuringTransactionPoolReset(t *testing.T) {
 	pool := NewTxPool(ctx, testTxPoolConfig, params.TestChainConfig, blockchain)
 	defer pool.Stop()
 
-	nonce, err := pool.State().GetNonce(address)
-	if err != nil {
-		log.Error("Failed to get nonce", "err", err)
-	}
+	nonce := pool.State().GetNonce(address)
 	if nonce != 0 {
 		t.Fatalf("Invalid nonce, want 0, got %d", nonce)
 	}
 
 	pool.AddRemotes(ctx, types.Transactions{tx0, tx1})
 
-	nonce, err = pool.State().GetNonce(address)
-	if err != nil {
-		log.Error("Failed to get nonce", "err", err)
-	}
+	nonce = pool.State().GetNonce(address)
 	if nonce != 2 {
 		t.Fatalf("Invalid nonce, want 2, got %d", nonce)
 	}
@@ -255,10 +243,7 @@ func TestStateChangeDuringTransactionPoolReset(t *testing.T) {
 		t.Logf("%0x: %d\n", addr, len(txs))
 	}
 
-	nonce, err = pool.State().GetNonce(address)
-	if err != nil {
-		log.Error("Failed to get nonce", "err", err)
-	}
+	nonce = pool.State().GetNonce(address)
 	if nonce != 2 {
 		t.Fatalf("Invalid nonce, want 2, got %d", nonce)
 	}
@@ -527,12 +512,8 @@ func TestTransactionNonceRecovery(t *testing.T) {
 	defer pool.mu.Unlock()
 	pool.currentState.SetNonce(addr, n-1)
 	pool.reset(ctx, nil, nil)
-	fn, err := pool.pendingState.GetNonce(addr)
-	if err != nil {
-		log.Error("Failed to get nonce", "err", err)
-	}
-	if fn != n-1 {
-		t.Errorf("expected nonce to be %d, got %d", n-1, fn)
+	if got := pool.pendingState.GetNonce(addr); got != n-1 {
+		t.Errorf("expected nonce to be %d, got %d", n-1, got)
 	}
 }
 

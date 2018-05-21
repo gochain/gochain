@@ -37,7 +37,6 @@ import (
 	"github.com/gochain-io/gochain/eth/filters"
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/event"
-	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 	"github.com/gochain-io/gochain/rpc"
 )
@@ -120,7 +119,7 @@ func (b *SimulatedBackend) CodeAt(ctx context.Context, contract common.Address, 
 		return nil, errBlockNumberUnsupported
 	}
 	statedb, _ := b.blockchain.State()
-	return statedb.GetCode(contract)
+	return statedb.GetCode(contract), nil
 }
 
 // BalanceAt returns the wei balance of a certain account in the blockchain.
@@ -132,7 +131,7 @@ func (b *SimulatedBackend) BalanceAt(ctx context.Context, contract common.Addres
 		return nil, errBlockNumberUnsupported
 	}
 	statedb, _ := b.blockchain.State()
-	return statedb.GetBalance(contract)
+	return statedb.GetBalance(contract), nil
 }
 
 // NonceAt returns the nonce of a certain account in the blockchain.
@@ -144,7 +143,7 @@ func (b *SimulatedBackend) NonceAt(ctx context.Context, contract common.Address,
 		return 0, errBlockNumberUnsupported
 	}
 	statedb, _ := b.blockchain.State()
-	return statedb.GetNonce(contract)
+	return statedb.GetNonce(contract), nil
 }
 
 // StorageAt returns the value of key in the storage of an account in the blockchain.
@@ -156,8 +155,8 @@ func (b *SimulatedBackend) StorageAt(ctx context.Context, contract common.Addres
 		return nil, errBlockNumberUnsupported
 	}
 	statedb, _ := b.blockchain.State()
-	s, err := statedb.GetState(contract, key)
-	return s[:], err
+	s := statedb.GetState(contract, key)
+	return s[:], nil
 }
 
 // TransactionReceipt returns the receipt of a transaction.
@@ -171,7 +170,7 @@ func (b *SimulatedBackend) PendingCodeAt(ctx context.Context, contract common.Ad
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	return b.pendingState.GetCode(contract)
+	return b.pendingState.GetCode(contract), nil
 }
 
 // CallContract executes a contract call.
@@ -303,10 +302,7 @@ func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx *types.Transa
 	if err != nil {
 		panic(fmt.Errorf("invalid transaction: %v", err))
 	}
-	nonce, err := b.pendingState.GetNonce(sender)
-	if err != nil {
-		log.Error("Failed to get nonce", "err", err)
-	}
+	nonce := b.pendingState.GetNonce(sender)
 	if tx.Nonce() != nonce {
 		panic(fmt.Errorf("invalid transaction nonce: got %d, want %d", tx.Nonce(), nonce))
 	}

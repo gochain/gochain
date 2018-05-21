@@ -172,8 +172,18 @@ func (db *StateDB) Empty(addr common.Address) bool {
 	return so == nil || so.empty()
 }
 
-// Retrieve the balance from the given address or 0 if object not found
-func (db *StateDB) GetBalance(addr common.Address) (*big.Int, error) {
+// Retrieve the balance from the given address or 0 if object not found.
+func (db *StateDB) GetBalance(addr common.Address) *big.Int {
+	bal, err := db.GetBalanceErr(addr)
+	if err != nil {
+		log.Error("Failed to get balance", "err", err)
+		return common.Big0
+	}
+	return bal
+}
+
+// Retrieve the balance from the given address or an error.
+func (db *StateDB) GetBalanceErr(addr common.Address) (*big.Int, error) {
 	stateObject, err := db.getStateObject(addr)
 	if err != nil {
 		return nil, err
@@ -184,7 +194,16 @@ func (db *StateDB) GetBalance(addr common.Address) (*big.Int, error) {
 	return common.Big0, nil
 }
 
-func (db *StateDB) GetNonce(addr common.Address) (uint64, error) {
+func (db *StateDB) GetNonce(addr common.Address) uint64 {
+	nonce, err := db.GetNonceErr(addr)
+	if err != nil {
+		log.Error("Failed to get nonce", "err", err)
+		return 0
+	}
+	return nonce
+}
+
+func (db *StateDB) GetNonceErr(addr common.Address) (uint64, error) {
 	stateObject, err := db.getStateObject(addr)
 	if err != nil {
 		return 0, err
@@ -196,7 +215,16 @@ func (db *StateDB) GetNonce(addr common.Address) (uint64, error) {
 	return 0, nil
 }
 
-func (db *StateDB) GetCode(addr common.Address) ([]byte, error) {
+func (db *StateDB) GetCode(addr common.Address) []byte {
+	code, err := db.GetCodeErr(addr)
+	if err != nil {
+		log.Error("Failed to get code", "err", err)
+		return nil
+	}
+	return code
+}
+
+func (db *StateDB) GetCodeErr(addr common.Address) ([]byte, error) {
 	stateObject, err := db.getStateObject(addr)
 	if err != nil {
 		return nil, err
@@ -207,32 +235,46 @@ func (db *StateDB) GetCode(addr common.Address) ([]byte, error) {
 	return nil, nil
 }
 
-func (db *StateDB) GetCodeSize(addr common.Address) (int, error) {
+func (db *StateDB) GetCodeSize(addr common.Address) int {
 	stateObject, err := db.getStateObject(addr)
 	if err != nil {
-		return -1, err
+		log.Error("Failed to get code size", "err", err)
+		return 0
 	}
 	if stateObject == nil {
-		return 0, nil
+		return 0
 	}
 	if stateObject.code != nil {
-		return len(stateObject.code), nil
+		return len(stateObject.code)
 	}
-	return db.db.ContractCodeSize(stateObject.addrHash, stateObject.data.CodeHash)
+	size, err := db.db.ContractCodeSize(stateObject.addrHash, stateObject.data.CodeHash)
+	if err != nil {
+		log.Error("Failed to get code size", "err", err)
+	}
+	return size
 }
 
-func (db *StateDB) GetCodeHash(addr common.Address) (common.Hash, error) {
+func (db *StateDB) GetCodeHash(addr common.Address) common.Hash {
 	stateObject, err := db.getStateObject(addr)
 	if err != nil {
-		return common.Hash{}, err
+		log.Error("Failed to get code hash", "err", err)
+	} else if stateObject != nil {
+		return stateObject.data.CodeHash
 	}
-	if stateObject == nil {
-		return common.Hash{}, nil
-	}
-	return stateObject.data.CodeHash, nil
+	return common.Hash{}
+
 }
 
-func (db *StateDB) GetState(a common.Address, b common.Hash) (common.Hash, error) {
+func (db *StateDB) GetState(a common.Address, b common.Hash) common.Hash {
+	state, err := db.GetStateErr(a, b)
+	if err != nil {
+		log.Error("Failed to get state", "err", err)
+		return common.Hash{}
+	}
+	return state
+}
+
+func (db *StateDB) GetStateErr(a common.Address, b common.Hash) (common.Hash, error) {
 	stateObject, err := db.getStateObject(a)
 	if err != nil {
 		return common.Hash{}, err

@@ -19,7 +19,6 @@ package vm
 import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/math"
-	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 )
 
@@ -118,12 +117,9 @@ func gasReturnDataCopy(gt params.GasTable, evm *EVM, contract *Contract, stack *
 
 func gasSStore(gt params.GasTable, evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
 	var (
-		y, x     = stack.Back(1), stack.Back(0)
-		val, err = evm.StateDB.GetState(contract.Address(), common.BigToHash(x))
+		y, x = stack.Back(1), stack.Back(0)
+		val  = evm.StateDB.GetState(contract.Address(), common.BigToHash(x))
 	)
-	if err != nil {
-		log.Error("Failed to get state", "err", err)
-	}
 	// This checks for 3 scenario's and calculates gas accordingly
 	// 1. From a zero-value address to a non-zero value         (NEW VALUE)
 	// 2. From a non-zero value address to a zero-value address (DELETE)
@@ -398,11 +394,7 @@ func gasSuicide(gt params.GasTable, evm *EVM, contract *Contract, stack *Stack, 
 
 		if eip158 {
 			// if empty and transfers value
-			bal, err := evm.StateDB.GetBalance(contract.Address())
-			if err != nil {
-				log.Error("Failed to get balance", "err", err)
-			}
-			if evm.StateDB.Empty(address) && bal.Sign() != 0 {
+			if evm.StateDB.Empty(address) && evm.StateDB.GetBalance(contract.Address()).Sign() != 0 {
 				gas += gt.CreateBySuicide
 			}
 		} else if !evm.StateDB.Exist(address) {

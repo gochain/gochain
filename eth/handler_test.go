@@ -30,7 +30,6 @@ import (
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/eth/downloader"
 	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/params"
 )
@@ -378,15 +377,8 @@ func testGetNodeData(t *testing.T, protocol int) {
 
 		for j, acc := range accounts {
 			state, _ := pm.blockchain.State()
-			bw, err := state.GetBalance(acc)
-			if err != nil {
-				log.Error("Failed to get balance", "err", err)
-			}
-			bh, err := trie.GetBalance(acc)
-			if err != nil {
-				log.Error("Failed to get balance", "err", err)
-			}
-
+			bw := state.GetBalance(acc)
+			bh := trie.GetBalance(acc)
 			if (bw != nil && bh == nil) || (bw == nil && bh != nil) {
 				t.Errorf("test %d, account %d: balance mismatch: have %v, want %v", i, j, bh, bw)
 			}
