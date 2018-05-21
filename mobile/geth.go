@@ -29,8 +29,8 @@ import (
 	"github.com/gochain-io/gochain/eth"
 	"github.com/gochain-io/gochain/eth/downloader"
 	"github.com/gochain-io/gochain/ethclient"
-	"github.com/gochain-io/gochain/ethstats"
 	"github.com/gochain-io/gochain/les"
+	"github.com/gochain-io/gochain/netstats"
 	"github.com/gochain-io/gochain/node"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/p2p/nat"
@@ -161,8 +161,11 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 			if err := rawStack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 				var lesServ *les.LightGoChain
 				ctx.Service(&lesServ)
-
-				return ethstats.New(config.EthereumNetStats, nil, lesServ)
+				cfg, err := netstats.ParseConfig(config.EthereumNetStats)
+				if err != nil {
+					return nil, err
+				}
+				return netstats.New(cfg, nil, lesServ), nil
 			}); err != nil {
 				return nil, fmt.Errorf("netstats init: %v", err)
 			}

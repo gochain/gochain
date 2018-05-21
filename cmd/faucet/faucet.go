@@ -49,9 +49,9 @@ import (
 	"github.com/gochain-io/gochain/eth"
 	"github.com/gochain-io/gochain/eth/downloader"
 	"github.com/gochain-io/gochain/ethclient"
-	"github.com/gochain-io/gochain/ethstats"
 	"github.com/gochain-io/gochain/les"
 	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/netstats"
 	"github.com/gochain-io/gochain/node"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/p2p/discover"
@@ -67,7 +67,7 @@ var (
 	ethPortFlag = flag.Int("ethport", 30303, "Listener port for the devp2p connection")
 	bootFlag    = flag.String("bootnodes", "", "Comma separated bootnode enode URLs to seed with")
 	netFlag     = flag.Uint64("network", 0, "Network ID to use for the GoChain protocol")
-	statsFlag   = flag.String("ethstats", "", "Ethstats network monitoring auth string")
+	statsFlag   = flag.String("netstats", "", "Netstats network monitoring auth string")
 
 	netnameFlag = flag.String("faucet.name", "", "Network name to assign to the faucet")
 	payoutFlag  = flag.Int("faucet.amount", 1, "Number of Ethers to pay out per user request")
@@ -241,12 +241,16 @@ func newFaucet(genesis *core.Genesis, port int, enodes []*discv5.Node, network u
 	}); err != nil {
 		return nil, err
 	}
-	// Assemble the ethstats monitoring and reporting service'
+	// Assemble the netstats monitoring and reporting service'
 	if stats != "" {
 		if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 			var serv *les.LightGoChain
 			ctx.Service(&serv)
-			return ethstats.New(stats, nil, serv)
+			cfg, err := netstats.ParseConfig(stats)
+			if err != nil {
+				return nil, err
+			}
+			return netstats.New(cfg, nil, serv), nil
 		}); err != nil {
 			return nil, err
 		}

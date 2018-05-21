@@ -31,6 +31,7 @@ import (
 	"github.com/gochain-io/gochain/cmd/utils"
 	"github.com/gochain-io/gochain/dashboard"
 	"github.com/gochain-io/gochain/eth"
+	"github.com/gochain-io/gochain/netstats"
 	"github.com/gochain-io/gochain/node"
 	"github.com/gochain-io/gochain/params"
 	whisper "github.com/gochain-io/gochain/whisper/whisperv5"
@@ -71,19 +72,15 @@ var tomlSettings = toml.Config{
 	},
 }
 
-type ethstatsConfig struct {
-	URL string `toml:",omitempty"`
-}
-
-type gethConfig struct {
+type gochainConfig struct {
 	Eth       eth.Config
 	Shh       whisper.Config
 	Node      node.Config
-	Ethstats  ethstatsConfig
+	Netstats  netstats.Config
 	Dashboard dashboard.Config
 }
 
-func loadConfig(file string, cfg *gethConfig) error {
+func loadConfig(file string, cfg *gochainConfig) error {
 	f, err := os.Open(file)
 	if err != nil {
 		return err
@@ -108,9 +105,9 @@ func defaultNodeConfig() node.Config {
 	return cfg
 }
 
-func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
+func makeConfigNode(ctx *cli.Context) (*node.Node, gochainConfig) {
 	// Load defaults.
-	cfg := gethConfig{
+	cfg := gochainConfig{
 		Eth:       eth.DefaultConfig,
 		Shh:       whisper.DefaultConfig,
 		Node:      defaultNodeConfig(),
@@ -131,8 +128,11 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 		utils.Fatalf("Failed to create the protocol stack: %v", err)
 	}
 	utils.SetEthConfig(ctx, stack, &cfg.Eth)
-	if ctx.GlobalIsSet(utils.EthStatsURLFlag.Name) {
-		cfg.Ethstats.URL = ctx.GlobalString(utils.EthStatsURLFlag.Name)
+	if ctx.GlobalIsSet(utils.NetStatsURLFlag.Name) {
+		cfg.Netstats, err = netstats.ParseConfig(ctx.GlobalString(utils.NetStatsURLFlag.Name))
+		if err != nil {
+			utils.Fatalf("Failed to parse netstats flag: %v", err)
+		}
 	}
 
 	utils.SetShhConfig(ctx, stack, &cfg.Shh)
@@ -173,8 +173,8 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 	}
 
 	// Add the GoChain Stats daemon if requested.
-	if cfg.Ethstats.URL != "" {
-		utils.RegisterEthStatsService(stack, cfg.Ethstats.URL)
+	if cfg.Netstats.URL != "" {
+		utils.RegisterNetStatsService(stack, cfg.Netstats)
 	}
 	return stack
 }

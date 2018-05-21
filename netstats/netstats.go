@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package ethstats implements the network stats reporting service.
-package ethstats
+// Package netstats implements the network stats reporting service.
+package netstats
 
 import (
 	"context"
@@ -82,14 +82,28 @@ type Service struct {
 	histCh chan []uint64 // History request block numbers are fed into this channel
 }
 
-// New returns a monitoring service ready for stats reporting.
-func New(url string, ethServ *eth.GoChain, lesServ *les.LightGoChain) (*Service, error) {
-	// Parse the netstats connection url
+type Config struct {
+	Name   string `toml:",omitempty"`
+	Secret string `toml:",omitempty"`
+	URL    string `toml:",omitempty"`
+}
+
+// ParseConfig parses the netstats flag. It has the form "nodename:secret@host:port".
+func ParseConfig(flag string) (Config, error) {
 	re := regexp.MustCompile("([^:@]*)(:([^@]*))?@(.+)")
-	parts := re.FindStringSubmatch(url)
+	parts := re.FindStringSubmatch(flag)
 	if len(parts) != 5 {
-		return nil, fmt.Errorf("invalid netstats url: \"%s\", should be nodename:secret@host:port", url)
+		return Config{}, fmt.Errorf("invalid netstats flag: \"%s\", should be nodename:secret@host:port", flag)
 	}
+	return Config{
+		Name:   parts[1],
+		Secret: parts[3],
+		URL:    parts[4],
+	}, nil
+}
+
+// New returns a monitoring service ready for stats reporting.
+func New(cfg Config, ethServ *eth.GoChain, lesServ *les.LightGoChain) *Service {
 	// Assemble and return the stats service
 	var engine consensus.Engine
 	if ethServ != nil {
@@ -101,12 +115,12 @@ func New(url string, ethServ *eth.GoChain, lesServ *les.LightGoChain) (*Service,
 		eth:    ethServ,
 		les:    lesServ,
 		engine: engine,
-		node:   parts[1],
-		pass:   parts[3],
-		host:   parts[4],
+		node:   cfg.Name,
+		pass:   cfg.Secret,
+		host:   cfg.URL,
 		pongCh: make(chan struct{}),
 		histCh: make(chan []uint64, 1),
-	}, nil
+	}
 }
 
 // Protocols implements node.Service, returning the P2P network protocols used
@@ -317,7 +331,7 @@ func (s *Service) readLoop(conn *websocket.Conn) {
 			if !ok {
 				log.Warn("Invalid stats history request", "msg", msg["emit"][1])
 				s.histCh <- nil
-				continue // Ethstats sometime sends invalid history requests, ignore those
+				continue // Netstats sometime sends invalid history requests, ignore those
 			}
 			list, ok := request["list"].([]interface{})
 			if !ok {
@@ -432,7 +446,7 @@ func (s *Service) report(conn *websocket.Conn) error {
 // reportLatency sends a ping request to the server, measures the RTT time and
 // finally sends a latency update.
 func (s *Service) reportLatency(conn *websocket.Conn) error {
-	// Send the current time to the ethstats server
+	// Send the current time to the netstats server
 	start := time.Now()
 
 	ping := map[string][]interface{}{
@@ -455,7 +469,7 @@ func (s *Service) reportLatency(conn *websocket.Conn) error {
 	latency := strconv.Itoa(int((time.Since(start) / time.Duration(2)).Nanoseconds() / 1000000))
 
 	// Send back the measured latency
-	log.Trace("Sending measured latency to ethstats", "latency", latency)
+	log.Trace("Sending measured latency to netstats", "latency", latency)
 
 	stats := map[string][]interface{}{
 		"emit": {"latency", map[string]string{
@@ -505,7 +519,7 @@ func (s *Service) reportBlock(conn *websocket.Conn, block *types.Block) error {
 	details := s.assembleBlockStats(block)
 
 	// Assemble the block report and send it to the server
-	log.Trace("Sending new block to ethstats", "number", details.Number, "hash", details.Hash)
+	log.Trace("Sending new block to netstats", "number", details.Number, "hash", details.Hash)
 
 	stats := map[string]interface{}{
 		"id":    s.node,
@@ -617,7 +631,7 @@ func (s *Service) reportHistory(conn *websocket.Conn, list []uint64) error {
 	}
 	// Assemble the history report and send it to the server
 	if len(history) > 0 {
-		log.Trace("Sending historical blocks to ethstats", "first", history[0].Number, "last", history[len(history)-1].Number)
+		log.Trace("Sending historical blocks to netstats", "first", history[0].Number, "last", history[len(history)-1].Number)
 	} else {
 		log.Trace("No history to send to stats server")
 	}
@@ -647,7 +661,7 @@ func (s *Service) reportPending(conn *websocket.Conn) error {
 		pending = s.les.TxPool().Stats()
 	}
 	// Assemble the transaction stats and send it to the server
-	log.Trace("Sending pending transactions to ethstats", "count", pending)
+	log.Trace("Sending pending transactions to netstats", "count", pending)
 
 	stats := map[string]interface{}{
 		"id": s.node,
@@ -696,7 +710,7 @@ func (s *Service) reportStats(conn *websocket.Conn) error {
 		syncing = s.les.BlockChain().CurrentHeader().Number.Uint64() >= sync.HighestBlock
 	}
 	// Assemble the node stats and send it to the server
-	log.Trace("Sending node details to ethstats")
+	log.Trace("Sending node details to netstats")
 
 	stats := map[string]interface{}{
 		"id": s.node,
