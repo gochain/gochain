@@ -175,9 +175,8 @@ func (s *Service) loop() {
 		txCh   = make(chan struct{}, 1)
 	)
 	go func() {
+		defer close(quitCh)
 		var lastTx mclock.AbsTime
-
-	HandleLoop:
 		for {
 			select {
 			// Notify of chain head events, but drop if too frequent
@@ -201,12 +200,11 @@ func (s *Service) loop() {
 
 			// node stopped
 			case <-txSub.Err():
-				break HandleLoop
+				return
 			case <-headSub.Err():
-				break HandleLoop
+				return
 			}
 		}
-		close(quitCh)
 	}()
 	// Loop reporting until termination
 	for {

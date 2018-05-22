@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -651,7 +652,8 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 			log.Error("Propagating dangling block", "number", block.Number(), "hash", hash)
 			return
 		}
-		for _, p := range peers {
+		// Send the block to a subset of our peers.
+		for _, p := range peers[:int(math.Sqrt(float64(len(peers))))] {
 			p.SendNewBlockAsync(block, td)
 		}
 		return
