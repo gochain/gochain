@@ -642,7 +642,7 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 	hash := block.Hash()
 	peers := pm.peers.PeersWithoutBlock(hash)
 
-	// If propagation is requested, send to a subset of the peer
+	// If propagation is requested, send to a subset of the peers.
 	if propagate {
 		// Calculate the TD of the block (it's not imported yet, so block.Td is not valid)
 		var td *big.Int
@@ -652,8 +652,12 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 			log.Error("Propagating dangling block", "number", block.Number(), "hash", hash)
 			return
 		}
-		// Send the block to a subset of our peers.
-		for _, p := range peers[:int(math.Sqrt(float64(len(peers))))] {
+		// Send the block to a subset of our peers (at most, square root of total peers).
+		max := int(math.Sqrt(float64(cap(peers))))
+		if max > len(peers) {
+			max = len(peers)
+		}
+		for _, p := range peers[:max] {
 			p.SendNewBlockAsync(block, td)
 		}
 		return
