@@ -192,14 +192,14 @@ func (p *peer) broadcast() {
 
 		case prop := <-p.queuedProps:
 			if err := p.SendNewBlock(prop.block, prop.td); err != nil {
-				p.Log().Error("Failed to propagate block", prop.block.Number(), "hash", prop.block.Hash(), "td", prop.td)
+				p.Log().Error("Failed to propagate block", "number", prop.block.Number(), "hash", prop.block.Hash(), "td", prop.td, "err", err)
 			} else {
-				p.Log().Trace("Propagated block", prop.block.Number(), "hash", prop.block.Hash(), "td", prop.td)
+				p.Log().Trace("Propagated block", "number", prop.block.Number(), "hash", prop.block.Hash(), "td", prop.td)
 			}
 
 		case block := <-p.queuedAnns:
 			if err := p.SendNewBlockHash(block.Hash(), block.NumberU64()); err != nil {
-				p.Log().Error("Failed to announce block", "number", block.Number(), "hash", block.Hash())
+				p.Log().Error("Failed to announce block", "number", block.Number(), "hash", block.Hash(), "err", err)
 			} else {
 				p.Log().Trace("Announced block", "number", block.Number(), "hash", block.Hash())
 			}
