@@ -46,7 +46,7 @@ const (
 	// maxQueuedTxs is the maximum number of transaction lists to queue up before
 	// dropping broadcasts. This is a sensitive number as a transaction list might
 	// contain a single transaction, or thousands.
-	maxQueuedTxs = 1024
+	maxQueuedTxs = 128
 
 	// maxQueuedProps is the maximum number of block propagations to queue up before
 	// dropping broadcasts. There's not much point in queueing stale blocks, so a few
@@ -531,7 +531,7 @@ func (ps *peerSet) All() []*peer {
 }
 
 // PeersWithoutBlock retrieves a list of peers that do not have a given block in
-// their set of known hashes.
+// their set of known hashes. cap is the total number of peers.
 func (ps *peerSet) PeersWithoutBlock(hash common.Hash) []*peer {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
