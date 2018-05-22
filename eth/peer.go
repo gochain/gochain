@@ -42,6 +42,21 @@ const (
 	maxKnownBlocks    = 1024            // Maximum block hashes to keep in the known list (prevent DOS)
 	forgetTxsInterval = 2 * time.Minute // Timer interval to forget known txs
 	handshakeTimeout  = 5 * time.Second
+
+	// maxQueuedTxs is the maximum number of transaction lists to queue up before
+	// dropping broadcasts. This is a sensitive number as a transaction list might
+	// contain a single transaction, or thousands.
+	maxQueuedTxs = 1024
+
+	// maxQueuedProps is the maximum number of block propagations to queue up before
+	// dropping broadcasts. There's not much point in queueing stale blocks, so a few
+	// that might cover uncles should be enough.
+	maxQueuedProps = 4
+
+	// maxQueuedAnns is the maximum number of block announcements to queue up before
+	// dropping broadcasts. Similarly to block propagations, there's no point to queue
+	// above some healthy uncle limit, so use that.
+	maxQueuedAnns = 4
 )
 
 // PeerInfo represents a short summary of the GoChain sub-protocol metadata known
@@ -119,6 +134,12 @@ func (s *knownHashes) Has(h common.Hash) bool {
 	return ok
 }
 
+// propEvent is a block propagation, waiting for its turn in the broadcast queue.
+type propEvent struct {
+	block *types.Block
+	td    *big.Int
+}
+
 type peer struct {
 	id string
 
@@ -134,21 +155,64 @@ type peer struct {
 
 	knownTxs    knownHashes // Set of transaction hashes known to be known by this peer
 	knownBlocks knownHashes // Set of block hashes known to be known by this peer
+
+	queuedTxs   chan types.Transactions // Queue of transactions to broadcast to the peer
+	queuedProps chan *propEvent         //Queue of blocks to broadcast to the peer
+	queuedAnns  chan *types.Block       //Queue of blocks to announce to the peer
+	term        chan struct{}           // Termination channel to stop the broadcaster
 }
 
 func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
-	id := p.ID()
-
-	r := &peer{
+	return &peer{
 		Peer:        p,
 		rw:          rw,
 		version:     version,
-		id:          fmt.Sprintf("%x", id[:8]),
+		id:          fmt.Sprintf("%x", p.ID().Bytes()[:8]),
 		knownTxs:    knownHashes{cap: maxKnownTxs, forgetInterval: forgetTxsInterval},
 		knownBlocks: knownHashes{cap: maxKnownBlocks},
+		queuedTxs:   make(chan types.Transactions, maxQueuedTxs),
+		queuedProps: make(chan *propEvent, maxQueuedProps),
+		queuedAnns:  make(chan *types.Block, maxQueuedAnns),
+		term:        make(chan struct{}),
 	}
+}
 
-	return r
+// broadcast is a write loop that multiplexes block propagations, announcements
+// and transaction broadcasts into the remote peer. The goal is to have an async
+// writer that does not lock up node internals.
+func (p *peer) broadcast() {
+	for {
+		select {
+		case txs := <-p.queuedTxs:
+			if err := p.SendTransactions(txs); err != nil {
+				p.Log().Error("Failed to broadcast txs", "len", len(txs), "err", err)
+			} else {
+				p.Log().Trace("Broadcast txs", "len", len(txs))
+			}
+
+		case prop := <-p.queuedProps:
+			if err := p.SendNewBlock(prop.block, prop.td); err != nil {
+				p.Log().Error("Failed to propagate block", prop.block.Number(), "hash", prop.block.Hash(), "td", prop.td)
+			} else {
+				p.Log().Trace("Propagated block", prop.block.Number(), "hash", prop.block.Hash(), "td", prop.td)
+			}
+
+		case block := <-p.queuedAnns:
+			if err := p.SendNewBlockHash(block.Hash(), block.NumberU64()); err != nil {
+				p.Log().Error("Failed to announce block", "number", block.Number(), "hash", block.Hash())
+			} else {
+				p.Log().Trace("Announced block", "number", block.Number(), "hash", block.Hash())
+			}
+
+		case <-p.term:
+			return
+		}
+	}
+}
+
+// Close signals the broadcast goroutine to terminate.
+func (p *peer) Close() {
+	close(p.term)
 }
 
 // Info gathers and returns a collection of metadata known about a peer.
@@ -203,42 +267,58 @@ func (p *peer) SendTransactions(txs types.Transactions) error {
 	return err
 }
 
-// SendNewBlockHashParallel announces the availability of a number of blocks through
-// a hash notification to peers in parallel.
-func SendNewBlockHashParallel(peers []*peer, hash common.Hash, number uint64) error {
+// SendTransactionsAsync queues txs for broadcast, or drops them if the queue is full.
+func (p *peer) SendTransactionsAsync(txs types.Transactions) {
+	select {
+	case p.queuedTxs <- txs:
+	default:
+		p.Log().Debug("Dropping transaction propagation", "count", len(txs))
+	}
+}
+
+// SendNewBlockAsync queues a block for propagation, or drops it if the queue is full.
+func (p *peer) SendNewBlockAsync(block *types.Block, td *big.Int) {
+	select {
+	case p.queuedProps <- &propEvent{block: block, td: td}:
+	default:
+		p.Log().Debug("Dropping block propagation", "number", block.NumberU64(), "hash", block.Hash())
+	}
+}
+
+// SendNewBlockHashAsync queues a block announcement, or drops it if the queue is full.
+func (p *peer) SendNewBlockHashAsync(block *types.Block) {
+	select {
+	case p.queuedAnns <- block:
+	default:
+		p.Log().Debug("Dropping block announcement", "number", block.NumberU64(), "hash", block.Hash())
+	}
+}
+
+// SendNewBlockHash announces the availability of a block.
+func (p *peer) SendNewBlockHash(hash common.Hash, number uint64) error {
 	b, err := rlp.EncodeToBytes(newBlockHashesData{{Hash: hash, Number: number}})
 	if err != nil {
 		return err
 	}
-	for _, p := range peers {
-		go func(p *peer) {
-			msg := p2p.Msg{Code: NewBlockHashesMsg, Size: uint32(len(b)), Payload: bytes.NewReader(b)}
-			if err := p.rw.WriteMsg(msg); err != nil {
-				log.Error("Failed to send new block hash", "peer", p.ID(), "hash", hash, "number", number, "size", len(b), "err", err)
-			} else {
-				p.knownBlocks.Add(hash)
-			}
-		}(p)
+	msg := p2p.Msg{Code: NewBlockHashesMsg, Size: uint32(len(b)), Payload: bytes.NewReader(b)}
+	if err := p.rw.WriteMsg(msg); err != nil {
+		return err
 	}
+	p.knownBlocks.Add(hash)
 	return nil
 }
 
-// SendNewBlockParallel propagates an entire block to peers.
-func SendNewBlockParallel(peers []*peer, block *types.Block, td *big.Int) error {
+// SendNewBlock propagates an entire block.
+func (p *peer) SendNewBlock(block *types.Block, td *big.Int) error {
 	b, err := rlp.EncodeToBytes([]interface{}{block, td})
 	if err != nil {
 		return err
 	}
-	for _, p := range peers {
-		go func(p *peer) {
-			msg := p2p.Msg{Code: NewBlockMsg, Size: uint32(len(b)), Payload: bytes.NewReader(b)}
-			if err := p.rw.WriteMsg(msg); err != nil {
-				log.Error("Failed to send new block hash", "peer", p.ID(), "hash", block.Hash(), "number", block.NumberU64(), "size", len(b), "err", err)
-			} else {
-				p.knownBlocks.Add(block.Hash())
-			}
-		}(p)
+	msg := p2p.Msg{Code: NewBlockMsg, Size: uint32(len(b)), Payload: bytes.NewReader(b)}
+	if err := p.rw.WriteMsg(msg); err != nil {
+		return err
 	}
+	p.knownBlocks.Add(block.Hash())
 	return nil
 }
 
@@ -391,7 +471,8 @@ func newPeerSet() *peerSet {
 }
 
 // Register injects a new peer into the working set, or returns an error if the
-// peer is already known.
+// peer is already known. If a new peer is registered, its broadcast loop is also
+// started.
 func (ps *peerSet) Register(p *peer) error {
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
@@ -403,6 +484,7 @@ func (ps *peerSet) Register(p *peer) error {
 		return errAlreadyRegistered
 	}
 	ps.peers[p.id] = p
+	go p.broadcast()
 	return nil
 }
 
@@ -411,11 +493,12 @@ func (ps *peerSet) Register(p *peer) error {
 func (ps *peerSet) Unregister(id string) error {
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
-
-	if _, ok := ps.peers[id]; !ok {
+	p, ok := ps.peers[id]
+	if !ok {
 		return errNotRegistered
 	}
 	delete(ps.peers, id)
+	p.Close()
 	return nil
 }
 

@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -652,21 +651,15 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 			log.Error("Propagating dangling block", "number", block.Number(), "hash", hash)
 			return
 		}
-		// Send the block to a subset of our peers
-		transfer := peers[:int(math.Sqrt(float64(len(peers))))]
-		if err := SendNewBlockParallel(transfer, block, td); err != nil {
-			log.Error("Cannot send new block", "hash", hash, "number", block.NumberU64(), "err", err)
-		} else {
-			log.Trace("Propagated block", "hash", hash, "recipients", len(transfer), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
+		for _, p := range peers {
+			p.SendNewBlockAsync(block, td)
 		}
 		return
 	}
 	// Otherwise if the block is indeed in out own chain, announce it
 	if pm.blockchain.HasBlock(hash, block.NumberU64()) {
-		if err := SendNewBlockHashParallel(peers, hash, block.NumberU64()); err != nil {
-			log.Error("Cannot send new block hash", "hash", hash, "number", block.NumberU64(), "err", err)
-		} else {
-			log.Trace("Announced block", "hash", hash, "recipients", len(peers), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
+		for _, p := range peers {
+			p.SendNewBlockHashAsync(block)
 		}
 	}
 }
@@ -675,11 +668,7 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 // already have them. Returns without blocking after launching each peer send in separate concurrent goroutines.
 func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 	for p, txs := range pm.peers.PeersWithoutTxs(txs) {
-		go func(p *peer, txs types.Transactions) {
-			if err := p.SendTransactions(txs); err != nil {
-				log.Error("Failed to send txs", "peer", p.ID(), "len", len(txs), "err", err)
-			}
-		}(p, txs)
+		p.SendTransactionsAsync(txs)
 	}
 }
 
