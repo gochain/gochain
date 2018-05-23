@@ -315,60 +315,68 @@ func (es *EventSystem) SubscribePendingTxs(hashes chan []common.Hash) *Subscript
 
 type filterIndex map[Type]map[rpc.ID]*subscription
 
-// broadcast event to filters that match criteria.
-func (es *EventSystem) broadcast(filters filterIndex, ev interface{}) {
+func (es *EventSystem) broadcastLogs(filters filterIndex, ev []*types.Log) {
 	if ev == nil {
 		return
 	}
 
-	switch e := ev.(type) {
-	case []*types.Log:
-		if len(e) > 0 {
-			for _, f := range filters[LogsSubscription] {
-				if matchedLogs := filterLogs(e, f.logsCrit.FromBlock, f.logsCrit.ToBlock, f.logsCrit.Addresses, f.logsCrit.Topics); len(matchedLogs) > 0 {
+	if len(ev) > 0 {
+		for _, f := range filters[LogsSubscription] {
+			if matchedLogs := filterLogs(ev, f.logsCrit.FromBlock, f.logsCrit.ToBlock, f.logsCrit.Addresses, f.logsCrit.Topics); len(matchedLogs) > 0 {
+				f.logs <- matchedLogs
+			}
+		}
+	}
+}
+
+func (es *EventSystem) broadcastRemovedLogs(filters filterIndex, ev core.RemovedLogsEvent) {
+	for _, f := range filters[LogsSubscription] {
+		if matchedLogs := filterLogs(ev.Logs, f.logsCrit.FromBlock, f.logsCrit.ToBlock, f.logsCrit.Addresses, f.logsCrit.Topics); len(matchedLogs) > 0 {
+			f.logs <- matchedLogs
+		}
+	}
+}
+
+func (es *EventSystem) broadcastTypeMux(filters filterIndex, ev *event.TypeMuxEvent) {
+	if ev == nil {
+		return
+	}
+	switch muxe := ev.Data.(type) {
+	case core.PendingLogsEvent:
+		for _, f := range filters[PendingLogsSubscription] {
+			if ev.Time.After(f.created) {
+				if matchedLogs := filterLogs(muxe.Logs, nil, f.logsCrit.ToBlock, f.logsCrit.Addresses, f.logsCrit.Topics); len(matchedLogs) > 0 {
 					f.logs <- matchedLogs
 				}
 			}
 		}
-	case core.RemovedLogsEvent:
-		for _, f := range filters[LogsSubscription] {
-			if matchedLogs := filterLogs(e.Logs, f.logsCrit.FromBlock, f.logsCrit.ToBlock, f.logsCrit.Addresses, f.logsCrit.Topics); len(matchedLogs) > 0 {
-				f.logs <- matchedLogs
-			}
-		}
-	case *event.TypeMuxEvent:
-		switch muxe := e.Data.(type) {
-		case core.PendingLogsEvent:
-			for _, f := range filters[PendingLogsSubscription] {
-				if e.Time.After(f.created) {
-					if matchedLogs := filterLogs(muxe.Logs, nil, f.logsCrit.ToBlock, f.logsCrit.Addresses, f.logsCrit.Topics); len(matchedLogs) > 0 {
-						f.logs <- matchedLogs
-					}
-				}
-			}
-		}
-	case core.NewTxsEvent:
-		hashes := make([]common.Hash, 0, len(e.Txs))
-		for _, tx := range e.Txs {
-			hashes = append(hashes, tx.Hash())
-		}
-		for _, f := range filters[PendingTransactionsSubscription] {
-			f.hashes <- hashes
-		}
-	case core.ChainEvent:
-		for _, f := range filters[BlocksSubscription] {
-			f.headers <- e.Block.Header()
-		}
-		if es.lightMode && len(filters[LogsSubscription]) > 0 {
-			es.lightFilterNewHead(e.Block.Header(), func(header *types.Header, remove bool) {
-				for _, f := range filters[LogsSubscription] {
-					if matchedLogs := es.lightFilterLogs(header, f.logsCrit.Addresses, f.logsCrit.Topics, remove); len(matchedLogs) > 0 {
-						f.logs <- matchedLogs
-					}
-				}
-			})
-		}
 	}
+}
+
+func (es *EventSystem) broadcastNewTxs(filters filterIndex, ev core.NewTxsEvent) {
+	hashes := make([]common.Hash, 0, len(ev.Txs))
+	for _, tx := range ev.Txs {
+		hashes = append(hashes, tx.Hash())
+	}
+	for _, f := range filters[PendingTransactionsSubscription] {
+		f.hashes <- hashes
+	}
+}
+
+func (es *EventSystem) broadcastChain(filters filterIndex, ev core.ChainEvent) {
+	for _, f := range filters[BlocksSubscription] {
+		f.headers <- ev.Block.Header()
+	}
+	if es.lightMode && len(filters[LogsSubscription]) > 0 {
+		es.lightFilterNewHead(ev.Block.Header(), func(header *types.Header, remove bool) {
+			for _, f := range filters[LogsSubscription] {
+				if matchedLogs := es.lightFilterLogs(header, f.logsCrit.Addresses, f.logsCrit.Topics, remove); len(matchedLogs) > 0 {
+					f.logs <- matchedLogs
+				}
+			}
+		})
+	}
+
 }
 
 func (es *EventSystem) lightFilterNewHead(newHeader *types.Header, callBack func(*types.Header, bool)) {
@@ -448,18 +456,18 @@ func (es *EventSystem) eventLoop() {
 		select {
 		// Handle subscribed events
 		case ev := <-es.txsCh:
-			es.broadcast(index, ev)
+			es.broadcastNewTxs(index, ev)
 		case ev := <-es.logsCh:
-			es.broadcast(index, ev)
+			es.broadcastLogs(index, ev)
 		case ev := <-es.rmLogsCh:
-			es.broadcast(index, ev)
+			es.broadcastRemovedLogs(index, ev)
 		case ev := <-es.chainCh:
-			es.broadcast(index, ev)
+			es.broadcastChain(index, ev)
 		case ev, active := <-es.pendingLogSub.Chan():
 			if !active { // system stopped
 				return
 			}
-			es.broadcast(index, ev)
+			es.broadcastTypeMux(index, ev)
 
 		case f := <-es.install:
 			if f.typ == MinedAndPendingLogsSubscription {
