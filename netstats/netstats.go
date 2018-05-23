@@ -160,22 +160,23 @@ func (s *Service) loop() {
 		txpool = s.les.TxPool()
 	}
 
-	chainHeadCh := make(chan core.ChainHeadEvent, chainHeadChanSize)
-	headSub := blockchain.SubscribeChainHeadEvent(chainHeadCh)
-	defer headSub.Unsubscribe()
-
-	txEventCh := make(chan core.NewTxsEvent, txChanSize)
-	txSub := txpool.SubscribeNewTxsEvent(txEventCh)
-	defer txSub.Unsubscribe()
-
-	// Start a goroutine that exhausts the subsciptions to avoid events piling up
+	// Start a goroutine that exhausts the subscriptions to avoid events piling up
 	var (
+		chainHeadCh = make(chan core.ChainHeadEvent, chainHeadChanSize)
+		txEventCh   = make(chan core.NewTxsEvent, txChanSize)
+
+		headSub = blockchain.SubscribeChainHeadEvent(chainHeadCh)
+		txSub   = txpool.SubscribeNewTxsEvent(txEventCh)
+
 		quitCh = make(chan struct{})
 		headCh = make(chan *types.Block, 1)
 		txCh   = make(chan struct{}, 1)
 	)
 	go func() {
 		defer close(quitCh)
+		defer txSub.Unsubscribe()
+		defer headSub.Unsubscribe()
+
 		var lastTx mclock.AbsTime
 		for {
 			select {
@@ -206,83 +207,63 @@ func (s *Service) loop() {
 			}
 		}
 	}()
+	// Resolve the URL, defaulting to TLS, but falling back to none too
+	path := fmt.Sprintf("%s/api", s.host)
+	urls := []string{path}
+
+	if !strings.Contains(path, "://") { // url.Parse and url.IsAbs is unsuitable (https://github.com/golang/go/issues/19779)
+		urls = []string{"wss://" + path, "ws://" + path}
+	}
 	// Loop reporting until termination
 	for {
-		// Resolve the URL, defaulting to TLS, but falling back to none too
-		path := fmt.Sprintf("%s/api", s.host)
-		urls := []string{path}
-
-		if !strings.Contains(path, "://") { // url.Parse and url.IsAbs is unsuitable (https://github.com/golang/go/issues/19779)
-			urls = []string{"wss://" + path, "ws://" + path}
-		}
-		// Establish a websocket connection to the server on any supported URL
-		var (
-			conf *websocket.Config
-			conn *websocket.Conn
-			err  error
-		)
-		for _, url := range urls {
-			if conf, err = websocket.NewConfig(url, "http://localhost/"); err != nil {
-				continue
-			}
-			conf.Dialer = &net.Dialer{Timeout: 5 * time.Second}
-			if conn, err = websocket.DialConfig(conf); err == nil {
-				break
-			}
-		}
-		if err != nil {
-			log.Warn("Stats server unreachable", "err", err)
-			time.Sleep(10 * time.Second)
-			continue
-		}
-		// Authenticate the client with the server
-		if err = s.login(conn); err != nil {
-			log.Warn("Stats login failed", "err", err)
-			conn.Close()
-			time.Sleep(10 * time.Second)
-			continue
-		}
-		go s.readLoop(conn)
-
-		// Send the initial stats so our node looks decent from the get go
-		if err = s.report(conn); err != nil {
-			log.Warn("Initial stats report failed", "err", err)
-			conn.Close()
-			continue
-		}
-		// Keep sending status updates until the connection breaks
-		fullReport := time.NewTicker(15 * time.Second)
-
-		for err == nil {
+		conn := s.connect(urls)
+		if conn == nil {
 			select {
 			case <-quitCh:
-				conn.Close()
 				return
-
-			case <-fullReport.C:
-				if err = s.report(conn); err != nil {
-					log.Warn("Full stats report failed", "err", err)
-				}
-			case list := <-s.histCh:
-				if err = s.reportHistory(conn, list); err != nil {
-					log.Warn("Requested history report failed", "err", err)
-				}
-			case head := <-headCh:
-				if err = s.reportBlock(conn, head); err != nil {
-					log.Warn("Block stats report failed", "err", err)
-				}
-				if err = s.reportPending(conn); err != nil {
-					log.Warn("Post-block transaction stats report failed", "err", err)
-				}
-			case <-txCh:
-				if err = s.reportPending(conn); err != nil {
-					log.Warn("Transaction stats report failed", "err", err)
-				}
+			case <-time.After(10 * time.Second):
 			}
+			continue
 		}
-		// Make sure the connection is closed
-		conn.Close()
+		// Respond to specific requests.
+		go s.readLoop(conn)
+		// Scheduled and triggered reports.
+		s.reportLoop(conn, quitCh, txCh, headCh)
+		select {
+		case <-quitCh:
+			return
+		default:
+		}
 	}
+}
+
+// connect establishes a websocket connection to the server on any supported URL, or returns nil if unable.
+func (s *Service) connect(urls []string) *websocket.Conn {
+	var (
+		conf *websocket.Config
+		conn *websocket.Conn
+		err  error
+	)
+	for _, url := range urls {
+		if conf, err = websocket.NewConfig(url, "http://localhost/"); err != nil {
+			continue
+		}
+		conf.Dialer = &net.Dialer{Timeout: 5 * time.Second}
+		if conn, err = websocket.DialConfig(conf); err == nil {
+			break
+		}
+	}
+	if err != nil {
+		log.Warn("Stats server unreachable", "err", err)
+		return nil
+	}
+	// Authenticate the client with the server
+	if err = s.login(conn); err != nil {
+		log.Warn("Stats login failed", "err", err)
+		conn.Close()
+		return nil
+	}
+	return conn
 }
 
 // readLoop loops as long as the connection is alive and retrieves data packets
@@ -354,6 +335,48 @@ func (s *Service) readLoop(conn *websocket.Conn) {
 		}
 		// Report anything else and continue
 		log.Info("Unknown stats message", "msg", msg)
+	}
+}
+
+// reportLoop sends status updates until the connection breaks.
+func (s *Service) reportLoop(conn *websocket.Conn, quitCh, txCh <-chan struct{}, headCh <-chan *types.Block) {
+	defer conn.Close()
+
+	// Send the initial stats so our node looks decent from the get go
+	if err := s.report(conn); err != nil {
+		log.Warn("Initial stats report failed", "err", err)
+		return
+	}
+
+	fullReport := time.NewTicker(15 * time.Second)
+	defer fullReport.Stop()
+
+	var err error
+	for err == nil {
+		select {
+		case <-quitCh:
+			return
+
+		case <-fullReport.C:
+			if err = s.report(conn); err != nil {
+				log.Warn("Full stats report failed", "err", err)
+			}
+		case list := <-s.histCh:
+			if err = s.reportHistory(conn, list); err != nil {
+				log.Warn("Requested history report failed", "err", err)
+			}
+		case head := <-headCh:
+			if err = s.reportBlock(conn, head); err != nil {
+				log.Warn("Block stats report failed", "err", err)
+			}
+			if err = s.reportPending(conn); err != nil {
+				log.Warn("Post-block transaction stats report failed", "err", err)
+			}
+		case <-txCh:
+			if err = s.reportPending(conn); err != nil {
+				log.Warn("Transaction stats report failed", "err", err)
+			}
+		}
 	}
 }
 
