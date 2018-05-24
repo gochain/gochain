@@ -35,6 +35,8 @@ import (
 	"sync"
 	"time"
 
+	"encoding/hex"
+
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/crypto/ecies"
 	"github.com/gochain-io/gochain/crypto/secp256k1"
@@ -161,13 +163,18 @@ func readProtocolHandshake(rw MsgReader, our *protoHandshake) (*protoHandshake, 
 		return nil, fmt.Errorf("message too big")
 	}
 	if msg.Code == discMsg {
+		buf := bytes.NewBuffer(make([]byte, 0, msg.Size))
+		if _, err := io.Copy(buf, msg.Payload); err != nil {
+			return nil, fmt.Errorf("failed to read disc msg: %s", err)
+		}
 		// Disconnect before protocol handshake is valid according to the
 		// spec and we send it ourself if the posthanshake checks fail.
 		// We can't return the reason directly, though, because it is echoed
 		// back otherwise. Wrap it in a string instead.
 		var reason [1]DiscReason
-		if err := rlp.Decode(msg.Payload, &reason); err != nil {
-			log.Error("Cannot decode rlpx disc msg", "err", err)
+		if err := rlp.Decode(buf, &reason); err != nil {
+			log.Error("Cannot decode rlpx disc msg", "msg", hex.EncodeToString(buf.Bytes()), "err", err)
+			return nil, fmt.Errorf("failed to decode disc msg: %s", err)
 		}
 		return nil, reason[0]
 	}
