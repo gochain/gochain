@@ -286,7 +286,7 @@ func (p *Peer) handle(msg Msg) error {
 		// This is the last message. We don't need to discard or
 		// check errors because, the connection will be closed after it.
 		if err := rlp.Decode(buf, &reason); err != nil {
-			log.Error("Cannot decode disc msg payload", "msg", buf.String(), "err", err)
+			p.Log().Error("Cannot decode disc msg payload", "msg", buf.String(), "err", err)
 			return fmt.Errorf("failed to decode disc msg: %s", err)
 		}
 		return reason[0]
