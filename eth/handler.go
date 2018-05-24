@@ -670,8 +670,8 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 	}
 }
 
-// BroadcastTxs propagates a batch of transactions to all peers which are not known to
-// already have them. Returns without blocking after launching each peer send in separate concurrent goroutines.
+// BroadcastTxs propagates a batch of transactions to a subset of peers which are not known to already have them.
+// Returns without blocking after launching each peer send in separate concurrent goroutines.
 func (pm *ProtocolManager) BroadcastTxs(txs types.Transactions) {
 	for p, txs := range pm.peers.PeersWithoutTxs(txs) {
 		p.SendTransactionsAsync(txs)

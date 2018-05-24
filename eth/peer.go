@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"sync"
 	"time"
@@ -546,6 +547,7 @@ func (ps *peerSet) PeersWithoutBlock(hash common.Hash) []*peer {
 }
 
 // PeersWithoutTxs retrieves a map of peers to transactions from txs which are not in their set of known hashes.
+// Each transaction will be included in the lists of, at most, square root of total peers.
 func (ps *peerSet) PeersWithoutTxs(txs types.Transactions) map[*peer]types.Transactions {
 	peerTxs := make(map[*peer]types.Transactions)
 	tracing := log.Tracing()
@@ -553,6 +555,7 @@ func (ps *peerSet) PeersWithoutTxs(txs types.Transactions) map[*peer]types.Trans
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
+	max := int(math.Sqrt(float64(len(ps.peers))))
 	for _, tx := range txs {
 		hash := tx.Hash()
 		var count int
@@ -562,6 +565,9 @@ func (ps *peerSet) PeersWithoutTxs(txs types.Transactions) map[*peer]types.Trans
 			}
 			peerTxs[p] = append(peerTxs[p], tx)
 			count++
+			if count >= max {
+				break
+			}
 		}
 		if !tracing || count == 0 {
 			continue
