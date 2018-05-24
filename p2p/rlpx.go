@@ -35,6 +35,8 @@ import (
 	"sync"
 	"time"
 
+	"encoding/hex"
+
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/crypto/ecies"
 	"github.com/gochain-io/gochain/crypto/secp256k1"
@@ -171,7 +173,7 @@ func readProtocolHandshake(rw MsgReader, our *protoHandshake) (*protoHandshake, 
 		// back otherwise. Wrap it in a string instead.
 		var reason [1]DiscReason
 		if err := rlp.Decode(buf, &reason); err != nil {
-			log.Error("Cannot decode rlpx disc msg", "msg", buf.String(), "err", err)
+			log.Error("Cannot decode rlpx disc msg", "msg", hex.EncodeToString(buf.Bytes()), "err", err)
 			return nil, fmt.Errorf("failed to decode disc msg: %s", err)
 		}
 		return nil, reason[0]
