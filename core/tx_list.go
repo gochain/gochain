@@ -362,6 +362,11 @@ func (l *txList) Add(tx *types.Transaction, priceBump uint64) (bool, *types.Tran
 		}
 	}
 	// Otherwise overwrite the old transaction with the current one
+	l.add(tx)
+	return true, old
+}
+
+func (l *txList) add(tx *types.Transaction) {
 	l.txs.Put(tx)
 	if cost := tx.Cost(); l.costcap.Cmp(cost) < 0 {
 		l.costcap = cost
@@ -369,7 +374,6 @@ func (l *txList) Add(tx *types.Transaction, priceBump uint64) (bool, *types.Tran
 	if gas := tx.Gas(); l.gascap < gas {
 		l.gascap = gas
 	}
-	return true, old
 }
 
 // Forward removes all transactions from the list with a nonce lower than the
