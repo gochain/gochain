@@ -28,10 +28,15 @@ var (
 	TestnetGenesisHash = common.HexToHash("0x84337e882fad5883e2ed6e587ab5bdf711b7107a39abe8e080784bb30c8f047e")
 )
 
+const (
+	MainnetChainID = 60
+	TestnetChainID = 31337
+)
+
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
-		ChainId:        big.NewInt(60),
+		ChainId:        big.NewInt(MainnetChainID),
 		HomesteadBlock: big.NewInt(0),
 		EIP150Block:    big.NewInt(0),
 		EIP150Hash:     common.Hash{},
@@ -47,7 +52,7 @@ var (
 
 	// TestnetChainConfig contains the chain parameters to run a node on the test network.
 	TestnetChainConfig = &ChainConfig{
-		ChainId:        big.NewInt(31337),
+		ChainId:        big.NewInt(TestnetChainID),
 		HomesteadBlock: big.NewInt(0),
 		EIP150Block:    big.NewInt(0),
 		EIP150Hash:     common.Hash{},
