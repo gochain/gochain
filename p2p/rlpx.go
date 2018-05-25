@@ -88,7 +88,7 @@ type rlpx struct {
 
 func newRLPX(fd net.Conn) transport {
 	if err := fd.SetDeadline(time.Now().Add(handshakeTimeout)); err != nil {
-		log.Error("Cannot set rlpx deadline", "err", err)
+		log.Info("Failed to set rlpx deadline", "err", err)
 	}
 	return &rlpx{fd: fd}
 }
@@ -97,7 +97,7 @@ func (t *rlpx) ReadMsg() (Msg, error) {
 	t.rmu.Lock()
 	defer t.rmu.Unlock()
 	if err := t.fd.SetReadDeadline(time.Now().Add(frameReadTimeout)); err != nil {
-		log.Error("Cannot set rlpx read deadline", "err", err)
+		log.Info("Failed to set rlpx read deadline", "err", err)
 	}
 	return t.rw.ReadMsg()
 }
@@ -118,15 +118,15 @@ func (t *rlpx) close(err error) {
 	if t.rw != nil {
 		if r, ok := err.(DiscReason); ok && r != DiscNetworkError {
 			if err := t.fd.SetWriteDeadline(time.Now().Add(discWriteTimeout)); err != nil {
-				log.Error("Cannot set rlpx write deadline while closing", "err", err)
+				log.Info("Failed to set rlpx write deadline while closing", "err", err)
 			}
 			if err := SendItems(t.rw, discMsg, r); err != nil {
-				log.Error("Cannot send rlpx disc msg while closing", "err", err)
+				log.Info("Failed to send rlpx disc msg while closing", "err", err)
 			}
 		}
 	}
 	if err := t.fd.Close(); err != nil {
-		log.Error("Cannot close rlpx file descriptor", "err", err)
+		log.Error("Failed to close rlpx file descriptor", "err", err)
 	}
 }
 
