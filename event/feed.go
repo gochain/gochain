@@ -18,11 +18,18 @@ package event
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"sync"
+	"time"
+
+	"github.com/gochain-io/gochain/log"
 )
 
 var errBadChannel = errors.New("event: Subscribe argument does not have sendable channel type")
+
+// DefaultFeedTimeout is the default value used if Feed.Timeout is zero.
+const DefaultFeedTimeout = 5 * time.Second
 
 // Feed implements one-to-many subscriptions where the carrier of events is a channel.
 // Values sent to a Feed are delivered to all subscribed channels simultaneously.
@@ -43,6 +50,10 @@ type Feed struct {
 	inbox  caseList
 	etype  reflect.Type
 	closed bool
+
+	// Time before timing out on a Feed.Send().
+	// Without this, subscriptions can block each other.
+	Timeout time.Duration
 }
 
 // This is the index of the first actual subscription channel in sendCases.
@@ -145,25 +156,45 @@ func (f *Feed) Send(value interface{}) (nsent int) {
 
 	// Set the sent value on all channels.
 	for i := firstSubSendCase; i < len(f.sendCases); i++ {
-		f.sendCases[i].Send = rvalue
+		if f.sendCases[i].Dir == reflect.SelectSend {
+			f.sendCases[i].Send = rvalue
+		}
 	}
 
-	// Send until all channels except removeSub have been chosen.
-	cases := f.sendCases
+	// Determine the timeout.
+	timeout := f.Timeout
+	if timeout == 0 {
+		timeout = DefaultFeedTimeout
+	}
+
+	// Create timer & select-case.
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	timerSelectCase := reflect.SelectCase{
+		Dir:  reflect.SelectRecv,
+		Chan: reflect.ValueOf(timer.C),
+	}
+
+	// Send until all channels except removeSub & timer have been chosen.
+	minSelectCaseN := firstSubSendCase + 1 // removeSub + timeout.C
+	cases := make(caseList, len(f.sendCases)+1)
+	copy(cases, f.sendCases)
+	cases[len(cases)-1] = timerSelectCase
 	for {
 		// Fast path: try sending without blocking before adding to the select set.
 		// This should usually succeed if subscribers are fast enough and have free
 		// buffer space.
 		for i := firstSubSendCase; i < len(cases); i++ {
-			if cases[i].Chan.TrySend(rvalue) {
+			if cases[i].Dir == reflect.SelectSend && cases[i].Chan.TrySend(rvalue) {
 				nsent++
 				cases = cases.deactivate(i)
 				i--
 			}
 		}
-		if len(cases) == firstSubSendCase {
+		if len(cases) == minSelectCaseN {
 			break
 		}
+
 		// Select on all the receivers, waiting for them to unblock.
 		chosen, recv, _ := reflect.Select(cases)
 		if chosen == 0 /* <-f.removeSub */ {
@@ -172,6 +203,15 @@ func (f *Feed) Send(value interface{}) (nsent int) {
 			if index >= 0 && index < len(cases) {
 				cases = f.sendCases[:len(cases)-1]
 			}
+		} else if cases[chosen].Chan == timerSelectCase.Chan {
+			// Remove all pending channels from the feed in the event of a timeout.
+			for i := 1; i < len(cases); i++ {
+				if idx := f.sendCases.find(cases[i].Chan.Interface()); idx != -1 {
+					f.sendCases = f.sendCases.delete(idx)
+					log.Warn("feed channel send timeout, subscription dropped", "data", fmt.Sprintf("%T", value))
+				}
+			}
+			break
 		} else {
 			cases = cases.deactivate(chosen)
 			nsent++

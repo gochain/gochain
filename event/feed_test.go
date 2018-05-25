@@ -262,6 +262,30 @@ func TestFeedUnsubscribeFromInbox(t *testing.T) {
 	}
 }
 
+func TestFeed_Send_Timeout(t *testing.T) {
+	var feed Feed
+	feed.Timeout = 1 * time.Second
+
+	sub := make(chan int)
+	feed.Subscribe(sub)
+
+	// Ensure feed skips subscription after timeout.
+	t0 := time.Now()
+	if nsent := feed.Send(100); nsent != 0 {
+		t.Fatal("expected no messages sent")
+	} else if d := time.Since(t0); d < feed.Timeout {
+		t.Fatalf("unexpected delay: %s", d)
+	}
+
+	// Ensure feed no longer exists in subscription.
+	t1 := time.Now()
+	if nsent := feed.Send(100); nsent != 0 {
+		t.Fatal("expected no messages sent")
+	} else if d := time.Since(t1); d > 100*time.Millisecond {
+		t.Fatalf("expected no delay, waited: %s", d)
+	}
+}
+
 func BenchmarkFeedSend1000(b *testing.B) {
 	var (
 		done  sync.WaitGroup
