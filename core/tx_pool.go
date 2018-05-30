@@ -1026,7 +1026,7 @@ func (pool *TxPool) promoteExecutablesAll() {
 	}
 	// Notify subsystem for new promoted transactions.
 	if len(event.Txs) > 0 {
-		pool.txFeed.Send(event)
+		go pool.txFeed.Send(event)
 	}
 	pool.finishPromotion()
 }
@@ -1049,7 +1049,7 @@ func (pool *TxPool) promoteExecutables(accounts ...common.Address) {
 	}
 	// Notify subsystem for new promoted transactions.
 	if len(event.Txs) > 0 {
-		pool.txFeed.Send(event)
+		go pool.txFeed.Send(event)
 	}
 	pool.finishPromotion()
 }
