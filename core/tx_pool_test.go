@@ -394,9 +394,9 @@ func TestTransactionChainFork(t *testing.T) {
 	if _, err := pool.add(ctx, tx, false); err != nil {
 		t.Error("didn't expect error", err)
 	}
-	pool.all.lock.Lock()
+	pool.all.mu.Lock()
 	pool.removeTx(ctx, tx)
-	pool.all.lock.Unlock()
+	pool.all.mu.Unlock()
 	pool.mu.Unlock()
 
 	// reset the pool's internal state

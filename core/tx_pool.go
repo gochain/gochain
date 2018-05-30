@@ -972,32 +972,32 @@ func (pool *TxPool) Get(hash common.Hash) *types.Transaction {
 
 // removeTx removes a single transaction from pending or queue, moving all subsequent
 // transactions back to the future queue.
-// The caller must hold pool.mu and pool.all.lock.
+// The caller must hold pool.mu and pool.all.mu.
 func (pool *TxPool) removeTx(ctx context.Context, tx *types.Transaction) {
 	delete(pool.all.all, tx.Hash())
 
 	addr, _ := types.Sender(ctx, pool.signer, tx) // already validated during insertion
 
-	// Remove the transaction from the pending lists and reset the account nonce
+	// Remove the transaction from the pending lists and reset the account nonce.
 	if pending := pool.pending[addr]; pending != nil {
 		queue := pool.queue[addr]
 		if queue == nil {
+			// Create a new queue for any invalidated pending txs. Will be discarded before returning if unused.
 			queue = newTxList(false)
 			pool.queue[addr] = queue
-			defer func() {
-				if queue.Empty() {
-					delete(pool.queue, addr)
-				}
-			}()
 		}
 		// Remove from pending, and demote any invalidated to the queue.
 		if pending.Remove(tx, queue.add) {
-			// If no more transactions are left, remove the list
+			// If no more transactions are left, remove the list.
 			if pending.Empty() {
 				delete(pool.pending, addr)
 				delete(pool.beats, addr)
 			}
-			// Update the account nonce if needed
+			// If we created a new queue, but no txs were invalidated, then remove it.
+			if queue.Empty() {
+				delete(pool.queue, addr)
+			}
+			// Update the account nonce, if necessary.
 			stNonce := pool.pendingState.GetNonce(addr)
 			if nonce := tx.Nonce(); stNonce > nonce {
 				pool.pendingState.SetNonce(addr, nonce)
@@ -1005,10 +1005,10 @@ func (pool *TxPool) removeTx(ctx context.Context, tx *types.Transaction) {
 			return
 		}
 	}
-	// Transaction is in the future queue
-	if future := pool.queue[addr]; future != nil {
-		_ = future.Remove(tx, func(tx *types.Transaction) {})
-		if future.Empty() {
+	// Transaction is in the future queue.
+	if queue := pool.queue[addr]; queue != nil {
+		_ = queue.Remove(tx, func(tx *types.Transaction) {})
+		if queue.Empty() {
 			delete(pool.queue, addr)
 		}
 	}
@@ -1369,8 +1369,8 @@ func (as *accountSet) add(addr common.Address) {
 // peeking into the pool in TxPool.Get without having to acquire the widely scoped
 // TxPool.mu mutex.
 type txLookup struct {
-	all  map[common.Hash]*types.Transaction
-	lock sync.RWMutex
+	all map[common.Hash]*types.Transaction
+	mu  sync.RWMutex
 }
 
 // newTxLookup returns a new txLookup structure.
@@ -1382,8 +1382,8 @@ func newTxLookup() *txLookup {
 
 // ForEach calls f for each tx, while holding the write lock.
 func (t *txLookup) ForEach(f func(tx *types.Transaction)) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	for _, value := range t.all {
 		f(value)
@@ -1392,30 +1392,30 @@ func (t *txLookup) ForEach(f func(tx *types.Transaction)) {
 
 // Get returns a transaction if it exists in the lookup, or nil if not found.
 func (t *txLookup) Get(hash common.Hash) *types.Transaction {
-	t.lock.RLock()
+	t.mu.RLock()
 	tx := t.all[hash]
-	t.lock.RUnlock()
+	t.mu.RUnlock()
 	return tx
 }
 
 // Count returns the current number of items in the lookup.
 func (t *txLookup) Count() int {
-	t.lock.RLock()
+	t.mu.RLock()
 	l := len(t.all)
-	t.lock.RUnlock()
+	t.mu.RUnlock()
 	return l
 }
 
 // Add adds a transaction to the lookup.
 func (t *txLookup) Add(tx *types.Transaction) {
-	t.lock.Lock()
+	t.mu.Lock()
 	t.all[tx.Hash()] = tx
-	t.lock.Unlock()
+	t.mu.Unlock()
 }
 
 // Remove removes a transaction from the lookup.
 func (t *txLookup) Remove(hash common.Hash) {
-	t.lock.Lock()
+	t.mu.Lock()
 	delete(t.all, hash)
-	t.lock.Unlock()
+	t.mu.Unlock()
 }
