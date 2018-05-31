@@ -36,6 +36,7 @@ import (
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
 	"github.com/gochain-io/gochain/crypto"
+	"github.com/gochain-io/gochain/eth/gasprice"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/params"
@@ -43,10 +44,6 @@ import (
 	"github.com/gochain-io/gochain/rpc"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
-)
-
-const (
-	defaultGasPrice = 50 * params.Shannon
 )
 
 // PublicEthereumAPI provides an API to access Ethereum related information.
@@ -635,7 +632,7 @@ func (s *PublicBlockChainAPI) doCall(ctx context.Context, args CallArgs, blockNr
 		gas = 50000000
 	}
 	if gasPrice.Sign() == 0 {
-		gasPrice = new(big.Int).SetUint64(defaultGasPrice)
+		gasPrice = gasprice.Default
 	}
 
 	// Create new call message

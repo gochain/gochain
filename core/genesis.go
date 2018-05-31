@@ -329,7 +329,7 @@ func DefaultGenesisBlock() *Genesis {
 		Config:     params.MainnetChainConfig,
 		Timestamp:  1526400000,
 		ExtraData:  append(extra, make([]byte, 32-len(extra))...),
-		GasLimit:   210284448,
+		GasLimit:   params.GenesisGasLimit,
 		Difficulty: big.NewInt(1),
 		Signers: []common.Address{
 			common.HexToAddress("0xed7f2e81b0264177e0df8f275f97fd74fa51a896"),
@@ -356,7 +356,7 @@ func DefaultTestnetGenesisBlock() *Genesis {
 		Config:     params.TestnetChainConfig,
 		Timestamp:  1526048200,
 		ExtraData:  hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000"),
-		GasLimit:   210284448,
+		GasLimit:   params.GenesisGasLimit,
 		Difficulty: big.NewInt(1),
 		Signers: []common.Address{
 			common.HexToAddress("0x7aeceb5d345a01f8014a4320ab1f3d467c0c086a"),

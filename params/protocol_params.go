@@ -19,10 +19,14 @@ package params
 import "math/big"
 
 var (
-	TargetGasLimit uint64 = GenesisGasLimit // The artificial target
+	// The artificial target gas limit. Overridable via TargetGasLimitFlag.
+	TargetGasLimit uint64 = TargetTxsPerSec * DefaultCliquePeriod * TxGas
 )
 
 const (
+	DefaultCliquePeriod = 5
+	TargetTxsPerSec     = 1300
+
 	GasLimitBoundDivisor uint64 = 1024      // The bound divisor of the gas limit, used in update calculations.
 	MinGasLimit          uint64 = 5000      // Minimum the gas limit may ever be.
 	GenesisGasLimit      uint64 = 210284448 // Gas limit of the Genesis block.
