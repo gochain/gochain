@@ -45,7 +45,7 @@ var (
 		ByzantiumBlock: big.NewInt(0),
 
 		Clique: &CliqueConfig{
-			Period: 5,
+			Period: DefaultCliquePeriod,
 			Epoch:  3000,
 		},
 	}
@@ -61,7 +61,7 @@ var (
 		ByzantiumBlock: big.NewInt(0),
 
 		Clique: &CliqueConfig{
-			Period: 5,
+			Period: DefaultCliquePeriod,
 			Epoch:  3000,
 		},
 	}
@@ -83,7 +83,7 @@ var (
 	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0),
 		new(EthashConfig),
 		&CliqueConfig{
-			Period: 5,
+			Period: DefaultCliquePeriod,
 			Epoch:  3000,
 		},
 	}
