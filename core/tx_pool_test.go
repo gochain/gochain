@@ -297,60 +297,151 @@ func TestInvalidTransactions(t *testing.T) {
 }
 
 func TestTransactionQueue(t *testing.T) {
-	ctx := context.Background()
 	t.Parallel()
 
-	pool, key := setupTxPool(ctx)
-	defer pool.Stop()
+	t.Run("low1", func(t *testing.T) {
+		ctx := context.Background()
+		pool, key := setupTxPool(ctx)
+		defer pool.Stop()
 
-	tx := transaction(0, 100, key)
-	from, _ := deriveSender(ctx, tx)
-	pool.mu.Lock()
-	defer pool.mu.Unlock()
-	pool.currentState.AddBalance(from, big.NewInt(1000))
-	pool.reset(ctx, nil, nil)
-	pool.enqueueTx(ctx, tx)
+		tx := transaction(0, 100, key)
+		from, _ := deriveSender(ctx, tx)
+		pool.mu.Lock()
+		defer pool.mu.Unlock()
+		pool.currentState.AddBalance(from, big.NewInt(1000))
+		pool.reset(ctx, nil, nil)
+		if _, err := pool.enqueueTx(ctx, tx); err != nil {
+			t.Fatal(err)
+		}
 
-	pool.promoteExecutables(from)
-	if len(pool.pending) != 1 {
-		t.Error("expected valid txs to be 1 is", len(pool.pending))
-	}
+		pool.promoteExecutables(from)
+		if len(pool.pending) != 1 {
+			t.Error("expected valid txs to be 1 is", len(pool.pending))
+		}
 
-	tx = transaction(1, 100, key)
-	from, _ = deriveSender(ctx, tx)
-	pool.currentState.SetNonce(from, 2)
-	pool.enqueueTx(ctx, tx)
-	pool.promoteExecutables(from)
-	if _, ok := pool.pending[from].txs.items[tx.Nonce()]; ok {
-		t.Error("expected transaction to be in tx pool")
-	}
+		tx = transaction(1, 100, key)
+		from, _ = deriveSender(ctx, tx)
+		pool.currentState.SetNonce(from, 2)
+		if _, err := pool.enqueueTx(ctx, tx); err != nil {
+			t.Fatal(err)
+		}
+		pool.promoteExecutables(from)
+		if _, ok := pool.pending[from].txs.items[tx.Nonce()]; ok {
+			t.Error("expected transaction to be dropped")
+		}
 
-	if len(pool.queue) > 0 {
-		t.Error("expected transaction queue to be empty. is", len(pool.queue))
-	}
+		if len(pool.queue) > 0 {
+			t.Error("expected transaction queue to be empty. is", len(pool.queue))
+		}
+	})
 
-	pool, key = setupTxPool(ctx)
-	defer pool.Stop()
+	t.Run("low2", func(t *testing.T) {
+		ctx := context.Background()
+		pool, key := setupTxPool(ctx)
+		defer pool.Stop()
 
-	tx1 := transaction(0, 100, key)
-	tx2 := transaction(10, 100, key)
-	tx3 := transaction(11, 100, key)
-	from, _ = deriveSender(ctx, tx1)
-	pool.currentState.AddBalance(from, big.NewInt(1000))
-	pool.reset(ctx, nil, nil)
+		tx1 := transaction(0, 100, key)
+		tx2 := transaction(10, 100, key)
+		tx3 := transaction(11, 100, key)
+		from, _ := deriveSender(ctx, tx1)
+		pool.mu.Lock()
+		defer pool.mu.Unlock()
+		pool.currentState.AddBalance(from, big.NewInt(1000))
+		pool.reset(ctx, nil, nil)
 
-	pool.enqueueTx(ctx, tx1)
-	pool.enqueueTx(ctx, tx2)
-	pool.enqueueTx(ctx, tx3)
+		if _, err := pool.enqueueTx(ctx, tx1); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.enqueueTx(ctx, tx2); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.enqueueTx(ctx, tx3); err != nil {
+			t.Fatal(err)
+		}
 
-	pool.promoteExecutables(from)
+		pool.promoteExecutables(from)
 
-	if len(pool.pending) != 1 {
-		t.Error("expected tx pool to be 1, got", len(pool.pending))
-	}
-	if pool.queue[from].Len() != 2 {
-		t.Error("expected len(queue) == 2, got", pool.queue[from].Len())
-	}
+		if len(pool.pending) != 1 {
+			t.Error("expected tx pool to be 1, got", len(pool.pending))
+		}
+		if pool.queue[from].Len() != 2 {
+			t.Error("expected len(queue) == 2, got", pool.queue[from].Len())
+		}
+	})
+
+	const gasLimit = 90000
+	t.Run("high1", func(t *testing.T) {
+		ctx := context.Background()
+		pool, key := setupTxPool(ctx)
+		defer pool.Stop()
+
+		tx := transaction(0, gasLimit, key)
+		from, _ := deriveSender(ctx, tx)
+		pool.mu.Lock()
+		pool.currentState.AddBalance(from, big.NewInt(1000000000000000))
+		pool.reset(ctx, nil, nil)
+		pool.mu.Unlock()
+		if err := pool.AddRemote(ctx, tx); err != nil {
+			t.Fatal(err)
+		}
+
+		pool.mu.Lock()
+		if len(pool.pending) != 1 {
+			t.Error("expected valid txs to be 1 is", len(pool.pending))
+		}
+		pool.mu.Unlock()
+
+		tx = transaction(1, gasLimit, key)
+		from, _ = deriveSender(ctx, tx)
+		pool.mu.Lock()
+		pool.currentState.SetNonce(from, 2)
+		pool.mu.Unlock()
+		if err := pool.AddRemote(ctx, tx); err != ErrNonceTooLow {
+			t.Fatalf("expected 'nonce too low' but got %q", err)
+		}
+
+		pool.mu.Lock()
+		if pending := pool.pending[from]; pending == nil {
+			t.Errorf("expected pending txs for %s", from.Hex())
+		} else if _, ok := pending.txs.items[tx.Nonce()]; ok {
+			t.Error("expected transaction to be dropped:", pending.txs.items)
+		}
+		if len(pool.queue) > 0 {
+			t.Error("expected transaction queue to be empty. is", len(pool.queue))
+		}
+		pool.mu.Unlock()
+	})
+
+	t.Run("high2", func(t *testing.T) {
+		ctx := context.Background()
+		pool, key := setupTxPool(ctx)
+		defer pool.Stop()
+
+		tx1 := transaction(0, gasLimit, key)
+		tx2 := transaction(10, gasLimit, key)
+		tx3 := transaction(11, gasLimit, key)
+		from, _ := deriveSender(ctx, tx1)
+
+		pool.mu.Lock()
+		pool.currentState.AddBalance(from, big.NewInt(1000000000000000))
+		pool.reset(ctx, nil, nil)
+		pool.mu.Unlock()
+
+		if err := pool.AddRemotes(ctx, []*types.Transaction{tx1, tx2, tx3}); err != nil {
+			t.Fatal(err)
+		}
+
+		pool.mu.Lock()
+		if len(pool.pending) != 1 {
+			t.Error("expected tx pool to be 1, got", len(pool.pending))
+		}
+		if queue := pool.queue[from]; queue == nil {
+			t.Errorf("expected queued txs for %s", from.Hex())
+		} else if queue.Len() != 2 {
+			t.Error("expected len(queue) == 2, got", pool.queue[from].Len())
+		}
+		pool.mu.Unlock()
+	})
 }
 
 func TestTransactionNegativeValue(t *testing.T) {
