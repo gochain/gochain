@@ -44,6 +44,7 @@ var testTxPoolConfig TxPoolConfig
 func init() {
 	testTxPoolConfig = DefaultTxPoolConfig
 	testTxPoolConfig.Journal = ""
+	testTxPoolConfig.PriceLimit = 1
 }
 
 type testBlockChain struct {

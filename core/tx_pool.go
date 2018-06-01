@@ -29,6 +29,7 @@ import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
+	"github.com/gochain-io/gochain/eth/gasprice"
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/metrics"
@@ -157,7 +158,7 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	Journal:   "transactions.rlp",
 	Rejournal: time.Hour,
 
-	PriceLimit: 1,
+	PriceLimit: gasprice.Default.Uint64(),
 	PriceBump:  10,
 
 	AccountSlots: 2048,
