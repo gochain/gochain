@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	Default  = new(big.Int).SetUint64(1 * params.Shannon)
+	Default  = new(big.Int).SetUint64(2 * params.Shannon)
 	maxPrice = big.NewInt(500 * params.Shannon)
 )
 
