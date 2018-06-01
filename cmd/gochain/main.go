@@ -76,7 +76,6 @@ var (
 		utils.TxPoolNoLocalsFlag,
 		utils.TxPoolJournalFlag,
 		utils.TxPoolRejournalFlag,
-		utils.TxPoolPriceLimitFlag,
 		utils.TxPoolPriceBumpFlag,
 		utils.TxPoolAccountSlotsFlag,
 		utils.TxPoolGlobalSlotsFlag,
@@ -304,8 +303,6 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 				th.SetThreads(threads)
 			}
 		}
-		// Set the gas price to the limits from the CLI and start mining
-		gochain.TxPool().SetGasPrice(context.TODO(), utils.GlobalBig(ctx, utils.GasPriceFlag.Name))
 		if err := gochain.StartMining(context.TODO(), true); err != nil {
 			utils.Fatalf("Failed to start mining: %v", err)
 		}
