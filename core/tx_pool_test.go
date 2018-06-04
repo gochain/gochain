@@ -111,6 +111,13 @@ func setupTxPool(ctx context.Context) (*TxPool, *ecdsa.PrivateKey) {
 	return pool, key
 }
 
+func resetTxPool(pool *TxPool) {
+	pool.pending = make(map[common.Address]*txList)
+	pool.queue = make(map[common.Address]*txList)
+	pool.beats = make(map[common.Address]time.Time)
+	pool.all = newTxLookup()
+}
+
 // validateTxPoolInternals checks various consistency invariants within the pool.
 func validateTxPoolInternals(pool *TxPool) error {
 	pool.mu.RLock()
@@ -1912,62 +1919,90 @@ func TestTransactionStatusCheck(t *testing.T) {
 
 // Benchmarks the speed of validating the contents of the pending queue of the
 // transaction pool.
-func BenchmarkPendingDemotion100(b *testing.B)   { benchmarkPendingDemotion(b, 100) }
-func BenchmarkPendingDemotion1000(b *testing.B)  { benchmarkPendingDemotion(b, 1000) }
-func BenchmarkPendingDemotion10000(b *testing.B) { benchmarkPendingDemotion(b, 10000) }
+func BenchmarkTxPool_promoteTx(b *testing.B) {
+	b.Run("10", func(b *testing.B) {
+		benchmarkTxPool_promoteTx(b, 10)
+	})
+	b.Run("100", func(b *testing.B) {
+		benchmarkTxPool_promoteTx(b, 100)
+	})
+	b.Run("1000", func(b *testing.B) {
+		benchmarkTxPool_promoteTx(b, 1000)
+	})
+	b.Run("10000", func(b *testing.B) {
+		benchmarkTxPool_promoteTx(b, 10000)
+	})
+}
 
-func benchmarkPendingDemotion(b *testing.B, size int) {
+func benchmarkTxPool_promoteTx(b *testing.B, size int) {
 	ctx := context.Background()
-	// Add a batch of transactions to a pool one by one
+
 	pool, key := setupTxPool(ctx)
 	defer pool.Stop()
-
-	account, _ := deriveSender(ctx, transaction(0, 0, key))
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
-	pool.currentState.AddBalance(account, big.NewInt(1000000))
 
-	for i := 0; i < size; i++ {
-		tx := transaction(uint64(i), 100000, key)
-		pool.promoteTx(account, tx.Hash(), tx)
+	account, _ := deriveSender(ctx, transaction(0, 0, key))
+	pool.currentState.AddBalance(account, big.NewInt(1000000))
+	txs := make([]*types.Transaction, size)
+	for i := range txs {
+		txs[i] = transaction(uint64(1+i), 100000, key)
 	}
-	// Benchmark the speed of pool validation
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		pool.demoteUnexecutables()
+		resetTxPool(pool)
+		for _, tx := range txs {
+			pool.promoteTx(account, tx.Hash(), tx)
+		}
 	}
 }
 
 // Benchmarks the speed of scheduling the contents of the future queue of the
 // transaction pool.
-func BenchmarkFuturePromotion100(b *testing.B)   { benchmarkFuturePromotion(b, 100) }
-func BenchmarkFuturePromotion1000(b *testing.B)  { benchmarkFuturePromotion(b, 1000) }
-func BenchmarkFuturePromotion10000(b *testing.B) { benchmarkFuturePromotion(b, 10000) }
+func BenchmarkTxPool_enqueueTx(b *testing.B) {
+	b.Run("10", func(b *testing.B) {
+		benchmarkTxPool_enqueueTx(b, 10)
+	})
+	b.Run("100", func(b *testing.B) {
+		benchmarkTxPool_enqueueTx(b, 100)
+	})
+	b.Run("1000", func(b *testing.B) {
+		benchmarkTxPool_enqueueTx(b, 1000)
+	})
+	b.Run("10000", func(b *testing.B) {
+		benchmarkTxPool_enqueueTx(b, 10000)
+	})
+}
 
-func benchmarkFuturePromotion(b *testing.B, size int) {
+func benchmarkTxPool_enqueueTx(b *testing.B, size int) {
 	ctx := context.Background()
 	// Add a batch of transactions to a pool one by one
 	pool, key := setupTxPool(ctx)
 	defer pool.Stop()
-
-	account, _ := deriveSender(ctx, transaction(0, 0, key))
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
-	pool.currentState.AddBalance(account, big.NewInt(1000000))
 
-	for i := 0; i < size; i++ {
-		tx := transaction(uint64(1+i), 100000, key)
-		pool.enqueueTx(ctx, tx)
+	account, _ := deriveSender(ctx, transaction(0, 0, key))
+	pool.currentState.AddBalance(account, big.NewInt(1000000))
+	txs := make([]*types.Transaction, size)
+	for i := range txs {
+		txs[i] = transaction(uint64(i), 100000, key)
 	}
-	// Benchmark the speed of pool validation
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		pool.promoteExecutablesAll()
+		resetTxPool(pool)
+		for i, tx := range txs {
+			if _, err := pool.enqueueTx(ctx, tx); err != nil {
+				b.Fatalf("failed to enqueue tx %d %s: %s", i, tx.Hash().Hex(), err)
+			}
+		}
 	}
 }
 
 // Benchmarks the speed of iterative transaction insertion.
-func BenchmarkPoolInsert(b *testing.B) {
+func BenchmarkTxPool_AddRemote(b *testing.B) {
 	ctx := context.Background()
 	// Generate a batch of transactions to enqueue into the pool
 	pool, key := setupTxPool(ctx)
@@ -1990,11 +2025,19 @@ func BenchmarkPoolInsert(b *testing.B) {
 }
 
 // Benchmarks the speed of batched transaction insertion.
-func BenchmarkPoolBatchInsert100(b *testing.B)   { benchmarkPoolBatchInsert(b, 100) }
-func BenchmarkPoolBatchInsert1000(b *testing.B)  { benchmarkPoolBatchInsert(b, 1000) }
-func BenchmarkPoolBatchInsert10000(b *testing.B) { benchmarkPoolBatchInsert(b, 10000) }
+func BenchmarkTxPool_AddRemotes(b *testing.B) {
+	b.Run("100", func(b *testing.B) {
+		benchmarkTxPool_AddRemotes(b, 100)
+	})
+	b.Run("1000", func(b *testing.B) {
+		benchmarkTxPool_AddRemotes(b, 1000)
+	})
+	b.Run("10000", func(b *testing.B) {
+		benchmarkTxPool_AddRemotes(b, 10000)
+	})
+}
 
-func benchmarkPoolBatchInsert(b *testing.B, size int) {
+func benchmarkTxPool_AddRemotes(b *testing.B, size int) {
 	ctx := context.Background()
 	// Generate a batch of transactions to enqueue into the pool
 	pool, key := setupTxPool(ctx)
