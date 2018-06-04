@@ -84,9 +84,9 @@ var (
 )
 
 var (
-	evictionInterval    = time.Minute     // Time interval to check for evictable transactions
-	statsReportInterval = 2 * time.Second // Time interval to report transaction pool stats
-	resetInterval       = 5 * time.Second // Time interval to reset the txpool
+	evictionInterval    = time.Minute      // Time interval to check for evictable transactions
+	statsReportInterval = 10 * time.Second // Time interval to report transaction pool stats
+	resetInterval       = 1 * time.Second  // Time interval to reset the txpool
 )
 
 var (
@@ -314,14 +314,19 @@ func (pool *TxPool) loop(ctx context.Context) {
 	defer journal.Stop()
 
 	// Track the current and latest blocks for transaction reorgs.
-	var blockMu sync.RWMutex
 	pool.mu.Lock()
-	currentBlock := pool.chain.CurrentBlock()
-	latestBlock := pool.chain.CurrentBlock()
+	b := pool.chain.CurrentBlock()
 	pool.mu.Unlock()
+	blocks := struct {
+		sync.RWMutex
+		current, latest *types.Block
+	}{
+		current: b,
+		latest:  b,
+	}
 
-	chainHeadGauge.Update(int64(currentBlock.NumberU64()))
-	chainHeadTxsGauge.Update(int64(len(currentBlock.Transactions())))
+	chainHeadGauge.Update(int64(blocks.current.NumberU64()))
+	chainHeadTxsGauge.Update(int64(len(blocks.current.Transactions())))
 
 	globalSlotsGauge.Update(int64(pool.config.GlobalSlots))
 	globalQueueGauge.Update(int64(pool.config.GlobalQueue))
@@ -337,18 +342,18 @@ func (pool *TxPool) loop(ctx context.Context) {
 				if ev.Block == nil {
 					continue
 				}
-				blockMu.RLock()
-				chain := latestBlock
-				blockMu.RUnlock()
+				blocks.RLock()
+				chain := blocks.latest
+				blocks.RUnlock()
 
 				n := ev.Block.Number()
 				if n.Cmp(chain.Number()) <= 0 {
 					continue
 				}
 				// Update latestBlock for next reset.
-				blockMu.Lock()
-				latestBlock = ev.Block
-				blockMu.Unlock()
+				blocks.Lock()
+				blocks.latest = ev.Block
+				blocks.Unlock()
 
 				if !pool.chainconfig.IsHomestead(n) {
 					continue
@@ -368,18 +373,18 @@ func (pool *TxPool) loop(ctx context.Context) {
 
 		// Periodically reset to latest chain head.
 		case <-reset.C:
-			blockMu.RLock()
-			latest, current := latestBlock, currentBlock
-			blockMu.RUnlock()
+			blocks.RLock()
+			latest, current := blocks.latest, blocks.current
+			blocks.RUnlock()
 
 			if latest.NumberU64() > current.NumberU64() {
 				pool.mu.Lock()
 				pool.reset(ctx, current, latest)
 				pool.mu.Unlock()
 
-				blockMu.Lock()
-				currentBlock = latest
-				blockMu.Unlock()
+				blocks.Lock()
+				blocks.current = latest
+				blocks.Unlock()
 
 				chainHeadGauge.Update(int64(latest.NumberU64()))
 				chainHeadTxsGauge.Update(int64(len(latest.Transactions())))
@@ -387,9 +392,7 @@ func (pool *TxPool) loop(ctx context.Context) {
 
 		// Handle stats reporting ticks
 		case <-report.C:
-			pool.mu.RLock()
-			pending, queued := pool.stats()
-			pool.mu.RUnlock()
+			pending, queued := pool.Stats()
 
 			pendingGauge.Update(int64(pending))
 			queuedGauge.Update(int64(queued))
@@ -431,61 +434,78 @@ func (pool *TxPool) loop(ctx context.Context) {
 	}
 }
 
+const maxReorgDepth = 16
+
 // reset retrieves the current state of the blockchain and ensures the content
 // of the transaction pool is valid with regard to the chain state.
 func (pool *TxPool) reset(ctx context.Context, oldBlock, newBlock *types.Block) {
 	// If we're reorging an old state, reinject all dropped transactions
-	var reinject types.Transactions
+	reinject := make(map[common.Hash]*types.Transaction)
 
 	if oldBlock != nil && oldBlock.Hash() != newBlock.ParentHash() {
 		// If the reorg is too deep, avoid doing it (will happen during fast sync)
-		oldNum := oldBlock.Number().Uint64()
-		newNum := newBlock.Number().Uint64()
+		branchNum := oldBlock.NumberU64()
+		mainNum := newBlock.NumberU64()
 
-		if depth := uint64(math.Abs(float64(oldNum) - float64(newNum))); depth > 64 {
+		var depth uint64
+		if branchNum > mainNum {
+			depth = branchNum - mainNum
+		} else {
+			depth = mainNum - branchNum
+		}
+		if depth > maxReorgDepth {
+			// Too deep to pull all transactions into memory.
 			log.Debug("Skipping deep transaction reorg", "depth", depth)
 		} else {
-			// Reorg seems shallow enough to pull in all transactions into memory
-			var discarded types.Transactions
+			// Set of txs included in the main chain.
 			included := make(map[common.Hash]struct{})
-
 			var (
-				rem = oldBlock
-				add = newBlock
+				branch = oldBlock
+				main   = newBlock
 			)
-			for rem.NumberU64() > add.NumberU64() {
-				discarded = append(discarded, rem.Transactions()...)
-				if rem = pool.chain.GetBlock(rem.ParentHash(), rem.NumberU64()-1); rem == nil {
-					log.Error("Unrooted old chain seen by tx pool", "block", oldNum, "hash", oldBlock.Hash())
-					return
-				}
-			}
-			for add.NumberU64() > rem.NumberU64() {
-				for _, tx := range add.Transactions() {
+			// Rewind main up the chain to a possible common ancestor.
+			for main.NumberU64() > branchNum {
+				for _, tx := range main.Transactions() {
 					included[tx.Hash()] = struct{}{}
 				}
-				if add = pool.chain.GetBlock(add.ParentHash(), add.NumberU64()-1); add == nil {
-					log.Error("Unrooted new chain seen by tx pool", "block", newNum, "hash", newBlock.Hash())
+				if main = pool.chain.GetBlock(main.ParentHash(), main.NumberU64()-1); main == nil {
+					log.Error("Unrooted new chain seen by tx pool", "block", mainNum, "hash", newBlock.Hash())
 					return
 				}
 			}
-			for rem.Hash() != add.Hash() {
-				discarded = append(discarded, rem.Transactions()...)
-				if rem = pool.chain.GetBlock(rem.ParentHash(), rem.NumberU64()-1); rem == nil {
-					log.Error("Unrooted old chain seen by tx pool", "block", oldNum, "hash", oldBlock.Hash())
-					return
+			// Rewind branch up the chain to a possible common ancestor.
+			for branch.NumberU64() > mainNum {
+				for _, tx := range branch.Transactions() {
+					if _, ok := included[tx.Hash()]; !ok {
+						reinject[tx.Hash()] = tx
+					}
 				}
-				for _, tx := range add.Transactions() {
-					included[tx.Hash()] = struct{}{}
-				}
-				if add = pool.chain.GetBlock(add.ParentHash(), add.NumberU64()-1); add == nil {
-					log.Error("Unrooted new chain seen by tx pool", "block", newNum, "hash", newBlock.Hash())
+				if branch = pool.chain.GetBlock(branch.ParentHash(), branch.NumberU64()-1); branch == nil {
+					log.Error("Unrooted old chain seen by tx pool", "block", branchNum, "hash", oldBlock.Hash())
 					return
 				}
 			}
-			for _, tx := range discarded {
-				if _, ok := included[tx.Hash()]; !ok {
-					reinject = append(reinject, tx)
+			// Continue up the chain until a common ancestor is found.
+			for branch.Hash() != main.Hash() {
+				for _, tx := range main.Transactions() {
+					hash := tx.Hash()
+					if _, ok := reinject[hash]; ok {
+						delete(reinject, hash)
+					}
+					included[hash] = struct{}{}
+				}
+				if main = pool.chain.GetBlock(main.ParentHash(), main.NumberU64()-1); main == nil {
+					log.Error("Unrooted new chain seen by tx pool", "block", mainNum, "hash", newBlock.Hash())
+					return
+				}
+				for _, tx := range branch.Transactions() {
+					if _, ok := included[tx.Hash()]; !ok {
+						reinject[tx.Hash()] = tx
+					}
+				}
+				if branch = pool.chain.GetBlock(branch.ParentHash(), branch.NumberU64()-1); branch == nil {
+					log.Error("Unrooted old chain seen by tx pool", "block", branchNum, "hash", oldBlock.Hash())
+					return
 				}
 			}
 		}
@@ -503,9 +523,18 @@ func (pool *TxPool) reset(ctx context.Context, oldBlock, newBlock *types.Block) 
 	pool.pendingState = state.ManageState(statedb)
 	pool.currentMaxGas = newBlock.GasLimit()
 
-	// Inject any transactions discarded due to reorgs
-	log.Debug("Reinjecting stale transactions", "count", len(reinject))
-	pool.addTxsLocked(ctx, reinject, false)
+	if l := len(reinject); l > 0 {
+		// Inject any transactions discarded due to reorgs.
+		log.Debug("Reinjecting stale transactions", "count", l)
+		if errs := pool.reinject(ctx, reinject); len(errs) > 0 {
+			log.Error("Failed to reinject txs during pool rest", "total", l, "errs", len(errs))
+			if log.Tracing() {
+				for i, err := range errs {
+					log.Trace("Failed to reinject tx", "num", i, "err", err)
+				}
+			}
+		}
+	}
 
 	// validate the pool of pending transactions, this will remove
 	// any transactions that have been included in the block or
@@ -925,6 +954,34 @@ func (pool *TxPool) addTxsLocked(ctx context.Context, txs []*types.Transaction, 
 
 	for _, tx := range txs {
 		replace, err := pool.add(ctx, tx, local)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if !replace {
+			from, _ := types.Sender(ctx, pool.signer, tx) // already validated
+			dirty[from] = struct{}{}
+		}
+	}
+	// Only reprocess the internal state if something was actually added
+	if len(dirty) > 0 {
+		addrs := make([]common.Address, 0, len(dirty))
+		for addr := range dirty {
+			addrs = append(addrs, addr)
+		}
+		pool.promoteExecutables(addrs...)
+	}
+	return errs
+}
+
+// reinject is like addTxsLocked but with a map and local false.
+func (pool *TxPool) reinject(ctx context.Context, txs map[common.Hash]*types.Transaction) []error {
+	// Add the batch of transaction, tracking the accepted ones
+	dirty := make(map[common.Address]struct{})
+	var errs []error
+
+	for _, tx := range txs {
+		replace, err := pool.add(ctx, tx, false)
 		if err != nil {
 			errs = append(errs, err)
 			continue
