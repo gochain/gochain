@@ -62,6 +62,9 @@ func (b *EthApiBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNum
 	// Pending block is only known by the miner
 	if blockNr == rpc.PendingBlockNumber {
 		block := b.eth.miner.PendingBlock()
+		if block == nil {
+			return nil, nil
+		}
 		return block.Header(), nil
 	}
 	// Otherwise resolve and return the block

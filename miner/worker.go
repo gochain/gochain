@@ -216,6 +216,9 @@ func (w *worker) pendingBlock() *types.Block {
 
 	w.currentMu.RLock()
 	defer w.currentMu.RUnlock()
+	if w.current == nil {
+		return nil
+	}
 	return w.current.Block
 }
 
