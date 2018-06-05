@@ -24,9 +24,13 @@ import (
 	"io"
 	"math/big"
 	mrand "math/rand"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/hashicorp/golang-lru"
+	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/mclock"
@@ -42,8 +46,6 @@ import (
 	"github.com/gochain-io/gochain/params"
 	"github.com/gochain-io/gochain/rlp"
 	"github.com/gochain-io/gochain/trie"
-	"github.com/hashicorp/golang-lru"
-	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
 var (
@@ -123,10 +125,11 @@ type BlockChain struct {
 	procInterrupt int32          // interrupt signaler for block processing
 	wg            sync.WaitGroup // chain processing wait group for shutting down
 
-	engine    consensus.Engine
-	processor Processor // block processor interface
-	validator Validator // block and state validator interface
-	vmConfig  vm.Config
+	engine     consensus.Engine
+	processor  Processor // block processor interface
+	validator  Validator // block and state validator interface
+	vmConfig   vm.Config
+	parWorkers int // Number of workers to spawn for parallel tasks.
 
 	badBlocks *lru.Cache // Bad block cache
 }
@@ -160,6 +163,7 @@ func NewBlockChain(ctx context.Context, db ethdb.Database, cacheConfig *CacheCon
 		futureBlocks: futureBlocks,
 		engine:       engine,
 		vmConfig:     vmConfig,
+		parWorkers:   runtime.GOMAXPROCS(0),
 		badBlocks:    badBlocks,
 	}
 	bc.SetValidator(NewBlockValidator(chainConfig, bc, engine))
@@ -1017,7 +1021,11 @@ func (bc *BlockChain) InsertChain(ctx context.Context, chain types.Blocks) (int,
 // only reason this method exists as a separate one is to make locking cleaner
 // with deferred statements.
 func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int, []interface{}, []*types.Log, error) {
-	// Do a sanity check that the provided chain is actually ordered and linked
+	// Sanity check that we have something meaningful to import.
+	if len(chain) == 0 {
+		return 0, nil, nil, nil
+	}
+	// Do a sanity check that the provided chain is actually ordered and linked.
 	for i := 1; i < len(chain); i++ {
 		if chain[i].NumberU64() != chain[i-1].NumberU64()+1 || chain[i].ParentHash() != chain[i-1].Hash() {
 			// Chain broke ancestry, log a messge (programming error) and skip insertion
@@ -1054,6 +1062,30 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 	}
 	abort, results := bc.engine.VerifyHeaders(ctx, bc, headers, seals)
 	defer close(abort)
+
+	go func() {
+		// Pre-compute and cache sender ecrecover for each transaction.
+		for _, block := range chain {
+			signer := types.MakeSigner(bc.Config(), block.Number())
+			var wi int32 = -1
+			txs := block.Transactions()
+			l32 := int32(len(txs))
+			var wg sync.WaitGroup
+			wg.Add(bc.parWorkers)
+			for s := 0; s < bc.parWorkers; s++ {
+				go func() {
+					defer wg.Done()
+					for i := atomic.AddInt32(&wi, 1); i < l32; i = atomic.AddInt32(&wi, 1) {
+						txs[i].Hash()
+						if _, err := types.Sender(ctx, signer, txs[i]); err != nil {
+							log.Error("Cannot derive address from signature")
+						}
+					}
+				}()
+			}
+			wg.Wait()
+		}
+	}()
 
 	// Iterate over the blocks and insert when the verifier permits
 	for i, block := range chain {
