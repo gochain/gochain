@@ -114,7 +114,7 @@ jobs:
               - /tmp/go/cache
       - attach_workspace:
           at: .
-      - run: go test -race ./core/...
+      - run: go test -race ./...
       - save_cache:
           key: race-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
           paths:
