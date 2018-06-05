@@ -387,7 +387,7 @@ func DeveloperGenesisBlock(period uint64, faucet common.Address) *Genesis {
 	if !ok {
 		panic("failed to parse big.Int string")
 	}
-	var extra = faucet.Bytes()
+	var extra = []byte(faucet.Hex())[:32]
 	// Assemble and return the genesis with the precompiles and faucet pre-funded
 	return &Genesis{
 		Config:     &config,
