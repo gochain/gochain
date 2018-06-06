@@ -18,8 +18,6 @@ package core
 
 import (
 	"context"
-	"runtime"
-	"sync/atomic"
 
 	"github.com/gochain-io/gochain/common/perfutils"
 	"github.com/gochain-io/gochain/consensus"
@@ -27,7 +25,6 @@ import (
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
 	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 )
 
@@ -36,19 +33,17 @@ import (
 //
 // StateProcessor implements Processor.
 type StateProcessor struct {
-	config     *params.ChainConfig // Chain configuration options
-	bc         *BlockChain         // Canonical block chain
-	engine     consensus.Engine    // Consensus engine used for block rewards
-	parWorkers int                 // Number of workers to spawn for parallel tasks.
+	config *params.ChainConfig // Chain configuration options
+	bc     *BlockChain         // Canonical block chain
+	engine consensus.Engine    // Consensus engine used for block rewards
 }
 
 // NewStateProcessor initialises a new StateProcessor.
 func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consensus.Engine) *StateProcessor {
 	return &StateProcessor{
-		config:     config,
-		bc:         bc,
-		engine:     engine,
-		parWorkers: 2 * runtime.GOMAXPROCS(0),
+		config: config,
+		bc:     bc,
+		engine: engine,
 	}
 }
 
@@ -62,20 +57,6 @@ func NewStateProcessor(config *params.ChainConfig, bc *BlockChain, engine consen
 func (p *StateProcessor) Process(ctx context.Context, block *types.Block, statedb *state.StateDB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
 	txs := block.Transactions()
 	header := block.Header()
-
-	signer := types.MakeSigner(p.config, header.Number)
-	var wi int32 = -1
-	l32 := int32(len(txs))
-	for s := 0; s < p.parWorkers; s++ {
-		go func() {
-			for i := atomic.AddInt32(&wi, 1); i < l32; i = atomic.AddInt32(&wi, 1) {
-				txs[i].Hash()
-				if _, err := types.Sender(ctx, signer, txs[i]); err != nil {
-					log.Error("Cannot derive address from signature")
-				}
-			}
-		}()
-	}
 
 	var (
 		receipts = make(types.Receipts, len(txs))
@@ -96,7 +77,7 @@ func (p *StateProcessor) Process(ctx context.Context, block *types.Block, stated
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
 		ps.Stop()
 		ps = perfTimer.Start(perfutils.ApplyTransaction)
-		receipt, _, err := ApplyTransaction(ctx, vmenv, p.config, gp, statedb, header, tx, usedGas, signer)
+		receipt, _, err := ApplyTransaction(ctx, vmenv, p.config, gp, statedb, header, tx, usedGas, types.MakeSigner(p.config, header.Number))
 		if err != nil {
 			return nil, nil, 0, err
 		}
