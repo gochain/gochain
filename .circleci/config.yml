@@ -214,7 +214,13 @@ workflows:
   prepare-accept-deploy:
     jobs:
       - prepare      
-      - prepare-gcr
+      - prepare-gcr:
+         filters:
+            branches:
+              only: 
+                - testnet
+                - master
+                - stable
       - build:
           requires:
             - prepare
