@@ -1278,11 +1278,16 @@ func (s *PublicTransactionPoolAPI) SignTransaction(ctx context.Context, args Sen
 	return &SignTransactionResult{data, tx}, nil
 }
 
-// PendingTransactions returns the transactions that are in the transaction pool and have a from address that is one of
-// the accounts this node manages.
+// PendingTransactions returns the transactions that are in the transaction pool
+// and have a from address that is one of the accounts this node manages.
 func (s *PublicTransactionPoolAPI) PendingTransactions(ctx context.Context) ([]*RPCTransaction, error) {
 	pending := s.b.GetPoolTransactions()
-
+	accounts := make(map[common.Address]struct{})
+	for _, wallet := range s.b.AccountManager().Wallets() {
+		for _, account := range wallet.Accounts() {
+			accounts[account.Address] = struct{}{}
+		}
+	}
 	transactions := make([]*RPCTransaction, 0, len(pending))
 	for _, tx := range pending {
 		var signer types.Signer = types.HomesteadSigner{}
@@ -1290,7 +1295,7 @@ func (s *PublicTransactionPoolAPI) PendingTransactions(ctx context.Context) ([]*
 			signer = types.NewEIP155Signer(tx.ChainId())
 		}
 		from, _ := types.Sender(ctx, signer, tx)
-		if _, err := s.b.AccountManager().Find(accounts.Account{Address: from}); err == nil {
+		if _, exists := accounts[from]; exists {
 			transactions = append(transactions, newRPCPendingTransaction(ctx, tx))
 		}
 	}
