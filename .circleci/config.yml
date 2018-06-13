@@ -23,7 +23,23 @@ jobs:
           root: .
           paths:
             - .
+  prepare-gcr:
+    <<: *defaults
+    steps:
+      - run:       
+         name: Store Service Account
+         command: echo $ACCT_AUTH > ${HOME}/gcloud-service-key.json
+      - run:
+          name: install dependencies
+          command: |
+            wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-204.0.0-linux-x86_64.tar.gz
+            tar -xvzf google-cloud-sdk-204.0.0-linux-x86_64.tar.gz
+            ./google-cloud-sdk/install.sh -q            
 
+      - persist_to_workspace:
+          root: .
+          paths:
+            - .
   build:
     <<: *defaults
     steps:
@@ -156,10 +172,16 @@ jobs:
               echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
               version_file="params/version.go"
               version=$(grep -m1 -Eo "[0-9]+\.[0-9]+\.[0-9]+" ${version_file})
-              echo "Version: ${version}"
+              echo "Version: ${version}"              
               docker pull gochain/gochain:${version}
               docker tag gochain/gochain:${version} gochain/gochain:testnet
-              docker push gochain/gochain:testnet
+              docker push gochain/gochain:testnet    
+              echo $ACCT_AUTH > ${HOME}/gcloud-service-key.json
+              ./google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json                
+              docker login -u _json_key -p "$(cat ${HOME}/gcloud-service-key.json)" https://gcr.io
+              docker pull gcr.io/gochain-core/gochain:${version}
+              docker tag gcr.io/gochain-core/gochain:${version} gcr.io/gochain-core/gochain:testnet
+              docker push gcr.io/gochain-core/gochain:testnet
             fi
 
   push-stable:
@@ -175,17 +197,30 @@ jobs:
               echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
               version_file="params/version.go"
               version=$(grep -m1 -Eo "[0-9]+\.[0-9]+\.[0-9]+" ${version_file})
-              echo "Version: ${version}"
+              echo "Version: ${version}"              
               docker pull gochain/gochain:${version}
               docker tag gochain/gochain:${version} gochain/gochain:stable
-              docker push gochain/gochain:stable
+              docker push gochain/gochain:stable                            
+              echo $ACCT_AUTH > ${HOME}/gcloud-service-key.json              
+              ./google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
+              docker login -u _json_key -p "$(cat ${HOME}/gcloud-service-key.json)" https://gcr.io
+              docker pull gcr.io/gochain-core/gochain:${version}
+              docker tag gcr.io/gochain-core/gochain:${version} gcr.io/gochain-core/gochain:stable
+              docker push gcr.io/gochain-core/gochain:stable
             fi
 
 workflows:
   version: 2
   prepare-accept-deploy:
     jobs:
-      - prepare
+      - prepare      
+      - prepare-gcr:
+         filters:
+            branches:
+              only: 
+                - testnet
+                - master
+                - stable
       - build:
           requires:
             - prepare
@@ -208,7 +243,8 @@ workflows:
             - build
             - test
             - test-fuse
-            - race
+            - race  
+            - prepare-gcr          
       - push-testnet:
           filters:
             branches:
@@ -217,7 +253,8 @@ workflows:
             - build
             - test
             - test-fuse
-            - race
+            - race            
+            - prepare-gcr
       - approve-push-stable:
           type: approval
           filters:
@@ -228,6 +265,7 @@ workflows:
             - test
             - test-fuse
             - race
+            - prepare-gcr            
       - push-stable:
           filters:
             branches:
