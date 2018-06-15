@@ -38,12 +38,17 @@ import (
 )
 
 type LesApiBackend struct {
-	eth *LightGoChain
-	gpo *gasprice.Oracle
+	eth           *LightGoChain
+	initialSupply *big.Int
+	gpo           *gasprice.Oracle
 }
 
 func (b *LesApiBackend) ChainConfig() *params.ChainConfig {
 	return b.eth.chainConfig
+}
+
+func (b *LesApiBackend) InitialSupply() *big.Int {
+	return b.initialSupply
 }
 
 func (b *LesApiBackend) CurrentBlock() *types.Block {

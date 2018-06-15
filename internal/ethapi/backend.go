@@ -71,6 +71,9 @@ type Backend interface {
 
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
+	// InitialSupply returns the initial total supply from the genesis allocation,
+	// or nil if a custom genesis is not available.
+	InitialSupply() *big.Int
 }
 
 func GetAPIs(apiBackend Backend) []rpc.API {

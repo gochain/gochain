@@ -30,6 +30,7 @@ import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/common/math"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/consensus/ethash"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/state"
@@ -487,6 +488,36 @@ func NewPublicBlockChainAPI(b Backend) *PublicBlockChainAPI {
 func (s *PublicBlockChainAPI) BlockNumber() *big.Int {
 	header, _ := s.b.HeaderByNumber(context.Background(), rpc.LatestBlockNumber) // latest header should always be available
 	return header.Number
+}
+
+// TotalSupply returns the total supply in wei as of the given block number. The
+// rpc.LatestBlockNumber and rpc.PendingBlockNumber meta block numbers are also allowed.
+func (s *PublicBlockChainAPI) TotalSupply(ctx context.Context, blockNr rpc.BlockNumber) (*big.Int, error) {
+	initial := s.b.InitialSupply()
+	if initial == nil {
+		return nil, fmt.Errorf("unknown initial allocation")
+	}
+	var n *big.Int
+	switch blockNr {
+	default:
+		if blockNr < rpc.PendingBlockNumber {
+			return nil, fmt.Errorf("illegal block number %d", blockNr)
+		}
+		n = big.NewInt(int64(blockNr))
+	case rpc.LatestBlockNumber, rpc.PendingBlockNumber:
+		header, err := s.b.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+		if err != nil {
+			return nil, err
+		}
+		switch blockNr {
+		case rpc.LatestBlockNumber:
+			n = header.Number
+		case rpc.PendingBlockNumber:
+			n = n.Add(big.NewInt(1), header.Number)
+		}
+	}
+	rewards := new(big.Int).Mul(n, clique.GochainBlockReward)
+	return rewards.Add(rewards, initial), nil
 }
 
 // GetBalance returns the amount of wei for the given address in the state of the
