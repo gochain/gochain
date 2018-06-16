@@ -253,8 +253,7 @@ func (tx *Transaction) EncodeJSON() (string, error) {
 // String implements the fmt.Stringer interface to print some semi-meaningful
 // data dump of the transaction for debugging purposes.
 func (tx *Transaction) String() string {
-	ctx := context.TODO()
-	return tx.tx.String(ctx)
+	return tx.tx.String()
 }
 
 func (tx *Transaction) GetData() []byte      { return tx.tx.Data() }
