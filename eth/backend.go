@@ -132,6 +132,11 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *Config) (*GoCha
 	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {
 		return nil, genesisErr
 	}
+	if config.Genesis == nil {
+		if genesisHash == params.MainnetGenesisHash {
+			config.Genesis = core.DefaultGenesisBlock()
+		}
+	}
 	log.Info("Initialised chain configuration", "config", chainConfig)
 
 	eth := &GoChain{
@@ -203,7 +208,12 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *Config) (*GoCha
 		log.Error("Cannot set extra chain data", "err", err)
 	}
 
-	eth.ApiBackend = &EthApiBackend{eth, nil}
+	eth.ApiBackend = &EthApiBackend{
+		eth: eth,
+	}
+	if g := eth.config.Genesis; g != nil {
+		eth.ApiBackend.initialSupply = g.Alloc.Total()
+	}
 	gpoParams := config.GPO
 	if gpoParams.Default == nil {
 		gpoParams.Default = config.GasPrice

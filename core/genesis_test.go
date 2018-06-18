@@ -193,3 +193,37 @@ func TestDefaultGenesisBlock(t *testing.T) {
 		}
 	}
 }
+
+func TestGenesisAlloc_Total(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		exp   *big.Int
+		alloc GenesisAlloc
+	}{
+		{
+			name:  "mainnet",
+			exp:   new(big.Int).Mul(big.NewInt(params.Ether), big.NewInt(1000000000)),
+			alloc: DefaultGenesisBlock().Alloc,
+		},
+		{
+			name:  "testnet",
+			exp:   new(big.Int).Mul(big.NewInt(params.Ether), big.NewInt(1000000000)),
+			alloc: DefaultTestnetGenesisBlock().Alloc,
+		},
+		{
+			name: "custom",
+			exp:  big.NewInt(100),
+			alloc: GenesisAlloc{
+				common.StringToAddress("a"): {Balance: big.NewInt(1)},
+				common.StringToAddress("b"): {Balance: big.NewInt(10)},
+				common.StringToAddress("c"): {Balance: big.NewInt(19)},
+				common.StringToAddress("d"): {Balance: big.NewInt(30)},
+				common.StringToAddress("e"): {Balance: big.NewInt(40)},
+			},
+		},
+	} {
+		if got := test.alloc.Total(); got.Cmp(test.exp) != 0 {
+			t.Errorf("%s: expected %s but got %s", test.name, test.exp, got)
+		}
+	}
+}

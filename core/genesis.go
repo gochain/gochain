@@ -78,6 +78,17 @@ func (ga *GenesisAlloc) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (ga *GenesisAlloc) Total() *big.Int {
+	sum := new(big.Int)
+	if ga == nil {
+		return sum
+	}
+	for _, st := range *ga {
+		sum = sum.Add(sum, st.Balance)
+	}
+	return sum
+}
+
 // GenesisAccount is an account in the state of the genesis block.
 type GenesisAccount struct {
 	Code       []byte                      `json:"code,omitempty"`

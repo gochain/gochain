@@ -5275,6 +5275,14 @@ var methods = function () {
         outputFormatter: formatters.outputBigNumberFormatter
     });
 
+    var totalSupply = new Method({
+        name: 'totalSupply',
+        call: 'eth_totalSupply',
+        params: 1,
+        inputFormatter: [formatters.inputDefaultBlockNumberFormatter],
+        outputFormatter: formatters.outputBigNumberFormatter
+    });
+
     var getStorageAt = new Method({
         name: 'getStorageAt',
         call: 'eth_getStorageAt',
@@ -5433,6 +5441,7 @@ var methods = function () {
 
     return [
         getBalance,
+        totalSupply,
         getStorageAt,
         getCode,
         getBlock,

@@ -85,9 +85,17 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *eth.Config) (*L
 	if err != nil {
 		return nil, err
 	}
+	if config.Genesis == nil {
+		config.Genesis = core.DefaultGenesisBlock()
+	}
 	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
 	if _, isCompat := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !isCompat {
 		return nil, genesisErr
+	}
+	if config.Genesis == nil {
+		if genesisHash == params.MainnetGenesisHash {
+			config.Genesis = core.DefaultGenesisBlock()
+		}
 	}
 	log.Info("Initialised chain configuration", "config", chainConfig)
 
@@ -132,7 +140,13 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *eth.Config) (*L
 	if leth.protocolManager, err = NewProtocolManager(ctx, leth.chainConfig, true, ClientProtocolVersions, config.NetworkId, leth.eventMux, leth.engine, leth.peers, leth.blockchain, nil, chainDb, leth.odr, leth.relay, quitSync, &leth.wg); err != nil {
 		return nil, err
 	}
-	leth.ApiBackend = &LesApiBackend{leth, nil}
+	leth.ApiBackend = &LesApiBackend{
+		eth: leth,
+		gpo: nil,
+	}
+	if g := leth.config.Genesis; g != nil {
+		leth.ApiBackend.initialSupply = g.Alloc.Total()
+	}
 	gpoParams := config.GPO
 	if gpoParams.Default == nil {
 		gpoParams.Default = config.GasPrice
