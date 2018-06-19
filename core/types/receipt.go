@@ -149,14 +149,6 @@ func (r *Receipt) Size() common.StorageSize {
 	return size
 }
 
-// String implements the Stringer interface.
-func (r *Receipt) String() string {
-	if len(r.PostState) == 0 {
-		return fmt.Sprintf("receipt{status=%d cgas=%v bloom=%x logs=%v}", r.Status, r.CumulativeGasUsed, r.Bloom, r.Logs)
-	}
-	return fmt.Sprintf("receipt{med=%x cgas=%v bloom=%x logs=%v}", r.PostState, r.CumulativeGasUsed, r.Bloom, r.Logs)
-}
-
 // ReceiptsForStorage RLP encodes as []*ReceiptForStorage.
 type ReceiptsForStorage []*Receipt
 
