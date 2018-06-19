@@ -25,5 +25,5 @@ var MainnetBootnodes = []string{
 // TestnetBootnodes are the enode URLs of the P2P bootstrap nodes running on the
 // test network.
 var TestnetBootnodes = []string{
-	"enode://bfbb22927487ae6b74d39817e73ee3ba776b12772fc92e00809c3bfca06ad0f1d07276b845f9cd1b1747529b9d2b762c24f877efde7b219cefbc0e012f6c5115@159.65.104.177:30301",
+	"enode://093dab36f391382510c7dd705dacb5d589f32da005ef39a8052f42a928581d676f5a04e4668c0d88ae721f7ccc018eb0af7fd54bfae7b70fb1d261890272884f@159.65.104.177:30301",
 }
