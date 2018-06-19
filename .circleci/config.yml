@@ -32,9 +32,9 @@ jobs:
       - run:
           name: install dependencies
           command: |
-            wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-204.0.0-linux-x86_64.tar.gz
-            tar -xvzf google-cloud-sdk-204.0.0-linux-x86_64.tar.gz
-            ./google-cloud-sdk/install.sh -q            
+            wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-204.0.0-linux-x86_64.tar.gz --directory-prefix=tmp
+            tar -xvzf tmp/google-cloud-sdk-204.0.0-linux-x86_64.tar.gz -C tmp
+            ./tmp/google-cloud-sdk/install.sh -q            
 
       - persist_to_workspace:
           root: .
@@ -177,7 +177,7 @@ jobs:
               docker tag gochain/gochain:${version} gochain/gochain:testnet
               docker push gochain/gochain:testnet    
               echo $ACCT_AUTH > ${HOME}/gcloud-service-key.json
-              ./google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json                
+              ./tmp/google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json                
               docker login -u _json_key -p "$(cat ${HOME}/gcloud-service-key.json)" https://gcr.io
               docker pull gcr.io/gochain-core/gochain:${version}
               docker tag gcr.io/gochain-core/gochain:${version} gcr.io/gochain-core/gochain:testnet
@@ -202,7 +202,7 @@ jobs:
               docker tag gochain/gochain:${version} gochain/gochain:stable
               docker push gochain/gochain:stable                            
               echo $ACCT_AUTH > ${HOME}/gcloud-service-key.json              
-              ./google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
+              ./tmp/google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
               docker login -u _json_key -p "$(cat ${HOME}/gcloud-service-key.json)" https://gcr.io
               docker pull gcr.io/gochain-core/gochain:${version}
               docker tag gcr.io/gochain-core/gochain:${version} gcr.io/gochain-core/gochain:stable
