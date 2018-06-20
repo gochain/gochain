@@ -222,6 +222,7 @@ type TxPool struct {
 	chain        blockChain
 	gasPrice     *big.Int
 	txFeed       event.Feed
+	txFeedBuf    chan *types.Transaction
 	scope        event.SubscriptionScope
 	chainHeadCh  chan ChainHeadEvent
 	chainHeadSub event.Subscription
@@ -245,8 +246,6 @@ type TxPool struct {
 	homestead bool
 }
 
-const txPoolInitCap = 20000
-
 // NewTxPool creates a new transaction pool to gather, sort and filter inbound
 // transactions from the network.
 func NewTxPool(ctx context.Context, config TxPoolConfig, chainconfig *params.ChainConfig, chain blockChain) *TxPool {
@@ -262,9 +261,10 @@ func NewTxPool(ctx context.Context, config TxPoolConfig, chainconfig *params.Cha
 		pending:     make(map[common.Address]*txList),
 		queue:       make(map[common.Address]*txList),
 		beats:       make(map[common.Address]time.Time),
-		all:         newTxLookup(),
+		all:         newTxLookup(int(config.GlobalSlots / 2)),
 		chainHeadCh: make(chan ChainHeadEvent, chainHeadChanSize),
 		gasPrice:    new(big.Int).SetUint64(config.PriceLimit),
+		txFeedBuf:   make(chan *types.Transaction, config.GlobalSlots/4),
 	}
 	pool.locals = newAccountSet(pool.signer)
 	pool.reset(ctx, nil, chain.CurrentBlock())
@@ -282,12 +282,13 @@ func NewTxPool(ctx context.Context, config TxPoolConfig, chainconfig *params.Cha
 			log.Warn("Failed to rotate transaction journal", "err", err)
 		}
 	}
-	// Subscribe events from blockchain
-	pool.chainHeadSub = pool.chain.SubscribeChainHeadEvent(pool.chainHeadCh)
 
-	// Start the event loop and return
-	pool.wg.Add(1)
+	// Subscribe events from blockchain.
+	pool.chainHeadSub = pool.chain.SubscribeChainHeadEvent(pool.chainHeadCh)
+	// Spawn worker routines to run until chainHeadSub unsub.
+	pool.wg.Add(3)
 	go pool.loop(ctx)
+	go pool.feedLoop()
 
 	return pool
 }
@@ -333,6 +334,8 @@ func (pool *TxPool) loop(ctx context.Context) {
 
 	// Handle ChainHeadEvents separately
 	go func() {
+		defer pool.wg.Done()
+
 		for {
 			select {
 			case <-pool.chainHeadSub.Err():
@@ -431,6 +434,41 @@ func (pool *TxPool) loop(ctx context.Context) {
 				pool.mu.Unlock()
 			}
 		}
+	}
+}
+
+// feedLoop continuously sends batches of txs from the txFeedBuf to the txFeed.
+func (pool *TxPool) feedLoop() {
+	defer pool.wg.Done()
+
+	const batchSize = 1000
+	for {
+		select {
+		case <-pool.chainHeadSub.Err():
+			return
+		case tx := <-pool.txFeedBuf:
+			var event NewTxsEvent
+			event.Txs = append(event.Txs, tx)
+			for i := 1; i < batchSize; i++ {
+				select {
+				case tx := <-pool.txFeedBuf:
+					event.Txs = append(event.Txs, tx)
+				default:
+					break
+				}
+			}
+			pool.txFeed.Send(event)
+		}
+	}
+}
+
+// feedSend queues tx to eventually be sent on the txFeed.
+func (pool *TxPool) feedSend(tx *types.Transaction) {
+	select {
+	case pool.txFeedBuf <- tx:
+		return
+	default:
+		go func() { pool.txFeedBuf <- tx }()
 	}
 }
 
@@ -786,7 +824,7 @@ func (pool *TxPool) add(ctx context.Context, tx *types.Transaction, local bool) 
 		poolAddTimer.UpdateSince(t)
 
 		// We've directly injected a replacement transaction, notify subsystems
-		go pool.txFeed.Send(NewTxsEvent{types.Transactions{tx}})
+		pool.feedSend(tx)
 
 		return old != nil, nil
 	}
@@ -1074,17 +1112,8 @@ func (pool *TxPool) removeTx(ctx context.Context, tx *types.Transaction) {
 
 // promoteExecutablesAll is like promoteExecutables, but for the entire queue.
 func (pool *TxPool) promoteExecutablesAll() {
-	// Track the promoted transactions to broadcast them at once
-	var event NewTxsEvent
-	promoted := func(tx *types.Transaction) {
-		event.Txs = append(event.Txs, tx)
-	}
 	for addr, queued := range pool.queue {
-		pool.promoteExecutable(addr, queued, promoted)
-	}
-	// Notify subsystem for new promoted transactions.
-	if len(event.Txs) > 0 {
-		go pool.txFeed.Send(event)
+		pool.promoteExecutable(addr, queued)
 	}
 	pool.finishPromotion()
 }
@@ -1093,26 +1122,17 @@ func (pool *TxPool) promoteExecutablesAll() {
 // future queue to the set of pending transactions. During this process, all
 // invalidated transactions (low nonce, low balance) are deleted.
 func (pool *TxPool) promoteExecutables(accounts ...common.Address) {
-	// Track the promoted transactions to broadcast them at once
-	var event NewTxsEvent
-	promoted := func(tx *types.Transaction) {
-		event.Txs = append(event.Txs, tx)
-	}
 	for _, addr := range accounts {
 		queued := pool.queue[addr]
 		if queued == nil {
 			continue // Just in case someone calls with a non existing account
 		}
-		pool.promoteExecutable(addr, queued, promoted)
-	}
-	// Notify subsystem for new promoted transactions.
-	if len(event.Txs) > 0 {
-		go pool.txFeed.Send(event)
+		pool.promoteExecutable(addr, queued)
 	}
 	pool.finishPromotion()
 }
 
-func (pool *TxPool) promoteExecutable(addr common.Address, queued *txList, promoted func(*types.Transaction)) {
+func (pool *TxPool) promoteExecutable(addr common.Address, queued *txList) {
 	tracing := log.Tracing()
 	// Drop all transactions that are deemed too old (low nonce)
 	remove := func(tx *types.Transaction) {
@@ -1145,7 +1165,7 @@ func (pool *TxPool) promoteExecutable(addr common.Address, queued *txList, promo
 	// Gather all executable transactions and promote them
 	promote := func(tx *types.Transaction) {
 		if pool.promoteTx(addr, tx.Hash(), tx) {
-			promoted(tx)
+			pool.feedSend(tx)
 		}
 	}
 	if tracing {
@@ -1153,7 +1173,7 @@ func (pool *TxPool) promoteExecutable(addr common.Address, queued *txList, promo
 			hash := tx.Hash()
 			if pool.promoteTx(addr, hash, tx) {
 				log.Trace("Promoting queued transaction", "hash", hash)
-				promoted(tx)
+				pool.feedSend(tx)
 			} else {
 				log.Trace("Removed old queued transaction", "hash", hash)
 			}
@@ -1432,9 +1452,9 @@ type txLookup struct {
 }
 
 // newTxLookup returns a new txLookup structure.
-func newTxLookup() *txLookup {
+func newTxLookup(cap int) *txLookup {
 	return &txLookup{
-		all: make(map[common.Hash]*types.Transaction, txPoolInitCap),
+		all: make(map[common.Hash]*types.Transaction, cap),
 	}
 }
 

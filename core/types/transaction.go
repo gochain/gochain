@@ -267,13 +267,13 @@ func (tx *Transaction) RawSignatureValues() (*big.Int, *big.Int, *big.Int) {
 	return tx.data.V, tx.data.R, tx.data.S
 }
 
-func (tx *Transaction) String(ctx context.Context) string {
+func (tx *Transaction) String() string {
 	var from, to string
 	if tx.data.V != nil {
 		// make a best guess about the signer and use that to derive
 		// the sender.
 		signer := deriveSigner(tx.data.V)
-		if f, err := Sender(ctx, signer, tx); err != nil { // derive but don't cache
+		if f, err := Sender(context.Background(), signer, tx); err != nil { // derive but don't cache
 			from = "[invalid sender: invalid sig]"
 		} else {
 			from = fmt.Sprintf("%x", f[:])

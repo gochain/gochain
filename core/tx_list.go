@@ -251,6 +251,7 @@ func (m *txSortedMap) Ready(start uint64, fn func(*types.Transaction)) {
 		}
 		delete(m.items, nonce)
 		fn(item)
+		next++
 	}
 	// Rebuild heap.
 	*m.index = make([]uint64, 0, len(m.items))
@@ -423,7 +424,7 @@ func (l *txList) Remove(tx *types.Transaction, invalid func(*types.Transaction))
 // and calling fn for each one.
 //
 // Note, all transactions with nonces lower than start will also be included to
-// prevent getting into and invalid state. This is not something that should ever
+// prevent getting into an invalid state. This is not something that should ever
 // happen but better to be self correcting than failing!
 func (l *txList) Ready(start uint64, fn func(*types.Transaction)) {
 	l.txs.Ready(start, fn)

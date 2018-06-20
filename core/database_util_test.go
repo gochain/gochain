@@ -18,7 +18,6 @@ package core
 
 import (
 	"bytes"
-	"context"
 	"math/big"
 	"testing"
 
@@ -289,7 +288,6 @@ func TestHeadStorage(t *testing.T) {
 
 // Tests that positional lookup metadata can be stored and retrieved.
 func TestLookupStorage(t *testing.T) {
-	ctx := context.Background()
 	db := ethdb.NewMemDatabase()
 
 	tx1 := types.NewTransaction(1, common.BytesToAddress([]byte{0x11}), big.NewInt(111), 1111, big.NewInt(11111), []byte{0x11, 0x11, 0x11})
@@ -319,7 +317,7 @@ func TestLookupStorage(t *testing.T) {
 			if hash != block.Hash() || number != block.NumberU64() || index != uint64(i) {
 				t.Fatalf("tx #%d [%x]: positional metadata mismatch: have %x/%d/%d, want %x/%v/%v", i, tx.Hash(), hash, number, index, block.Hash(), block.NumberU64(), i)
 			}
-			if tx.String(ctx) != txn.String(ctx) {
+			if tx.Hash() != txn.Hash() {
 				t.Fatalf("tx #%d [%x]: transaction mismatch: have %v, want %v", i, tx.Hash(), txn, tx)
 			}
 		}

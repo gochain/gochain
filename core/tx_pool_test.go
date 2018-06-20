@@ -115,7 +115,7 @@ func resetTxPool(pool *TxPool) {
 	pool.pending = make(map[common.Address]*txList)
 	pool.queue = make(map[common.Address]*txList)
 	pool.beats = make(map[common.Address]time.Time)
-	pool.all = newTxLookup()
+	pool.all = newTxLookup(0)
 }
 
 // validateTxPoolInternals checks various consistency invariants within the pool.
@@ -144,27 +144,26 @@ func validateTxPoolInternals(pool *TxPool) error {
 	return nil
 }
 
-// validateEvents checks that the correct number of transaction addition events
+// validateEvents checks that the correct number of transactions
 // were fired on the pool's event feed.
-func validateEvents(events chan NewTxsEvent, count int) error {
-	var received []*types.Transaction
+func validateEvents(events chan NewTxsEvent, expTxs int) error {
+	var received types.Transactions
 
-	var event int
-	for len(received) < count {
+	for len(received) < expTxs {
 		select {
 		case ev := <-events:
 			received = append(received, ev.Txs...)
-			event++
 		case <-time.After(time.Second):
-			return fmt.Errorf("timed out waiting for event %d", event)
+			return fmt.Errorf("timed out waiting for event after %d txs", len(received))
 		}
 	}
-	if len(received) > count {
-		return fmt.Errorf("more than %d events fired: %v", count, received[count:])
+	if len(received) > expTxs {
+		return fmt.Errorf("expected %d txs but got %d: %v", expTxs, len(received), received)
 	}
 	select {
 	case ev := <-events:
-		return fmt.Errorf("more than %d events fired: %v", count, ev.Txs)
+		received = append(received, ev.Txs...)
+		return fmt.Errorf("expected %d txs but got more: %v", expTxs, received)
 
 	case <-time.After(50 * time.Millisecond):
 		// This branch should be "default", but it's a data race between goroutines,
@@ -1693,6 +1692,9 @@ func TestTransactionReplacement(t *testing.T) {
 	if err := pool.AddRemote(ctx, pricedTransaction(0, 100000, big.NewInt(2), key)); err != nil {
 		t.Fatalf("failed to replace original cheap pending transaction: %v", err)
 	}
+	for len(pool.txFeedBuf) > 0 {
+		time.Sleep(100 * time.Millisecond)
+	}
 	if err := validateEvents(events, 2); err != nil {
 		t.Fatalf("cheap replacement event firing failed: %v", err)
 	}
@@ -1705,6 +1707,9 @@ func TestTransactionReplacement(t *testing.T) {
 	}
 	if err := pool.AddRemote(ctx, pricedTransaction(0, 100000, big.NewInt(threshold), key)); err != nil {
 		t.Fatalf("failed to replace original proper pending transaction: %v", err)
+	}
+	for len(pool.txFeedBuf) > 0 {
+		time.Sleep(100 * time.Millisecond)
 	}
 	if err := validateEvents(events, 2); err != nil {
 		t.Fatalf("proper replacement event firing failed: %v", err)
@@ -1729,7 +1734,9 @@ func TestTransactionReplacement(t *testing.T) {
 	if err := pool.AddRemote(ctx, pricedTransaction(2, 100000, big.NewInt(threshold), key)); err != nil {
 		t.Fatalf("failed to replace original proper queued transaction: %v", err)
 	}
-
+	for len(pool.txFeedBuf) > 0 {
+		time.Sleep(100 * time.Millisecond)
+	}
 	if err := validateEvents(events, 0); err != nil {
 		t.Fatalf("queued replacement event firing failed: %v", err)
 	}
