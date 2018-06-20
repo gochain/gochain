@@ -449,12 +449,13 @@ func (pool *TxPool) feedLoop() {
 		case tx := <-pool.txFeedBuf:
 			var event NewTxsEvent
 			event.Txs = append(event.Txs, tx)
+		batchLoop:
 			for i := 1; i < batchSize; i++ {
 				select {
 				case tx := <-pool.txFeedBuf:
 					event.Txs = append(event.Txs, tx)
 				default:
-					break
+					break batchLoop
 				}
 			}
 			pool.txFeed.Send(event)
