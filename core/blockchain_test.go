@@ -77,6 +77,38 @@ func newTestBlockChainWithGenesis(ctx context.Context, fake, disk bool, genesis 
 	return blockchain, nil
 }
 
+// So we can deterministically seed different blockchains
+var (
+	canonicalSeed = 1
+	forkSeed      = 2
+)
+
+// newCanonical creates a chain database, and injects a deterministic canonical
+// chain. Depending on the full flag, if creates either a full block chain or a
+// header only chain.
+func newCanonical(ctx context.Context, engine consensus.Engine, n int, full bool) (ethdb.Database, *BlockChain, error) {
+	// Initialize a fresh chain with only a genesis block
+	gspec := new(Genesis)
+	db := ethdb.NewMemDatabase()
+	genesis := gspec.MustCommit(db)
+
+	blockchain, _ := NewBlockChain(ctx, db, nil, params.AllEthashProtocolChanges, engine, vm.Config{})
+	// Create and inject the requested chain
+	if n == 0 {
+		return db, blockchain, nil
+	}
+	if full {
+		// Full block-chain requested
+		blocks := makeBlockChain(ctx, genesis, n, engine, db, canonicalSeed)
+		_, err := blockchain.InsertChain(ctx, blocks)
+		return db, blockchain, err
+	}
+	// Header-only chain requested
+	headers := makeHeaderChain(ctx, genesis.Header(), n, engine, db, canonicalSeed)
+	_, err := blockchain.InsertHeaderChain(ctx, headers, 1)
+	return db, blockchain, err
+}
+
 // Test fork of length N starting from block i
 func testFork(t *testing.T, blockchain *BlockChain, i, n int, full bool, comparator func(td1, td2 *big.Int)) {
 	ctx := context.Background()

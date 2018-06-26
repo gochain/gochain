@@ -25,6 +25,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/util"
+
 	"github.com/gochain-io/gochain/accounts"
 	"github.com/gochain-io/gochain/accounts/keystore"
 	"github.com/gochain-io/gochain/common"
@@ -43,8 +47,6 @@ import (
 	"github.com/gochain-io/gochain/params"
 	"github.com/gochain-io/gochain/rlp"
 	"github.com/gochain-io/gochain/rpc"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 // PublicEthereumAPI provides an API to access Ethereum related information.
@@ -1405,7 +1407,7 @@ func (api *PublicDebugAPI) PrintBlock(ctx context.Context, number uint64) (strin
 	if block == nil {
 		return "", fmt.Errorf("block #%d not found", number)
 	}
-	return block.String(), nil
+	return spew.Sdump(block), nil
 }
 
 // SeedHash retrieves the seed hash of a block.

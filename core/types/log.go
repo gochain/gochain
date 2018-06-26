@@ -17,7 +17,6 @@
 package types
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/gochain-io/gochain/common"
@@ -93,10 +92,6 @@ func (l *Log) DecodeRLP(s *rlp.Stream) error {
 		l.Address, l.Topics, l.Data = dec.Address, dec.Topics, dec.Data
 	}
 	return err
-}
-
-func (l *Log) String() string {
-	return fmt.Sprintf(`log: %x %x %x %x %d %x %d`, l.Address, l.Topics, l.Data, l.TxHash, l.TxIndex, l.BlockHash, l.Index)
 }
 
 // LogsForStorage RLP encodes as []*LogForStorage.
