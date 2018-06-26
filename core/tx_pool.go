@@ -566,7 +566,7 @@ func (pool *TxPool) reset(ctx context.Context, oldBlock, newBlock *types.Block) 
 		// Inject any transactions discarded due to reorgs.
 		log.Debug("Reinjecting stale transactions", "count", l)
 		if errs := pool.reinject(ctx, reinject); len(errs) > 0 {
-			log.Error("Failed to reinject txs during pool rest", "total", l, "errs", len(errs))
+			log.Error("Failed to reinject txs during pool reset", "total", l, "errs", len(errs))
 			if log.Tracing() {
 				for i, err := range errs {
 					log.Trace("Failed to reinject tx", "num", i, "err", err)
@@ -782,7 +782,7 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction, local
 // the pool due to pricing constraints.
 func (pool *TxPool) add(ctx context.Context, tx *types.Transaction, local bool) (bool, error) {
 	t := time.Now()
-	// If the transaction is already known, discard it
+	// If the transaction is already known, discard it.
 	hash := tx.Hash()
 	if pool.all.Get(hash) != nil {
 		if log.Tracing() {
@@ -952,6 +952,11 @@ func (pool *TxPool) AddRemotes(ctx context.Context, txs []*types.Transaction) []
 
 // addTx enqueues a single transaction into the pool if it is valid.
 func (pool *TxPool) addTx(ctx context.Context, tx *types.Transaction, local bool) error {
+	// Check if the transaction is already known, before locking the whole pool.
+	if pool.all.Get(tx.Hash()) != nil {
+		return fmt.Errorf("known tx: %x", tx.Hash())
+	}
+
 	// Pre-compute and cache before locking.
 	_, _ = types.Sender(ctx, pool.signer, tx)
 
@@ -973,15 +978,24 @@ func (pool *TxPool) addTx(ctx context.Context, tx *types.Transaction, local bool
 
 // addTxs attempts to queue a batch of transactions if they are valid.
 func (pool *TxPool) addTxs(ctx context.Context, txs []*types.Transaction, local bool) []error {
-	// Pre-compute and cache before locking.
+	var add []*types.Transaction
+	// Filter out known, and pre-compute/cache signer before locking.
 	for _, tx := range txs {
+		// If the transaction is already known, discard it.
+		if pool.all.Get(tx.Hash()) != nil {
+			continue
+		}
+		add = append(add, tx)
 		_, _ = types.Sender(ctx, pool.signer, tx)
+	}
+	if len(add) == 0 {
+		return nil
 	}
 
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
-	return pool.addTxsLocked(ctx, txs, local)
+	return pool.addTxsLocked(ctx, add, local)
 }
 
 // addTxsLocked attempts to queue a batch of transactions if they are valid,
