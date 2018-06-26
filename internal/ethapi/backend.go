@@ -74,6 +74,8 @@ type Backend interface {
 	// InitialSupply returns the initial total supply from the genesis allocation,
 	// or nil if a custom genesis is not available.
 	InitialSupply() *big.Int
+	// GenesisAlloc returns the initial genesis allocation, or nil if a custom genesis is not available.
+	GenesisAlloc() core.GenesisAlloc
 }
 
 func GetAPIs(apiBackend Backend) []rpc.API {

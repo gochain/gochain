@@ -3842,6 +3842,21 @@ var outputBlockFormatter = function(block) {
 };
 
 /**
+ * Formats the output of a genesisAlloc to its proper values
+ *
+ * @method genesisAllocFormatter
+ * @param {Object} genesisAlloc
+ * @returns {Object}
+ */
+var genesisAllocFormatter = function(genesisAlloc) {
+  Object.keys(genesisAlloc).forEach(function(key) {
+    // transform to number
+    genesisAlloc[key].balance = utils.toDecimal(genesisAlloc[key].balance)
+  });
+  return genesisAlloc
+};
+
+/**
  * Formats the output of a log
  *
  * @method outputLogFormatter
@@ -3958,6 +3973,7 @@ module.exports = {
     outputTransactionFormatter: outputTransactionFormatter,
     outputTransactionReceiptFormatter: outputTransactionReceiptFormatter,
     outputBlockFormatter: outputBlockFormatter,
+    genesisAllocFormatter: genesisAllocFormatter,
     outputLogFormatter: outputLogFormatter,
     outputPostFormatter: outputPostFormatter,
     outputSyncingFormatter: outputSyncingFormatter
@@ -5283,6 +5299,13 @@ var methods = function () {
         outputFormatter: formatters.outputBigNumberFormatter
     });
 
+    var genesisAlloc = new Method({
+        name: 'genesisAlloc',
+        call: 'eth_genesisAlloc',
+        params: 0,
+        outputFormatter: formatters.genesisAllocFormatter
+    });
+
     var getStorageAt = new Method({
         name: 'getStorageAt',
         call: 'eth_getStorageAt',
@@ -5442,6 +5465,7 @@ var methods = function () {
     return [
         getBalance,
         totalSupply,
+        genesisAlloc,
         getStorageAt,
         getCode,
         getBlock,

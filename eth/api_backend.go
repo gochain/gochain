@@ -52,6 +52,13 @@ func (b *EthApiBackend) InitialSupply() *big.Int {
 	return b.initialSupply
 }
 
+func (b *EthApiBackend) GenesisAlloc() core.GenesisAlloc {
+	if g := b.eth.config.Genesis; g != nil {
+		return g.Alloc
+	}
+	return nil
+}
+
 func (b *EthApiBackend) CurrentBlock() *types.Block {
 	return b.eth.blockchain.CurrentBlock()
 }

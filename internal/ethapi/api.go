@@ -522,6 +522,15 @@ func (s *PublicBlockChainAPI) TotalSupply(ctx context.Context, blockNr rpc.Block
 	return rewards.Add(rewards, initial), nil
 }
 
+// GenesisAlloc returns the initial genesis allocation, or an error if a custom genesis is not available.
+func (s *PublicBlockChainAPI) GenesisAlloc(ctx context.Context) (core.GenesisAlloc, error) {
+	ga := s.b.GenesisAlloc()
+	if ga == nil {
+		return nil, fmt.Errorf("unknown initial allocation")
+	}
+	return ga, nil
+}
+
 // GetBalance returns the amount of wei for the given address in the state of the
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
