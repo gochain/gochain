@@ -51,6 +51,13 @@ func (b *LesApiBackend) InitialSupply() *big.Int {
 	return b.initialSupply
 }
 
+func (b *LesApiBackend) GenesisAlloc() core.GenesisAlloc {
+	if g := b.eth.config.Genesis; g != nil {
+		return g.Alloc
+	}
+	return nil
+}
+
 func (b *LesApiBackend) CurrentBlock() *types.Block {
 	return types.NewBlockWithHeader(b.eth.BlockChain().CurrentHeader())
 }
