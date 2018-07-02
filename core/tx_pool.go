@@ -727,8 +727,28 @@ func (pool *TxPool) local() (int, types.Transactions) {
 	return acts, txs
 }
 
+// preValidateTx does preliminary transaction validation (a subset of validateTx), without requiring pool.mu to be held.
+func (pool *TxPool) preValidateTx(ctx context.Context, tx *types.Transaction, local bool) error {
+	// Heuristic limit, reject transactions over 32KB to prevent DOS attacks
+	if tx.Size() > 32*1024 {
+		return ErrOversizedData
+	}
+	// Transactions can't be negative. This may never happen using RLP decoded
+	// transactions but may occur if you create a transaction using the RPC.
+	if tx.Value().Sign() < 0 {
+		return ErrNegativeValue
+	}
+	// Make sure the transaction is signed properly
+	_, err := types.Sender(ctx, pool.signer, tx)
+	if err != nil {
+		return ErrInvalidSender
+	}
+	return nil
+}
+
 // validateTx checks whether a transaction is valid according to the consensus
 // rules and adheres to some heuristic limits of the local node (price and size).
+// The caller must hold pool.mu.
 func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction, local bool) error {
 	// Heuristic limit, reject transactions over 32KB to prevent DOS attacks
 	if tx.Size() > 32*1024 {
@@ -790,7 +810,7 @@ func (pool *TxPool) add(ctx context.Context, tx *types.Transaction, local bool) 
 		}
 		return false, fmt.Errorf("known transaction: %x", hash)
 	}
-	// If the transaction fails basic validation, discard it
+	// If the transaction fails basic validation, discard it.
 	if err := pool.validateTx(ctx, tx, local); err != nil {
 		if log.Tracing() {
 			log.Trace("Discarding invalid transaction", "hash", hash, "err", err)
@@ -956,9 +976,14 @@ func (pool *TxPool) addTx(ctx context.Context, tx *types.Transaction, local bool
 	if pool.all.Get(tx.Hash()) != nil {
 		return fmt.Errorf("known tx: %x", tx.Hash())
 	}
-
-	// Pre-compute and cache before locking.
-	_, _ = types.Sender(ctx, pool.signer, tx)
+	// If the transaction fails basic validation, discard it.
+	if err := pool.preValidateTx(ctx, tx, local); err != nil {
+		if log.Tracing() {
+			log.Trace("Discarding invalid transaction", "hash", tx.Hash(), "err", err)
+		}
+		invalidTxCounter.Inc(1)
+		return err
+	}
 
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
@@ -985,8 +1010,15 @@ func (pool *TxPool) addTxs(ctx context.Context, txs []*types.Transaction, local 
 		if pool.all.Get(tx.Hash()) != nil {
 			continue
 		}
+		// If the transaction fails basic validation, discard it.
+		if err := pool.preValidateTx(ctx, tx, local); err != nil {
+			if log.Tracing() {
+				log.Trace("Discarding invalid transaction", "hash", tx.Hash(), "err", err)
+			}
+			invalidTxCounter.Inc(1)
+			continue
+		}
 		add = append(add, tx)
-		_, _ = types.Sender(ctx, pool.signer, tx)
 	}
 	if len(add) == 0 {
 		return nil
