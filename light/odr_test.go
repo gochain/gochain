@@ -54,11 +54,11 @@ var (
 
 type testOdr struct {
 	OdrBackend
-	sdb, ldb ethdb.Database
+	sdb, ldb common.Database
 	disable  bool
 }
 
-func (odr *testOdr) Database() ethdb.Database {
+func (odr *testOdr) Database() common.Database {
 	return odr.ldb
 }
 
@@ -70,26 +70,26 @@ func (odr *testOdr) Retrieve(ctx context.Context, req OdrRequest) error {
 	}
 	switch req := req.(type) {
 	case *BlockRequest:
-		req.Rlp = core.GetBodyRLP(odr.sdb, req.Hash, core.GetBlockNumber(odr.sdb, req.Hash))
+		req.Rlp = core.GetBodyRLP(odr.sdb.BodyTable(), req.Hash, core.GetBlockNumber(odr.sdb.GlobalTable(), req.Hash))
 	case *ReceiptsRequest:
-		req.Receipts = core.GetBlockReceipts(odr.sdb, req.Hash, core.GetBlockNumber(odr.sdb, req.Hash))
+		req.Receipts = core.GetBlockReceipts(odr.sdb.ReceiptTable(), req.Hash, core.GetBlockNumber(odr.sdb.GlobalTable(), req.Hash))
 	case *TrieRequest:
-		t, _ := trie.New(req.Id.Root, trie.NewDatabase(odr.sdb))
+		t, _ := trie.New(req.Id.Root, trie.NewDatabase(odr.sdb.GlobalTable()))
 		nodes := NewNodeSet()
 		t.Prove(req.Key, 0, nodes)
 		req.Proof = nodes
 	case *CodeRequest:
-		req.Data, _ = odr.sdb.Get(req.Hash[:])
+		req.Data, _ = odr.sdb.GlobalTable().Get(req.Hash[:])
 	}
 	req.StoreResult(odr.ldb)
 	return nil
 }
 
-type odrTestFn func(ctx context.Context, db ethdb.Database, bc *core.BlockChain, lc *LightChain, bhash common.Hash) ([]byte, error)
+type odrTestFn func(ctx context.Context, db common.Database, bc *core.BlockChain, lc *LightChain, bhash common.Hash) ([]byte, error)
 
 func TestOdrGetBlockLes1(t *testing.T) { testChainOdr(t, 1, odrGetBlock) }
 
-func odrGetBlock(ctx context.Context, db ethdb.Database, bc *core.BlockChain, lc *LightChain, bhash common.Hash) ([]byte, error) {
+func odrGetBlock(ctx context.Context, db common.Database, bc *core.BlockChain, lc *LightChain, bhash common.Hash) ([]byte, error) {
 	var block *types.Block
 	if bc != nil {
 		block = bc.GetBlockByHash(bhash)
@@ -105,12 +105,12 @@ func odrGetBlock(ctx context.Context, db ethdb.Database, bc *core.BlockChain, lc
 
 func TestOdrGetReceiptsLes1(t *testing.T) { testChainOdr(t, 1, odrGetReceipts) }
 
-func odrGetReceipts(ctx context.Context, db ethdb.Database, bc *core.BlockChain, lc *LightChain, bhash common.Hash) ([]byte, error) {
+func odrGetReceipts(ctx context.Context, db common.Database, bc *core.BlockChain, lc *LightChain, bhash common.Hash) ([]byte, error) {
 	var receipts types.Receipts
 	if bc != nil {
-		receipts = core.GetBlockReceipts(db, bhash, core.GetBlockNumber(db, bhash))
+		receipts = core.GetBlockReceipts(db.ReceiptTable(), bhash, core.GetBlockNumber(db.GlobalTable(), bhash))
 	} else {
-		receipts, _ = GetBlockReceipts(ctx, lc.Odr(), bhash, core.GetBlockNumber(db, bhash))
+		receipts, _ = GetBlockReceipts(ctx, lc.Odr(), bhash, core.GetBlockNumber(db.GlobalTable(), bhash))
 	}
 	if receipts == nil {
 		return nil, nil
@@ -121,7 +121,7 @@ func odrGetReceipts(ctx context.Context, db ethdb.Database, bc *core.BlockChain,
 
 func TestOdrAccountsLes1(t *testing.T) { testChainOdr(t, 1, odrAccounts) }
 
-func odrAccounts(ctx context.Context, db ethdb.Database, bc *core.BlockChain, lc *LightChain, bhash common.Hash) ([]byte, error) {
+func odrAccounts(ctx context.Context, db common.Database, bc *core.BlockChain, lc *LightChain, bhash common.Hash) ([]byte, error) {
 	dummyAddr := common.HexToAddress("1234567812345678123456781234567812345678")
 	acc := []common.Address{testBankAddress, acc1Addr, acc2Addr, dummyAddr}
 
@@ -151,7 +151,7 @@ type callmsg struct {
 
 func (callmsg) CheckNonce() bool { return false }
 
-func odrContractCall(ctx context.Context, db ethdb.Database, bc *core.BlockChain, lc *LightChain, bhash common.Hash) ([]byte, error) {
+func odrContractCall(ctx context.Context, db common.Database, bc *core.BlockChain, lc *LightChain, bhash common.Hash) ([]byte, error) {
 	data := common.Hex2Bytes("60CD26850000000000000000000000000000000000000000000000000000000000000000")
 	config := params.TestChainConfig
 

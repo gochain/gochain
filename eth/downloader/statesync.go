@@ -241,7 +241,7 @@ type stateTask struct {
 func newStateSync(d *Downloader, root common.Hash) *stateSync {
 	return &stateSync{
 		d:       d,
-		sched:   state.NewStateSync(root, d.stateDB),
+		sched:   state.NewStateSync(root, d.stateDB.GlobalTable()),
 		keccak:  sha3.NewKeccak256(),
 		tasks:   make(map[common.Hash]*stateTask),
 		deliver: make(chan *stateReq),
@@ -330,7 +330,7 @@ func (s *stateSync) commit(force bool) error {
 		return nil
 	}
 	start := time.Now()
-	b := s.d.stateDB.NewBatch()
+	b := s.d.stateDB.GlobalTable().NewBatch()
 	if written, err := s.sched.Commit(b); written == 0 || err != nil {
 		return err
 	}

@@ -28,7 +28,6 @@ import (
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/eth"
-	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/les/flowcontrol"
 	"github.com/gochain-io/gochain/light"
 	"github.com/gochain-io/gochain/log"
@@ -227,7 +226,7 @@ func linRegFromBytes(data []byte) *linReg {
 
 type requestCostStats struct {
 	lock  sync.RWMutex
-	db    ethdb.Database
+	db    common.Database
 	stats map[uint64]*linReg
 }
 
@@ -238,14 +237,14 @@ type requestCostStatsRlp []struct {
 
 var rcStatsKey = []byte("_requestCostStats")
 
-func newCostStats(db ethdb.Database) *requestCostStats {
+func newCostStats(db common.Database) *requestCostStats {
 	stats := make(map[uint64]*linReg)
 	for _, code := range reqList {
 		stats[code] = &linReg{cnt: 100}
 	}
 
 	if db != nil {
-		data, err := db.Get(rcStatsKey)
+		data, err := db.GlobalTable().Get(rcStatsKey)
 		var statsRlp requestCostStatsRlp
 		if err == nil {
 			err = rlp.DecodeBytes(data, &statsRlp)
@@ -278,7 +277,7 @@ func (s *requestCostStats) store() {
 	}
 
 	if data, err := rlp.EncodeToBytes(statsRlp); err == nil {
-		if err := s.db.Put(rcStatsKey, data); err != nil {
+		if err := s.db.GlobalTable().Put(rcStatsKey, data); err != nil {
 			log.Error("Cannot put les req cost stats", "err", err)
 		}
 	}
@@ -334,11 +333,11 @@ func (pm *ProtocolManager) blockLoop() {
 					header := ev.Block.Header()
 					hash := header.Hash()
 					number := header.Number.Uint64()
-					td := core.GetTd(pm.chainDb, hash, number)
+					td := core.GetTd(pm.chainDb.GlobalTable(), hash, number)
 					if td != nil && td.Cmp(lastBroadcastTd) > 0 {
 						var reorg uint64
 						if lastHead != nil {
-							reorg = lastHead.Number.Uint64() - core.FindCommonAncestor(pm.chainDb, header, lastHead).Number.Uint64()
+							reorg = lastHead.Number.Uint64() - core.FindCommonAncestor(pm.chainDb.HeaderTable(), header, lastHead).Number.Uint64()
 						}
 						lastHead = header
 						lastBroadcastTd = td

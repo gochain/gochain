@@ -35,7 +35,6 @@ import (
 	"github.com/gochain-io/gochain/eth/downloader"
 	"github.com/gochain-io/gochain/eth/filters"
 	"github.com/gochain-io/gochain/eth/gasprice"
-	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/internal/ethapi"
 	"github.com/gochain-io/gochain/light"
@@ -64,7 +63,7 @@ type LightGoChain struct {
 	reqDist         *requestDistributor
 	retriever       *retrieveManager
 	// DB interfaces
-	chainDb ethdb.Database // Block chain database
+	chainDb common.Database // Block chain database
 
 	bloomRequests                              chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
 	bloomIndexer, chtIndexer, bloomTrieIndexer *core.ChainIndexer
@@ -135,7 +134,7 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *eth.Config) (*L
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
 		leth.blockchain.SetHead(compat.RewindTo)
-		if err := core.WriteChainConfig(chainDb, genesisHash, chainConfig); err != nil {
+		if err := core.WriteChainConfig(chainDb.GlobalTable(), genesisHash, chainConfig); err != nil {
 			log.Error("Cannot write chain config during rewind", "hash", genesisHash, "err", err)
 		}
 	}

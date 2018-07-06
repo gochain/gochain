@@ -20,6 +20,7 @@ import (
 	"reflect"
 
 	"github.com/gochain-io/gochain/accounts"
+	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/p2p"
@@ -39,12 +40,12 @@ type ServiceContext struct {
 // OpenDatabase opens an existing database with the given name (or creates one
 // if no previous can be found) from within the node's data directory. If the
 // node is an ephemeral one, a memory database is returned.
-func (ctx *ServiceContext) OpenDatabase(name string, cache int, handles int) (ethdb.Database, error) {
+func (ctx *ServiceContext) OpenDatabase(name string, cache int, handles int) (common.Database, error) {
 	if ctx.config.DataDir == "" {
 		return ethdb.NewMemDatabase(), nil
 	}
-	db, err := ethdb.NewLDBDatabase(ctx.config.resolvePath(name), cache, handles)
-	if err != nil {
+	db := ethdb.NewDB(ctx.config.resolvePath(name))
+	if err := db.Open(); err != nil {
 		return nil, err
 	}
 	return db, nil

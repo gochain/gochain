@@ -34,7 +34,6 @@ import (
 	"github.com/gochain-io/gochain/core/vm"
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/eth"
-	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/les/flowcontrol"
 	"github.com/gochain-io/gochain/light"
@@ -136,7 +135,7 @@ func testRCL() RequestCostList {
 // newTestProtocolManager creates a new protocol manager for testing purposes,
 // with the given number of blocks already known, and potential notification
 // channels for different events.
-func newTestProtocolManager(ctx context.Context, lightSync bool, blocks int, generator func(context.Context, int, *core.BlockGen), peers *peerSet, odr *LesOdr, db ethdb.Database) (*ProtocolManager, error) {
+func newTestProtocolManager(ctx context.Context, lightSync bool, blocks int, generator func(context.Context, int, *core.BlockGen), peers *peerSet, odr *LesOdr, db common.Database) (*ProtocolManager, error) {
 	var (
 		evmux  = new(event.TypeMux)
 		engine = clique.NewFaker()
@@ -205,7 +204,7 @@ func newTestProtocolManager(ctx context.Context, lightSync bool, blocks int, gen
 // with the given number of blocks already known, and potential notification
 // channels for different events. In case of an error, the constructor force-
 // fails the test.
-func newTestProtocolManagerMust(ctx context.Context, t *testing.T, lightSync bool, blocks int, generator func(context.Context, int, *core.BlockGen), peers *peerSet, odr *LesOdr, db ethdb.Database) *ProtocolManager {
+func newTestProtocolManagerMust(ctx context.Context, t *testing.T, lightSync bool, blocks int, generator func(context.Context, int, *core.BlockGen), peers *peerSet, odr *LesOdr, db common.Database) *ProtocolManager {
 	pm, err := newTestProtocolManager(ctx, lightSync, blocks, generator, peers, odr, db)
 	if err != nil {
 		t.Fatalf("Failed to create protocol manager: %v", err)

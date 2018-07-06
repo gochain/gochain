@@ -24,7 +24,6 @@ import (
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/bloombits"
 	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 )
@@ -62,7 +61,7 @@ func (gc *GoChain) startBloomHandlers() {
 					task.Bitsets = make([][]byte, len(task.Sections))
 					for i, section := range task.Sections {
 						head := core.GetCanonicalHash(gc.chainDb, (section+1)*params.BloomBitsBlocks-1)
-						if compVector, err := core.GetBloomBits(gc.chainDb, task.Bit, section, head); err == nil {
+						if compVector, err := core.GetBloomBits(gc.chainDb.GlobalTable(), task.Bit, section, head); err == nil {
 							if blob, err := bitutil.DecompressBytes(compVector, int(params.BloomBitsBlocks)/8); err == nil {
 								task.Bitsets[i] = blob
 							} else {
@@ -94,7 +93,7 @@ const (
 type BloomIndexer struct {
 	size uint64 // section size to generate bloombits for
 
-	db  ethdb.Database       // database instance to write index data and metadata into
+	db  common.Database      // database instance to write index data and metadata into
 	gen *bloombits.Generator // generator to rotate the bloom bits crating the bloom index
 
 	section uint64      // Section is the section number being processed currently
@@ -103,12 +102,12 @@ type BloomIndexer struct {
 
 // NewBloomIndexer returns a chain indexer that generates bloom bits data for the
 // canonical chain for fast logs filtering.
-func NewBloomIndexer(db ethdb.Database, size uint64) *core.ChainIndexer {
+func NewBloomIndexer(db common.Database, size uint64) *core.ChainIndexer {
 	backend := &BloomIndexer{
 		db:   db,
 		size: size,
 	}
-	table := ethdb.NewTable(db, string(core.BloomBitsIndexPrefix))
+	table := common.NewTablePrefixer(db.GlobalTable(), string(core.BloomBitsIndexPrefix))
 
 	return core.NewChainIndexer(db, table, backend, size, bloomConfirms, bloomThrottling, "bloombits")
 }
@@ -133,7 +132,7 @@ func (b *BloomIndexer) Process(header *types.Header) {
 // Commit implements core.ChainIndexerBackend, finalizing the bloom section and
 // writing it out into the database.
 func (b *BloomIndexer) Commit() error {
-	batch := b.db.NewBatch()
+	batch := b.db.GlobalTable().NewBatch()
 
 	for i := 0; i < types.BloomBitLength; i++ {
 		bits, err := b.gen.Bitset(uint(i))

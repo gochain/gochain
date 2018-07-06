@@ -19,6 +19,7 @@ package core
 import (
 	"container/list"
 
+	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/event"
@@ -29,7 +30,7 @@ type TestManager struct {
 	// stateManager *StateManager
 	eventMux *event.TypeMux
 
-	db         ethdb.Database
+	db         common.Database
 	txPool     *TxPool
 	blockChain *BlockChain
 	Blocks     []*types.Block
@@ -71,7 +72,7 @@ func (tm *TestManager) EventMux() *event.TypeMux {
 // 	return nil
 // }
 
-func (tm *TestManager) Db() ethdb.Database {
+func (tm *TestManager) Db() common.Database {
 	return tm.db
 }
 

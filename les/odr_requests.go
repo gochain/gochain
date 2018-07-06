@@ -28,7 +28,6 @@ import (
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/light"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/rlp"
@@ -52,7 +51,7 @@ type LesOdrRequest interface {
 	GetCost(*peer) uint64
 	CanSend(*peer) bool
 	Request(context.Context, uint64, *peer) error
-	Validate(ethdb.Database, *Msg) error
+	Validate(common.Database, *Msg) error
 }
 
 func LesRequest(req light.OdrRequest) LesOdrRequest {
@@ -97,7 +96,7 @@ func (r *BlockRequest) Request(ctx context.Context, reqID uint64, peer *peer) er
 // Valid processes an ODR request reply message from the LES network
 // returns true and stores results in memory if the message was a valid reply
 // to the request (implementation of LesOdrRequest)
-func (r *BlockRequest) Validate(db ethdb.Database, msg *Msg) error {
+func (r *BlockRequest) Validate(db common.Database, msg *Msg) error {
 	log.Debug("Validating block body", "hash", r.Hash)
 
 	// Ensure we have a correct message with a single block body
@@ -111,7 +110,7 @@ func (r *BlockRequest) Validate(db ethdb.Database, msg *Msg) error {
 	body := bodies[0]
 
 	// Retrieve our stored header and validate block content against it
-	header := core.GetHeader(db, r.Hash, r.Number)
+	header := core.GetHeader(db.HeaderTable(), r.Hash, r.Number)
 	if header == nil {
 		return errHeaderUnavailable
 	}
@@ -153,7 +152,7 @@ func (r *ReceiptsRequest) Request(ctx context.Context, reqID uint64, peer *peer)
 // Valid processes an ODR request reply message from the LES network
 // returns true and stores results in memory if the message was a valid reply
 // to the request (implementation of LesOdrRequest)
-func (r *ReceiptsRequest) Validate(db ethdb.Database, msg *Msg) error {
+func (r *ReceiptsRequest) Validate(db common.Database, msg *Msg) error {
 	log.Debug("Validating block receipts", "hash", r.Hash)
 
 	// Ensure we have a correct message with a single block receipt
@@ -167,7 +166,7 @@ func (r *ReceiptsRequest) Validate(db ethdb.Database, msg *Msg) error {
 	receipt := receipts[0]
 
 	// Retrieve our stored header and validate receipt content against it
-	header := core.GetHeader(db, r.Hash, r.Number)
+	header := core.GetHeader(db.HeaderTable(), r.Hash, r.Number)
 	if header == nil {
 		return errHeaderUnavailable
 	}
@@ -220,7 +219,7 @@ func (r *TrieRequest) Request(ctx context.Context, reqID uint64, peer *peer) err
 // Valid processes an ODR request reply message from the LES network
 // returns true and stores results in memory if the message was a valid reply
 // to the request (implementation of LesOdrRequest)
-func (r *TrieRequest) Validate(db ethdb.Database, msg *Msg) error {
+func (r *TrieRequest) Validate(db common.Database, msg *Msg) error {
 	log.Debug("Validating trie proof", "root", r.Id.Root, "key", r.Key)
 
 	switch msg.MsgType {
@@ -289,7 +288,7 @@ func (r *CodeRequest) Request(ctx context.Context, reqID uint64, peer *peer) err
 // Valid processes an ODR request reply message from the LES network
 // returns true and stores results in memory if the message was a valid reply
 // to the request (implementation of LesOdrRequest)
-func (r *CodeRequest) Validate(db ethdb.Database, msg *Msg) error {
+func (r *CodeRequest) Validate(db common.Database, msg *Msg) error {
 	log.Debug("Validating code data", "hash", r.Hash)
 
 	// Ensure we have a correct message with a single code element
@@ -386,7 +385,7 @@ func (r *ChtRequest) Request(ctx context.Context, reqID uint64, peer *peer) erro
 // Valid processes an ODR request reply message from the LES network
 // returns true and stores results in memory if the message was a valid reply
 // to the request (implementation of LesOdrRequest)
-func (r *ChtRequest) Validate(db ethdb.Database, msg *Msg) error {
+func (r *ChtRequest) Validate(db common.Database, msg *Msg) error {
 	log.Debug("Validating CHT", "cht", r.ChtNum, "block", r.BlockNum)
 
 	switch msg.MsgType {
@@ -510,7 +509,7 @@ func (r *BloomRequest) Request(ctx context.Context, reqID uint64, peer *peer) er
 // Valid processes an ODR request reply message from the LES network
 // returns true and stores results in memory if the message was a valid reply
 // to the request (implementation of LesOdrRequest)
-func (r *BloomRequest) Validate(db ethdb.Database, msg *Msg) error {
+func (r *BloomRequest) Validate(db common.Database, msg *Msg) error {
 	log.Debug("Validating BloomBits", "bloomTrie", r.BloomTrieNum, "bitIdx", r.BitIdx, "sections", r.SectionIdxList)
 
 	// Ensure we have a correct message with a single proof element

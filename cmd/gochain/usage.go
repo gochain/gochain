@@ -211,17 +211,19 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.LightModeFlag,
 		},
 	},
-	{
-		Name: "ARCHIVE",
-		Flags: []cli.Flag{
-			utils.ArchiveEndpointFlag,
-			utils.ArchiveBucketFlag,
-			utils.ArchiveIDFlag,
-			utils.ArchiveSecretFlag,
-			utils.ArchiveAgeFlag,
-			utils.ArchivePeriodFlag,
+	/*
+		{
+			Name: "ARCHIVE",
+			Flags: []cli.Flag{
+				utils.ArchiveEndpointFlag,
+				utils.ArchiveBucketFlag,
+				utils.ArchiveIDFlag,
+				utils.ArchiveSecretFlag,
+				utils.ArchiveAgeFlag,
+				utils.ArchivePeriodFlag,
+			},
 		},
-	},
+	*/
 	{
 		Name: "MISC",
 	},

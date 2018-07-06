@@ -53,9 +53,9 @@ func init() {
 type downloadTester struct {
 	downloader *Downloader
 
-	genesis *types.Block   // Genesis blocks used by the tester and peers
-	stateDb ethdb.Database // Database used by the tester for syncing from peers
-	peerDb  ethdb.Database // Database of the peers containing all data
+	genesis *types.Block    // Genesis blocks used by the tester and peers
+	stateDb common.Database // Database used by the tester for syncing from peers
+	peerDb  common.Database // Database of the peers containing all data
 
 	ownHashes   []common.Hash                  // Hash chain belonging to the tester
 	ownHeaders  map[common.Hash]*types.Header  // Headers belonging to the tester
@@ -95,7 +95,7 @@ func newTester() *downloadTester {
 		peerMissingStates: make(map[string]map[common.Hash]bool),
 	}
 	tester.stateDb = ethdb.NewMemDatabase()
-	tester.stateDb.Put(genesis.Root().Bytes(), []byte{0x00})
+	tester.stateDb.GlobalTable().Put(genesis.Root().Bytes(), []byte{0x00})
 
 	tester.downloader = New(FullSync, tester.stateDb, new(event.TypeMux), tester, nil, tester.dropPeer)
 
@@ -256,7 +256,7 @@ func (dl *downloadTester) CurrentBlock() *types.Block {
 
 	for i := len(dl.ownHashes) - 1; i >= 0; i-- {
 		if block := dl.ownBlocks[dl.ownHashes[i]]; block != nil {
-			if _, err := dl.stateDb.Get(block.Root().Bytes()); err == nil {
+			if _, err := dl.stateDb.GlobalTable().Get(block.Root().Bytes()); err == nil {
 				return block
 			}
 		}
@@ -281,7 +281,7 @@ func (dl *downloadTester) CurrentFastBlock() *types.Block {
 func (dl *downloadTester) FastSyncCommitHead(hash common.Hash) error {
 	// For now only check that the state trie is correct
 	if block := dl.GetBlockByHash(hash); block != nil {
-		_, err := trie.NewSecure(block.Root(), trie.NewDatabase(dl.stateDb), 0)
+		_, err := trie.NewSecure(block.Root(), trie.NewDatabase(dl.stateDb.GlobalTable()), 0)
 		return err
 	}
 	return fmt.Errorf("non existent block: %x", hash[:4])
@@ -332,7 +332,7 @@ func (dl *downloadTester) InsertChain(ctx context.Context, blocks types.Blocks) 
 	for i, block := range blocks {
 		if parent, ok := dl.ownBlocks[block.ParentHash()]; !ok {
 			return i, errors.New("unknown parent")
-		} else if _, err := dl.stateDb.Get(parent.Root().Bytes()); err != nil {
+		} else if _, err := dl.stateDb.GlobalTable().Get(parent.Root().Bytes()); err != nil {
 			return i, fmt.Errorf("unknown parent state %x: %v", parent.Root(), err)
 		}
 		if _, ok := dl.ownHeaders[block.Hash()]; !ok {
@@ -340,7 +340,7 @@ func (dl *downloadTester) InsertChain(ctx context.Context, blocks types.Blocks) 
 			dl.ownHeaders[block.Hash()] = block.Header()
 		}
 		dl.ownBlocks[block.Hash()] = block
-		dl.stateDb.Put(block.Root().Bytes(), []byte{0x00})
+		dl.stateDb.GlobalTable().Put(block.Root().Bytes(), []byte{0x00})
 		dl.ownChainTd[block.Hash()] = new(big.Int).Add(dl.ownChainTd[block.ParentHash()], block.Difficulty())
 	}
 	return len(blocks), nil
@@ -584,7 +584,7 @@ func (dlp *downloadTesterPeer) RequestNodeData(ctx context.Context, hashes []com
 
 	results := make([][]byte, 0, len(hashes))
 	for _, hash := range hashes {
-		if data, err := dlp.dl.peerDb.Get(hash.Bytes()); err == nil {
+		if data, err := dlp.dl.peerDb.GlobalTable().Get(hash.Bytes()); err == nil {
 			if !dlp.dl.peerMissingStates[dlp.id][hash] {
 				results = append(results, data)
 			}

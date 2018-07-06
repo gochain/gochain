@@ -417,7 +417,7 @@ func testGetCHTProofs(t *testing.T, protocol int) {
 	switch protocol {
 	case 1:
 		root := light.GetChtRoot(db, 0, bc.GetHeaderByNumber(frequency-1).Hash())
-		trie, _ := trie.New(root, trie.NewDatabase(ethdb.NewTable(db, light.ChtTablePrefix)))
+		trie, _ := trie.New(root, trie.NewDatabase(common.NewTablePrefixer(db.GlobalTable(), light.ChtTablePrefix)))
 
 		var proof light.NodeList
 		trie.Prove(key, 0, &proof)
@@ -425,7 +425,7 @@ func testGetCHTProofs(t *testing.T, protocol int) {
 
 	case 2:
 		root := light.GetChtV2Root(db, 0, bc.GetHeaderByNumber(frequency-1).Hash())
-		trie, _ := trie.New(root, trie.NewDatabase(ethdb.NewTable(db, light.ChtTablePrefix)))
+		trie, _ := trie.New(root, trie.NewDatabase(common.NewTablePrefixer(db.GlobalTable(), light.ChtTablePrefix)))
 		trie.Prove(key, 0, &proofsV2.Proofs)
 	}
 	// Assemble the requests for the different protocols
@@ -486,7 +486,7 @@ func TestGetBloombitsProofs(t *testing.T) {
 		var proofs HelperTrieResps
 
 		root := light.GetBloomTrieRoot(db, 0, bc.GetHeaderByNumber(light.BloomTrieFrequency-1).Hash())
-		trie, _ := trie.New(root, trie.NewDatabase(ethdb.NewTable(db, light.BloomTrieTablePrefix)))
+		trie, _ := trie.New(root, trie.NewDatabase(common.NewTablePrefixer(db.GlobalTable(), light.BloomTrieTablePrefix)))
 		trie.Prove(key, 0, &proofs.Proofs)
 
 		// Send the proof request and verify the response

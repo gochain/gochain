@@ -26,7 +26,6 @@ import (
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
-	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/params"
 )
 
@@ -144,7 +143,7 @@ func (b *BlockGen) SetDifficulty(amt uint64) {
 // Blocks created by GenerateChain do not contain valid proof of work
 // values. Inserting them into BlockChain requires use of FakePow or
 // a similar non-validating proof of work implementation.
-func GenerateChain(ctx context.Context, config *params.ChainConfig, first *types.Block, engine consensus.Engine, db ethdb.Database, n int, gen func(context.Context, int, *BlockGen)) ([]*types.Block, []types.Receipts) {
+func GenerateChain(ctx context.Context, config *params.ChainConfig, first *types.Block, engine consensus.Engine, db common.Database, n int, gen func(context.Context, int, *BlockGen)) ([]*types.Block, []types.Receipts) {
 	if config == nil {
 		config = params.TestChainConfig
 	}
@@ -153,7 +152,7 @@ func GenerateChain(ctx context.Context, config *params.ChainConfig, first *types
 	genblock := func(i int, parent *types.Block, statedb *state.StateDB) (*types.Block, types.Receipts) {
 		// TODO(karalabe): This is needed for clique, which depends on multiple blocks.
 		// It's nonetheless ugly to spin up a blockchain here. Get rid of this somehow.
-		blockchain, _ := NewBlockChain(db, nil, config, engine, vm.Config{})
+		blockchain, _ := NewBlockChain(ctx, db, nil, config, engine, vm.Config{})
 		defer blockchain.Stop()
 		b := &BlockGen{i: i, parent: parent, chain: blocks, chainReader: blockchain, statedb: statedb, config: config, engine: engine}
 
@@ -211,7 +210,7 @@ func GenerateChain(ctx context.Context, config *params.ChainConfig, first *types
 }
 
 // makeHeaderChain creates a deterministic chain of headers rooted at parent.
-func makeHeaderChain(ctx context.Context, parent *types.Header, n int, engine consensus.Engine, db ethdb.Database, seed int) []*types.Header {
+func makeHeaderChain(ctx context.Context, parent *types.Header, n int, engine consensus.Engine, db common.Database, seed int) []*types.Header {
 	blocks := makeBlockChain(ctx, types.NewBlockWithHeader(parent), n, engine, db, seed)
 	headers := make([]*types.Header, len(blocks))
 	for i, block := range blocks {
@@ -221,7 +220,7 @@ func makeHeaderChain(ctx context.Context, parent *types.Header, n int, engine co
 }
 
 // makeBlockChain creates a deterministic chain of blocks rooted at parent.
-func makeBlockChain(ctx context.Context, parent *types.Block, n int, engine consensus.Engine, db ethdb.Database, seed int) []*types.Block {
+func makeBlockChain(ctx context.Context, parent *types.Block, n int, engine consensus.Engine, db common.Database, seed int) []*types.Block {
 	blocks, _ := GenerateChain(ctx, params.TestChainConfig, parent, engine, db, n, func(ctx context.Context, i int, b *BlockGen) {
 		b.SetExtra([]byte{0: byte(seed)})
 	})
