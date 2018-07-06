@@ -121,12 +121,12 @@ var (
 		utils.GpoBlocksFlag,
 		utils.GpoPercentileFlag,
 		utils.ExtraDataFlag,
-		utils.ArchiveEndpointFlag,
-		utils.ArchiveBucketFlag,
-		utils.ArchiveIDFlag,
-		utils.ArchiveSecretFlag,
-		utils.ArchiveAgeFlag,
-		utils.ArchivePeriodFlag,
+		// utils.ArchiveEndpointFlag,
+		// utils.ArchiveBucketFlag,
+		// utils.ArchiveIDFlag,
+		// utils.ArchiveSecretFlag,
+		// utils.ArchiveAgeFlag,
+		// utils.ArchivePeriodFlag,
 		configFileFlag,
 	}
 

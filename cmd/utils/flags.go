@@ -44,8 +44,6 @@ import (
 	"github.com/gochain-io/gochain/eth"
 	"github.com/gochain-io/gochain/eth/downloader"
 	"github.com/gochain-io/gochain/eth/gasprice"
-	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/ethdb/archive"
 	"github.com/gochain-io/gochain/les"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/metrics"
@@ -531,32 +529,34 @@ var (
 	}
 
 	// Archive settings
-	ArchiveEndpointFlag = cli.StringFlag{
-		Name:  "archive",
-		Usage: "S3 compatible archive endpoint.",
-	}
-	ArchiveBucketFlag = cli.StringFlag{
-		Name:  "archivebucket",
-		Usage: "Name of archive bucket. Must already exist.",
-	}
-	ArchiveIDFlag = cli.StringFlag{
-		Name:  "archiveid",
-		Usage: "Archive access key ID.",
-	}
-	ArchiveSecretFlag = cli.StringFlag{
-		Name:  "archivesecret",
-		Usage: "Archive access key secret.",
-	}
-	ArchiveAgeFlag = cli.Uint64Flag{
-		Name:  "archiveage",
-		Usage: "Archive age. The number of blocks from head before archiving.",
-		Value: archive.DefaultArchiveAge,
-	}
-	ArchivePeriodFlag = cli.DurationFlag{
-		Name:  "archiveperiod",
-		Usage: "How often the archive process runs.",
-		Value: archive.DefaultArchivePeriod,
-	}
+	/*
+		ArchiveEndpointFlag = cli.StringFlag{
+			Name:  "archive",
+			Usage: "S3 compatible archive endpoint.",
+		}
+		ArchiveBucketFlag = cli.StringFlag{
+			Name:  "archivebucket",
+			Usage: "Name of archive bucket. Must already exist.",
+		}
+		ArchiveIDFlag = cli.StringFlag{
+			Name:  "archiveid",
+			Usage: "Archive access key ID.",
+		}
+		ArchiveSecretFlag = cli.StringFlag{
+			Name:  "archivesecret",
+			Usage: "Archive access key secret.",
+		}
+		ArchiveAgeFlag = cli.Uint64Flag{
+			Name:  "archiveage",
+			Usage: "Archive age. The number of blocks from head before archiving.",
+			Value: archive.DefaultArchiveAge,
+		}
+		ArchivePeriodFlag = cli.DurationFlag{
+			Name:  "archiveperiod",
+			Usage: "How often the archive process runs.",
+			Value: archive.DefaultArchivePeriod,
+		}
+	*/
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating
@@ -942,6 +942,7 @@ func setEthash(ctx *cli.Context, cfg *eth.Config) {
 	}
 }
 
+/*
 func setArchive(ctx *cli.Context, cfg *archive.Config) {
 	if ctx.GlobalIsSet(ArchiveEndpointFlag.Name) {
 		cfg.Endpoint = ctx.GlobalString(ArchiveEndpointFlag.Name)
@@ -962,6 +963,7 @@ func setArchive(ctx *cli.Context, cfg *archive.Config) {
 		cfg.Period = ctx.GlobalDuration(ArchivePeriodFlag.Name)
 	}
 }
+*/
 
 // checkExclusive verifies that only a single isntance of the provided flags was
 // set by the user. Each flag might optionally be followed by a string type to
@@ -1024,7 +1026,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 	setGPO(ctx, &cfg.GPO)
 	setTxPool(ctx, &cfg.TxPool)
 	setEthash(ctx, cfg)
-	setArchive(ctx, &cfg.Archive)
+	// setArchive(ctx, &cfg.Archive)
 
 	switch {
 	case ctx.GlobalIsSet(SyncModeFlag.Name):
@@ -1183,7 +1185,7 @@ func SetupNetwork(ctx *cli.Context) {
 }
 
 // MakeChainDatabase open an LevelDB using the flags passed to the client and will hard crash if it fails.
-func MakeChainDatabase(ctx *cli.Context, stack *node.Node) ethdb.Database {
+func MakeChainDatabase(ctx *cli.Context, stack *node.Node) common.Database {
 	var (
 		cache   = ctx.GlobalInt(CacheFlag.Name) * ctx.GlobalInt(CacheDatabaseFlag.Name) / 100
 		handles = makeDatabaseHandles()
@@ -1213,7 +1215,7 @@ func MakeGenesis(ctx *cli.Context) *core.Genesis {
 }
 
 // MakeChain creates a chain manager from set command line flags.
-func MakeChain(ctx *cli.Context, stack *node.Node) (chain *core.BlockChain, chainDb ethdb.Database) {
+func MakeChain(ctx *cli.Context, stack *node.Node) (chain *core.BlockChain, chainDb common.Database) {
 	var err error
 	chainDb = MakeChainDatabase(ctx, stack)
 

@@ -159,7 +159,7 @@ func genUncles(ctx context.Context, i int, gen *BlockGen) {
 
 func benchInsertChain(ctx context.Context, b *testing.B, disk bool, gen func(context.Context, int, *BlockGen)) {
 	// Create the database in memory or in a temporary directory.
-	var db ethdb.Database
+	var db common.Database
 	if !disk {
 		db = ethdb.NewMemDatabase()
 	} else {
@@ -168,11 +168,13 @@ func benchInsertChain(ctx context.Context, b *testing.B, disk bool, gen func(con
 			b.Fatalf("cannot create temporary directory: %v", err)
 		}
 		defer os.RemoveAll(dir)
-		db, err = ethdb.NewLDBDatabase(dir, 128, 128)
-		if err != nil {
+
+		diskDB := ethdb.NewDB(dir)
+		if err := diskDB.Open(); err != nil {
 			b.Fatalf("cannot create temporary database: %v", err)
 		}
-		defer db.Close()
+		defer diskDB.Close()
+		db = diskDB
 	}
 
 	// Generate a chain of b.N blocks using the supplied block
@@ -234,7 +236,7 @@ func BenchmarkChainWrite_full_500k(b *testing.B) {
 
 // makeChainForBench writes a given number of headers or empty blocks/receipts
 // into a database.
-func makeChainForBench(db ethdb.Database, full bool, count uint64) {
+func makeChainForBench(db common.Database, full bool, count uint64) {
 	var hash common.Hash
 	for n := uint64(0); n < count; n++ {
 		header := &types.Header{
@@ -247,13 +249,13 @@ func makeChainForBench(db ethdb.Database, full bool, count uint64) {
 			ReceiptHash: types.EmptyRootHash,
 		}
 		hash = header.Hash()
-		WriteHeader(db, header)
+		WriteHeader(db.GlobalTable(), db.HeaderTable(), header)
 		WriteCanonicalHash(db, hash, n)
-		WriteTd(db, hash, n, big.NewInt(int64(n+1)))
+		WriteTd(db.GlobalTable(), hash, n, big.NewInt(int64(n+1)))
 		if full || n == 0 {
 			block := types.NewBlockWithHeader(header)
-			WriteBody(db, hash, n, block.Body())
-			WriteBlockReceipts(db, hash, n, nil)
+			WriteBody(db.BodyTable(), hash, n, block.Body())
+			WriteBlockReceipts(db.ReceiptTable(), hash, n, nil)
 		}
 	}
 }
@@ -264,8 +266,8 @@ func benchWriteChain(b *testing.B, full bool, count uint64) {
 		if err != nil {
 			b.Fatalf("cannot create temporary directory: %v", err)
 		}
-		db, err := ethdb.NewLDBDatabase(dir, 128, 1024)
-		if err != nil {
+		db := ethdb.NewDB(dir)
+		if err := db.Open(); err != nil {
 			b.Fatalf("error opening database at %v: %v", dir, err)
 		}
 		makeChainForBench(db, full, count)
@@ -282,8 +284,8 @@ func benchReadChain(b *testing.B, full bool, count uint64) {
 	}
 	defer os.RemoveAll(dir)
 
-	db, err := ethdb.NewLDBDatabase(dir, 128, 1024)
-	if err != nil {
+	db := ethdb.NewDB(dir)
+	if err := db.Open(); err != nil {
 		b.Fatalf("error opening database at %v: %v", dir, err)
 	}
 	makeChainForBench(db, full, count)
@@ -293,8 +295,8 @@ func benchReadChain(b *testing.B, full bool, count uint64) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		db, err := ethdb.NewLDBDatabase(dir, 128, 1024)
-		if err != nil {
+		db := ethdb.NewDB(dir)
+		if err := db.Open(); err != nil {
 			b.Fatalf("error opening database at %v: %v", dir, err)
 		}
 		chain, err := NewBlockChain(ctx, db, nil, params.TestChainConfig, ethash.NewFaker(), vm.Config{})
@@ -306,8 +308,8 @@ func benchReadChain(b *testing.B, full bool, count uint64) {
 			header := chain.GetHeaderByNumber(n)
 			if full {
 				hash := header.Hash()
-				GetBody(db, hash, n)
-				GetBlockReceipts(db, hash, n)
+				GetBody(db.BodyTable(), hash, n)
+				GetBlockReceipts(db.ReceiptTable(), hash, n)
 			}
 		}
 

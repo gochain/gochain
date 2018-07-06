@@ -43,17 +43,18 @@ import (
 // genesis can be nil to use default
 func newTestBlockChainWithGenesis(ctx context.Context, fake, disk bool, genesis *Genesis) (*BlockChain, error) {
 	var err error
-	var db ethdb.Database
+	var db common.Database
 	if disk {
 		dir, err := ioutil.TempDir("", "example")
 		if err != nil {
 			return nil, err
 		}
 		defer os.RemoveAll(dir)
-		db, err = ethdb.NewLDBDatabase(dir, 128, 1024) // todo: not sure what best values here should be
-		if err != nil {
+		diskDB := ethdb.NewDB(dir)
+		if err := diskDB.Open(); err != nil {
 			return nil, err
 		}
+		db = diskDB
 	} else {
 		db = ethdb.NewMemDatabase()
 	}
@@ -86,7 +87,7 @@ var (
 // newCanonical creates a chain database, and injects a deterministic canonical
 // chain. Depending on the full flag, if creates either a full block chain or a
 // header only chain.
-func newCanonical(ctx context.Context, engine consensus.Engine, n int, full bool) (ethdb.Database, *BlockChain, error) {
+func newCanonical(ctx context.Context, engine consensus.Engine, n int, full bool) (common.Database, *BlockChain, error) {
 	// Initialize a fresh chain with only a genesis block
 	gspec := new(Genesis)
 	db := ethdb.NewMemDatabase()
@@ -204,8 +205,8 @@ func testBlockChainImport(ctx context.Context, chain types.Blocks, blockchain *B
 			return err
 		}
 		blockchain.mu.Lock()
-		WriteTd(blockchain.db, block.Hash(), block.NumberU64(), new(big.Int).Add(block.Difficulty(), blockchain.GetTdByHash(block.ParentHash())))
-		WriteBlock(blockchain.db, block)
+		WriteTd(blockchain.db.GlobalTable(), block.Hash(), block.NumberU64(), new(big.Int).Add(block.Difficulty(), blockchain.GetTdByHash(block.ParentHash())))
+		WriteBlock(blockchain.db.GlobalTable(), blockchain.db.BodyTable(), blockchain.db.HeaderTable(), block)
 		statedb.Commit(false)
 		blockchain.mu.Unlock()
 	}
@@ -222,8 +223,8 @@ func testHeaderChainImport(ctx context.Context, chain []*types.Header, blockchai
 		}
 		// Manually insert the header into the database, but don't reorganise (allows subsequent testing)
 		blockchain.mu.Lock()
-		WriteTd(blockchain.db, header.Hash(), header.Number.Uint64(), new(big.Int).Add(header.Difficulty, blockchain.GetTdByHash(header.ParentHash)))
-		WriteHeader(blockchain.db, header)
+		WriteTd(blockchain.db.GlobalTable(), header.Hash(), header.Number.Uint64(), new(big.Int).Add(header.Difficulty, blockchain.GetTdByHash(header.ParentHash)))
+		WriteHeader(blockchain.db.GlobalTable(), blockchain.db.HeaderTable(), header)
 		blockchain.mu.Unlock()
 	}
 	return nil
@@ -250,7 +251,7 @@ func TestLastBlock(t *testing.T) {
 	if _, err := blockchain.InsertChain(ctx, blocks); err != nil {
 		t.Fatalf("Failed to insert block: %v", err)
 	}
-	if blocks[len(blocks)-1].Hash() != GetHeadBlockHash(blockchain.db) {
+	if blocks[len(blocks)-1].Hash() != GetHeadBlockHash(blockchain.db.GlobalTable()) {
 		t.Fatalf("Write/Get HeadBlockHash failed")
 	}
 }

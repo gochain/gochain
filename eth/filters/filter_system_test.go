@@ -39,7 +39,7 @@ import (
 
 type testBackend struct {
 	mux        *event.TypeMux
-	db         ethdb.Database
+	db         common.Database
 	sections   uint64
 	txFeed     *event.Feed
 	rmLogsFeed *event.Feed
@@ -47,7 +47,7 @@ type testBackend struct {
 	chainFeed  *event.Feed
 }
 
-func (b *testBackend) ChainDb() ethdb.Database {
+func (b *testBackend) ChainDb() common.Database {
 	return b.db
 }
 
@@ -59,18 +59,18 @@ func (b *testBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumbe
 	var hash common.Hash
 	var num uint64
 	if blockNr == rpc.LatestBlockNumber {
-		hash = core.GetHeadBlockHash(b.db)
-		num = core.GetBlockNumber(b.db, hash)
+		hash = core.GetHeadBlockHash(b.db.GlobalTable())
+		num = core.GetBlockNumber(b.db.GlobalTable(), hash)
 	} else {
 		num = uint64(blockNr)
 		hash = core.GetCanonicalHash(b.db, num)
 	}
-	return core.GetHeader(b.db, hash, num), nil
+	return core.GetHeader(b.db.HeaderTable(), hash, num), nil
 }
 
 func (b *testBackend) GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error) {
-	num := core.GetBlockNumber(b.db, blockHash)
-	return core.GetBlockReceipts(b.db, blockHash, num), nil
+	num := core.GetBlockNumber(b.db.GlobalTable(), blockHash)
+	return core.GetBlockReceipts(b.db.ReceiptTable(), blockHash, num), nil
 }
 
 func (b *testBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
@@ -111,7 +111,7 @@ func (b *testBackend) ServiceFilter(ctx context.Context, session *bloombits.Matc
 				for i, section := range task.Sections {
 					if rand.Int()%4 != 0 { // Handle occasional missing deliveries
 						head := core.GetCanonicalHash(b.db, (section+1)*params.BloomBitsBlocks-1)
-						task.Bitsets[i], _ = core.GetBloomBits(b.db, task.Bit, section, head)
+						task.Bitsets[i], _ = core.GetBloomBits(b.db.GlobalTable(), task.Bit, section, head)
 					}
 				}
 				request <- task

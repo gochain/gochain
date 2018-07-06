@@ -43,6 +43,11 @@ func NewMemDatabaseWithCap(size int) (*MemDatabase, error) {
 	}, nil
 }
 
+func (db *MemDatabase) GlobalTable() common.Table  { return db }
+func (db *MemDatabase) BodyTable() common.Table    { return db }
+func (db *MemDatabase) HeaderTable() common.Table  { return db }
+func (db *MemDatabase) ReceiptTable() common.Table { return db }
+
 func (db *MemDatabase) Put(key []byte, value []byte) error {
 	db.lock.Lock()
 	defer db.lock.Unlock()
@@ -88,9 +93,9 @@ func (db *MemDatabase) Delete(key []byte) error {
 	return nil
 }
 
-func (db *MemDatabase) Close() {}
+func (db *MemDatabase) Close() error { return nil }
 
-func (db *MemDatabase) NewBatch() Batch {
+func (db *MemDatabase) NewBatch() common.Batch {
 	return &memBatch{db: db}
 }
 

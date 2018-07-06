@@ -1,5 +1,6 @@
 package archive
 
+/*
 import (
 	"bytes"
 	"fmt"
@@ -9,7 +10,6 @@ import (
 	"github.com/minio/minio-go"
 	gometrics "github.com/rcrowley/go-metrics"
 	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/util"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core"
@@ -139,10 +139,9 @@ func archiveKey(prefix byte, num uint64, hash common.Hash) string {
 	return fmt.Sprintf("%s/%d-%s", prefixDir(prefix), num, hash.Hex())
 }
 
-// DB extends an LDBDatabase with support for archiving entries to a
-// Archive.
+// DB extends an LDBDatabase with support for archiving entries to a Archive.
 type DB struct {
-	*ethdb.LDBDatabase
+	*ethdb.DB
 	archive *Archive
 
 	done chan struct{} // Closed to signal sweep() to stop.
@@ -151,12 +150,12 @@ type DB struct {
 
 // NewDB returns a new DB, backed by a Archive.
 // Start() must be called to begin the background archival process.
-func NewDB(db *ethdb.LDBDatabase, archive *Archive) *DB {
+func NewDB(db *ethdb.DB, archive *Archive) *DB {
 	a := &DB{
-		LDBDatabase: db,
-		archive:     archive,
-		done:        make(chan struct{}),
-		loop:        make(chan struct{})}
+		DB:      db,
+		archive: archive,
+		done:    make(chan struct{}),
+		loop:    make(chan struct{})}
 	return a
 }
 
@@ -178,14 +177,15 @@ func (db *DB) Start(limitFn func(byte) uint64) {
 	}()
 }
 
-func (db *DB) Close() {
+func (db *DB) Close() (err error) {
 	close(db.done)
-	db.LDBDatabase.Close()
+	err = db.DB.Close()
 	<-db.loop
+	return nil
 }
 
 func (db *DB) Get(key []byte) ([]byte, error) {
-	val, err := db.LDBDatabase.Get(key)
+	val, err := db.DB.Get(key)
 	if err != nil {
 		if err == leveldb.ErrNotFound {
 			ok, prefix, num, hash := core.DBArchiveKey(key)
@@ -195,7 +195,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 				if err != nil {
 					return nil, err
 				}
-				_ = db.LDBDatabase.Put(key, val)
+				_ = db.DB.Put(key, val)
 				return val, nil
 			}
 		}
@@ -205,7 +205,7 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 }
 
 func (db *DB) Has(key []byte) (bool, error) {
-	if ok, err := db.LDBDatabase.Has(key); err != nil {
+	if ok, err := db.DB.Has(key); err != nil {
 		return false, err
 	} else if ok {
 		return true, nil
@@ -226,7 +226,7 @@ func (db *DB) Delete(key []byte) error {
 			return err
 		}
 	}
-	return db.LDBDatabase.Delete(key)
+	return db.DB.Delete(key)
 }
 
 // sweep archives data older than latest - DefaultArchiveAge.
@@ -277,45 +277,49 @@ func (db *DB) sweepPrefix(prefix byte, limit uint64) (int, int64) {
 	log.Info("Archive worker started", "type", prefixDir(prefix), "limit", limit)
 	var entries int
 	var totalBytes int64
-	i := db.LDBDatabase.NewIterator(util.BytesPrefix([]byte{prefix}), nil)
-	for i.Next() {
-		select {
-		case <-db.done:
-			break
-		default:
-		}
-		key := i.Key()
-		if len(key) < 9 {
-			continue
-		}
-		ok, _, num, hash := core.DBArchiveKey(key)
-		if !ok {
-			continue
-		}
-		arKey := archiveKey(prefix, num, hash)
-		if num < limit {
-			if n, err := db.archive.Put(arKey, i.Value()); err != nil {
-				log.Info("Archive entry failed", "key", arKey, "err", err)
-			} else {
-				entries++
-				totalBytes += n
-				if entries%sweepUpdateFreq == 0 {
-					log.Info("Archive worker status update", "type", prefixDir(prefix), "limit", limit, "count", entries, "size", common.StorageSize(totalBytes))
-				}
-				if err := db.LDBDatabase.Delete(key); err != nil {
-					// Note but move on. DB still consistent, and future run will clean up.
-					log.Info("Archive entry successful, but failed local deletion", "key", arKey, "err", err)
-				}
+
+	// TODO: Archive via immutable segments.
+		i := db.DB.NewIterator(util.BytesPrefix([]byte{prefix}), nil)
+		for i.Next() {
+			select {
+			case <-db.done:
+				break
+			default:
 			}
-		} else {
-			// Everything left is more recent, so we're done.
-			break
+			key := i.Key()
+			if len(key) < 9 {
+				continue
+			}
+			ok, _, num, hash := core.DBArchiveKey(key)
+			if !ok {
+				continue
+			}
+			arKey := archiveKey(prefix, num, hash)
+			if num < limit {
+				if n, err := db.archive.Put(arKey, i.Value()); err != nil {
+					log.Info("Archive entry failed", "key", arKey, "err", err)
+				} else {
+					entries++
+					totalBytes += n
+					if entries%sweepUpdateFreq == 0 {
+						log.Info("Archive worker status update", "type", prefixDir(prefix), "limit", limit, "count", entries, "size", common.StorageSize(totalBytes))
+					}
+					if err := db.LDBDatabase.Delete(key); err != nil {
+						// Note but move on. DB still consistent, and future run will clean up.
+						log.Info("Archive entry successful, but failed local deletion", "key", arKey, "err", err)
+					}
+				}
+			} else {
+				// Everything left is more recent, so we're done.
+				break
+			}
 		}
-	}
-	i.Release()
-	err := i.Error()
-	if err != nil {
-		log.Warn("Archive worker failed", "type", prefixDir(prefix), "limit", limit, "err", err)
-	}
+		i.Release()
+		err := i.Error()
+		if err != nil {
+			log.Warn("Archive worker failed", "type", prefixDir(prefix), "limit", limit, "err", err)
+		}
+
 	return entries, totalBytes
 }
+*/

@@ -38,8 +38,6 @@ import (
 	"github.com/gochain-io/gochain/eth/downloader"
 	"github.com/gochain-io/gochain/eth/filters"
 	"github.com/gochain-io/gochain/eth/gasprice"
-	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/ethdb/archive"
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/internal/ethapi"
 	"github.com/gochain-io/gochain/log"
@@ -73,7 +71,7 @@ type GoChain struct {
 	lesServer       LesServer
 
 	// DB interfaces
-	chainDb ethdb.Database // Block chain database
+	chainDb common.Database // Block chain database
 
 	eventMux       *event.TypeMux
 	engine         consensus.Engine
@@ -113,20 +111,22 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *Config) (*GoCha
 		return nil, err
 	}
 
-	stopDbUpgrade := upgradeDeduplicateData(chainDb)
+	stopDbUpgrade := func() error { return nil } // upgradeDeduplicateData(chainDb)
 
-	if config.Archive.Endpoint != "" {
-		ar, err := archive.NewArchive(config.Archive)
-		if err != nil {
-			return nil, fmt.Errorf("failed to connect to archive: %s", err)
+	/*
+		if config.Archive.Endpoint != "" {
+			ar, err := archive.NewArchive(config.Archive)
+			if err != nil {
+				return nil, fmt.Errorf("failed to connect to archive: %s", err)
+			}
+			ar.Meter("db/archive/chaindata/")
+			if ldb, ok := chainDb.(*ethdb.DB); !ok {
+				return nil, fmt.Errorf("only ethdb.DB maybe be archived, but found: %T", chainDb)
+			} else {
+				chainDb = archive.NewDB(ldb, ar)
+			}
 		}
-		ar.Meter("db/archive/chaindata/")
-		if ldb, ok := chainDb.(*ethdb.LDBDatabase); !ok {
-			return nil, fmt.Errorf("only ethdb.LDBDatabase maybe be archived, but found: %T", chainDb)
-		} else {
-			chainDb = archive.NewDB(ldb, ar)
-		}
-	}
+	*/
 
 	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
 	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {
@@ -158,11 +158,11 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *Config) (*GoCha
 	log.Info("Initialising GoChain protocol", "versions", ProtocolVersions, "network", config.NetworkId)
 
 	if !config.SkipBcVersionCheck {
-		bcVersion := core.GetBlockChainVersion(chainDb)
+		bcVersion := core.GetBlockChainVersion(chainDb.GlobalTable())
 		if bcVersion != core.BlockChainVersion && bcVersion != 0 {
 			return nil, fmt.Errorf("Blockchain DB version mismatch (%d / %d). Run geth upgradedb.\n", bcVersion, core.BlockChainVersion)
 		}
-		core.WriteBlockChainVersion(chainDb, core.BlockChainVersion)
+		core.WriteBlockChainVersion(chainDb.GlobalTable(), core.BlockChainVersion)
 	}
 	var (
 		vmConfig    = vm.Config{EnablePreimageRecording: config.EnablePreimageRecording}
@@ -172,24 +172,26 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *Config) (*GoCha
 	if err != nil {
 		return nil, err
 	}
-	if arDB, ok := eth.chainDb.(*archive.DB); ok {
-		arDB.Start(func(prefix byte) uint64 {
-			switch prefix {
-			case 'h':
-				return eth.blockchain.CurrentHeader().Number.Uint64()
-			case 'b', 'r':
-				return eth.blockchain.CurrentBlock().Number().Uint64()
-			}
-			return 0
-		})
-	}
+	/*
+		if arDB, ok := eth.chainDb.(*archive.DB); ok {
+			arDB.Start(func(prefix byte) uint64 {
+				switch prefix {
+				case 'h':
+					return eth.blockchain.CurrentHeader().Number.Uint64()
+				case 'b', 'r':
+					return eth.blockchain.CurrentBlock().Number().Uint64()
+				}
+				return 0
+			})
+		}
+	*/
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
 		if err := eth.blockchain.SetHead(compat.RewindTo); err != nil {
 			log.Error("Cannot set head during chain rewind", "rewind_to", compat.RewindTo, "err", err)
 		}
-		if err := core.WriteChainConfig(chainDb, genesisHash, chainConfig); err != nil {
+		if err := core.WriteChainConfig(chainDb.GlobalTable(), genesisHash, chainConfig); err != nil {
 			log.Error("Cannot write chain config during rewind", "hash", genesisHash, "err", err)
 		}
 	}
@@ -243,19 +245,23 @@ func makeExtraData(extra []byte) []byte {
 }
 
 // CreateDB creates the chain database.
-func CreateDB(ctx *node.ServiceContext, config *Config, name string) (ethdb.Database, error) {
+func CreateDB(ctx *node.ServiceContext, config *Config, name string) (common.Database, error) {
 	db, err := ctx.OpenDatabase(name, config.DatabaseCache, config.DatabaseHandles)
 	if err != nil {
 		return nil, err
 	}
-	if db, ok := db.(*ethdb.LDBDatabase); ok {
-		db.Meter("db/chaindata/")
-	}
+
+	// TODO(benbjohnson): Add metrics to ethdb.DB.
+	/*
+		if db, ok := db.(*ethdb.DB); ok {
+			db.Meter("db/chaindata/")
+		}
+	*/
 	return db, nil
 }
 
 // CreateConsensusEngine creates the required type of consensus engine instance for an GoChain service
-func CreateConsensusEngine(ctx *node.ServiceContext, config *ethash.Config, chainConfig *params.ChainConfig, db ethdb.Database) consensus.Engine {
+func CreateConsensusEngine(ctx *node.ServiceContext, config *ethash.Config, chainConfig *params.ChainConfig, db common.Database) consensus.Engine {
 	// If proof-of-authority is requested, set it up
 	if chainConfig.Clique != nil {
 		return clique.New(chainConfig.Clique, db)
@@ -414,7 +420,7 @@ func (gc *GoChain) BlockChain() *core.BlockChain       { return gc.blockchain }
 func (gc *GoChain) TxPool() *core.TxPool               { return gc.txPool }
 func (gc *GoChain) EventMux() *event.TypeMux           { return gc.eventMux }
 func (gc *GoChain) Engine() consensus.Engine           { return gc.engine }
-func (gc *GoChain) ChainDb() ethdb.Database            { return gc.chainDb }
+func (gc *GoChain) ChainDb() common.Database           { return gc.chainDb }
 func (gc *GoChain) IsListening() bool                  { return true } // Always listening
 func (gc *GoChain) EthVersion() int                    { return int(gc.protocolManager.SubProtocols[0].Version) }
 func (gc *GoChain) NetVersion() uint64                 { return gc.networkId }

@@ -16,6 +16,7 @@
 
 package ethdb
 
+/*
 import (
 	"strconv"
 	"strings"
@@ -322,66 +323,67 @@ func (b *ldbBatch) Reset() {
 	b.size = 0
 }
 
-type table struct {
+type ldbTable struct {
 	db     Database
 	prefix string
 }
 
-// NewTable returns a Database object that prefixes all keys with a given
+// NewLDBTable returns a Database object that prefixes all keys with a given
 // string.
-func NewTable(db Database, prefix string) Database {
-	return &table{
+func NewLDBTable(db Database, prefix string) Database {
+	return &ldbTable{
 		db:     db,
 		prefix: prefix,
 	}
 }
 
-func (dt *table) Put(key []byte, value []byte) error {
+func (dt *ldbTable) Put(key []byte, value []byte) error {
 	return dt.db.Put(append([]byte(dt.prefix), key...), value)
 }
 
-func (dt *table) Has(key []byte) (bool, error) {
+func (dt *ldbTable) Has(key []byte) (bool, error) {
 	return dt.db.Has(append([]byte(dt.prefix), key...))
 }
 
-func (dt *table) Get(key []byte) ([]byte, error) {
+func (dt *ldbTable) Get(key []byte) ([]byte, error) {
 	return dt.db.Get(append([]byte(dt.prefix), key...))
 }
 
-func (dt *table) Delete(key []byte) error {
+func (dt *ldbTable) Delete(key []byte) error {
 	return dt.db.Delete(append([]byte(dt.prefix), key...))
 }
 
-func (dt *table) Close() {
+func (dt *ldbTable) Close() {
 	// Do nothing; don't close the underlying DB.
 }
 
-type tableBatch struct {
+type ldbTableBatch struct {
 	batch  Batch
 	prefix string
 }
 
-// NewTableBatch returns a Batch object which prefixes all keys with a given string.
-func NewTableBatch(db Database, prefix string) Batch {
-	return &tableBatch{db.NewBatch(), prefix}
+// NewLDBTableBatch returns a Batch object which prefixes all keys with a given string.
+func NewLDBTableBatch(db Database, prefix string) Batch {
+	return &ldbTableBatch{db.NewBatch(), prefix}
 }
 
-func (dt *table) NewBatch() Batch {
-	return &tableBatch{dt.db.NewBatch(), dt.prefix}
+func (dt *ldbTable) NewBatch() Batch {
+	return &ldbTableBatch{dt.db.NewBatch(), dt.prefix}
 }
 
-func (tb *tableBatch) Put(key, value []byte) error {
+func (tb *ldbTableBatch) Put(key, value []byte) error {
 	return tb.batch.Put(append([]byte(tb.prefix), key...), value)
 }
 
-func (tb *tableBatch) Write() error {
+func (tb *ldbTableBatch) Write() error {
 	return tb.batch.Write()
 }
 
-func (tb *tableBatch) ValueSize() int {
+func (tb *ldbTableBatch) ValueSize() int {
 	return tb.batch.ValueSize()
 }
 
-func (tb *tableBatch) Reset() {
+func (tb *ldbTableBatch) Reset() {
 	tb.batch.Reset()
 }
+*/

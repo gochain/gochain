@@ -36,8 +36,6 @@ import (
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/trie"
-	"github.com/syndtr/goleveldb/leveldb/util"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -221,43 +219,45 @@ func importChain(ctx *cli.Context) error {
 	chain.Stop()
 	fmt.Printf("Import done in %v.\n\n", time.Since(start))
 
-	// Output pre-compaction stats mostly to see the import trashing
-	db := chainDb.(*ethdb.LDBDatabase)
+	/*
+		// Output pre-compaction stats mostly to see the import trashing
+		db := chainDb.(*ethdb.LDBDatabase)
 
-	stats, err := db.LDB().GetProperty("leveldb.stats")
-	if err != nil {
-		utils.Fatalf("Failed to read database stats: %v", err)
-	}
-	fmt.Println(stats)
-	fmt.Printf("Trie cache misses:  %d\n", trie.CacheMisses())
-	fmt.Printf("Trie cache unloads: %d\n\n", trie.CacheUnloads())
+		stats, err := db.LDB().GetProperty("leveldb.stats")
+		if err != nil {
+			utils.Fatalf("Failed to read database stats: %v", err)
+		}
+		fmt.Println(stats)
+		fmt.Printf("Trie cache misses:  %d\n", trie.CacheMisses())
+		fmt.Printf("Trie cache unloads: %d\n\n", trie.CacheUnloads())
 
-	// Print the memory statistics used by the importing
-	mem := new(runtime.MemStats)
-	runtime.ReadMemStats(mem)
+		// Print the memory statistics used by the importing
+		mem := new(runtime.MemStats)
+		runtime.ReadMemStats(mem)
 
-	fmt.Printf("Object memory: %.3f MB current, %.3f MB peak\n", float64(mem.Alloc)/1024/1024, float64(atomic.LoadUint64(&peakMemAlloc))/1024/1024)
-	fmt.Printf("System memory: %.3f MB current, %.3f MB peak\n", float64(mem.Sys)/1024/1024, float64(atomic.LoadUint64(&peakMemSys))/1024/1024)
-	fmt.Printf("Allocations:   %.3f million\n", float64(mem.Mallocs)/1000000)
-	fmt.Printf("GC pause:      %v\n\n", time.Duration(mem.PauseTotalNs))
+		fmt.Printf("Object memory: %.3f MB current, %.3f MB peak\n", float64(mem.Alloc)/1024/1024, float64(atomic.LoadUint64(&peakMemAlloc))/1024/1024)
+		fmt.Printf("System memory: %.3f MB current, %.3f MB peak\n", float64(mem.Sys)/1024/1024, float64(atomic.LoadUint64(&peakMemSys))/1024/1024)
+		fmt.Printf("Allocations:   %.3f million\n", float64(mem.Mallocs)/1000000)
+		fmt.Printf("GC pause:      %v\n\n", time.Duration(mem.PauseTotalNs))
 
-	if ctx.GlobalIsSet(utils.NoCompactionFlag.Name) {
-		return nil
-	}
+		if ctx.GlobalIsSet(utils.NoCompactionFlag.Name) {
+			return nil
+		}
 
-	// Compact the entire database to more accurately measure disk io and print the stats
-	start = time.Now()
-	fmt.Println("Compacting entire database...")
-	if err = db.LDB().CompactRange(util.Range{}); err != nil {
-		utils.Fatalf("Compaction failed: %v", err)
-	}
-	fmt.Printf("Compaction done in %v.\n\n", time.Since(start))
+		// Compact the entire database to more accurately measure disk io and print the stats
+		start = time.Now()
+		fmt.Println("Compacting entire database...")
+		if err = db.LDB().CompactRange(util.Range{}); err != nil {
+			utils.Fatalf("Compaction failed: %v", err)
+		}
+		fmt.Printf("Compaction done in %v.\n\n", time.Since(start))
 
-	stats, err = db.LDB().GetProperty("leveldb.stats")
-	if err != nil {
-		utils.Fatalf("Failed to read database stats: %v", err)
-	}
-	fmt.Println(stats)
+		stats, err = db.LDB().GetProperty("leveldb.stats")
+		if err != nil {
+			utils.Fatalf("Failed to read database stats: %v", err)
+		}
+		fmt.Println(stats)
+	*/
 
 	return nil
 }
@@ -307,8 +307,8 @@ func copyDb(ctx *cli.Context) error {
 	dl := downloader.New(syncmode, chainDb, new(event.TypeMux), chain, nil, nil)
 
 	// Create a source peer to satisfy downloader requests from
-	db, err := ethdb.NewLDBDatabase(ctx.Args().First(), ctx.GlobalInt(utils.CacheFlag.Name), 256)
-	if err != nil {
+	db := ethdb.NewDB(ctx.Args().First())
+	if err := db.Open(); err != nil {
 		return err
 	}
 	hc, err := core.NewHeaderChain(db, chain.Config(), chain.Engine(), func() bool { return false })
@@ -332,12 +332,14 @@ func copyDb(ctx *cli.Context) error {
 	fmt.Printf("Database copy done in %v\n", time.Since(start))
 
 	// Compact the entire database to remove any sync overhead
-	start = time.Now()
-	fmt.Println("Compacting entire database...")
-	if err = chainDb.(*ethdb.LDBDatabase).LDB().CompactRange(util.Range{}); err != nil {
-		utils.Fatalf("Compaction failed: %v", err)
-	}
-	fmt.Printf("Compaction done in %v.\n\n", time.Since(start))
+	/*
+		start = time.Now()
+		fmt.Println("Compacting entire database...")
+		if err = chainDb.(*ethdb.LDBDatabase).LDB().CompactRange(util.Range{}); err != nil {
+			utils.Fatalf("Compaction failed: %v", err)
+		}
+		fmt.Printf("Compaction done in %v.\n\n", time.Since(start))
+	*/
 
 	return nil
 }

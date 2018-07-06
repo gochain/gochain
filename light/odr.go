@@ -25,7 +25,6 @@ import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/log"
 )
 
@@ -35,7 +34,7 @@ var NoOdr = context.Background()
 
 // OdrBackend is an interface to a backend service that handles ODR retrievals type
 type OdrBackend interface {
-	Database() ethdb.Database
+	Database() common.Database
 	ChtIndexer() *core.ChainIndexer
 	BloomTrieIndexer() *core.ChainIndexer
 	BloomIndexer() *core.ChainIndexer
@@ -44,7 +43,7 @@ type OdrBackend interface {
 
 // OdrRequest is an interface for retrieval requests
 type OdrRequest interface {
-	StoreResult(db ethdb.Database)
+	StoreResult(db common.Database)
 }
 
 // TrieID identifies a state or account storage trie
@@ -86,8 +85,8 @@ type TrieRequest struct {
 }
 
 // StoreResult stores the retrieved data in local database
-func (req *TrieRequest) StoreResult(db ethdb.Database) {
-	req.Proof.Store(db)
+func (req *TrieRequest) StoreResult(db common.Database) {
+	req.Proof.Store(db.GlobalTable())
 }
 
 // CodeRequest is the ODR request type for retrieving contract code
@@ -99,8 +98,8 @@ type CodeRequest struct {
 }
 
 // StoreResult stores the retrieved data in local database
-func (req *CodeRequest) StoreResult(db ethdb.Database) {
-	if err := db.Put(req.Hash[:], req.Data); err != nil {
+func (req *CodeRequest) StoreResult(db common.Database) {
+	if err := db.GlobalTable().Put(req.Hash[:], req.Data); err != nil {
 		log.Error("Cannot store code request result", "err", err)
 	}
 }
@@ -114,8 +113,8 @@ type BlockRequest struct {
 }
 
 // StoreResult stores the retrieved data in local database
-func (req *BlockRequest) StoreResult(db ethdb.Database) {
-	if err := core.WriteBodyRLP(db, req.Hash, req.Number, req.Rlp); err != nil {
+func (req *BlockRequest) StoreResult(db common.Database) {
+	if err := core.WriteBodyRLP(db.BodyTable(), req.Hash, req.Number, req.Rlp); err != nil {
 		log.Error("Cannot store block request result", "err", err)
 	}
 }
@@ -129,8 +128,8 @@ type ReceiptsRequest struct {
 }
 
 // StoreResult stores the retrieved data in local database
-func (req *ReceiptsRequest) StoreResult(db ethdb.Database) {
-	if err := core.WriteBlockReceipts(db, req.Hash, req.Number, req.Receipts); err != nil {
+func (req *ReceiptsRequest) StoreResult(db common.Database) {
+	if err := core.WriteBlockReceipts(db.ReceiptTable(), req.Hash, req.Number, req.Receipts); err != nil {
 		log.Error("Cannot store receipts request result", "err", err)
 	}
 }
@@ -146,13 +145,13 @@ type ChtRequest struct {
 }
 
 // StoreResult stores the retrieved data in local database
-func (req *ChtRequest) StoreResult(db ethdb.Database) {
+func (req *ChtRequest) StoreResult(db common.Database) {
 	// if there is a canonical hash, there is a header too
-	if err := core.WriteHeader(db, req.Header); err != nil {
+	if err := core.WriteHeader(db.GlobalTable(), db.HeaderTable(), req.Header); err != nil {
 		log.Error("Cannot store cht request header result", "err", err)
 	}
 	hash, num := req.Header.Hash(), req.Header.Number.Uint64()
-	if err := core.WriteTd(db, hash, num, req.Td); err != nil {
+	if err := core.WriteTd(db.GlobalTable(), hash, num, req.Td); err != nil {
 		log.Error("Cannot store cht request td result", "err", err)
 	}
 	if err := core.WriteCanonicalHash(db, hash, num); err != nil {
@@ -172,13 +171,13 @@ type BloomRequest struct {
 }
 
 // StoreResult stores the retrieved data in local database
-func (req *BloomRequest) StoreResult(db ethdb.Database) {
+func (req *BloomRequest) StoreResult(db common.Database) {
 	for i, sectionIdx := range req.SectionIdxList {
 		sectionHead := core.GetCanonicalHash(db, (sectionIdx+1)*BloomTrieFrequency-1)
 		// if we don't have the canonical hash stored for this section head number, we'll still store it under
 		// a key with a zero sectionHead. GetBloomBits will look there too if we still don't have the canonical
 		// hash. In the unlikely case we've retrieved the section head hash since then, we'll just retrieve the
 		// bit vector again from the network.
-		core.WriteBloomBits(db, req.BitIdx, sectionIdx, sectionHead, req.BloomBits[i])
+		core.WriteBloomBits(db.GlobalTable(), req.BitIdx, sectionIdx, sectionHead, req.BloomBits[i])
 	}
 }

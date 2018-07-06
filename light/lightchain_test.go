@@ -36,7 +36,7 @@ var (
 )
 
 // makeHeaderChain creates a deterministic chain of headers rooted at parent.
-func makeHeaderChain(ctx context.Context, parent *types.Header, n int, db ethdb.Database, seed int) []*types.Header {
+func makeHeaderChain(ctx context.Context, parent *types.Header, n int, db common.Database, seed int) []*types.Header {
 	blocks, _ := core.GenerateChain(ctx, params.TestChainConfig, types.NewBlockWithHeader(parent), ethash.NewFaker(), db, n, func(ctx context.Context, i int, b *core.BlockGen) {
 		b.SetCoinbase(common.Address{0: byte(seed), 19: byte(i)})
 	})
@@ -50,7 +50,7 @@ func makeHeaderChain(ctx context.Context, parent *types.Header, n int, db ethdb.
 // newCanonical creates a chain database, and injects a deterministic canonical
 // chain. Depending on the full flag, if creates either a full block chain or a
 // header only chain.
-func newCanonical(n int) (ethdb.Database, *LightChain, error) {
+func newCanonical(n int) (common.Database, *LightChain, error) {
 	ctx := context.Background()
 	db := ethdb.NewMemDatabase()
 	gspec := core.Genesis{Config: params.TestChainConfig}
@@ -124,8 +124,8 @@ func testHeaderChainImport(ctx context.Context, chain []*types.Header, lightchai
 		}
 		// Manually insert the header into the database, but don't reorganize (allows subsequent testing)
 		lightchain.mu.Lock()
-		core.WriteTd(lightchain.chainDb, header.Hash(), header.Number.Uint64(), new(big.Int).Add(header.Difficulty, lightchain.GetTdByHash(header.ParentHash)))
-		core.WriteHeader(lightchain.chainDb, header)
+		core.WriteTd(lightchain.chainDb.GlobalTable(), header.Hash(), header.Number.Uint64(), new(big.Int).Add(header.Difficulty, lightchain.GetTdByHash(header.ParentHash)))
+		core.WriteHeader(lightchain.chainDb.GlobalTable(), lightchain.chainDb.HeaderTable(), header)
 		lightchain.mu.Unlock()
 	}
 	return nil
@@ -267,10 +267,10 @@ func makeHeaderChainWithDiff(genesis *types.Block, d []int, seed byte) []*types.
 
 type dummyOdr struct {
 	OdrBackend
-	db ethdb.Database
+	db common.Database
 }
 
-func (odr *dummyOdr) Database() ethdb.Database {
+func (odr *dummyOdr) Database() common.Database {
 	return odr.db
 }
 

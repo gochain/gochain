@@ -319,13 +319,13 @@ func TestLargeValue(t *testing.T) {
 }
 
 type countingDB struct {
-	ethdb.Database
+	common.Table
 	gets map[string]int
 }
 
 func (db *countingDB) Get(key []byte) ([]byte, error) {
 	db.gets[string(key)]++
-	return db.Database.Get(key)
+	return db.Table.Get(key)
 }
 
 // TestCacheUnload checks that decoded nodes are unloaded after a
@@ -344,7 +344,7 @@ func TestCacheUnload(t *testing.T) {
 	// Commit the trie repeatedly and access key1.
 	// The branch containing it is loaded from DB exactly two times:
 	// in the 0th and 6th iteration.
-	db := &countingDB{Database: trie.db.diskdb, gets: make(map[string]int)}
+	db := &countingDB{Table: trie.db.diskdb, gets: make(map[string]int)}
 	trie, _ = New(root, NewDatabase(db))
 	trie.SetCacheLimit(5)
 	for i := 0; i < 12; i++ {
@@ -542,9 +542,9 @@ func benchGet(b *testing.B, commit bool) {
 	b.StopTimer()
 
 	if commit {
-		ldb := trie.db.diskdb.(*ethdb.LDBDatabase)
+		ldb := trie.db.diskdb.(*ethdb.Table)
 		ldb.Close()
-		os.RemoveAll(ldb.Path())
+		os.RemoveAll(ldb.Path)
 	}
 }
 
@@ -598,11 +598,11 @@ func tempDB() (string, *Database) {
 	if err != nil {
 		panic(fmt.Sprintf("can't create temporary directory: %v", err))
 	}
-	diskdb, err := ethdb.NewLDBDatabase(dir, 256, 0)
-	if err != nil {
+	diskDB := ethdb.NewDB(dir)
+	if err := diskDB.Open(); err != nil {
 		panic(fmt.Sprintf("can't create temporary database: %v", err))
 	}
-	return dir, NewDatabase(diskdb)
+	return dir, NewDatabase(diskDB.GlobalTable())
 }
 
 func getString(trie *Trie, k string) []byte {

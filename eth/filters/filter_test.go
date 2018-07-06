@@ -51,7 +51,7 @@ func BenchmarkFilters(b *testing.B) {
 	defer os.RemoveAll(dir)
 
 	var (
-		db, _      = ethdb.NewLDBDatabase(dir, 0, 0)
+		db         = ethdb.NewDB(dir)
 		mux        = new(event.TypeMux)
 		txFeed     = new(event.Feed)
 		rmLogsFeed = new(event.Feed)
@@ -64,6 +64,9 @@ func BenchmarkFilters(b *testing.B) {
 		addr3      = common.BytesToAddress([]byte("ethereum"))
 		addr4      = common.BytesToAddress([]byte("random addresses please"))
 	)
+	if err := db.Open(); err != nil {
+		b.Fatal(err)
+	}
 	defer db.Close()
 
 	genesis := core.GenesisBlockForTesting(db, addr1, big.NewInt(1000000))
@@ -85,14 +88,14 @@ func BenchmarkFilters(b *testing.B) {
 		}
 	})
 	for i, block := range chain {
-		core.WriteBlock(db, block)
+		core.WriteBlock(db.GlobalTable(), db.BodyTable(), db.HeaderTable(), block)
 		if err := core.WriteCanonicalHash(db, block.Hash(), block.NumberU64()); err != nil {
 			b.Fatalf("failed to insert block number: %v", err)
 		}
-		if err := core.WriteHeadBlockHash(db, block.Hash()); err != nil {
+		if err := core.WriteHeadBlockHash(db.GlobalTable(), block.Hash()); err != nil {
 			b.Fatalf("failed to insert block number: %v", err)
 		}
-		if err := core.WriteBlockReceipts(db, block.Hash(), block.NumberU64(), receipts[i]); err != nil {
+		if err := core.WriteBlockReceipts(db.ReceiptTable(), block.Hash(), block.NumberU64(), receipts[i]); err != nil {
 			b.Fatal("error writing block receipts:", err)
 		}
 	}
@@ -117,7 +120,7 @@ func TestFilters(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	var (
-		db, _      = ethdb.NewLDBDatabase(dir, 0, 0)
+		db         = ethdb.NewDB(dir)
 		mux        = new(event.TypeMux)
 		txFeed     = new(event.Feed)
 		rmLogsFeed = new(event.Feed)
@@ -132,6 +135,9 @@ func TestFilters(t *testing.T) {
 		hash3 = common.BytesToHash([]byte("topic3"))
 		hash4 = common.BytesToHash([]byte("topic4"))
 	)
+	if err := db.Open(); err != nil {
+		t.Fatal(err)
+	}
 	defer db.Close()
 
 	genesis := core.GenesisBlockForTesting(db, addr, big.NewInt(1000000))
@@ -176,14 +182,14 @@ func TestFilters(t *testing.T) {
 		}
 	})
 	for i, block := range chain {
-		core.WriteBlock(db, block)
+		core.WriteBlock(db.GlobalTable(), db.BodyTable(), db.HeaderTable(), block)
 		if err := core.WriteCanonicalHash(db, block.Hash(), block.NumberU64()); err != nil {
 			t.Fatalf("failed to insert block number: %v", err)
 		}
-		if err := core.WriteHeadBlockHash(db, block.Hash()); err != nil {
+		if err := core.WriteHeadBlockHash(db.GlobalTable(), block.Hash()); err != nil {
 			t.Fatalf("failed to insert block number: %v", err)
 		}
-		if err := core.WriteBlockReceipts(db, block.Hash(), block.NumberU64(), receipts[i]); err != nil {
+		if err := core.WriteBlockReceipts(db.ReceiptTable(), block.Hash(), block.NumberU64(), receipts[i]); err != nil {
 			t.Fatal("error writing block receipts:", err)
 		}
 	}

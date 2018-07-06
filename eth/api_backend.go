@@ -30,7 +30,6 @@ import (
 	"github.com/gochain-io/gochain/core/vm"
 	"github.com/gochain-io/gochain/eth/downloader"
 	"github.com/gochain-io/gochain/eth/gasprice"
-	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
@@ -135,7 +134,7 @@ func (b *EthApiBackend) GetBlock(ctx context.Context, blockHash common.Hash) (*t
 }
 
 func (b *EthApiBackend) GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error) {
-	return core.GetBlockReceipts(b.eth.chainDb, blockHash, core.GetBlockNumber(b.eth.chainDb, blockHash)), nil
+	return core.GetBlockReceipts(b.eth.chainDb.ReceiptTable(), blockHash, core.GetBlockNumber(b.eth.chainDb.GlobalTable(), blockHash)), nil
 }
 
 func (b *EthApiBackend) GetTd(blockHash common.Hash) *big.Int {
@@ -210,7 +209,7 @@ func (b *EthApiBackend) SuggestPrice(ctx context.Context) (*big.Int, error) {
 	return b.gpo.SuggestPrice(ctx)
 }
 
-func (b *EthApiBackend) ChainDb() ethdb.Database {
+func (b *EthApiBackend) ChainDb() common.Database {
 	return b.eth.ChainDb()
 }
 

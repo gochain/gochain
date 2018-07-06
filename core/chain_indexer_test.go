@@ -58,7 +58,7 @@ func testChainIndexer(t *testing.T, count int) {
 			confirmsReq = uint64(rand.Intn(10))
 		)
 		backends[i] = &testChainIndexBackend{t: t, processCh: make(chan uint64)}
-		backends[i].indexer = NewChainIndexer(db, ethdb.NewTable(db, string([]byte{byte(i)})), backends[i], sectionSize, confirmsReq, 0, fmt.Sprintf("indexer-%d", i))
+		backends[i].indexer = NewChainIndexer(db, common.NewTablePrefixer(db.GlobalTable(), string([]byte{byte(i)})), backends[i], sectionSize, confirmsReq, 0, fmt.Sprintf("indexer-%d", i))
 
 		if sections, _, _ := backends[i].indexer.Sections(); sections != 0 {
 			t.Fatalf("Canonical section count mismatch: have %v, want %v", sections, 0)
@@ -94,7 +94,7 @@ func testChainIndexer(t *testing.T, count int) {
 		if number > 0 {
 			header.ParentHash = GetCanonicalHash(db, number-1)
 		}
-		WriteHeader(db, header)
+		WriteHeader(db.GlobalTable(), db.HeaderTable(), header)
 		WriteCanonicalHash(db, header.Hash(), number)
 	}
 	// Start indexer with an already existing chain
