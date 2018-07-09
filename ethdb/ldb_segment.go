@@ -7,7 +7,7 @@ import (
 )
 
 // Ensure implementation implements interface.
-var _ Segment = (*FileSegment)(nil)
+var _ MutableSegment = (*LDBSegment)(nil)
 
 // LDBSegement represents a mutable segment in a Table.
 // These segments can eventually be rebuilt into immutable FileSegments.
