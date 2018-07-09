@@ -22,6 +22,7 @@ import (
 	"github.com/gochain-io/gochain/accounts"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/ethdb"
+	"github.com/gochain-io/gochain/ethdb/s3"
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/rpc"
@@ -45,6 +46,9 @@ func (ctx *ServiceContext) OpenDatabase(name string, cache int, handles int) (co
 		return ethdb.NewMemDatabase(), nil
 	}
 	db := ethdb.NewDB(ctx.config.resolvePath(name))
+	if err := s3.ConfigureDB(db, ctx.config.Ethdb); err != nil {
+		return nil, err
+	}
 	if err := db.Open(); err != nil {
 		return nil, err
 	}

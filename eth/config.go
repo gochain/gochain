@@ -85,9 +85,6 @@ type Config struct {
 
 	// Miscellaneous options
 	DocRoot string `toml:"-"`
-
-	// Archive options.
-	// Archive archive.Config `toml:",omitempty"`
 }
 
 type configMarshaling struct {

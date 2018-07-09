@@ -88,6 +88,15 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.DeveloperPeriodFlag,
 		},
 	},
+	{
+		Name: "ETHDB",
+		Flags: []cli.Flag{
+			utils.EthdbEndpointFlag,
+			utils.EthdbBucketFlag,
+			utils.EthdbAccessKeyIDFlag,
+			utils.EthdbSecretAccessKeyFlag,
+		},
+	},
 	//{
 	//	Name: "DASHBOARD",
 	//	Flags: []cli.Flag{
@@ -211,19 +220,6 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.LightModeFlag,
 		},
 	},
-	/*
-		{
-			Name: "ARCHIVE",
-			Flags: []cli.Flag{
-				utils.ArchiveEndpointFlag,
-				utils.ArchiveBucketFlag,
-				utils.ArchiveIDFlag,
-				utils.ArchiveSecretFlag,
-				utils.ArchiveAgeFlag,
-				utils.ArchivePeriodFlag,
-			},
-		},
-	*/
 	{
 		Name: "MISC",
 	},

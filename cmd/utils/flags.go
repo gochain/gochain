@@ -43,6 +43,7 @@ import (
 	"github.com/gochain-io/gochain/eth"
 	"github.com/gochain-io/gochain/eth/downloader"
 	"github.com/gochain-io/gochain/eth/gasprice"
+	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/les"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/metrics"
@@ -505,35 +506,23 @@ var (
 		Value: whisper.DefaultMinimumPoW,
 	}
 
-	// Archive settings
-	/*
-		ArchiveEndpointFlag = cli.StringFlag{
-			Name:  "archive",
-			Usage: "S3 compatible archive endpoint.",
-		}
-		ArchiveBucketFlag = cli.StringFlag{
-			Name:  "archivebucket",
-			Usage: "Name of archive bucket. Must already exist.",
-		}
-		ArchiveIDFlag = cli.StringFlag{
-			Name:  "archiveid",
-			Usage: "Archive access key ID.",
-		}
-		ArchiveSecretFlag = cli.StringFlag{
-			Name:  "archivesecret",
-			Usage: "Archive access key secret.",
-		}
-		ArchiveAgeFlag = cli.Uint64Flag{
-			Name:  "archiveage",
-			Usage: "Archive age. The number of blocks from head before archiving.",
-			Value: archive.DefaultArchiveAge,
-		}
-		ArchivePeriodFlag = cli.DurationFlag{
-			Name:  "archiveperiod",
-			Usage: "How often the archive process runs.",
-			Value: archive.DefaultArchivePeriod,
-		}
-	*/
+	// S3 archival settings
+	EthdbEndpointFlag = cli.StringFlag{
+		Name:  "ethdb.endpoint",
+		Usage: "S3 compatible archive endpoint.",
+	}
+	EthdbBucketFlag = cli.StringFlag{
+		Name:  "ethdb.bucket",
+		Usage: "Name of ethdb archive bucket. Must already exist.",
+	}
+	EthdbAccessKeyIDFlag = cli.StringFlag{
+		Name:  "ethdb.accesskeyid",
+		Usage: "Ethdb archive access key ID.",
+	}
+	EthdbSecretAccessKeyFlag = cli.StringFlag{
+		Name:  "ethdb.secretaccesskey",
+		Usage: "Ethdb archive secret access key.",
+	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating
@@ -836,6 +825,7 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	setHTTP(ctx, cfg)
 	setWS(ctx, cfg)
 	setNodeUserIdent(ctx, cfg)
+	setEthdb(ctx, &cfg.Ethdb)
 
 	switch {
 	case ctx.GlobalIsSet(DataDirFlag.Name):
@@ -896,6 +886,21 @@ func setTxPool(ctx *cli.Context, cfg *core.TxPoolConfig) {
 	}
 	if ctx.GlobalIsSet(TxPoolLifetimeFlag.Name) {
 		cfg.Lifetime = ctx.GlobalDuration(TxPoolLifetimeFlag.Name)
+	}
+}
+
+func setEthdb(ctx *cli.Context, cfg *ethdb.Config) {
+	if ctx.GlobalIsSet(EthdbEndpointFlag.Name) {
+		cfg.Endpoint = ctx.GlobalString(EthdbEndpointFlag.Name)
+	}
+	if ctx.GlobalIsSet(EthdbBucketFlag.Name) {
+		cfg.Bucket = ctx.GlobalString(EthdbBucketFlag.Name)
+	}
+	if ctx.GlobalIsSet(EthdbAccessKeyIDFlag.Name) {
+		cfg.AccessKeyID = ctx.GlobalString(EthdbAccessKeyIDFlag.Name)
+	}
+	if ctx.GlobalIsSet(EthdbSecretAccessKeyFlag.Name) {
+		cfg.SecretAccessKey = ctx.GlobalString(EthdbSecretAccessKeyFlag.Name)
 	}
 }
 

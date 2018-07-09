@@ -3,6 +3,7 @@ package ethdb
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -12,12 +13,13 @@ import (
 
 	"github.com/cespare/xxhash"
 	"github.com/edsrzf/mmap-go"
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/common"
 )
 
 var (
-	ErrKeyNotFound          = errors.New("ethdb: key not found")
-	ErrFileSegmentImmutable = errors.New("ethdb: file segment immutable")
+	ErrKeyNotFound        = errors.New("ethdb: key not found")
+	ErrImmutableSegment   = errors.New("ethdb: immutable segment")
+	ErrSegmentTypeUnknown = errors.New("ethdb: segment type unknown")
 )
 
 const (
@@ -156,19 +158,7 @@ func (s *FileSegment) Get(key []byte) ([]byte, error) {
 	// Read value.
 	data := s.data[voff:]
 	n, sz := binary.Uvarint(data)
-	return data[sz : sz+int(n) : sz+int(n)], nil
-}
-
-// Put returns an error. FileSegment is immutable.
-func (s *FileSegment) Put(key, value []byte) error {
-	log.Error("ethdb.FileSegment.Put() immutable")
-	return ErrFileSegmentImmutable
-}
-
-// Delete returns an error. FileSegment is immutable.
-func (s *FileSegment) Delete(key []byte) error {
-	log.Error("ethdb.FileSegment.Put() immutable")
-	return ErrFileSegmentImmutable
+	return common.CopyBytes(data[sz : sz+int(n) : sz+int(n)]), nil
 }
 
 // Iterator returns an iterator for iterating over all key/value pairs.
@@ -246,6 +236,80 @@ func (itr *FileSegmentIterator) Next() bool {
 	itr.offset += int64(sz + int(n))
 
 	return true
+}
+
+// FileSegmentOpener initializes and opens segments.
+type FileSegmentOpener struct{}
+
+// NewFileSegmentOpener returns a new instance of FileSegmentOpener.
+func NewFileSegmentOpener() *FileSegmentOpener {
+	return &FileSegmentOpener{}
+}
+
+// OpenSegment returns an initialized and opened segment.
+func (o *FileSegmentOpener) OpenSegment(table, name, path string) (Segment, error) {
+	// Determine the segment file type.
+	typ, err := SegmentFileType(path)
+	if err != nil {
+		return nil, err
+	}
+
+	switch typ {
+	case SegmentETH1:
+		segment := NewFileSegment(name, path)
+		if err := segment.Open(); err != nil {
+			return nil, err
+		}
+		return segment, nil
+	default:
+		return nil, ErrSegmentTypeUnknown
+	}
+}
+
+// FileSegmentCompactor locally compacts LDB segments into file segments.
+type FileSegmentCompactor struct{}
+
+// NewFileSegmentCompactor returns a new instance of FileSegmentCompactor.
+func NewFileSegmentCompactor() *FileSegmentCompactor {
+	return &FileSegmentCompactor{}
+}
+
+// CompactSegment compacts an LDB segment into a file segment.
+func (c *FileSegmentCompactor) CompactSegment(ctx context.Context, table string, s *LDBSegment) (Segment, error) {
+	tmpPath := s.Path() + ".tmp"
+	if err := c.CompactSegmentTo(ctx, s, tmpPath); err != nil {
+		return nil, err
+	} else if err := c.SwapSegment(ctx, s, tmpPath); err != nil {
+		return nil, err
+	}
+
+	// Reopen as file segment.
+	newSegment := NewFileSegment(s.Name(), s.Path())
+	if err := newSegment.Open(); err != nil {
+		return nil, err
+	}
+	return newSegment, nil
+}
+
+// CompactSegmentTo compacts an LDB segment to a specified path.
+func (c *FileSegmentCompactor) CompactSegmentTo(ctx context.Context, s *LDBSegment, path string) error {
+	if err := s.CompactTo(path); err != nil {
+		os.Remove(path)
+		return err
+	}
+	return nil
+}
+
+// SwapSegment closes and removes s and renames the new segment at path.
+func (c *FileSegmentCompactor) SwapSegment(ctx context.Context, s *LDBSegment, path string) error {
+	if err := s.Close(); err != nil {
+		return err
+	} else if err := os.RemoveAll(s.Path()); err != nil {
+		return err
+	} else if err := os.Rename(path, s.Path()); err != nil {
+		return err
+	}
+	return nil
 }
 
 // FileSegmentEncoder represents a encoder for building a ethdb.FileSegment.

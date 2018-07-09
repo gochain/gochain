@@ -112,21 +112,6 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 
 	stopDbUpgrade := func() error { return nil } // upgradeDeduplicateData(chainDb)
 
-	/*
-		if config.Archive.Endpoint != "" {
-			ar, err := archive.NewArchive(config.Archive)
-			if err != nil {
-				return nil, fmt.Errorf("failed to connect to archive: %s", err)
-			}
-			ar.Meter("db/archive/chaindata/")
-			if ldb, ok := chainDb.(*ethdb.DB); !ok {
-				return nil, fmt.Errorf("only ethdb.DB maybe be archived, but found: %T", chainDb)
-			} else {
-				chainDb = archive.NewDB(ldb, ar)
-			}
-		}
-	*/
-
 	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
 	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {
 		return nil, genesisErr
@@ -252,13 +237,6 @@ func CreateDB(ctx *node.ServiceContext, config *Config, name string) (common.Dat
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO(benbjohnson): Add metrics to ethdb.DB.
-	/*
-		if db, ok := db.(*ethdb.DB); ok {
-			db.Meter("db/chaindata/")
-		}
-	*/
 	return db, nil
 }
 

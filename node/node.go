@@ -29,6 +29,7 @@ import (
 	"github.com/gochain-io/gochain/accounts"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/ethdb"
+	"github.com/gochain-io/gochain/ethdb/s3"
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/internal/debug"
 	"github.com/gochain-io/gochain/log"
@@ -661,7 +662,9 @@ func (n *Node) OpenDatabase(name string, cache, handles int) (common.Database, e
 		return ethdb.NewMemDatabase(), nil
 	}
 	db := ethdb.NewDB(n.config.resolvePath(name))
-	if err := db.Open(); err != nil {
+	if err := s3.ConfigureDB(db, n.config.Ethdb); err != nil {
+		return nil, err
+	} else if err := db.Open(); err != nil {
 		return nil, err
 	}
 	return db, nil
