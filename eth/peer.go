@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"sync"
 	"time"
@@ -555,7 +554,6 @@ func (ps *peerSet) PeersWithoutTxs(txs types.Transactions) map[*peer]types.Trans
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
-	max := int(math.Sqrt(float64(len(ps.peers))))
 	for _, tx := range txs {
 		hash := tx.Hash()
 		var count int
@@ -565,14 +563,10 @@ func (ps *peerSet) PeersWithoutTxs(txs types.Transactions) map[*peer]types.Trans
 			}
 			peerTxs[p] = append(peerTxs[p], tx)
 			count++
-			if count >= max {
-				break
-			}
 		}
-		if !tracing || count == 0 {
-			continue
+		if tracing && count > 0 {
+			log.Trace("Broadcast transaction", "hash", hash, "recipients", count)
 		}
-		log.Trace("Broadcast transaction", "hash", hash, "recipients", count)
 	}
 	return peerTxs
 }
