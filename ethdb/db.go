@@ -1,6 +1,7 @@
 package ethdb
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -34,7 +35,7 @@ const (
 	DefaultPartitionSize = 1024
 
 	// The minimum number of mutable segments on a given table.
-	MinMutableSegmentCount = 2
+	MinMutableSegmentCount = 10
 )
 
 // DB is the top-level database and contains a mixture of LevelDB & File storage layers.
@@ -330,13 +331,17 @@ func (t *Table) Get(key []byte) ([]byte, error) {
 
 // Put associates a value with key.
 func (t *Table) Put(key, value []byte) error {
+	// Ignore if value is the same.
+	if v, err := t.Get(key); err != nil && err != ErrKeyNotFound {
+		return err
+	} else if bytes.Equal(v, value) {
+		return nil
+	}
+
 	s, err := t.CreateSegmentIfNotExists(t.Partitioner.Partition(key))
 	if err != nil {
 		return err
 	}
-	// if s.Name() != "data" {
-	// 	fmt.Printf("dbg/put(T) %s %q %x\n", s.Name(), string(key[:1]), key)
-	// }
 	return s.Put(key, value)
 }
 
@@ -414,10 +419,14 @@ type tableBatch struct {
 }
 
 func (b *tableBatch) Put(key, value []byte) error {
+	// Ignore if value is the same.
+	if v, err := b.table.Get(key); err != nil && err != ErrKeyNotFound {
+		return err
+	} else if bytes.Equal(v, value) {
+		return nil
+	}
+
 	name := b.table.Partitioner.Partition(key)
-	// if name != "data" {
-	// 	fmt.Printf("dbg/put(b) %s %q %x\n", name, string(key[:1]), key)
-	// }
 	segment, err := b.table.CreateSegmentIfNotExists(name)
 	if err != nil {
 		log.Error("tableBatch.Put: error", "table", b.table.Name, "segment", name, "key", fmt.Sprintf("%x", key))
