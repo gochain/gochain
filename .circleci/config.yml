@@ -155,12 +155,7 @@ workflows:
   version: 2
   prepare-accept-deploy:
     jobs:
-      - prepare      
-      - prepare-gcr:
-         filters:
-            branches:
-              only:
-                - master
+      - prepare
       - build:
           requires:
             - prepare
@@ -183,5 +178,4 @@ workflows:
             - build
             - test
             - test-fuse
-            - race  
-            - prepare-gcr
+            - race
