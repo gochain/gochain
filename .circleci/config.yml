@@ -23,23 +23,6 @@ jobs:
           root: .
           paths:
             - .
-  prepare-gcr:
-    <<: *defaults
-    steps:
-      - run:       
-         name: Store Service Account
-         command: echo $ACCT_AUTH > ${HOME}/gcloud-service-key.json
-      - run:
-          name: install dependencies
-          command: |
-            wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-204.0.0-linux-x86_64.tar.gz --directory-prefix=tmp
-            tar -xvzf tmp/google-cloud-sdk-204.0.0-linux-x86_64.tar.gz -C tmp
-            ./tmp/google-cloud-sdk/install.sh -q            
-
-      - persist_to_workspace:
-          root: .
-          paths:
-            - .
   build:
     <<: *defaults
     steps:
@@ -144,6 +127,15 @@ jobs:
       - attach_workspace:
           at: .
       - run:
+          name: Store Service Account
+          command: echo $ACCT_AUTH > ${HOME}/gcloud-service-key.json
+      - run:
+          name: install dependencies
+          command: |
+            wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-204.0.0-linux-x86_64.tar.gz --directory-prefix=tmp
+            tar -xvzf tmp/google-cloud-sdk-204.0.0-linux-x86_64.tar.gz -C tmp
+            ./tmp/google-cloud-sdk/install.sh -q
+      - run:
           name: add github ssh
           command: |
             echo '
@@ -159,56 +151,6 @@ jobs:
               ./release.sh
             fi
 
-  push-testnet:
-    <<: *defaults
-    steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - attach_workspace:
-          at: .
-      - deploy:
-          command: |
-            if [[ "${CIRCLE_BRANCH}" == "testnet" && -z "${CIRCLE_PR_REPONAME}" ]]; then
-              echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-              version_file="params/version.go"
-              version=$(grep -m1 -Eo "[0-9]+\.[0-9]+\.[0-9]+" ${version_file})
-              echo "Version: ${version}"              
-              docker pull gochain/gochain:${version}
-              docker tag gochain/gochain:${version} gochain/gochain:testnet
-              docker push gochain/gochain:testnet    
-              echo $ACCT_AUTH > ${HOME}/gcloud-service-key.json
-              ./tmp/google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json                
-              docker login -u _json_key -p "$(cat ${HOME}/gcloud-service-key.json)" https://gcr.io
-              docker pull gcr.io/gochain-core/gochain:${version}
-              docker tag gcr.io/gochain-core/gochain:${version} gcr.io/gochain-core/gochain:testnet
-              docker push gcr.io/gochain-core/gochain:testnet
-            fi
-
-  push-stable:
-    <<: *defaults
-    steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - attach_workspace:
-          at: .
-      - deploy:
-          command: |
-            if [[ "${CIRCLE_BRANCH}" == "stable" && -z "${CIRCLE_PR_REPONAME}" ]]; then
-              echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-              version_file="params/version.go"
-              version=$(grep -m1 -Eo "[0-9]+\.[0-9]+\.[0-9]+" ${version_file})
-              echo "Version: ${version}"              
-              docker pull gochain/gochain:${version}
-              docker tag gochain/gochain:${version} gochain/gochain:stable
-              docker push gochain/gochain:stable                            
-              echo $ACCT_AUTH > ${HOME}/gcloud-service-key.json              
-              ./tmp/google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
-              docker login -u _json_key -p "$(cat ${HOME}/gcloud-service-key.json)" https://gcr.io
-              docker pull gcr.io/gochain-core/gochain:${version}
-              docker tag gcr.io/gochain-core/gochain:${version} gcr.io/gochain-core/gochain:stable
-              docker push gcr.io/gochain-core/gochain:stable
-            fi
-
 workflows:
   version: 2
   prepare-accept-deploy:
@@ -217,10 +159,8 @@ workflows:
       - prepare-gcr:
          filters:
             branches:
-              only: 
-                - testnet
+              only:
                 - master
-                - stable
       - build:
           requires:
             - prepare
@@ -244,31 +184,4 @@ workflows:
             - test
             - test-fuse
             - race  
-            - prepare-gcr          
-      - push-testnet:
-          filters:
-            branches:
-              only: testnet
-          requires:
-            - build
-            - test
-            - test-fuse
-            - race            
             - prepare-gcr
-      - approve-push-stable:
-          type: approval
-          filters:
-            branches:
-              only: stable
-          requires:
-            - build
-            - test
-            - test-fuse
-            - race
-            - prepare-gcr            
-      - push-stable:
-          filters:
-            branches:
-              only: stable
-          requires:
-            - approve-push-stable
