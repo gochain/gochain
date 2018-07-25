@@ -1,10 +1,12 @@
 package s3
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"path"
+	"strings"
 	"sync"
 
 	"github.com/gochain-io/gochain/ethdb"
@@ -67,9 +69,26 @@ func (c *Client) Open() (err error) {
 	return nil
 }
 
+// ListObjectKeys returns a list of all object keys with a given prefix.
+func (c *Client) ListObjectKeys(prefix string) ([]string, error) {
+	var keys []string
+	for info := range c.client.ListObjects(c.Bucket, prefix, true, nil) {
+		if info.Err != nil {
+			return nil, info.Err
+		}
+		keys = append(keys, info.Key)
+	}
+	return keys, nil
+}
+
 // FGetObject fetches the object at key and writes it to path.
 func (c *Client) FGetObject(ctx context.Context, key, path string) error {
 	return c.client.FGetObjectWithContext(ctx, c.Bucket, key, path, minio.GetObjectOptions{})
+}
+
+// PutObject writes an object to a key.
+func (c *Client) PutObject(ctx context.Context, key string, value []byte) (n int64, err error) {
+	return c.client.PutObjectWithContext(ctx, c.Bucket, key, bytes.NewReader(value), int64(len(value)), minio.PutObjectOptions{})
 }
 
 // FPutObject writes an object to key from a file at path.
@@ -201,6 +220,18 @@ func NewSegmentOpener(client *Client) *SegmentOpener {
 	return &SegmentOpener{Client: client}
 }
 
+// ListSegmentNames returns a list of segment names for a table.
+func (o *SegmentOpener) ListSegmentNames(path, table string) ([]string, error) {
+	keys, err := o.Client.ListObjectKeys(table)
+	if err != nil {
+		return nil, err
+	}
+	for i, key := range keys {
+		keys[i] = strings.TrimPrefix(key, table+"/")
+	}
+	return keys, nil
+}
+
 // OpenSegment returns creates and opens a reference to a remote immutable segment.
 func (o *SegmentOpener) OpenSegment(table, name, path string) (ethdb.Segment, error) {
 	return NewSegment(o.Client, table, name, path), nil
@@ -232,8 +263,14 @@ func (c *SegmentCompactor) CompactSegment(ctx context.Context, table string, s *
 		return nil, err
 	}
 
-	if err := fsc.SwapSegment(ctx, s, tmpPath); err != nil {
+	// Close and remove both segments.
+	if err := s.Close(); err != nil {
+		return nil, err
+	} else if err := os.RemoveAll(s.Path()); err != nil {
+		return nil, err
+	} else if err := os.Remove(tmpPath); err != nil {
 		return nil, err
 	}
+
 	return NewSegment(c.Client, table, s.Name(), s.Path()), nil
 }

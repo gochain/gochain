@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 
 	"github.com/cespare/xxhash"
@@ -244,6 +245,20 @@ type FileSegmentOpener struct{}
 // NewFileSegmentOpener returns a new instance of FileSegmentOpener.
 func NewFileSegmentOpener() *FileSegmentOpener {
 	return &FileSegmentOpener{}
+}
+
+// ListSegmentNames returns a list of all segment names for a table.
+func (o *FileSegmentOpener) ListSegmentNames(path, table string) ([]string, error) {
+	fis, err := ioutil.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var keys []string
+	for _, fi := range fis {
+		keys = append(keys, fi.Name())
+	}
+	return keys, nil
 }
 
 // OpenSegment returns an initialized and opened segment.

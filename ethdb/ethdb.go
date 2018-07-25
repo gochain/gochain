@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 )
 
 // Segment file types.
@@ -25,6 +26,11 @@ type Segment interface {
 	Get(key []byte) ([]byte, error)
 }
 
+// SortSegments sorts a by name.
+func SortSegments(a []Segment) {
+	sort.Slice(a, func(i, j int) bool { return a[i].Name() < a[j].Name() })
+}
+
 // MutableSegment represents a segment that can be altered.
 // These segments are eventually compacted into immutable segments.
 type MutableSegment interface {
@@ -36,6 +42,7 @@ type MutableSegment interface {
 // SegmentOpener represents an object that can instantiate and load an immutable segment.
 type SegmentOpener interface {
 	OpenSegment(table, name, path string) (Segment, error)
+	ListSegmentNames(path, table string) ([]string, error)
 }
 
 // SegmentCompactor represents an object that can compact from an LDB segment
