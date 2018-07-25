@@ -36,7 +36,12 @@ func (m *MutableSegment) Delete(key []byte) error     { return m.DeleteFunc(key)
 var _ ethdb.SegmentOpener = (*SegmentOpener)(nil)
 
 type SegmentOpener struct {
-	OpenSegmentFunc func(table, name, path string) (ethdb.Segment, error)
+	ListSegmentNamesFunc func(path, table string) ([]string, error)
+	OpenSegmentFunc      func(table, name, path string) (ethdb.Segment, error)
+}
+
+func (m *SegmentOpener) ListSegmentNames(path, table string) ([]string, error) {
+	return m.ListSegmentNamesFunc(path, table)
 }
 
 func (m *SegmentOpener) OpenSegment(table, name, path string) (ethdb.Segment, error) {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -17,13 +16,19 @@ import (
 // Table represents key/value storage for a particular data type.
 // Contains zero or more segments that are separated by partitioner.
 type Table struct {
-	mu       sync.RWMutex
-	active   string             // active segment name
-	segments map[string]Segment // all segments
+	mu          sync.RWMutex
+	active      string                 // active segment name
+	ldbSegments map[string]*LDBSegment // writable segments
+	segments    *SegmentSet            // all segments
 
 	Name        string
 	Path        string
 	Partitioner Partitioner
+
+	MinMutableSegmentCount int
+
+	// Maximum number of segments that can be opened at once.
+	MaxOpenSegmentCount int
 
 	SegmentOpener    SegmentOpener
 	SegmentCompactor SegmentCompactor
@@ -32,31 +37,38 @@ type Table struct {
 // NewTable returns a new instance of Table.
 func NewTable(name, path string, partitioner Partitioner) *Table {
 	return &Table{
-		segments: make(map[string]Segment),
-
 		Name:        name,
 		Path:        path,
 		Partitioner: partitioner,
+
+		MinMutableSegmentCount: DefaultMinMutableSegmentCount,
+		MaxOpenSegmentCount:    DefaultMaxOpenSegmentCount,
+
+		SegmentOpener:    NewFileSegmentOpener(),
+		SegmentCompactor: NewFileSegmentCompactor(),
 	}
 }
 
 // Open initializes the table and all existing segments.
 func (t *Table) Open() error {
+	t.ldbSegments = make(map[string]*LDBSegment)
+	t.segments = NewSegmentSet(t.MaxOpenSegmentCount)
+
 	if err := os.MkdirAll(t.Path, 0777); err != nil {
 		return err
 	}
 
-	fis, err := ioutil.ReadDir(t.Path)
+	names, err := t.SegmentOpener.ListSegmentNames(t.Path, t.Name)
 	if err != nil {
 		return err
 	}
-	for _, fi := range fis {
-		path := filepath.Join(t.Path, fi.Name())
-		name := filepath.Base(path)
+
+	for _, name := range names {
+		path := filepath.Join(t.Path, name)
 
 		// Determine the segment file type.
 		typ, err := SegmentFileType(path)
-		if err != nil {
+		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
 
@@ -68,17 +80,17 @@ func (t *Table) Open() error {
 				t.Close()
 				return err
 			}
-			t.segments[name] = ldbSegment
+			t.ldbSegments[name] = ldbSegment
 
 		default:
 			segment, err := t.SegmentOpener.OpenSegment(t.Name, name, path)
 			if err == ErrSegmentTypeUnknown {
-				log.Info("unknown segment type, skipping", "filename", fi.Name())
+				log.Info("unknown segment type, skipping", "filename", name)
 				continue
 			} else if err != nil {
 				return err
 			}
-			t.segments[name] = segment
+			t.segments.Add(segment)
 		}
 
 		// Set as active if it has the highest lexicographical name.
@@ -91,9 +103,17 @@ func (t *Table) Open() error {
 
 // Close closes all segments within the table.
 func (t *Table) Close() error {
-	for _, segment := range t.segments {
+	for _, segment := range t.ldbSegments {
 		if err := segment.Close(); err != nil {
 			return err
+		}
+	}
+	if t.segments != nil {
+		for _, segment := range t.segments.Slice() {
+			if err := segment.Close(); err != nil {
+				return err
+			}
+			t.segments.Remove(segment.Name())
 		}
 	}
 	return nil
@@ -107,10 +127,10 @@ func (t *Table) ActiveSegmentName() string {
 }
 
 // ActiveSegment returns the active segment.
-func (t *Table) ActiveSegment() Segment {
+func (t *Table) ActiveSegment() MutableSegment {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return t.segments[t.active]
+	return t.ldbSegments[t.active]
 }
 
 // SegmentPath returns the path of the named segment.
@@ -118,48 +138,84 @@ func (t *Table) SegmentPath(name string) string {
 	return filepath.Join(t.Path, name)
 }
 
-// Segment returns a segment by name. Returns nil if segment does not exist.
-func (t *Table) Segment(name string) Segment {
+// AcquireSegment returns a segment by name. Returns nil if segment does not exist.
+// Must call ReleaseSegment when finished with the segment.
+func (t *Table) AcquireSegment(name string) (Segment, error) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return t.segments[name]
+
+	if s := t.ldbSegments[name]; s != nil {
+		return s, nil
+	}
+	return t.segments.Acquire(name)
+}
+
+// ReleaseSegment releases a given segment.
+func (t *Table) ReleaseSegment(s Segment) {
+	switch s.(type) {
+	case *LDBSegment:
+		return
+	default:
+		t.segments.Release()
+	}
 }
 
 // SegmentNames a sorted list of all segments names.
 func (t *Table) SegmentNames() []string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	a := make([]string, 0, len(t.segments))
-	for _, s := range t.segments {
+
+	a := make([]string, 0, len(t.ldbSegments)+t.segments.Len())
+	for _, s := range t.ldbSegments {
+		a = append(a, s.Name())
+	}
+	for _, s := range t.segments.Slice() {
 		a = append(a, s.Name())
 	}
 	sort.Strings(a)
 	return a
 }
 
+// SegmentsSlice returns a sorted slice of all segments.
+func (t *Table) SegmentSlice() []Segment {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.segmentSlice()
+}
+
+func (t *Table) segmentSlice() []Segment {
+	a := make([]Segment, 0, len(t.ldbSegments)+t.segments.Len())
+	for _, s := range t.ldbSegments {
+		a = append(a, s)
+	}
+	for _, s := range t.segments.Slice() {
+		a = append(a, s)
+	}
+	SortSegments(a)
+	return a
+}
+
 // CreateSegmentIfNotExists returns a mutable segment by name.
 // Creates a new segment if it does not exist.
 func (t *Table) CreateSegmentIfNotExists(name string) (MutableSegment, error) {
-	if s := t.Segment(name); s != nil {
-		switch s := s.(type) {
-		case MutableSegment:
-			return s, nil
-		default:
-			return nil, ErrImmutableSegment
-		}
+	t.mu.RLock()
+	if s := t.ldbSegments[name]; s != nil {
+		t.mu.RUnlock()
+		return s, nil
 	}
+	t.mu.RUnlock()
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	// Recheck under write lock.
-	if s := t.segments[name]; s != nil {
-		switch s := s.(type) {
-		case MutableSegment:
-			return s, nil
-		default:
-			return nil, ErrImmutableSegment
-		}
+	if s := t.ldbSegments[name]; s != nil {
+		return s, nil
+	}
+
+	// Check if immutable already.
+	if t.segments.Contains(name) {
+		return nil, ErrImmutableSegment
 	}
 
 	// Ensure segment name can become active.
@@ -173,7 +229,7 @@ func (t *Table) CreateSegmentIfNotExists(name string) (MutableSegment, error) {
 	if err := ldbSegment.Open(); err != nil {
 		return nil, err
 	}
-	t.segments[name] = ldbSegment
+	t.ldbSegments[name] = ldbSegment
 
 	// Set as active segment.
 	t.active = name
@@ -187,37 +243,29 @@ func (t *Table) CreateSegmentIfNotExists(name string) (MutableSegment, error) {
 	return ldbSegment, nil
 }
 
-// SegmentSlice returns a sorted list of all segments.
-func (t *Table) SegmentSlice() []Segment {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-	return t.segmentSlice()
-}
-
-func (t *Table) segmentSlice() []Segment {
-	a := make([]Segment, 0, len(t.segments))
-	for _, tbl := range t.segments {
-		a = append(a, tbl)
-	}
-	sort.Slice(a, func(i, j int) bool { return a[i].Name() < a[j].Name() })
-	return a
-}
-
 // Has returns true if key exists in the table.
 func (t *Table) Has(key []byte) (bool, error) {
-	s := t.Segment(t.Partitioner.Partition(key))
-	if s == nil {
-		return false, nil
+	name := t.Partitioner.Partition(key)
+	s, err := t.AcquireSegment(name)
+	if err != nil {
+		return false, err
+	} else if s == nil {
+		return false, ErrKeyNotFound
 	}
+	defer t.ReleaseSegment(s)
 	return s.Has(key)
 }
 
 // Get returns the value associated with key.
 func (t *Table) Get(key []byte) ([]byte, error) {
-	s := t.Segment(t.Partitioner.Partition(key))
-	if s == nil {
+	name := t.Partitioner.Partition(key)
+	s, err := t.AcquireSegment(name)
+	if err != nil {
+		return nil, err
+	} else if s == nil {
 		return nil, nil
 	}
+	defer t.ReleaseSegment(s)
 	return s.Get(key)
 }
 
@@ -239,10 +287,14 @@ func (t *Table) Put(key, value []byte) error {
 
 // Delete removes key from the database.
 func (t *Table) Delete(key []byte) error {
-	s := t.Segment(t.Partitioner.Partition(key))
-	if s == nil {
+	s, err := t.AcquireSegment(t.Partitioner.Partition(key))
+	if err != nil {
+		return err
+	} else if s == nil {
 		return nil
 	}
+	defer t.ReleaseSegment(s)
+
 	switch s := s.(type) {
 	case MutableSegment:
 		return s.Delete(key)
@@ -265,11 +317,11 @@ func (t *Table) Compact(ctx context.Context) error {
 func (t *Table) compact(ctx context.Context) error {
 	// Retrieve segments. Exit if too few mutable segments.
 	segments := t.segmentSlice()
-	if len(segments) < MinMutableSegmentCount {
+	if len(segments) < t.MinMutableSegmentCount {
 		return nil
 	}
 
-	for _, s := range segments[:len(segments)-MinMutableSegmentCount] {
+	for _, s := range segments[:len(segments)-t.MinMutableSegmentCount] {
 		s, ok := s.(*LDBSegment)
 		if !ok {
 			continue
@@ -279,7 +331,8 @@ func (t *Table) compact(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		t.segments[s.Name()] = newSegment
+		t.segments.Add(newSegment)
+		delete(t.ldbSegments, s.Name())
 	}
 	return nil
 }
@@ -308,7 +361,6 @@ func (b *tableBatch) Put(key, value []byte) error {
 	ldbSegment, ok := segment.(*LDBSegment)
 	if !ok {
 		log.Error("cannot insert into compacted segment", "name", name, "key", fmt.Sprintf("%x", key))
-		panic("dbg/put.immutable")
 		return ErrImmutableSegment
 	}
 

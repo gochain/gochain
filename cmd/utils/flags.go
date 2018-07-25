@@ -523,6 +523,10 @@ var (
 		Name:  "ethdb.secretaccesskey",
 		Usage: "Ethdb archive secret access key.",
 	}
+	EthdbMaxOpenSegmentCountFlag = cli.IntFlag{
+		Name:  "ethdb.maxopensegmentcount",
+		Usage: "Ethdb per-table open segment count.",
+	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating
@@ -901,6 +905,9 @@ func setEthdb(ctx *cli.Context, cfg *ethdb.Config) {
 	}
 	if ctx.GlobalIsSet(EthdbSecretAccessKeyFlag.Name) {
 		cfg.SecretAccessKey = ctx.GlobalString(EthdbSecretAccessKeyFlag.Name)
+	}
+	if ctx.GlobalIsSet(EthdbMaxOpenSegmentCountFlag.Name) {
+		cfg.MaxOpenSegmentCount = ctx.GlobalInt(EthdbMaxOpenSegmentCountFlag.Name)
 	}
 }
 

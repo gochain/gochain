@@ -123,6 +123,7 @@ var (
 		utils.EthdbBucketFlag,
 		utils.EthdbAccessKeyIDFlag,
 		utils.EthdbSecretAccessKeyFlag,
+		utils.EthdbMaxOpenSegmentCountFlag,
 		configFileFlag,
 	}
 

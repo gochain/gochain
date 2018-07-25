@@ -1,6 +1,7 @@
 package ethdb_test
 
 import (
+	"context"
 	"encoding/binary"
 	"os"
 	"testing"
@@ -11,7 +12,7 @@ import (
 
 func TestTable_Put(t *testing.T) {
 	dir := MustTempDir()
-	tbl := ethdb.NewTable("test", dir, &ethdb.StaticPartitioner{Name:"data"})
+	tbl := ethdb.NewTable("test", dir, &ethdb.StaticPartitioner{Name: "data"})
 	defer os.RemoveAll(tbl.Path)
 
 	if err := tbl.Open(); err != nil {
@@ -43,7 +44,7 @@ func TestTable_Put(t *testing.T) {
 
 func TestTable_Delete(t *testing.T) {
 	dir := MustTempDir()
-	tbl := ethdb.NewTable("test", dir, &ethdb.StaticPartitioner{Name:"data"})
+	tbl := ethdb.NewTable("test", dir, &ethdb.StaticPartitioner{Name: "data"})
 	defer os.RemoveAll(tbl.Path)
 
 	if err := tbl.Open(); err != nil {
@@ -73,6 +74,7 @@ func TestTable_Compact(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	tbl := ethdb.NewTable("test", dir, ethdb.NewBlockNumberPartitioner(1000))
+	tbl.MinMutableSegmentCount = 2
 	if err := tbl.Open(); err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +91,7 @@ func TestTable_Compact(t *testing.T) {
 	}
 
 	// Force compaction.
-	if err := tbl.Compact(); err != nil {
+	if err := tbl.Compact(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 

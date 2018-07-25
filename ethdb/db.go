@@ -28,8 +28,8 @@ const (
 	// DefaultPartitionSize is the default number of blocks per partition.
 	DefaultPartitionSize = 256
 
-	// The minimum number of mutable segments on a given table.
-	MinMutableSegmentCount = 40
+	// DefaultMinMutableSegmentCount is the minimum number of mutable segments on a given table.
+	DefaultMinMutableSegmentCount = 40
 )
 
 // DB is the top-level database and contains a mixture of LevelDB & File storage layers.

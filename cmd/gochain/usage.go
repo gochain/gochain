@@ -95,6 +95,7 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.EthdbBucketFlag,
 			utils.EthdbAccessKeyIDFlag,
 			utils.EthdbSecretAccessKeyFlag,
+			utils.EthdbMaxOpenSegmentCountFlag,
 		},
 	},
 	//{
