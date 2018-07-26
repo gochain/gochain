@@ -228,7 +228,7 @@ func (hc *HeaderChain) ValidateHeaderChain(ctx context.Context, chain []*types.H
 	}
 	seals[len(seals)-1] = true // Last should always be verified to avoid junk
 
-	abort, results := hc.engine.VerifyHeaders(ctx, hc, chain, seals)
+	abort, results := hc.engine.VerifyHeaders(ctx, hc, chain)
 	defer close(abort)
 
 	// Iterate over the headers and ensure they all check out

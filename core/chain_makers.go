@@ -115,11 +115,6 @@ func (b *BlockGen) TxNonce(addr common.Address) uint64 {
 	return b.statedb.GetNonce(addr)
 }
 
-// AddUncle adds an uncle header to the generated block.
-func (b *BlockGen) AddUncle(h *types.Header) {
-	b.uncles = append(b.uncles, h)
-}
-
 // PrevBlock returns a previously generated block by number. It panics if
 // num is greater or equal to the number of the block being generated.
 // For index -1, PrevBlock returns the parent block given to GenerateChain.
@@ -133,16 +128,8 @@ func (b *BlockGen) PrevBlock(index int) *types.Block {
 	return b.chain[index]
 }
 
-// OffsetTime modifies the time instance of a block, implicitly changing its
-// associated difficulty. It's useful to test scenarios where forking is not
-// tied to chain length directly.
-func (b *BlockGen) OffsetTime(seconds int64) {
-	ctx := context.TODO()
-	b.header.Time.Add(b.header.Time, new(big.Int).SetInt64(seconds))
-	if b.header.Time.Cmp(b.parent.Header().Time) <= 0 {
-		panic("block time out of range")
-	}
-	b.header.Difficulty = b.engine.CalcDifficulty(ctx, b.chainReader, b.header.Time.Uint64(), b.parent.Header())
+func (b *BlockGen) SetDifficulty(amt uint64) {
+	b.header.Difficulty = new(big.Int).SetUint64(amt)
 }
 
 // GenerateChain creates a chain of n blocks. The first block's
@@ -157,19 +144,28 @@ func (b *BlockGen) OffsetTime(seconds int64) {
 // Blocks created by GenerateChain do not contain valid proof of work
 // values. Inserting them into BlockChain requires use of FakePow or
 // a similar non-validating proof of work implementation.
-func GenerateChain(ctx context.Context, config *params.ChainConfig, parent *types.Block, engine consensus.Engine, db ethdb.Database, n int, gen func(context.Context, int, *BlockGen)) ([]*types.Block, []types.Receipts) {
+func GenerateChain(ctx context.Context, config *params.ChainConfig, first *types.Block, engine consensus.Engine, db ethdb.Database, n int, gen func(context.Context, int, *BlockGen)) ([]*types.Block, []types.Receipts) {
 	if config == nil {
 		config = params.TestChainConfig
 	}
 	blocks, receipts := make(types.Blocks, n), make([]types.Receipts, n)
+
 	genblock := func(i int, parent *types.Block, statedb *state.StateDB) (*types.Block, types.Receipts) {
 		// TODO(karalabe): This is needed for clique, which depends on multiple blocks.
 		// It's nonetheless ugly to spin up a blockchain here. Get rid of this somehow.
 		blockchain, _ := NewBlockChain(db, nil, config, engine, vm.Config{})
 		defer blockchain.Stop()
-
 		b := &BlockGen{i: i, parent: parent, chain: blocks, chainReader: blockchain, statedb: statedb, config: config, engine: engine}
-		b.header = makeHeader(ctx, b.chainReader, parent, statedb, b.engine)
+
+		b.header = &types.Header{
+			Root:       statedb.IntermediateRoot(b.config.IsEIP158(parent.Number())),
+			ParentHash: parent.Hash(),
+			GasLimit:   CalcGasLimit(parent),
+			Number:     new(big.Int).Add(parent.Number(), common.Big1),
+			Signers:    parent.Signers(),
+			Voters:     parent.Voters(),
+			Time:       new(big.Int).Add(parent.Time(), new(big.Int).SetUint64(config.Clique.Period)),
+		}
 
 		// Execute any user modifications to the block and finalize it
 		if gen != nil {
@@ -177,7 +173,17 @@ func GenerateChain(ctx context.Context, config *params.ChainConfig, parent *type
 		}
 
 		if b.engine != nil {
-			block := b.engine.Finalize(ctx, b.chainReader, b.header, statedb, b.txs, b.uncles, b.receipts, true)
+			if err := b.engine.Prepare(ctx, b.chainReader, b.header); err != nil {
+				panic(fmt.Sprintf("failed to prepare %d: %v", b.header.Number.Uint64(), err))
+			}
+			block := b.engine.Finalize(ctx, b.chainReader, b.header, statedb, b.txs, b.receipts, true)
+
+			stop := make(chan struct{})
+			block, err := b.engine.Seal(ctx, b.chainReader, block, stop)
+			close(stop)
+			if err != nil {
+				panic(fmt.Sprintf("block seal error: %v", err))
+			}
 			// Write state changes to db
 			root, err := statedb.Commit(config.IsEIP158(b.header.Number))
 			if err != nil {
@@ -190,6 +196,7 @@ func GenerateChain(ctx context.Context, config *params.ChainConfig, parent *type
 		}
 		return nil, nil
 	}
+	parent := first
 	for i := 0; i < n; i++ {
 		statedb, err := state.New(parent.Root(), state.NewDatabase(db))
 		if err != nil {
@@ -201,30 +208,6 @@ func GenerateChain(ctx context.Context, config *params.ChainConfig, parent *type
 		parent = block
 	}
 	return blocks, receipts
-}
-
-func makeHeader(ctx context.Context, chain consensus.ChainReader, parent *types.Block, state *state.StateDB, engine consensus.Engine) *types.Header {
-	var time *big.Int
-	if parent.Time() == nil {
-		time = big.NewInt(10)
-	} else {
-		time = new(big.Int).Add(parent.Time(), big.NewInt(10)) // block time is fixed at 10 seconds
-	}
-
-	return &types.Header{
-		Root:       state.IntermediateRoot(chain.Config().IsEIP158(parent.Number())),
-		ParentHash: parent.Hash(),
-		Coinbase:   parent.Coinbase(),
-		Difficulty: engine.CalcDifficulty(ctx, chain, time.Uint64(), &types.Header{
-			Number:     parent.Number(),
-			Time:       new(big.Int).Sub(time, big.NewInt(10)),
-			Difficulty: parent.Difficulty(),
-			UncleHash:  parent.UncleHash(),
-		}),
-		GasLimit: CalcGasLimit(parent),
-		Number:   new(big.Int).Add(parent.Number(), common.Big1),
-		Time:     time,
-	}
 }
 
 // makeHeaderChain creates a deterministic chain of headers rooted at parent.
@@ -240,7 +223,7 @@ func makeHeaderChain(ctx context.Context, parent *types.Header, n int, engine co
 // makeBlockChain creates a deterministic chain of blocks rooted at parent.
 func makeBlockChain(ctx context.Context, parent *types.Block, n int, engine consensus.Engine, db ethdb.Database, seed int) []*types.Block {
 	blocks, _ := GenerateChain(ctx, params.TestChainConfig, parent, engine, db, n, func(ctx context.Context, i int, b *BlockGen) {
-		b.SetCoinbase(common.Address{0: byte(seed), 19: byte(i)})
+		b.SetExtra([]byte{0: byte(seed)})
 	})
 	return blocks
 }

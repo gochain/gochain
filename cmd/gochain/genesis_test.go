@@ -42,7 +42,12 @@ var customGenesisTests = map[string]customGenesisTest{
 			"mixhash"    : "0x0000000000000000000000000000000000000000000000000000000000000000",
 			"parentHash" : "0x0000000000000000000000000000000000000000000000000000000000000000",
 			"timestamp"  : "0x00",
-			"config"     : {}
+			"config"     : {
+				"clique": {
+      				"period": 5,
+      				"epoch": 3000
+    			}
+			}
 		}`,
 		query:  "eth.getBlock(0).nonce",
 		result: "0x0125864321546982",
@@ -60,7 +65,11 @@ var customGenesisTests = map[string]customGenesisTest{
 			"parentHash" : "0x0000000000000000000000000000000000000000000000000000000000000000",
 			"timestamp"  : "0x00",
 			"config"     : {
-				"homesteadBlock" : 314
+				"homesteadBlock" : 314,
+				"clique": {
+      				"period": 5,
+      				"epoch": 3000
+    			}
 			}
 		}`,
 		query:  "eth.getBlock(0).nonce",

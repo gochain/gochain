@@ -27,7 +27,7 @@ import (
 
 	"github.com/gochain-io/gochain"
 	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/consensus/ethash"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/bloombits"
 	"github.com/gochain-io/gochain/core/types"
@@ -138,8 +138,8 @@ func TestBlockSubscription(t *testing.T) {
 		chainFeed   = new(event.Feed)
 		backend     = &testBackend{mux, db, 0, txFeed, rmLogsFeed, logsFeed, chainFeed}
 		api         = NewPublicFilterAPI(backend, false)
-		genesis     = new(core.Genesis).MustCommit(db)
-		chain, _    = core.GenerateChain(ctx, params.TestChainConfig, genesis, ethash.NewFaker(), db, 10, func(ctx context.Context, i int, gen *core.BlockGen) {})
+		genesis     = core.GenesisBlockForTesting(db, common.Address{1}, common.Big256)
+		chain, _    = core.GenerateChain(ctx, params.TestChainConfig, genesis, clique.NewFaker(), db, 10, nil)
 		chainEvents = []core.ChainEvent{}
 	)
 

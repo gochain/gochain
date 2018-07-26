@@ -68,8 +68,8 @@ func (w *wizard) makeGenesis() {
 			Epoch:  30000,
 		}
 		fmt.Println()
-		fmt.Println("How many seconds should blocks take? (default = 15)")
-		genesis.Config.Clique.Period = uint64(w.readDefaultInt(15))
+		fmt.Printf("How many seconds should blocks take? (default = %d)\n", params.DefaultCliquePeriod)
+		genesis.Config.Clique.Period = uint64(w.readDefaultInt(params.DefaultCliquePeriod))
 
 		// We also need the initial list of signers
 		fmt.Println()

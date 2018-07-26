@@ -29,7 +29,6 @@ import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/consensus"
 	"github.com/gochain-io/gochain/consensus/clique"
-	"github.com/gochain-io/gochain/consensus/ethash"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/bloombits"
 	"github.com/gochain-io/gochain/core/types"
@@ -138,13 +137,16 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 	}
 	log.Info("Initialised chain configuration", "config", chainConfig)
 
+	if chainConfig.Clique == nil {
+		return nil, fmt.Errorf("invalid configuration, clique is nil: %v", chainConfig)
+	}
 	eth := &GoChain{
 		config:         config,
 		chainDb:        chainDb,
 		chainConfig:    chainConfig,
 		eventMux:       sctx.EventMux,
 		accountManager: sctx.AccountManager,
-		engine:         CreateConsensusEngine(sctx, &config.Ethash, chainConfig, chainDb),
+		engine:         clique.New(chainConfig.Clique, chainDb),
 		shutdownChan:   make(chan bool),
 		stopDbUpgrade:  stopDbUpgrade,
 		networkId:      config.NetworkId,
@@ -251,37 +253,6 @@ func CreateDB(ctx *node.ServiceContext, config *Config, name string) (ethdb.Data
 		db.Meter("db/chaindata/")
 	}
 	return db, nil
-}
-
-// CreateConsensusEngine creates the required type of consensus engine instance for an GoChain service
-func CreateConsensusEngine(ctx *node.ServiceContext, config *ethash.Config, chainConfig *params.ChainConfig, db ethdb.Database) consensus.Engine {
-	// If proof-of-authority is requested, set it up
-	if chainConfig.Clique != nil {
-		return clique.New(chainConfig.Clique, db)
-	}
-	// Otherwise assume proof-of-work
-	switch {
-	case config.PowMode == ethash.ModeFake:
-		log.Warn("Ethash used in fake mode")
-		return ethash.NewFaker()
-	case config.PowMode == ethash.ModeTest:
-		log.Warn("Ethash used in test mode")
-		return ethash.NewTester()
-	case config.PowMode == ethash.ModeShared:
-		log.Warn("Ethash used in shared mode")
-		return ethash.NewShared()
-	default:
-		engine := ethash.New(ethash.Config{
-			CacheDir:       ctx.ResolvePath(config.CacheDir),
-			CachesInMem:    config.CachesInMem,
-			CachesOnDisk:   config.CachesOnDisk,
-			DatasetDir:     config.DatasetDir,
-			DatasetsInMem:  config.DatasetsInMem,
-			DatasetsOnDisk: config.DatasetsOnDisk,
-		})
-		engine.SetThreads(-1) // Disable CPU mining
-		return engine
-	}
 }
 
 // APIs returns the collection of RPC services the ethereum package offers.

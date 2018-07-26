@@ -132,14 +132,7 @@ func (w *wizard) gatherStats(server string, pubkey []byte, client *sshClient) *s
 		stat.services["sealnode"] = infos.Report()
 		genesis = string(infos.genesis)
 	}
-	logger.Debug("Checking for explorer availability")
-	if infos, err := checkExplorer(client, w.network); err != nil {
-		if err != ErrServiceUnknown {
-			stat.services["explorer"] = map[string]string{"offline": err.Error()}
-		}
-	} else {
-		stat.services["explorer"] = infos.Report()
-	}
+
 	logger.Debug("Checking for wallet availability")
 	if infos, err := checkWallet(client, w.network); err != nil {
 		if err != ErrServiceUnknown {
@@ -156,14 +149,7 @@ func (w *wizard) gatherStats(server string, pubkey []byte, client *sshClient) *s
 	} else {
 		stat.services["faucet"] = infos.Report()
 	}
-	logger.Debug("Checking for dashboard availability")
-	if infos, err := checkDashboard(client, w.network); err != nil {
-		if err != ErrServiceUnknown {
-			stat.services["dashboard"] = map[string]string{"offline": err.Error()}
-		}
-	} else {
-		stat.services["dashboard"] = infos.Report()
-	}
+
 	// Feed and newly discovered information into the wizard
 	w.lock.Lock()
 	defer w.lock.Unlock()

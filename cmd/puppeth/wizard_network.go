@@ -187,13 +187,15 @@ func (w *wizard) deployComponent() {
 	case "3":
 		w.deployNode(false)
 	case "4":
-		w.deployExplorer()
+		//w.deployExplorer()
+		log.Error("explorer is not available")
 	case "5":
 		w.deployWallet()
 	case "6":
 		w.deployFaucet()
 	case "7":
-		w.deployDashboard()
+		//w.deployDashboard()
+		log.Error("dasboard is not available")
 	default:
 		log.Error("That's not something I can do")
 	}

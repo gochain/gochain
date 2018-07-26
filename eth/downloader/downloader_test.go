@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/consensus/ethash"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/crypto"
@@ -108,12 +108,12 @@ func newTester() *downloadTester {
 // reassembly.
 func (dl *downloadTester) makeChain(ctx context.Context, n int, seed byte, parent *types.Block, parentReceipts types.Receipts, heavy bool) ([]common.Hash, map[common.Hash]*types.Header, map[common.Hash]*types.Block, map[common.Hash]types.Receipts) {
 	// Generate the block chain
-	blocks, receipts := core.GenerateChain(ctx, params.TestChainConfig, parent, ethash.NewFaker(), dl.peerDb, n, func(ctx context.Context, i int, block *core.BlockGen) {
+	blocks, receipts := core.GenerateChain(ctx, params.TestChainConfig, parent, clique.NewFaker(), dl.peerDb, n, func(ctx context.Context, i int, block *core.BlockGen) {
 		block.SetCoinbase(common.Address{seed})
 
 		// If a heavy chain is requested, delay blocks to raise difficulty
 		if heavy {
-			block.OffsetTime(-1)
+			block.SetDifficulty(1)
 		}
 		// If the block number is multiple of 3, send a bonus transaction to the miner
 		if parent == dl.genesis && i%3 == 0 {
@@ -123,13 +123,6 @@ func (dl *downloadTester) makeChain(ctx context.Context, n int, seed byte, paren
 				panic(err)
 			}
 			block.AddTx(ctx, tx)
-		}
-		// If the block number is a multiple of 5, add a bonus uncle to the block
-		if i > 0 && i%5 == 0 {
-			block.AddUncle(&types.Header{
-				ParentHash: block.PrevBlock(i - 1).Hash(),
-				Number:     big.NewInt(block.Number().Int64() - 1),
-			})
 		}
 	})
 	// Convert the block-chain into a hash-chain and header/block maps
@@ -1761,16 +1754,19 @@ func testDeliverHeadersHang(t *testing.T, protocol int, mode SyncMode) {
 		tester.newPeer("peer", protocol, hashes, headers, blocks, receipts)
 		// Whenever the downloader requests headers, flood it with
 		// a lot of unrequested header deliveries.
-		tester.downloader.peers.peers["peer"].peer = &floodingTestPeer{
+		testPeer := &floodingTestPeer{
 			peer:   tester.downloader.peers.peers["peer"].peer,
 			tester: tester,
 		}
+		tester.downloader.peers.peers["peer"].peer = testPeer
 		if err := tester.sync(ctx, "peer", nil, mode); err != nil {
 			t.Errorf("test %d: sync failed: %v", i, err)
 		}
 		tester.terminate()
 
+		// Hack to mitigate racey use of WaitGroup
+		time.Sleep(100 * time.Millisecond)
 		// Flush all goroutines to prevent messing with subsequent tests
-		tester.downloader.peers.peers["peer"].peer.(*floodingTestPeer).pend.Wait()
+		testPeer.pend.Wait()
 	}
 }

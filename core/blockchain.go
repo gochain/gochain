@@ -717,6 +717,19 @@ const (
 	SideStatTy
 )
 
+func (ws WriteStatus) String() string {
+	switch ws {
+	case NonStatTy:
+		return "NonStatTy"
+	case CanonStatTy:
+		return "CanonStatTy"
+	case SideStatTy:
+		return "SideStatTy"
+	default:
+		return fmt.Sprintf("unknown WriteStatus: %d", ws)
+	}
+}
+
 // Rollback is designed to remove a chain of links from the database that aren't
 // certain enough to be valid.
 func (bc *BlockChain) Rollback(chain []common.Hash) {
@@ -1073,7 +1086,7 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 		headers[i] = block.Header()
 		seals[i] = true
 	}
-	abort, results := bc.engine.VerifyHeaders(ctx, bc, headers, seals)
+	abort, results := bc.engine.VerifyHeaders(ctx, bc, headers)
 	defer close(abort)
 
 	// Pre-compute and cache sender ecrecover for each transaction.

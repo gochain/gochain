@@ -19,8 +19,8 @@ package consensus
 
 import (
 	"context"
-	"math/big"
 
+	"github.com/gochain-io/gochain/accounts"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
@@ -52,7 +52,7 @@ type ChainReader interface {
 
 // Engine is an algorithm agnostic consensus engine.
 type Engine interface {
-	// Author retrieves the Ethereum address of the account that minted the given
+	// Author retrieves the GoChain address of the account that minted the given
 	// block, which may be different from the header's coinbase if a consensus
 	// engine is based on signatures.
 	Author(header *types.Header) (common.Address, error)
@@ -60,21 +60,13 @@ type Engine interface {
 	// VerifyHeader checks whether a header conforms to the consensus rules of a
 	// given engine. Verifying the seal may be done optionally here, or explicitly
 	// via the VerifySeal method.
-	VerifyHeader(ctx context.Context, chain ChainReader, header *types.Header, seal bool) error
+	VerifyHeader(ctx context.Context, chain ChainReader, header *types.Header) error
 
 	// VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
 	// concurrently. The method returns a quit channel to abort the operations and
 	// a results channel to retrieve the async verifications (the order is that of
 	// the input slice).
-	VerifyHeaders(ctx context.Context, chain ChainReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error)
-
-	// VerifyUncles verifies that the given block's uncles conform to the consensus
-	// rules of a given engine.
-	VerifyUncles(ctx context.Context, chain ChainReader, block *types.Block) error
-
-	// VerifySeal checks whether the crypto seal on a header is valid according to
-	// the consensus rules of the given engine.
-	VerifySeal(ctx context.Context, chain ChainReader, header *types.Header) error
+	VerifyHeaders(ctx context.Context, chain ChainReader, headers []*types.Header) (chan<- struct{}, <-chan error)
 
 	// Prepare initializes the consensus fields of a block header according to the
 	// rules of a particular engine. The changes are executed inline.
@@ -85,24 +77,19 @@ type Engine interface {
 	// Note: The block header and state database might be updated to reflect any
 	// consensus rules that happen at finalization (e.g. block rewards).
 	Finalize(ctx context.Context, chain ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
-		uncles []*types.Header, receipts []*types.Receipt, block bool) *types.Block
+		receipts []*types.Receipt, block bool) *types.Block
 
 	// Seal generates a new block for the given input block with the local miner's
 	// seal place on top.
 	Seal(ctx context.Context, chain ChainReader, block *types.Block, stop <-chan struct{}) (*types.Block, error)
 
-	// CalcDifficulty is the difficulty adjustment algorithm. It returns the difficulty
-	// that a new block should have.
-	CalcDifficulty(ctx context.Context, chain ChainReader, time uint64, parent *types.Header) *big.Int
-
 	// APIs returns the RPC APIs this consensus engine provides.
 	APIs(chain ChainReader) []rpc.API
+
+	// Authorize injects a private key into the consensus engine for minting new blocks.
+	Authorize(common.Address, SignerFn)
 }
 
-// PoW is a consensus engine based on proof-of-work.
-type PoW interface {
-	Engine
-
-	// Hashrate returns the current mining hashrate of a PoW consensus engine.
-	Hashrate() float64
-}
+// SignerFn is a signer callback function to request a hash to be signed by a
+// backing account.
+type SignerFn func(accounts.Account, []byte) ([]byte, error)

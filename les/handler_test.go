@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/consensus/ethash"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/crypto"
@@ -545,8 +545,9 @@ func TestTransactionStatusLes2(t *testing.T) {
 	// query again, now tx3 should be pending too
 	test(tx3, false, txStatus{Status: core.TxStatusPending})
 
+	engine := clique.NewFaker()
 	// generate and add a block with tx1 and tx2 included
-	gchain, _ := core.GenerateChain(ctx, params.TestChainConfig, chain.GetBlockByNumber(0), ethash.NewFaker(), db, 1, func(ctx context.Context, i int, block *core.BlockGen) {
+	gchain, _ := core.GenerateChain(ctx, params.TestChainConfig, chain.GetBlockByNumber(0), engine, db, 1, func(ctx context.Context, i int, block *core.BlockGen) {
 		block.AddTx(ctx, tx1)
 		block.AddTx(ctx, tx2)
 	})
@@ -570,7 +571,7 @@ func TestTransactionStatusLes2(t *testing.T) {
 	test(tx2, false, txStatus{Status: core.TxStatusIncluded, Lookup: &core.TxLookupEntry{BlockHash: block1hash, BlockIndex: 1, Index: 1}})
 
 	// create a reorg that rolls them back
-	gchain, _ = core.GenerateChain(ctx, params.TestChainConfig, chain.GetBlockByNumber(0), ethash.NewFaker(), db, 2, func(ctx context.Context, i int, block *core.BlockGen) {})
+	gchain, _ = core.GenerateChain(ctx, params.TestChainConfig, chain.GetBlockByNumber(0), engine, db, 2, func(ctx context.Context, i int, block *core.BlockGen) {})
 	if _, err := chain.InsertChain(ctx, gchain); err != nil {
 		panic(err)
 	}

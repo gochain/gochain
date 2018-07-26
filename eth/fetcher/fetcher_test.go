@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/consensus/ethash"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/crypto"
@@ -39,7 +39,7 @@ var (
 	testKey, _   = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 	testAddress  = crypto.PubkeyToAddress(testKey.PublicKey)
 	genesis      = core.GenesisBlockForTesting(testdb, testAddress, big.NewInt(1000000000))
-	unknownBlock = types.NewBlock(&types.Header{GasLimit: params.GenesisGasLimit}, nil, nil, nil)
+	unknownBlock = types.NewBlock(&types.Header{GasLimit: params.GenesisGasLimit, Signer: genesis.Signer()}, nil, nil, nil)
 )
 
 // makeChain creates a chain of n blocks starting at and including parent.
@@ -48,7 +48,7 @@ var (
 // reassembly.
 func makeChain(n int, seed byte, parent *types.Block) ([]common.Hash, map[common.Hash]*types.Block) {
 	ctx := context.Background()
-	blocks, _ := core.GenerateChain(ctx, params.TestChainConfig, parent, ethash.NewFaker(), testdb, n, func(ctx context.Context, i int, block *core.BlockGen) {
+	blocks, _ := core.GenerateChain(ctx, params.TestChainConfig, parent, clique.NewFaker(), testdb, n, func(ctx context.Context, i int, block *core.BlockGen) {
 		block.SetCoinbase(common.Address{seed})
 
 		// If the block number is multiple of 3, send a bonus transaction to the miner
@@ -59,10 +59,6 @@ func makeChain(n int, seed byte, parent *types.Block) ([]common.Hash, map[common
 				panic(err)
 			}
 			block.AddTx(ctx, tx)
-		}
-		// If the block number is a multiple of 5, add a bonus uncle to the block
-		if i%5 == 0 {
-			block.AddUncle(&types.Header{ParentHash: block.PrevBlock(i - 1).Hash(), Number: big.NewInt(int64(i - 1))})
 		}
 	})
 	hashes := make([]common.Hash, n+1)

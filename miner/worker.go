@@ -18,7 +18,6 @@ package miner
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -56,8 +55,7 @@ type Agent interface {
 	Work() chan<- *Work
 	SetReturnCh(chan<- *Result)
 	Stop()
-	Start()
-	GetHashRate() int64
+	Start(ctx context.Context)
 }
 
 // Work is the workers current environment and holds
@@ -66,14 +64,10 @@ type Work struct {
 	config *params.ChainConfig
 	signer types.Signer
 
-	stateMu   sync.RWMutex
-	state     *state.StateDB           // apply state changes here
-	ancestors map[common.Hash]struct{} // ancestor set (used for checking uncle parent validity)
-	family    map[common.Hash]struct{} // family set (used for checking uncle invalidity)
-	uncles    map[common.Hash]struct{} // uncle set
-	uncleMu   sync.RWMutex
-	tcount    int           // tx count in cycle
-	gasPool   *core.GasPool // available gas used to pack transactions
+	stateMu sync.RWMutex
+	state   *state.StateDB // apply state changes here
+	tcount  int            // tx count in cycle
+	gasPool *core.GasPool  // available gas used to pack transactions
 
 	Block *types.Block // the new block
 
@@ -102,8 +96,6 @@ type worker struct {
 	txsSub       event.Subscription
 	chainHeadCh  chan core.ChainHeadEvent
 	chainHeadSub event.Subscription
-	chainSideCh  chan core.ChainSideEvent
-	chainSideSub event.Subscription
 	wg           sync.WaitGroup
 
 	agents map[Agent]struct{}
@@ -124,9 +116,6 @@ type worker struct {
 	snapshotBlock *types.Block
 	snapshotState *state.StateDB
 
-	uncleMu        sync.Mutex
-	possibleUncles map[common.Hash]*types.Block
-
 	unconfirmed *unconfirmedBlocks // set of locally mined blocks pending canonicalness confirmations
 
 	// atomic status counters
@@ -136,27 +125,24 @@ type worker struct {
 
 func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase common.Address, eth Backend, mux *event.TypeMux) *worker {
 	worker := &worker{
-		config:         config,
-		engine:         engine,
-		eth:            eth,
-		mux:            mux,
-		txsCh:          make(chan core.NewTxsEvent, txChanSize),
-		chainHeadCh:    make(chan core.ChainHeadEvent, chainHeadChanSize),
-		chainSideCh:    make(chan core.ChainSideEvent, chainSideChanSize),
-		chainDb:        eth.ChainDb(),
-		recv:           make(chan *Result, resultQueueSize),
-		chain:          eth.BlockChain(),
-		proc:           eth.BlockChain().Validator(),
-		possibleUncles: make(map[common.Hash]*types.Block),
-		coinbase:       coinbase,
-		agents:         make(map[Agent]struct{}),
-		unconfirmed:    newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth),
+		config:      config,
+		engine:      engine,
+		eth:         eth,
+		mux:         mux,
+		txsCh:       make(chan core.NewTxsEvent, txChanSize),
+		chainHeadCh: make(chan core.ChainHeadEvent, chainHeadChanSize),
+		chainDb:     eth.ChainDb(),
+		recv:        make(chan *Result, resultQueueSize),
+		chain:       eth.BlockChain(),
+		proc:        eth.BlockChain().Validator(),
+		coinbase:    coinbase,
+		agents:      make(map[Agent]struct{}),
+		unconfirmed: newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth),
 	}
 	// Subscribe NewTxsEvent for tx pool
 	worker.txsSub = eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
-	worker.chainSideSub = eth.BlockChain().SubscribeChainSideEvent(worker.chainSideCh)
 	go worker.update()
 
 	go worker.wait()
@@ -267,7 +253,6 @@ func (w *worker) unregister(agent Agent) {
 func (w *worker) update() {
 	defer w.txsSub.Unsubscribe()
 	defer w.chainHeadSub.Unsubscribe()
-	defer w.chainSideSub.Unsubscribe()
 
 	for {
 		// A real event arrived, process interesting content
@@ -277,12 +262,6 @@ func (w *worker) update() {
 			ctx, span := trace.StartSpan(context.Background(), "worker.update-chainheadCh")
 			w.commitNewWork(ctx)
 			span.End()
-
-		// Handle ChainSideEvent
-		case ev := <-w.chainSideCh:
-			w.uncleMu.Lock()
-			w.possibleUncles[ev.Block.Hash()] = ev.Block
-			w.uncleMu.Unlock()
 
 		// Handle NewTxsEvent
 		case ev := <-w.txsCh:
@@ -319,8 +298,6 @@ func (w *worker) update() {
 		case <-w.txsSub.Err():
 			return
 		case <-w.chainHeadSub.Err():
-			return
-		case <-w.chainSideSub.Err():
 			return
 		}
 	}
@@ -418,21 +395,8 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 		config:    w.config,
 		signer:    types.NewEIP155Signer(w.config.ChainId),
 		state:     state,
-		ancestors: make(map[common.Hash]struct{}),
-		family:    make(map[common.Hash]struct{}),
-		uncles:    make(map[common.Hash]struct{}),
 		header:    header,
 		createdAt: time.Now(),
-	}
-
-	// when 08 is processed ancestors contain 07 (quick block)
-	for _, ancestor := range w.chain.GetBlocksFromHash(parent.Hash(), 7) {
-		for _, uncle := range ancestor.Uncles() {
-			work.family[uncle.Hash()] = struct{}{}
-		}
-		ah := ancestor.Hash()
-		work.family[ah] = struct{}{}
-		work.ancestors[ah] = struct{}{}
 	}
 
 	// Keep track of transactions which return errors so they can be removed
@@ -447,8 +411,6 @@ func (w *worker) commitNewWork(ctx context.Context) {
 
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	w.uncleMu.Lock()
-	defer w.uncleMu.Unlock()
 	w.currentMu.Lock()
 	defer w.currentMu.Unlock()
 
@@ -499,60 +461,15 @@ func (w *worker) commitNewWork(ctx context.Context) {
 	txs := types.NewTransactionsByPriceAndNonce(ctx, w.current.signer, pending)
 	work.commitTransactions(ctx, w.mux, txs, w.chain, w.coinbase)
 
-	// compute uncles for the new block.
-	var (
-		uncles    []*types.Header
-		badUncles []common.Hash
-		tracing   = log.Tracing()
-	)
-	for hash, uncle := range w.possibleUncles {
-		if len(uncles) == 2 {
-			break
-		}
-		if err := w.commitUncle(work, uncle.Header()); err != nil {
-			if tracing {
-				log.Trace("Bad uncle found and will be removed", "hash", hash)
-				log.Trace(fmt.Sprint(uncle))
-			}
-
-			badUncles = append(badUncles, hash)
-		} else {
-			log.Debug("Committing new uncle to block", "hash", hash)
-			uncles = append(uncles, uncle.Header())
-		}
-	}
-	for _, hash := range badUncles {
-		delete(w.possibleUncles, hash)
-	}
 	// Create the new block to seal with the consensus engine
-	work.Block = w.engine.Finalize(ctx, w.chain, header, work.state, work.txs, uncles, work.receipts, true)
+	work.Block = w.engine.Finalize(ctx, w.chain, header, work.state, work.txs, work.receipts, true)
 	// We only care about logging if we're actually mining.
 	if atomic.LoadInt32(&w.mining) == 1 {
-		log.Info("Commit new mining work", "number", work.Block.Number(), "txs", work.tcount, "uncles", len(uncles), "elapsed", common.PrettyDuration(time.Since(tstart)))
+		log.Info("Commit new mining work", "number", work.Block.Number(), "txs", work.tcount, "uncles", len(work.Block.Uncles()), "elapsed", common.PrettyDuration(time.Since(tstart)))
 		w.unconfirmed.Shift(work.Block.NumberU64() - 1)
 	}
 	w.push(work)
 	w.updateSnapshot(ctx)
-}
-
-func (*worker) commitUncle(work *Work, uncle *types.Header) error {
-	hash := uncle.Hash()
-	work.uncleMu.RLock()
-	_, ok := work.uncles[hash]
-	work.uncleMu.RUnlock()
-	if ok {
-		return fmt.Errorf("uncle not unique")
-	}
-	if _, ok := work.ancestors[uncle.ParentHash]; !ok {
-		return fmt.Errorf("uncle's parent unknown (%x)", uncle.ParentHash[0:4])
-	}
-	if _, ok := work.family[hash]; ok {
-		return fmt.Errorf("uncle already in family (%x)", hash)
-	}
-	work.uncleMu.Lock()
-	work.uncles[hash] = struct{}{}
-	work.uncleMu.Unlock()
-	return nil
 }
 
 // updateSnapshot updates snapshotState. Caller must hold currentMu.
