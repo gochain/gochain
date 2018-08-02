@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/log"
@@ -327,12 +328,16 @@ func (t *Table) compact(ctx context.Context) error {
 			continue
 		}
 
+		startTime := time.Now()
+
 		newSegment, err := t.SegmentCompactor.CompactSegment(ctx, t.Name, s)
 		if err != nil {
 			return err
 		}
 		t.segments.Add(newSegment)
 		delete(t.ldbSegments, s.Name())
+
+		log.Info("Compacted segment", "table", t.Name, "name", s.Name(), "elapsed", time.Since(startTime))
 	}
 	return nil
 }
