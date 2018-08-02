@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/gochain-io/gochain/log"
 	"github.com/hashicorp/golang-lru"
 	"golang.org/x/sync/semaphore"
 )
@@ -116,10 +117,13 @@ func (ss *SegmentSet) onEvicted(key, value interface{}) {
 
 	switch s := s.(type) {
 	case interface {
+		Segment
 		Purge() error
 	}:
+		log.Info("Purge local segment", "path", s.Path())
 		s.Purge()
 	default:
+		log.Info("Close local segment", "path", s.Path())
 		s.Close()
 	}
 }
