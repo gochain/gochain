@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sort"
 	"strings"
 	"sync"
 
@@ -222,14 +223,38 @@ func NewSegmentOpener(client *Client) *SegmentOpener {
 
 // ListSegmentNames returns a list of segment names for a table.
 func (o *SegmentOpener) ListSegmentNames(path, table string) ([]string, error) {
-	keys, err := o.Client.ListObjectKeys(table)
+	// Fetch local keys.
+	localKeys, err := ethdb.NewFileSegmentOpener().ListSegmentNames(path, table)
 	if err != nil {
 		return nil, err
 	}
-	for i, key := range keys {
-		keys[i] = strings.TrimPrefix(key, table+"/")
+
+	// Fetch remote keys.
+	remoteKeys, err := o.Client.ListObjectKeys(table)
+	if err != nil {
+		return nil, err
 	}
-	return keys, nil
+	for i, key := range remoteKeys {
+		remoteKeys[i] = strings.TrimPrefix(key, table+"/")
+	}
+
+	// Merge key sets.
+	m := make(map[string]struct{})
+	for _, k := range localKeys {
+		m[k] = struct{}{}
+	}
+	for _, k := range remoteKeys {
+		m[k] = struct{}{}
+	}
+
+	// Convert to slice.
+	a := make([]string, 0, len(m))
+	for k := range m {
+		a = append(a, k)
+	}
+	sort.Strings(a)
+
+	return a, nil
 }
 
 // OpenSegment returns creates and opens a reference to a remote immutable segment.
