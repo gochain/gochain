@@ -26,7 +26,7 @@ const (
 
 const (
 	// DefaultPartitionSize is the default number of blocks per partition.
-	DefaultPartitionSize = 256
+	DefaultPartitionSize = 1024
 
 	// DefaultMinMutableSegmentCount is the minimum number of mutable segments on a given table.
 	DefaultMinMutableSegmentCount = 40
