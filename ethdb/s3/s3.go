@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/gochain-io/gochain/ethdb"
+	"github.com/gochain-io/gochain/log"
 	"github.com/minio/minio-go"
 )
 
@@ -72,6 +73,8 @@ func (c *Client) Open() (err error) {
 
 // ListObjectKeys returns a list of all object keys with a given prefix.
 func (c *Client) ListObjectKeys(prefix string) ([]string, error) {
+	log.Info("List s3 keys", "prefix", prefix)
+
 	var keys []string
 	for info := range c.client.ListObjects(c.Bucket, prefix, true, nil) {
 		if info.Err != nil {
@@ -167,6 +170,7 @@ func (s *Segment) ensureFileSegment(ctx context.Context) error {
 
 	// Fetch segment if it doesn't exist on disk.
 	if _, err := os.Stat(s.path); os.IsNotExist(err) {
+		log.Info("Fetch segment from s3", "key", SegmentKey(s.table, s.name))
 		if err := s.client.FGetObject(ctx, SegmentKey(s.table, s.name), s.path); err != nil {
 			return err
 		}
