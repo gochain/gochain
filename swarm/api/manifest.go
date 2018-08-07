@@ -137,7 +137,7 @@ func (m *ManifestWalker) Walk(walkFn WalkFn) error {
 }
 
 func (m *ManifestWalker) walk(trie *manifestTrie, prefix string, walkFn WalkFn) error {
-	for _, entry := range trie.entries {
+	for _, entry := range &trie.entries {
 		if entry == nil {
 			continue
 		}
@@ -277,7 +277,7 @@ func (m *manifestTrie) addEntry(entry *manifestTrieEntry, quitC chan bool) {
 }
 
 func (m *manifestTrie) getCountLast() (cnt int, entry *manifestTrieEntry) {
-	for _, e := range m.entries {
+	for _, e := range &m.entries {
 		if e != nil {
 			cnt++
 			entry = e
@@ -331,7 +331,7 @@ func (m *manifestTrie) recalcAndStore() error {
 	buffer.WriteString(`{"entries":[`)
 
 	list := &Manifest{}
-	for _, entry := range m.entries {
+	for _, entry := range &m.entries {
 		if entry != nil {
 			if entry.Hash == "" { // TODO: paralellize
 				err := entry.subtrie.recalcAndStore()
