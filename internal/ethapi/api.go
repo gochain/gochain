@@ -656,8 +656,11 @@ func (s *PublicBlockChainAPI) doCall(ctx context.Context, args CallArgs, blockNr
 	defer func(start time.Time) { log.Debug("Executing EVM call finished", "runtime", time.Since(start)) }(time.Now())
 
 	state, header, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
-	if state == nil || err != nil {
+	if err != nil {
 		return nil, 0, false, err
+	}
+	if state == nil {
+		return nil, 0, false, fmt.Errorf("no state found for block #%d", blockNr)
 	}
 	// Set sender address or use a default if none specified
 	addr := args.From

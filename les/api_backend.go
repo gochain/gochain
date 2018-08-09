@@ -18,6 +18,7 @@ package les
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 
 	"github.com/gochain-io/gochain/accounts"
@@ -93,8 +94,11 @@ func (b *LesApiBackend) StateQuery(ctx context.Context, blockNr rpc.BlockNumber,
 
 func (b *LesApiBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.StateDB, *types.Header, error) {
 	header, err := b.HeaderByNumber(ctx, blockNr)
-	if header == nil || err != nil {
+	if err != nil {
 		return nil, nil, err
+	}
+	if header == nil {
+		return nil, nil, fmt.Errorf("no header found for block #%d", blockNr)
 	}
 	return light.NewState(ctx, header, b.eth.odr), header, nil
 }
