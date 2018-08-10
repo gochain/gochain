@@ -264,7 +264,6 @@ func TestFeedUnsubscribeFromInbox(t *testing.T) {
 
 func TestFeed_Send_Timeout(t *testing.T) {
 	var feed Feed
-	feed.Timeout = 1 * time.Second
 
 	sub := make(chan int)
 	feed.Subscribe(sub)
@@ -273,7 +272,7 @@ func TestFeed_Send_Timeout(t *testing.T) {
 	t0 := time.Now()
 	if nsent := feed.Send(100); nsent != 0 {
 		t.Fatal("expected no messages sent")
-	} else if d := time.Since(t0); d < feed.Timeout {
+	} else if d := time.Since(t0); d < feedTimeout {
 		t.Fatalf("unexpected delay: %s", d)
 	}
 

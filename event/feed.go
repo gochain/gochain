@@ -28,8 +28,7 @@ import (
 
 var errBadChannel = errors.New("event: Subscribe argument does not have sendable channel type")
 
-// DefaultFeedTimeout is the default value used if Feed.Timeout is zero.
-const DefaultFeedTimeout = 5 * time.Second
+const feedTimeout = 1 * time.Second
 
 // Feed implements one-to-many subscriptions where the carrier of events is a channel.
 // Values sent to a Feed are delivered to all subscribed channels simultaneously.
@@ -50,10 +49,6 @@ type Feed struct {
 	inbox  caseList
 	etype  reflect.Type
 	closed bool
-
-	// Time before timing out on a Feed.Send().
-	// Without this, subscriptions can block each other.
-	Timeout time.Duration
 }
 
 // This is the index of the first actual subscription channel in sendCases.
@@ -130,7 +125,9 @@ func (f *Feed) remove(sub *feedSub) {
 		// Send will remove the channel from f.sendCases.
 	case <-f.sendLock:
 		// No Send is in progress, delete the channel now that we have the send lock.
-		f.sendCases = f.sendCases.delete(f.sendCases.find(ch))
+		if i := f.sendCases.find(ch); i != -1 {
+			f.sendCases = f.sendCases.delete(i)
+		}
 		f.sendLock <- struct{}{}
 	}
 }
@@ -161,14 +158,8 @@ func (f *Feed) Send(value interface{}) (nsent int) {
 		}
 	}
 
-	// Determine the timeout.
-	timeout := f.Timeout
-	if timeout == 0 {
-		timeout = DefaultFeedTimeout
-	}
-
 	// Create timer & select-case.
-	timer := time.NewTimer(timeout)
+	timer := time.NewTimer(feedTimeout)
 	defer timer.Stop()
 	timerSelectCase := reflect.SelectCase{
 		Dir:  reflect.SelectRecv,
