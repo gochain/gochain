@@ -108,7 +108,6 @@ func (ss *SegmentSet) Release() {
 func (ss *SegmentSet) onEvicted(key, value interface{}) {
 	ss.mu.Lock()
 	s := ss.segments[key.(string)]
-	delete(ss.segments, key.(string))
 	ss.mu.Unlock()
 
 	if s == nil {

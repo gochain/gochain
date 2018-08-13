@@ -196,6 +196,15 @@ func (t *Table) segmentSlice() []Segment {
 	return a
 }
 
+func (t *Table) ldbSegmentSlice() []*LDBSegment {
+	a := make([]*LDBSegment, 0, len(t.ldbSegments))
+	for _, s := range t.ldbSegments {
+		a = append(a, s)
+	}
+	sort.Slice(a, func(i, j int) bool { return a[i].Name() < a[j].Name() })
+	return a
+}
+
 // CreateSegmentIfNotExists returns a mutable segment by name.
 // Creates a new segment if it does not exist.
 func (t *Table) CreateSegmentIfNotExists(name string) (MutableSegment, error) {
@@ -316,28 +325,24 @@ func (t *Table) Compact(ctx context.Context) error {
 }
 
 func (t *Table) compact(ctx context.Context) error {
-	// Retrieve segments. Exit if too few mutable segments.
-	segments := t.segmentSlice()
-	if len(segments) < t.MinMutableSegmentCount {
+	// Retrieve LDB segments. Exit if too few mutable segments.
+	ldbSegmentSlice := t.ldbSegmentSlice()
+	if len(ldbSegmentSlice) < t.MinMutableSegmentCount {
 		return nil
 	}
 
-	for _, s := range segments[:len(segments)-t.MinMutableSegmentCount] {
-		s, ok := s.(*LDBSegment)
-		if !ok {
-			continue
-		}
+	for _, ldbSegment := range ldbSegmentSlice[:len(ldbSegmentSlice)-t.MinMutableSegmentCount] {
 
 		startTime := time.Now()
 
-		newSegment, err := t.SegmentCompactor.CompactSegment(ctx, t.Name, s)
+		newSegment, err := t.SegmentCompactor.CompactSegment(ctx, t.Name, ldbSegment)
 		if err != nil {
 			return err
 		}
 		t.segments.Add(newSegment)
-		delete(t.ldbSegments, s.Name())
+		delete(t.ldbSegments, ldbSegment.Name())
 
-		log.Info("Compacted segment", "table", t.Name, "name", s.Name(), "elapsed", time.Since(startTime))
+		log.Info("Compacted segment", "table", t.Name, "name", ldbSegment.Name(), "elapsed", time.Since(startTime))
 	}
 	return nil
 }
