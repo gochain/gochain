@@ -340,8 +340,8 @@ func (srv *Server) makeSelf(listener net.Listener, ntab discoverTable) *discover
 // It blocks until all active connections have been closed.
 func (srv *Server) Stop() {
 	srv.lock.Lock()
-	defer srv.lock.Unlock()
 	if !srv.running {
+		srv.lock.Unlock()
 		return
 	}
 	srv.running = false
@@ -352,6 +352,7 @@ func (srv *Server) Stop() {
 		}
 	}
 	close(srv.quit)
+	srv.lock.Unlock()
 	srv.loopWG.Wait()
 }
 
