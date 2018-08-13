@@ -58,7 +58,8 @@ func NewClient() *Client {
 
 func (c *Client) Open() (err error) {
 	// Create minio client.
-	if c.client, err = minio.New(c.Endpoint, c.AccessKeyID, c.SecretAccessKey, true); err != nil {
+	ssl := !strings.HasPrefix(c.Endpoint, "127.0.0.1:")
+	if c.client, err = minio.New(c.Endpoint, c.AccessKeyID, c.SecretAccessKey, ssl); err != nil {
 		return err
 	}
 
@@ -172,6 +173,7 @@ func (s *Segment) ensureFileSegment(ctx context.Context) error {
 	if _, err := os.Stat(s.path); os.IsNotExist(err) {
 		log.Info("Fetch segment from s3", "key", SegmentKey(s.table, s.name))
 		if err := s.client.FGetObject(ctx, SegmentKey(s.table, s.name), s.path); err != nil {
+			log.Error("Cannot fetch segment from s3", "key", SegmentKey(s.table, s.name), "err", err)
 			return err
 		}
 	} else if err != nil {
