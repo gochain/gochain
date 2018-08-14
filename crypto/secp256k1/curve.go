@@ -37,6 +37,7 @@ import (
 	"unsafe"
 
 	"github.com/gochain-io/gochain/common/math"
+	_ "github.com/gochain-io/gochain/crypto/secp256k1/libsecp256k1/include"
 )
 
 /*
