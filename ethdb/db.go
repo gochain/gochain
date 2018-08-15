@@ -46,6 +46,9 @@ type DB struct {
 	// Number of blocks grouped together.
 	PartitionSize uint64
 
+	// Maximum number of segments that can be opened at once.
+	MaxOpenSegmentCount int
+
 	SegmentOpener    SegmentOpener
 	SegmentCompactor SegmentCompactor
 }
@@ -53,10 +56,11 @@ type DB struct {
 // NewDB returns a new instance of DB.
 func NewDB(path string) *DB {
 	return &DB{
-		Path:             path,
-		PartitionSize:    DefaultPartitionSize,
-		SegmentOpener:    NewFileSegmentOpener(),
-		SegmentCompactor: NewFileSegmentCompactor(),
+		Path:                path,
+		PartitionSize:       DefaultPartitionSize,
+		MaxOpenSegmentCount: DefaultMaxOpenSegmentCount,
+		SegmentOpener:       NewFileSegmentOpener(),
+		SegmentCompactor:    NewFileSegmentCompactor(),
 	}
 }
 
@@ -72,6 +76,7 @@ func (db *DB) Open() error {
 	db.receipt = NewTable("receipt", db.TablePath("receipt"), NewBlockNumberPartitioner(db.PartitionSize))
 
 	for _, tbl := range db.Tables() {
+		tbl.MaxOpenSegmentCount = db.MaxOpenSegmentCount
 		tbl.SegmentOpener = db.SegmentOpener
 		tbl.SegmentCompactor = db.SegmentCompactor
 		if err := tbl.Open(); err != nil {
