@@ -10,7 +10,7 @@ https://camo.githubusercontent.com/915b7be44ada53c290eb157634330494ebe3e30a/6874
 
 ## General Documentation
 
-If you are looking to build DApps, deploy smart contracts, setup a private network or run a node, please say
+If you are looking to build DApps, deploy smart contracts, setup a private network or run a node, please see
 our [Documentation Repository](https://github.com/gochain-io/docs), it will be much more useful to you.
 
 If you plan on working on the GoChain core code, then read on.
