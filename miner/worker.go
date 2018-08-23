@@ -55,7 +55,7 @@ type Agent interface {
 	Work() chan<- *Work
 	SetReturnCh(chan<- *Result)
 	Stop()
-	Start(ctx context.Context)
+	Start()
 }
 
 // Work is the workers current environment and holds

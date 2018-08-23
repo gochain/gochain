@@ -17,7 +17,6 @@
 package miner
 
 import (
-	"context"
 	"sync"
 	"sync/atomic"
 	"time"

@@ -100,7 +100,7 @@ func (b *SimulatedBackend) Commit(ctx context.Context) {
 // rollback aborts all pending transactions, reverting to the last committed state.
 func (b *SimulatedBackend) rollback() {
 	ctx := context.TODO()
-	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlock(ctx), clique.NewFaker(), b.database, 1, nil)
+	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlockCtx(ctx), clique.NewFaker(), b.database, 1, nil)
 	statedb, err := b.blockchain.State()
 	if err != nil {
 		panic(err)
@@ -310,7 +310,7 @@ func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx *types.Transa
 		panic(fmt.Errorf("invalid transaction nonce: got %d, want %d", tx.Nonce(), nonce))
 	}
 
-	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlock(ctx), clique.NewFaker(), b.database, 1, func(ctx context.Context, number int, block *core.BlockGen) {
+	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlockCtx(ctx), clique.NewFaker(), b.database, 1, func(ctx context.Context, number int, block *core.BlockGen) {
 		for _, tx := range b.pendingBlock.Transactions() {
 			block.AddTx(ctx, tx)
 		}
