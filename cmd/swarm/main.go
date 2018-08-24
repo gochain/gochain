@@ -38,7 +38,7 @@ import (
 	"github.com/gochain-io/gochain/console"
 	"github.com/gochain-io/gochain/contracts/ens"
 	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/ethclient"
+	"github.com/gochain-io/gochain/goclient"
 	"github.com/gochain-io/gochain/internal/debug"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/node"
@@ -461,7 +461,7 @@ func detectEnsAddr(client *rpc.Client) (common.Address, error) {
 		return common.Address{}, err
 	}
 
-	block, err := ethclient.NewClient(client).BlockByNumber(ctx, big.NewInt(0))
+	block, err := goclient.NewClient(client).BlockByNumber(ctx, big.NewInt(0))
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -485,24 +485,24 @@ func registerBzzService(bzzconfig *bzzapi.Config, ctx *cli.Context, stack *node.
 
 	//define the swarm service boot function
 	boot := func(*node.ServiceContext) (node.Service, error) {
-		var swapClient *ethclient.Client
+		var swapClient *goclient.Client
 		var err error
 		if bzzconfig.SwapApi != "" {
 			log.Info("connecting to SWAP API", "url", bzzconfig.SwapApi)
-			swapClient, err = ethclient.Dial(bzzconfig.SwapApi)
+			swapClient, err = goclient.Dial(bzzconfig.SwapApi)
 			if err != nil {
 				return nil, fmt.Errorf("error connecting to SWAP API %s: %s", bzzconfig.SwapApi, err)
 			}
 		}
 
-		var ensClient *ethclient.Client
+		var ensClient *goclient.Client
 		if bzzconfig.EnsApi != "" {
 			log.Info("connecting to ENS API", "url", bzzconfig.EnsApi)
 			client, err := rpc.Dial(bzzconfig.EnsApi)
 			if err != nil {
 				return nil, fmt.Errorf("error connecting to ENS API %s: %s", bzzconfig.EnsApi, err)
 			}
-			ensClient = ethclient.NewClient(client)
+			ensClient = goclient.NewClient(client)
 
 			//no ENS root address set yet
 			if bzzconfig.EnsRoot == (common.Address{}) {
