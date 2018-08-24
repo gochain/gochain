@@ -48,7 +48,7 @@ import (
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/eth"
 	"github.com/gochain-io/gochain/eth/downloader"
-	"github.com/gochain-io/gochain/ethclient"
+	"github.com/gochain-io/gochain/goclient"
 	"github.com/gochain-io/gochain/les"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/netstats"
@@ -196,7 +196,7 @@ type request struct {
 type faucet struct {
 	config *params.ChainConfig // Chain configurations for signing
 	stack  *node.Node          // GoChain protocol stack
-	client *ethclient.Client   // Client connection to the GoChain chain
+	client *goclient.Client    // Client connection to the GoChain chain
 	index  []byte              // Index page to serve up on the web
 
 	keystore *keystore.KeyStore // Keystore containing the single signer
@@ -269,7 +269,7 @@ func newFaucet(genesis *core.Genesis, port int, enodes []*discv5.Node, network u
 		stack.Stop()
 		return nil, err
 	}
-	client := ethclient.NewClient(api)
+	client := goclient.NewClient(api)
 
 	return &faucet{
 		config:   genesis.Config,

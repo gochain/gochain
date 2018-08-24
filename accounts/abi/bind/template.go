@@ -440,7 +440,7 @@ import org.ethereum.geth.internal.*;
 			public final static byte[] BYTECODE = "{{.InputBin}}".getBytes();
 
 			// deploy deploys a new Ethereum contract, binding an instance of {{.Type}} to it.
-			public static {{.Type}} deploy(TransactOpts auth, EthereumClient client{{range .Constructor.Inputs}}, {{bindtype .Type}} {{.Name}}{{end}}) throws Exception {
+			public static {{.Type}} deploy(TransactOpts auth, GoClient client{{range .Constructor.Inputs}}, {{bindtype .Type}} {{.Name}}{{end}}) throws Exception {
 				Interfaces args = GoChain.newInterfaces({{(len .Constructor.Inputs)}});
 				{{range $index, $element := .Constructor.Inputs}}
 				  args.set({{$index}}, GoChain.newInterface()); args.get({{$index}}).set{{namedtype (bindtype .Type) .Type}}({{.Name}});
@@ -466,7 +466,7 @@ import org.ethereum.geth.internal.*;
 		private final BoundContract Contract;
 
 		// Creates a new instance of {{.Type}}, bound to a specific deployed contract.
-		public {{.Type}}(Address address, EthereumClient client) throws Exception {
+		public {{.Type}}(Address address, GoClient client) throws Exception {
 			this(GoChain.bindContract(address, ABI, client));
 		}
 

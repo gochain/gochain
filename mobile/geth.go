@@ -28,7 +28,7 @@ import (
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/eth"
 	"github.com/gochain-io/gochain/eth/downloader"
-	"github.com/gochain-io/gochain/ethclient"
+	"github.com/gochain-io/gochain/goclient"
 	"github.com/gochain-io/gochain/les"
 	"github.com/gochain-io/gochain/netstats"
 	"github.com/gochain-io/gochain/node"
@@ -194,13 +194,13 @@ func (n *Node) Stop() error {
 	return n.node.Stop()
 }
 
-// GetEthereumClient retrieves a client to access the GoChain subsystem.
-func (n *Node) GetEthereumClient() (client *EthereumClient, _ error) {
+// GetGoClient retrieves a client to access the GoChain subsystem.
+func (n *Node) GetGoClient() (client *GoClient, _ error) {
 	rpc, err := n.node.Attach()
 	if err != nil {
 		return nil, err
 	}
-	return &EthereumClient{ethclient.NewClient(rpc)}, nil
+	return &GoClient{goclient.NewClient(rpc)}, nil
 }
 
 // GetNodeInfo gathers and returns a collection of metadata known about the host.
