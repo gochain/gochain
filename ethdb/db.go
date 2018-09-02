@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/log"
 )
 
 // Database errors.
@@ -80,6 +81,7 @@ func (db *DB) Open() error {
 		tbl.SegmentOpener = db.SegmentOpener
 		tbl.SegmentCompactor = db.SegmentCompactor
 		if err := tbl.Open(); err != nil {
+			log.Error("Cannot open table", "name", tbl.Name, "err", err)
 			db.Close()
 			return err
 		}

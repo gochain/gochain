@@ -665,6 +665,7 @@ func (n *Node) OpenDatabase(name string, cache, handles int) (common.Database, e
 	if err := s3.ConfigureDB(db, n.config.Ethdb); err != nil {
 		return nil, err
 	} else if err := db.Open(); err != nil {
+		log.Error("Cannot open database", "err", err)
 		return nil, err
 	}
 	return db, nil

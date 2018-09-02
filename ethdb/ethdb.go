@@ -69,7 +69,9 @@ func SegmentFileType(path string) (string, error) {
 
 	// Read file magic.
 	magic := make([]byte, len(FileSegmentMagic))
-	if _, err := io.ReadFull(f, magic); err != nil {
+	if _, err := io.ReadFull(f, magic); err == io.EOF {
+		return "", ErrInvalidSegmentType
+	} else if err != nil {
 		return "", err
 	}
 

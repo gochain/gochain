@@ -63,6 +63,7 @@ func run() error {
 	dst.MaxOpenSegmentCount = config.MaxOpenSegmentCount
 	s3.ConfigureDB(dst, config)
 	if err := dst.Open(); err != nil {
+		log.Error("cannot open dst database", "err", err)
 		return err
 	}
 	defer src.Close()

@@ -27,6 +27,7 @@ func ConfigureDB(db *ethdb.DB, config ethdb.Config) error {
 	c.AccessKeyID = config.AccessKeyID
 	c.SecretAccessKey = config.SecretAccessKey
 	if err := c.Open(); err != nil {
+		log.Error("Cannot open S3 client", "err", err)
 		return err
 	}
 
@@ -60,11 +61,13 @@ func (c *Client) Open() (err error) {
 	// Create minio client.
 	ssl := !strings.HasPrefix(c.Endpoint, "127.0.0.1:")
 	if c.client, err = minio.New(c.Endpoint, c.AccessKeyID, c.SecretAccessKey, ssl); err != nil {
+		log.Error("Cannot create minio client", "err", err)
 		return err
 	}
 
 	// Verify bucket exists.
 	if ok, err := c.client.BucketExists(c.Bucket); err != nil {
+		log.Error("Cannot verify bucket", "err", err)
 		return err
 	} else if !ok {
 		return fmt.Errorf("ethdb/s3: bucket does not exist: %s", c.Bucket)

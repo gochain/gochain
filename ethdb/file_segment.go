@@ -15,6 +15,7 @@ import (
 	"github.com/cespare/xxhash"
 	"github.com/edsrzf/mmap-go"
 	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/log"
 )
 
 var (
@@ -65,6 +66,7 @@ func NewFileSegment(name, path string) *FileSegment {
 func (s *FileSegment) Open() error {
 	file, err := os.Open(s.path)
 	if err != nil {
+		log.Error("Cannot open file segment", "path", s.path, "err", err)
 		return err
 	}
 	defer file.Close()
@@ -72,6 +74,7 @@ func (s *FileSegment) Open() error {
 	// Memory-map data.
 	data, err := mmap.Map(file, mmap.RDONLY, 0)
 	if err != nil {
+		log.Error("Cannot mmap file segment", "path", s.path, "err", err)
 		return err
 	}
 	s.data = []byte(data)
@@ -251,6 +254,7 @@ func NewFileSegmentOpener() *FileSegmentOpener {
 func (o *FileSegmentOpener) ListSegmentNames(path, table string) ([]string, error) {
 	fis, err := ioutil.ReadDir(path)
 	if err != nil {
+		log.Error("Cannot list file segments", "path", path, "table", table, "err", err)
 		return nil, err
 	}
 

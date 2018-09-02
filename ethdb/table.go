@@ -61,6 +61,7 @@ func (t *Table) Open() error {
 
 	names, err := t.SegmentOpener.ListSegmentNames(t.Path, t.Name)
 	if err != nil {
+		log.Error("Cannot list segment names", "path", t.Path, "name", t.Name, "err", err)
 		return err
 	}
 
@@ -69,7 +70,10 @@ func (t *Table) Open() error {
 
 		// Determine the segment file type.
 		typ, err := SegmentFileType(path)
-		if err != nil && !os.IsNotExist(err) {
+		if err == ErrInvalidSegmentType {
+			log.Warn("Invalid segment type, skipping", "path", path, "name", name, "err", err)
+			continue
+		} else if err != nil && !os.IsNotExist(err) {
 			return err
 		}
 
@@ -78,6 +82,7 @@ func (t *Table) Open() error {
 		case SegmentLDB1:
 			ldbSegment := NewLDBSegment(name, path)
 			if err := ldbSegment.Open(); err != nil {
+				log.Error("Cannot open ldb segment", "path", path, "name", name, "err", err)
 				t.Close()
 				return err
 			}
@@ -89,6 +94,7 @@ func (t *Table) Open() error {
 				log.Info("unknown segment type, skipping", "filename", name)
 				continue
 			} else if err != nil {
+				log.Error("Cannot open ethdb segment", "path", path, "table", t.Name, "name", name, "err", err)
 				return err
 			}
 			t.segments.Add(segment)
