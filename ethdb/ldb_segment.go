@@ -3,6 +3,7 @@ package ethdb
 import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/filter"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
@@ -79,6 +80,11 @@ func (s *LDBSegment) newBatch() *ldbSegmentBatch {
 	return &ldbSegmentBatch{segment: s, batch: new(leveldb.Batch)}
 }
 
+// Iterator returns a sequential iterator for the segment.
+func (s *LDBSegment) Iterator() SegmentIterator {
+	return &ldbSegmentIterator{s.db.NewIterator(nil, nil)}
+}
+
 // CompactTo writes the segment to disk as a file segment.
 func (s *LDBSegment) CompactTo(path string) error {
 	enc := NewFileSegmentEncoder(path)
@@ -86,8 +92,8 @@ func (s *LDBSegment) CompactTo(path string) error {
 		return err
 	}
 
-	itr := s.db.NewIterator(nil, nil)
-	defer itr.Release()
+	itr := s.Iterator()
+	defer itr.Close()
 
 	// Copy all LDB key/value pairs to the file segment.
 	for itr.Next() {
@@ -95,7 +101,7 @@ func (s *LDBSegment) CompactTo(path string) error {
 			return err
 		}
 	}
-	if err := itr.Error(); err != nil {
+	if err := itr.Close(); err != nil {
 		return err
 	}
 
@@ -106,7 +112,37 @@ func (s *LDBSegment) CompactTo(path string) error {
 		return err
 	}
 	return nil
+}
 
+// UncompactSegmentTo writes an LDB segment from a file segment.
+func UncompactSegmentTo(s Segment, path string) error {
+	ldbSegment := NewLDBSegment(s.Name(), path)
+	if err := ldbSegment.Open(); err != nil {
+		return err
+	}
+	defer ldbSegment.Close()
+
+	itr := s.Iterator()
+	defer itr.Close()
+
+	for itr.Next() {
+		if err := ldbSegment.Put(itr.Key(), itr.Value()); err != nil {
+			return err
+		}
+	}
+
+	return ldbSegment.Close()
+}
+
+// ldbSegmentIterator represents an adapter between goleveldb and the ethdb iterator.
+type ldbSegmentIterator struct {
+	iterator.Iterator
+}
+
+func (itr *ldbSegmentIterator) Close() (err error) {
+	err = itr.Error()
+	itr.Release()
+	return err
 }
 
 type ldbSegmentBatch struct {

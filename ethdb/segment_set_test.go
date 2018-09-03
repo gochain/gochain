@@ -10,12 +10,15 @@ import (
 
 func TestSegmentSet_AcquireRelease(t *testing.T) {
 	segment0 := &purgeableSegment{Segment: &mock.Segment{
+		PathFunc: func() string { return "/path/to/0000" },
 		NameFunc: func() string { return "0000" },
 	}}
 	segment1 := &purgeableSegment{Segment: &mock.Segment{
+		PathFunc: func() string { return "/path/to/0001" },
 		NameFunc: func() string { return "0001" },
 	}}
 	segment2 := &purgeableSegment{Segment: &mock.Segment{
+		PathFunc: func() string { return "/path/to/0002" },
 		NameFunc: func() string { return "0002" },
 	}}
 

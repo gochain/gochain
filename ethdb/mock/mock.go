@@ -9,18 +9,20 @@ import (
 var _ ethdb.Segment = (*Segment)(nil)
 
 type Segment struct {
-	CloseFunc func() error
-	NameFunc  func() string
-	PathFunc  func() string
-	HasFunc   func(key []byte) (bool, error)
-	GetFunc   func(key []byte) ([]byte, error)
+	CloseFunc    func() error
+	NameFunc     func() string
+	PathFunc     func() string
+	HasFunc      func(key []byte) (bool, error)
+	GetFunc      func(key []byte) ([]byte, error)
+	IteratorFunc func() ethdb.SegmentIterator
 }
 
-func (m *Segment) Close() error                   { return m.CloseFunc() }
-func (m *Segment) Name() string                   { return m.NameFunc() }
-func (m *Segment) Path() string                   { return m.PathFunc() }
-func (m *Segment) Has(key []byte) (bool, error)   { return m.HasFunc(key) }
-func (m *Segment) Get(key []byte) ([]byte, error) { return m.GetFunc(key) }
+func (m *Segment) Close() error                    { return m.CloseFunc() }
+func (m *Segment) Name() string                    { return m.NameFunc() }
+func (m *Segment) Path() string                    { return m.PathFunc() }
+func (m *Segment) Has(key []byte) (bool, error)    { return m.HasFunc(key) }
+func (m *Segment) Get(key []byte) ([]byte, error)  { return m.GetFunc(key) }
+func (m *Segment) Iterator() ethdb.SegmentIterator { return m.IteratorFunc() }
 
 var _ ethdb.MutableSegment = (*MutableSegment)(nil)
 
@@ -51,9 +53,14 @@ func (m *SegmentOpener) OpenSegment(table, name, path string) (ethdb.Segment, er
 var _ ethdb.SegmentCompactor = (*SegmentCompactor)(nil)
 
 type SegmentCompactor struct {
-	CompactSegmentFunc func(ctx context.Context, table string, s *ethdb.LDBSegment) (ethdb.Segment, error)
+	CompactSegmentFunc   func(ctx context.Context, table string, s *ethdb.LDBSegment) (ethdb.Segment, error)
+	UncompactSegmentFunc func(ctx context.Context, table string, s ethdb.Segment) (*ethdb.LDBSegment, error)
 }
 
 func (m *SegmentCompactor) CompactSegment(ctx context.Context, table string, s *ethdb.LDBSegment) (ethdb.Segment, error) {
 	return m.CompactSegmentFunc(ctx, table, s)
+}
+
+func (m *SegmentCompactor) UncompactSegment(ctx context.Context, table string, s ethdb.Segment) (*ethdb.LDBSegment, error) {
+	return m.UncompactSegmentFunc(ctx, table, s)
 }

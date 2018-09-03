@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/log"
@@ -212,6 +213,31 @@ func (s *Segment) Get(key []byte) ([]byte, error) {
 	return s.segment.Get(key)
 }
 
+// Iterator returns an iterator for the segment.
+func (s *Segment) Iterator() ethdb.SegmentIterator {
+	s.mu.RLock() // unlocked by SegmentIterator.Close()
+	return &SegmentIterator{
+		SegmentIterator: s.segment.Iterator(),
+		segment:         s,
+	}
+}
+
+// Ensure implementation implements interface.
+var _ ethdb.SegmentIterator = (*SegmentIterator)(nil)
+
+// SegmentIterator represents a wrapper around ethdb.SegmentIterator.
+// Releases read lock on close.
+type SegmentIterator struct {
+	ethdb.SegmentIterator
+	segment *Segment
+}
+
+// Close releases iterator resources and releases the read lock on the segment.
+func (itr *SegmentIterator) Close() error {
+	itr.segment.mu.RUnlock()
+	return itr.SegmentIterator.Close()
+}
+
 // SegmentKey returns the key used for the segment on S3.
 func SegmentKey(table, name string) string {
 	return path.Join(table, name)
@@ -281,7 +307,9 @@ type SegmentCompactor struct {
 
 // NewSegmentCompactor returns a new instance of SegmentCompactor.
 func NewSegmentCompactor(client *Client) *SegmentCompactor {
-	return &SegmentCompactor{Client: client}
+	return &SegmentCompactor{
+		Client: client,
+	}
 }
 
 // CompactSegment compacts s into a FileSegement and uploads it to S3.
@@ -307,4 +335,9 @@ func (c *SegmentCompactor) CompactSegment(ctx context.Context, table string, s *
 	}
 
 	return NewSegment(c.Client, table, s.Name(), s.Path()), nil
+}
+
+// UncompactSegment uncompacts s into an LDBSegement.
+func (c *SegmentCompactor) UncompactSegment(ctx context.Context, table string, s ethdb.Segment) (*ethdb.LDBSegment, error) {
+	return ethdb.NewFileSegmentCompactor().UncompactSegment(ctx, table, s)
 }

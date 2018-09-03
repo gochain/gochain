@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/log"
@@ -31,6 +32,10 @@ const (
 
 	// DefaultMinMutableSegmentCount is the minimum number of mutable segments on a given table.
 	DefaultMinMutableSegmentCount = 40
+
+	// DefaultMinCompactionAge is the minimum age after creation before an LDB
+	// segment can be compacted into a file segment.
+	DefaultMinCompactionAge = 1 * time.Minute
 )
 
 // DB is the top-level database and contains a mixture of LevelDB & File storage layers.
@@ -50,6 +55,9 @@ type DB struct {
 	// Maximum number of segments that can be opened at once.
 	MaxOpenSegmentCount int
 
+	// Age before LDB segment can be compacted to a file segment.
+	MinCompactionAge time.Duration
+
 	SegmentOpener    SegmentOpener
 	SegmentCompactor SegmentCompactor
 }
@@ -60,6 +68,7 @@ func NewDB(path string) *DB {
 		Path:                path,
 		PartitionSize:       DefaultPartitionSize,
 		MaxOpenSegmentCount: DefaultMaxOpenSegmentCount,
+		MinCompactionAge:    DefaultMinCompactionAge,
 		SegmentOpener:       NewFileSegmentOpener(),
 		SegmentCompactor:    NewFileSegmentCompactor(),
 	}
@@ -78,6 +87,7 @@ func (db *DB) Open() error {
 
 	for _, tbl := range db.Tables() {
 		tbl.MaxOpenSegmentCount = db.MaxOpenSegmentCount
+		tbl.MinCompactionAge = db.MinCompactionAge
 		tbl.SegmentOpener = db.SegmentOpener
 		tbl.SegmentCompactor = db.SegmentCompactor
 		if err := tbl.Open(); err != nil {

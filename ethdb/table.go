@@ -27,6 +27,7 @@ type Table struct {
 	Partitioner Partitioner
 
 	MinMutableSegmentCount int
+	MinCompactionAge       time.Duration
 
 	// Maximum number of segments that can be opened at once.
 	MaxOpenSegmentCount int
@@ -43,6 +44,7 @@ func NewTable(name, path string, partitioner Partitioner) *Table {
 		Partitioner: partitioner,
 
 		MinMutableSegmentCount: DefaultMinMutableSegmentCount,
+		MinCompactionAge:       DefaultMinCompactionAge,
 		MaxOpenSegmentCount:    DefaultMaxOpenSegmentCount,
 
 		SegmentOpener:    NewFileSegmentOpener(),
@@ -229,14 +231,14 @@ func (t *Table) CreateSegmentIfNotExists(name string) (MutableSegment, error) {
 		return s, nil
 	}
 
-	// Check if immutable already.
+	// Uncompact segment if it has already become compacted.
 	if t.segments.Contains(name) {
-		return nil, ErrImmutableSegment
+		return t.uncompact(context.TODO(), name)
 	}
 
 	// Ensure segment name can become active.
 	if name < t.active {
-		log.Error("cannot non-active create segment", "name", name, "active", t.active)
+		log.Error("cannot new non-active create segment", "name", name, "active", t.active)
 		return nil, ErrImmutableSegment
 	}
 
@@ -338,8 +340,14 @@ func (t *Table) compact(ctx context.Context) error {
 	}
 
 	for _, ldbSegment := range ldbSegmentSlice[:len(ldbSegmentSlice)-t.MinMutableSegmentCount] {
-
 		startTime := time.Now()
+
+		if fi, err := os.Stat(ldbSegment.Path()); err != nil {
+			return err
+		} else if time.Since(fi.ModTime()) < t.MinCompactionAge {
+			log.Info("LDB segment too young, skipping compaction", "table", t.Name, "name", ldbSegment.Name(), "elapsed", time.Since(startTime))
+			continue
+		}
 
 		newSegment, err := t.SegmentCompactor.CompactSegment(ctx, t.Name, ldbSegment)
 		if err != nil {
@@ -351,6 +359,24 @@ func (t *Table) compact(ctx context.Context) error {
 		log.Info("Compacted segment", "table", t.Name, "name", ldbSegment.Name(), "elapsed", time.Since(startTime))
 	}
 	return nil
+}
+
+// uncompact converts an immutable segment to a mutable segment.
+func (t *Table) uncompact(ctx context.Context, name string) (*LDBSegment, error) {
+	s, err := t.segments.Acquire(name)
+	if err != nil {
+		return nil, err
+	}
+	defer t.segments.Release()
+
+	ldbSegment, err := t.SegmentCompactor.UncompactSegment(ctx, t.Name, s)
+	if err != nil {
+		return nil, err
+	}
+	t.ldbSegments[name] = ldbSegment
+	t.segments.Remove(name)
+
+	return ldbSegment, nil
 }
 
 type tableBatch struct {

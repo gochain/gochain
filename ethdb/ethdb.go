@@ -24,6 +24,7 @@ type Segment interface {
 
 	Has(key []byte) (bool, error)
 	Get(key []byte) ([]byte, error)
+	Iterator() SegmentIterator
 }
 
 // SortSegments sorts a by name.
@@ -39,6 +40,15 @@ type MutableSegment interface {
 	Delete(key []byte) error
 }
 
+// SegmentIterator represents a sequentially iterator over all the key/value
+// pairs inside a segment.
+type SegmentIterator interface {
+	io.Closer
+	Next() bool
+	Key() []byte
+	Value() []byte
+}
+
 // SegmentOpener represents an object that can instantiate and load an immutable segment.
 type SegmentOpener interface {
 	OpenSegment(table, name, path string) (Segment, error)
@@ -46,9 +56,10 @@ type SegmentOpener interface {
 }
 
 // SegmentCompactor represents an object that can compact from an LDB segment
-// to an immutable segment.
+// to an immutable segment and back.
 type SegmentCompactor interface {
 	CompactSegment(ctx context.Context, table string, s *LDBSegment) (Segment, error)
+	UncompactSegment(ctx context.Context, table string, s Segment) (*LDBSegment, error)
 }
 
 // SegmentFileType returns the file type at path.

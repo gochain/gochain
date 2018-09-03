@@ -166,7 +166,7 @@ func (s *FileSegment) Get(key []byte) ([]byte, error) {
 }
 
 // Iterator returns an iterator for iterating over all key/value pairs.
-func (s *FileSegment) Iterator() *FileSegmentIterator {
+func (s *FileSegment) Iterator() SegmentIterator {
 	return &FileSegmentIterator{
 		data:   s.data[:s.indexOffset()],
 		offset: int64(FileSegmentHeaderSize),
@@ -208,13 +208,24 @@ func (s *FileSegment) offset(key []byte) (koff, voff int64) {
 	}
 }
 
-// FileSegmentIterator returns an error for sequentially iterating over a FileSegment's key/value pairs.
+// Ensure implementation implements interface.
+var _ SegmentIterator = (*FileSegmentIterator)(nil)
+
+// FileSegmentIterator returns an error for sequentially iterating over a
+// FileSegment's key/value pairs.
 type FileSegmentIterator struct {
 	data   []byte
 	offset int64
 
 	key   []byte
 	value []byte
+}
+
+// Close releases the iterator.
+func (itr *FileSegmentIterator) Close() error {
+	itr.data, itr.offset = nil, 0
+	itr.key, itr.value = nil, nil
+	return nil
 }
 
 // Key returns the current key. Must be called after Next().
@@ -298,7 +309,9 @@ func (c *FileSegmentCompactor) CompactSegment(ctx context.Context, table string,
 	tmpPath := s.Path() + ".tmp"
 	if err := c.CompactSegmentTo(ctx, s, tmpPath); err != nil {
 		return nil, err
-	} else if err := c.SwapSegment(ctx, s, tmpPath); err != nil {
+	} else if err := s.Close(); err != nil {
+		return nil, err
+	} else if err := c.RenameSegment(ctx, s.Path(), tmpPath); err != nil {
 		return nil, err
 	}
 
@@ -319,13 +332,39 @@ func (c *FileSegmentCompactor) CompactSegmentTo(ctx context.Context, s *LDBSegme
 	return nil
 }
 
-// SwapSegment closes and removes s and renames the new segment at path.
-func (c *FileSegmentCompactor) SwapSegment(ctx context.Context, s *LDBSegment, path string) error {
-	if err := s.Close(); err != nil {
+// UncompactSegment converts an LDB segment back into a file segment.
+func (c *FileSegmentCompactor) UncompactSegment(ctx context.Context, table string, s Segment) (*LDBSegment, error) {
+	tmpPath := s.Path() + ".tmp"
+	if err := c.UncompactSegmentTo(ctx, s, tmpPath); err != nil {
+		return nil, err
+	} else if err := s.Close(); err != nil {
+		return nil, err
+	} else if err := c.RenameSegment(ctx, s.Path(), tmpPath); err != nil {
+		return nil, err
+	}
+
+	// Reopen as LDB segment.
+	newLDBSegment := NewLDBSegment(s.Name(), s.Path())
+	if err := newLDBSegment.Open(); err != nil {
+		return nil, err
+	}
+	return newLDBSegment, nil
+}
+
+// UncompactSegmentTo converts a segment back to an LDB segment at path.
+func (c *FileSegmentCompactor) UncompactSegmentTo(ctx context.Context, s Segment, path string) error {
+	if err := UncompactSegmentTo(s, path); err != nil {
+		os.Remove(path)
 		return err
-	} else if err := os.RemoveAll(s.Path()); err != nil {
+	}
+	return nil
+}
+
+// RenameSegment removes dst and renames the new segment at path.
+func (c *FileSegmentCompactor) RenameSegment(ctx context.Context, dst, src string) error {
+	if err := os.RemoveAll(dst); err != nil {
 		return err
-	} else if err := os.Rename(path, s.Path()); err != nil {
+	} else if err := os.Rename(src, dst); err != nil {
 		return err
 	}
 	return nil
