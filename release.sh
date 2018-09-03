@@ -26,7 +26,7 @@ echo "Version: $version"
 docker build . -t $user/$image
 git add -u
 git commit -m "$image: $version release [skip ci]"
-git tag -f -a "$version" -m "version $version"
+git tag -f -a "v$version" -m "version $version"
 git push
 git push origin $version
 
