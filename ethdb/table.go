@@ -215,7 +215,7 @@ func (t *Table) ldbSegmentSlice() []*LDBSegment {
 
 // CreateSegmentIfNotExists returns a mutable segment by name.
 // Creates a new segment if it does not exist.
-func (t *Table) CreateSegmentIfNotExists(name string) (MutableSegment, error) {
+func (t *Table) CreateSegmentIfNotExists(name string) (*LDBSegment, error) {
 	t.mu.RLock()
 	if s := t.ldbSegments[name]; s != nil {
 		t.mu.RUnlock()
@@ -363,6 +363,8 @@ func (t *Table) compact(ctx context.Context) error {
 
 // uncompact converts an immutable segment to a mutable segment.
 func (t *Table) uncompact(ctx context.Context, name string) (*LDBSegment, error) {
+	startTime := time.Now()
+
 	s, err := t.segments.Acquire(name)
 	if err != nil {
 		return nil, err
@@ -375,6 +377,8 @@ func (t *Table) uncompact(ctx context.Context, name string) (*LDBSegment, error)
 	}
 	t.ldbSegments[name] = ldbSegment
 	t.segments.Remove(name)
+
+	log.Info("Uncompacted segment", "table", t.Name, "name", name, "elapsed", time.Since(startTime))
 
 	return ldbSegment, nil
 }
@@ -394,16 +398,10 @@ func (b *tableBatch) Put(key, value []byte) error {
 	}
 
 	name := b.table.Partitioner.Partition(key)
-	segment, err := b.table.CreateSegmentIfNotExists(name)
+	ldbSegment, err := b.table.CreateSegmentIfNotExists(name)
 	if err != nil {
 		log.Error("tableBatch.Put: error", "table", b.table.Name, "segment", name, "key", fmt.Sprintf("%x", key))
 		return err
-	}
-
-	ldbSegment, ok := segment.(*LDBSegment)
-	if !ok {
-		log.Error("cannot insert into compacted segment", "name", name, "key", fmt.Sprintf("%x", key))
-		return ErrImmutableSegment
 	}
 
 	sb := b.batches[name]

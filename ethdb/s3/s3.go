@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/log"
@@ -90,9 +89,15 @@ func (c *Client) ListObjectKeys(prefix string) ([]string, error) {
 	return keys, nil
 }
 
-// FGetObject fetches the object at key and writes it to path.
+// FGetObject fetches the object at key and atomically writes it to path.
 func (c *Client) FGetObject(ctx context.Context, key, path string) error {
-	return c.client.FGetObjectWithContext(ctx, c.Bucket, key, path, minio.GetObjectOptions{})
+	tmpPath := path + ".tmp"
+	if err := c.client.FGetObjectWithContext(ctx, c.Bucket, key, tmpPath, minio.GetObjectOptions{}); err != nil {
+		return err
+	} else if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	return nil
 }
 
 // PutObject writes an object to a key.

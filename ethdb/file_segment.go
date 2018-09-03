@@ -154,6 +154,13 @@ func (s *FileSegment) Has(key []byte) (bool, error) {
 
 // Get returns the value of the given key.
 func (s *FileSegment) Get(key []byte) ([]byte, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("Cannot read key in file segment", "name", s.name, "key", fmt.Sprintf("%x", key))
+			panic(r)
+		}
+	}()
+
 	_, voff := s.offset(key)
 	if voff == 0 {
 		return nil, ErrKeyNotFound
