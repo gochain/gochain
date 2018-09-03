@@ -156,7 +156,7 @@ func (s *FileSegment) Has(key []byte) (bool, error) {
 func (s *FileSegment) Get(key []byte) ([]byte, error) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Error("Cannot read key in file segment", "name", s.name, "key", fmt.Sprintf("%x", key))
+			log.Error("Cannot read key in file segment", "path", s.path, "key", fmt.Sprintf("%x", key))
 			panic(r)
 		}
 	}()
