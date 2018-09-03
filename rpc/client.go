@@ -450,6 +450,7 @@ func (c *Client) write(ctx context.Context, msg interface{}) error {
 		log.Error("Cannot set rpc client write deadline", "err", err)
 	}
 	err := json.NewEncoder(c.writeConn).Encode(msg)
+	c.writeConn.SetWriteDeadline(time.Time{})
 	if err != nil {
 		c.writeConn = nil
 	}
