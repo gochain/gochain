@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/cespare/xxhash"
 	"github.com/edsrzf/mmap-go"
@@ -19,9 +20,10 @@ import (
 )
 
 var (
-	ErrKeyNotFound        = errors.New("ethdb: key not found")
-	ErrImmutableSegment   = errors.New("ethdb: immutable segment")
-	ErrSegmentTypeUnknown = errors.New("ethdb: segment type unknown")
+	ErrKeyNotFound                 = errors.New("ethdb: key not found")
+	ErrImmutableSegment            = errors.New("ethdb: immutable segment")
+	ErrSegmentTypeUnknown          = errors.New("ethdb: segment type unknown")
+	ErrFileSegmentChecksumMismatch = errors.New("ethdb: file segment checksum mismatch")
 )
 
 const (
@@ -569,6 +571,25 @@ func ChecksumFileSegment(path string) ([]byte, error) {
 	binary.BigEndian.PutUint64(buf, h.Sum64())
 
 	return buf, nil
+}
+
+// VerifyFileSegment compares the calculated and stored checksum of the segment at path.
+func VerifyFileSegment(path string) error {
+	computed, err := ChecksumFileSegment(path)
+	if err != nil {
+		return err
+	}
+
+	s := NewFileSegment(filepath.Base(path), path)
+	if err := s.Open(); err != nil {
+		return err
+	}
+	defer s.Close()
+
+	if !bytes.Equal(s.Checksum(), computed) {
+		return ErrFileSegmentChecksumMismatch
+	}
+	return nil
 }
 
 // fileSegmentEncoderIndex represents a fixed-length RHH-based hash map.

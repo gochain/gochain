@@ -9,10 +9,17 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/log"
 	"github.com/minio/minio-go"
+)
+
+const (
+	// FGetObjectInterval represents the time between attempts to successfully
+	// fetch objects from the S3 store.
+	FGetObjectInterval = 2 * time.Second
 )
 
 // ConfigureDB updates db to archive to S3 if S3 configuration enabled.
@@ -90,11 +97,34 @@ func (c *Client) ListObjectKeys(prefix string) ([]string, error) {
 }
 
 // FGetObject fetches the object at key and atomically writes it to path.
-func (c *Client) FGetObject(ctx context.Context, key, path string) error {
+// Attempts multiple times until a successful fetch has been acheived.
+func (c *Client) FGetObject(ctx context.Context, key, path string) (err error) {
+	const retry = 5
+	for i := 0; i < retry; i++ {
+		if err = c.tryFGetObject(ctx, key, path); err == nil {
+			return nil
+		}
+		log.Error("Error fetching S3 file segment", "i", i, "path", path, "err", err)
+		time.Sleep(FGetObjectInterval)
+	}
+	return err
+}
+
+func (c *Client) tryFGetObject(ctx context.Context, key, path string) (err error) {
 	tmpPath := path + ".tmp"
 	if err := c.client.FGetObjectWithContext(ctx, c.Bucket, key, tmpPath, minio.GetObjectOptions{}); err != nil {
 		return err
-	} else if err := os.Rename(tmpPath, path); err != nil {
+	}
+
+	// Verify file segment checksum matches computed.
+	if err := ethdb.VerifyFileSegment(tmpPath); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+
+	// Move file from temp path to actual path.
+	if err := os.Rename(tmpPath, path); err != nil {
+		os.Remove(tmpPath)
 		return err
 	}
 	return nil
@@ -117,7 +147,9 @@ func (c *Client) RemoveObject(ctx context.Context, key string) error {
 
 // Segment represents an ethdb.FileSegment stored in S3.
 type Segment struct {
-	mu      sync.RWMutex
+	mu       sync.RWMutex
+	muEnsure sync.Mutex // lock during check for file existence.
+
 	client  *Client
 	segment *ethdb.FileSegment
 	table   string // table name
@@ -173,6 +205,9 @@ func (s *Segment) Purge() error {
 // ensureFileSegment instantiates the underlying file segment from the local disk.
 // If the segment does not exist locally on disk then it is fetched from S3.
 func (s *Segment) ensureFileSegment(ctx context.Context) error {
+	s.muEnsure.Lock()
+	defer s.muEnsure.Unlock()
+
 	// Exit if underlying segment exists.
 	if s.segment != nil {
 		return nil
@@ -299,7 +334,21 @@ func (o *SegmentOpener) ListSegmentNames(path, table string) ([]string, error) {
 
 // OpenSegment returns creates and opens a reference to a remote immutable segment.
 func (o *SegmentOpener) OpenSegment(table, name, path string) (ethdb.Segment, error) {
-	return NewSegment(o.Client, table, name, path), nil
+	s := NewSegment(o.Client, table, name, path)
+
+	// Remove local segment if it is a regular file.
+	fi, err := os.Stat(s.Path())
+	if os.IsNotExist(err) {
+		// nop
+	} else if err != nil {
+		return nil, err
+	} else if !fi.IsDir() {
+		if err := os.Remove(s.Path()); err != nil {
+			return nil, err
+		}
+	}
+
+	return s, nil
 }
 
 // Ensure implementation fulfills interface.
