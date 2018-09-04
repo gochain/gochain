@@ -41,7 +41,12 @@ const (
 	FileSegmentIndexCapacitySize = 8
 
 	// FileSegmentHeaderSize is the total size of the fixed length FileSegment header.
-	FileSegmentHeaderSize = len(FileSegmentMagic) + FileSegmentChecksumSize + FileSegmentIndexOffsetSize + FileSegmentIndexCountSize + FileSegmentIndexCapacitySize
+	FileSegmentHeaderSize = 0 +
+		len(FileSegmentMagic) +
+		FileSegmentChecksumSize +
+		FileSegmentIndexOffsetSize +
+		FileSegmentIndexCountSize +
+		FileSegmentIndexCapacitySize
 )
 
 // Ensure implementation implements interface.
@@ -112,6 +117,19 @@ func (s *FileSegment) Size() int {
 	return len(s.data)
 }
 
+// Data returns the underlying mmap data.
+func (s *FileSegment) Data() []byte {
+	return s.data
+}
+
+// Checksum returns the checksum written to the segment file.
+func (s *FileSegment) Checksum() []byte {
+	if len(s.data) < len(FileSegmentMagic)+FileSegmentChecksumSize {
+		return nil
+	}
+	return s.data[4:12]
+}
+
 // Len returns the number of keys in the file.
 func (s *FileSegment) Len() int {
 	if s.data == nil {
@@ -122,15 +140,15 @@ func (s *FileSegment) Len() int {
 }
 
 // index returns the byte slice containing the index.
-func (s *FileSegment) index() []byte {
+func (s *FileSegment) Index() []byte {
 	if s.data == nil {
 		return nil
 	}
-	return s.data[s.indexOffset():]
+	return s.data[s.IndexOffset():]
 }
 
 // indexOffset returns the file offset where the index starts.
-func (s *FileSegment) indexOffset() int64 {
+func (s *FileSegment) IndexOffset() int64 {
 	if s.data == nil {
 		return -1
 	}
@@ -138,7 +156,7 @@ func (s *FileSegment) indexOffset() int64 {
 }
 
 // capacity returns the capacity of the index.
-func (s *FileSegment) capacity() int {
+func (s *FileSegment) Cap() int {
 	if s.data == nil {
 		return 0
 	}
@@ -175,20 +193,20 @@ func (s *FileSegment) Get(key []byte) ([]byte, error) {
 // Iterator returns an iterator for iterating over all key/value pairs.
 func (s *FileSegment) Iterator() SegmentIterator {
 	return &FileSegmentIterator{
-		data:   s.data[:s.indexOffset()],
+		data:   s.data[:s.IndexOffset()],
 		offset: int64(FileSegmentHeaderSize),
 	}
 }
 
 // offset returns the offset of key & value. Returns 0 if key does not exist.
 func (s *FileSegment) offset(key []byte) (koff, voff int64) {
-	capacity := uint64(s.capacity())
+	capacity := uint64(s.Cap())
 	if capacity == 0 {
 		return 0, 0
 	}
 	mask := capacity - 1
 
-	idx := s.index()
+	idx := s.Index()
 	hash := hashKey(key)
 	pos := hash & mask
 
@@ -515,24 +533,11 @@ func (enc *FileSegmentEncoder) writeIndex() error {
 }
 
 func (enc *FileSegmentEncoder) writeChecksum() error {
-	// Open read-only handler to compute checksum.
-	f, err := os.Open(enc.Path)
+	buf, err := ChecksumFileSegment(enc.Path)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 
-	// Compute checksum for all data after checksum.
-	h := xxhash.New()
-	if _, err := f.Seek(int64(len(FileSegmentMagic)+FileSegmentChecksumSize), io.SeekStart); err != nil {
-		return err
-	} else if _, err := io.Copy(h, f); err != nil {
-		return err
-	}
-
-	// Write checksum to the header.
-	buf := make([]byte, FileSegmentChecksumSize)
-	binary.BigEndian.PutUint64(buf, h.Sum64())
 	if _, err := enc.f.Seek(int64(len(FileSegmentMagic)), io.SeekStart); err != nil {
 		return err
 	} else if _, err := enc.f.Write(buf); err != nil {
@@ -541,6 +546,29 @@ func (enc *FileSegmentEncoder) writeChecksum() error {
 		return err
 	}
 	return nil
+}
+
+// ChecksumFileSegment calculates the checksum for the file segment at path.
+func ChecksumFileSegment(path string) ([]byte, error) {
+	// Open handler to compute checksum.
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	// Compute checksum for all data after checksum.
+	h := xxhash.New()
+	if _, err := f.Seek(int64(len(FileSegmentMagic)+FileSegmentChecksumSize), io.SeekStart); err != nil {
+		return nil, err
+	} else if _, err := io.Copy(h, f); err != nil {
+		return nil, err
+	}
+
+	buf := make([]byte, FileSegmentChecksumSize)
+	binary.BigEndian.PutUint64(buf, h.Sum64())
+
+	return buf, nil
 }
 
 // fileSegmentEncoderIndex represents a fixed-length RHH-based hash map.
