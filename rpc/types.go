@@ -24,7 +24,6 @@ import (
 	"sync"
 
 	"github.com/gochain-io/gochain/common/hexutil"
-	"gopkg.in/fatih/set.v0"
 )
 
 // API describes the set of methods offered over the RPC interface
@@ -73,7 +72,7 @@ type Server struct {
 
 	run      int32
 	codecsMu sync.Mutex
-	codecs   *set.Set
+	codecs   map[ServerCodec]struct{}
 }
 
 // rpcRequest represents a raw incoming RPC request

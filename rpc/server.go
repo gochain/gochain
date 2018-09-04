@@ -26,7 +26,6 @@ import (
 	"sync/atomic"
 
 	"github.com/gochain-io/gochain/log"
-	"gopkg.in/fatih/set.v0"
 )
 
 const MetadataApi = "rpc"
@@ -46,7 +45,7 @@ const (
 func NewServer() *Server {
 	server := &Server{
 		services: make(serviceRegistry),
-		codecs:   set.New(),
+		codecs:   make(map[ServerCodec]struct{}),
 		run:      1,
 	}
 
@@ -138,7 +137,7 @@ func (s *Server) serveRequest(codec ServerCodec, singleShot bool, options CodecO
 			log.Error(string(buf))
 		}
 		s.codecsMu.Lock()
-		s.codecs.Remove(codec)
+		delete(s.codecs, codec)
 		s.codecsMu.Unlock()
 	}()
 
@@ -156,7 +155,7 @@ func (s *Server) serveRequest(codec ServerCodec, singleShot bool, options CodecO
 		s.codecsMu.Unlock()
 		return &shutdownError{}
 	}
-	s.codecs.Add(codec)
+	s.codecs[codec] = struct{}{}
 	s.codecsMu.Unlock()
 
 	// test if the server is ordered to stop
@@ -244,10 +243,9 @@ func (s *Server) Stop() {
 		log.Debug("RPC Server shutdown initiatied")
 		s.codecsMu.Lock()
 		defer s.codecsMu.Unlock()
-		s.codecs.Each(func(c interface{}) bool {
-			c.(ServerCodec).Close()
-			return true
-		})
+		for sc := range s.codecs {
+			sc.Close()
+		}
 	}
 }
 

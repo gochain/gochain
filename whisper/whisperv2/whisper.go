@@ -29,8 +29,6 @@ import (
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/rpc"
-
-	"gopkg.in/fatih/set.v0"
 )
 
 const (
@@ -66,9 +64,9 @@ type Whisper struct {
 
 	keys map[string]*ecdsa.PrivateKey
 
-	messages    map[common.Hash]*Envelope // Pool of messages currently tracked by this node
-	expirations map[uint32]*set.SetNonTS  // Message expiration pool (TODO: something lighter)
-	poolMu      sync.RWMutex              // Mutex to sync the message and expiration pools
+	messages    map[common.Hash]*Envelope           // Pool of messages currently tracked by this node
+	expirations map[uint32]map[common.Hash]struct{} // Message expiration pool
+	poolMu      sync.RWMutex                        // Mutex to sync the message and expiration pools
 
 	peers  map[*peer]struct{} // Set of currently active peers
 	peerMu sync.RWMutex       // Mutex to sync the active peer set
@@ -83,7 +81,7 @@ func New() *Whisper {
 		filters:     filter.New(),
 		keys:        make(map[string]*ecdsa.PrivateKey),
 		messages:    make(map[common.Hash]*Envelope),
-		expirations: make(map[uint32]*set.SetNonTS),
+		expirations: make(map[uint32]map[common.Hash]struct{}),
 		peers:       make(map[*peer]struct{}),
 		quit:        make(chan struct{}),
 	}
@@ -269,10 +267,10 @@ func (self *Whisper) add(envelope *Envelope) error {
 
 	// Insert the message into the expiration pool for later removal
 	if self.expirations[envelope.Expiry] == nil {
-		self.expirations[envelope.Expiry] = set.NewNonTS()
+		self.expirations[envelope.Expiry] = make(map[common.Hash]struct{})
 	}
-	if !self.expirations[envelope.Expiry].Has(hash) {
-		self.expirations[envelope.Expiry].Add(hash)
+	if _, ok := self.expirations[envelope.Expiry][hash]; !ok {
+		self.expirations[envelope.Expiry][hash] = struct{}{}
 
 		// Notify the local node of a message arrival
 		go self.postEvent(envelope)
@@ -357,11 +355,10 @@ func (self *Whisper) expire() {
 			continue
 		}
 		// Dump all expired messages and remove timestamp
-		hashSet.Each(func(v interface{}) bool {
-			delete(self.messages, v.(common.Hash))
-			return true
-		})
-		self.expirations[then].Clear()
+		for h := range hashSet {
+			delete(self.messages, h)
+		}
+		delete(self.expirations, then)
 	}
 }
 

@@ -27,7 +27,6 @@ import (
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/rlp"
-	set "gopkg.in/fatih/set.v0"
 )
 
 // Peer represents a whisper protocol peer connection.
@@ -42,7 +41,8 @@ type Peer struct {
 	bloomFilter    []byte
 	fullNode       bool
 
-	known *set.Set // Messages already known by the peer to avoid wasting bandwidth
+	knownMu sync.RWMutex
+	known   map[common.Hash]struct{} // Messages already known by the peer to avoid wasting bandwidth
 
 	quit chan struct{}
 }
@@ -55,7 +55,7 @@ func newPeer(host *Whisper, remote *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 		ws:             rw,
 		trusted:        false,
 		powRequirement: 0.0,
-		known:          set.New(),
+		known:          make(map[common.Hash]struct{}),
 		quit:           make(chan struct{}),
 		bloomFilter:    makeFullNodeBloom(),
 		fullNode:       true,
@@ -164,27 +164,35 @@ func (peer *Peer) update() {
 
 // mark marks an envelope known to the peer so that it won't be sent back.
 func (peer *Peer) mark(envelope *Envelope) {
-	peer.known.Add(envelope.Hash())
+	h := envelope.Hash()
+	peer.knownMu.Lock()
+	peer.known[h] = struct{}{}
+	peer.knownMu.Unlock()
 }
 
 // marked checks if an envelope is already known to the remote peer.
 func (peer *Peer) marked(envelope *Envelope) bool {
-	return peer.known.Has(envelope.Hash())
+	h := envelope.Hash()
+	peer.knownMu.RLock()
+	_, ok := peer.known[h]
+	peer.knownMu.RUnlock()
+	return ok
 }
 
 // expire iterates over all the known envelopes in the host and removes all
 // expired (unknown) ones from the known list.
 func (peer *Peer) expire() {
 	unmark := make(map[common.Hash]struct{})
-	peer.known.Each(func(v interface{}) bool {
-		if !peer.host.isEnvelopeCached(v.(common.Hash)) {
-			unmark[v.(common.Hash)] = struct{}{}
+	peer.knownMu.Lock()
+	defer peer.knownMu.Unlock()
+	for h := range peer.known {
+		if !peer.host.isEnvelopeCached(h) {
+			unmark[h] = struct{}{}
 		}
-		return true
-	})
+	}
 	// Dump all known but no longer cached
 	for hash := range unmark {
-		peer.known.Remove(hash)
+		delete(peer.known, hash)
 	}
 }
 
