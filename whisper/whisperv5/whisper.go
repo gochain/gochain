@@ -35,7 +35,6 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/sync/syncmap"
-	set "gopkg.in/fatih/set.v0"
 )
 
 type Statistics struct {
@@ -62,9 +61,9 @@ type Whisper struct {
 	symKeys     map[string][]byte            // Symmetric key storage
 	keyMu       sync.RWMutex                 // Mutex associated with key storages
 
-	poolMu      sync.RWMutex              // Mutex to sync the message and expiration pools
-	envelopes   map[common.Hash]*Envelope // Pool of envelopes currently tracked by this node
-	expirations map[uint32]*set.SetNonTS  // Message expiration pool
+	poolMu      sync.RWMutex                        // Mutex to sync the message and expiration pools
+	envelopes   map[common.Hash]*Envelope           // Pool of envelopes currently tracked by this node
+	expirations map[uint32]map[common.Hash]struct{} // Message expiration pool
 
 	peerMu sync.RWMutex       // Mutex to sync the active peer set
 	peers  map[*Peer]struct{} // Set of currently active peers
@@ -91,7 +90,7 @@ func New(cfg *Config) *Whisper {
 		privateKeys:  make(map[string]*ecdsa.PrivateKey),
 		symKeys:      make(map[string][]byte),
 		envelopes:    make(map[common.Hash]*Envelope),
-		expirations:  make(map[uint32]*set.SetNonTS),
+		expirations:  make(map[uint32]map[common.Hash]struct{}),
 		peers:        make(map[*Peer]struct{}),
 		messageQueue: make(chan *Envelope, messageQueueLimit),
 		p2pMsgQueue:  make(chan *Envelope, messageQueueLimit),
@@ -611,10 +610,10 @@ func (wh *Whisper) add(envelope *Envelope) (bool, error) {
 	if !alreadyCached {
 		wh.envelopes[hash] = envelope
 		if wh.expirations[envelope.Expiry] == nil {
-			wh.expirations[envelope.Expiry] = set.NewNonTS()
+			wh.expirations[envelope.Expiry] = make(map[common.Hash]struct{})
 		}
-		if !wh.expirations[envelope.Expiry].Has(hash) {
-			wh.expirations[envelope.Expiry].Add(hash)
+		if _, ok := wh.expirations[envelope.Expiry][hash]; !ok {
+			wh.expirations[envelope.Expiry][hash] = struct{}{}
 		}
 	}
 	wh.poolMu.Unlock()
@@ -714,15 +713,13 @@ func (w *Whisper) expire() {
 	for expiry, hashSet := range w.expirations {
 		if expiry < now {
 			// Dump all expired messages and remove timestamp
-			hashSet.Each(func(v interface{}) bool {
-				sz := w.envelopes[v.(common.Hash)].size()
-				delete(w.envelopes, v.(common.Hash))
+			for h := range hashSet {
+				sz := w.envelopes[h].size()
+				delete(w.envelopes, h)
 				w.stats.messagesCleared++
 				w.stats.memoryCleared += sz
 				w.stats.memoryUsed -= sz
-				return true
-			})
-			w.expirations[expiry].Clear()
+			}
 			delete(w.expirations, expiry)
 		}
 	}

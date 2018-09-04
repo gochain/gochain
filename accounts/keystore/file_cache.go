@@ -25,19 +25,18 @@ import (
 	"time"
 
 	"github.com/gochain-io/gochain/log"
-	set "gopkg.in/fatih/set.v0"
 )
 
 // fileCache is a cache of files seen during scan of keystore.
 type fileCache struct {
-	all     *set.SetNonTS // Set of all files from the keystore folder
-	lastMod time.Time     // Last time instance when a file was modified
+	all     map[string]struct{} // Set of all files from the keystore folder
+	lastMod time.Time           // Last time instance when a file was modified
 	mu      sync.RWMutex
 }
 
 // scan performs a new scan on the given directory, compares against the already
 // cached filenames, and returns file sets: creates, deletes, updates.
-func (fc *fileCache) scan(keyDir string) (set.Interface, set.Interface, set.Interface, error) {
+func (fc *fileCache) scan(keyDir string) (map[string]struct{}, map[string]struct{}, map[string]struct{}, error) {
 	t0 := time.Now()
 
 	// List all the failes from the keystore folder
@@ -51,8 +50,8 @@ func (fc *fileCache) scan(keyDir string) (set.Interface, set.Interface, set.Inte
 	defer fc.mu.Unlock()
 
 	// Iterate all the files and gather their metadata
-	all := set.NewNonTS()
-	mods := set.NewNonTS()
+	all := make(map[string]struct{})
+	mods := make(map[string]struct{})
 
 	var newLastMod time.Time
 	for _, fi := range files {
@@ -63,11 +62,11 @@ func (fc *fileCache) scan(keyDir string) (set.Interface, set.Interface, set.Inte
 			continue
 		}
 		// Gather the set of all and fresly modified files
-		all.Add(path)
+		all[path] = struct{}{}
 
 		modified := fi.ModTime()
 		if modified.After(fc.lastMod) {
-			mods.Add(path)
+			mods[path] = struct{}{}
 		}
 		if modified.After(newLastMod) {
 			newLastMod = modified
@@ -75,10 +74,31 @@ func (fc *fileCache) scan(keyDir string) (set.Interface, set.Interface, set.Inte
 	}
 	t2 := time.Now()
 
-	// Update the tracked files and return the three sets
-	deletes := set.Difference(fc.all, all)   // Deletes = previous - current
-	creates := set.Difference(all, fc.all)   // Creates = current - previous
-	updates := set.Difference(mods, creates) // Updates = modified - creates
+	// Update the tracked files and return the three sets.
+
+	// Deletes = previous - current
+	deletes := make(map[string]struct{})
+	for p := range fc.all {
+		if _, ok := all[p]; !ok {
+			deletes[p] = struct{}{}
+		}
+	}
+
+	// Creates = current - previous
+	creates := make(map[string]struct{})
+	for p := range all {
+		if _, ok := fc.all[p]; !ok {
+			creates[p] = struct{}{}
+		}
+	}
+
+	// Updates = modified - creates
+	updates := make(map[string]struct{})
+	for p := range mods {
+		if _, ok := creates[p]; !ok {
+			updates[p] = struct{}{}
+		}
+	}
 
 	fc.all, fc.lastMod = all, newLastMod
 	t3 := time.Now()

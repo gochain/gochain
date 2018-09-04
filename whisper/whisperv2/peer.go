@@ -18,13 +18,13 @@ package whisperv2
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/rlp"
-	"gopkg.in/fatih/set.v0"
 )
 
 // peer represents a whisper protocol peer connection.
@@ -33,7 +33,8 @@ type peer struct {
 	peer *p2p.Peer
 	ws   p2p.MsgReadWriter
 
-	known *set.Set // Messages already known by the peer to avoid wasting bandwidth
+	knownMu sync.RWMutex
+	known   map[common.Hash]struct{} // Messages already known by the peer to avoid wasting bandwidth
 
 	quit chan struct{}
 }
@@ -44,7 +45,7 @@ func newPeer(host *Whisper, remote *p2p.Peer, rw p2p.MsgReadWriter) *peer {
 		host:  host,
 		peer:  remote,
 		ws:    rw,
-		known: set.New(),
+		known: make(map[common.Hash]struct{}),
 		quit:  make(chan struct{}),
 	}
 }
@@ -123,33 +124,41 @@ func (self *peer) update() {
 
 // mark marks an envelope known to the peer so that it won't be sent back.
 func (self *peer) mark(envelope *Envelope) {
-	self.known.Add(envelope.Hash())
+	h := envelope.Hash()
+	self.knownMu.Lock()
+	self.known[h] = struct{}{}
+	self.knownMu.Unlock()
 }
 
 // marked checks if an envelope is already known to the remote peer.
 func (self *peer) marked(envelope *Envelope) bool {
-	return self.known.Has(envelope.Hash())
+	h := envelope.Hash()
+	self.knownMu.RLock()
+	_, ok := self.known[h]
+	self.knownMu.RUnlock()
+	return ok
 }
 
 // expire iterates over all the known envelopes in the host and removes all
 // expired (unknown) ones from the known list.
 func (self *peer) expire() {
 	// Assemble the list of available envelopes
-	available := set.NewNonTS()
+	available := make(map[common.Hash]struct{})
 	for _, envelope := range self.host.envelopes() {
-		available.Add(envelope.Hash())
+		available[envelope.Hash()] = struct{}{}
 	}
 	// Cross reference availability with known status
 	unmark := make(map[common.Hash]struct{})
-	self.known.Each(func(v interface{}) bool {
-		if !available.Has(v.(common.Hash)) {
-			unmark[v.(common.Hash)] = struct{}{}
+	self.knownMu.Lock()
+	defer self.knownMu.Unlock()
+	for h := range self.known {
+		if _, ok := available[h]; !ok {
+			unmark[h] = struct{}{}
 		}
-		return true
-	})
+	}
 	// Dump all known but unavailable
 	for hash := range unmark {
-		self.known.Remove(hash)
+		delete(self.known, hash)
 	}
 }
 

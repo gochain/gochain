@@ -476,12 +476,6 @@
   revision = "20d25e2804050c1cd24a7eea1e7a6447dd0e74ec"
 
 [[projects]]
-  name = "gopkg.in/fatih/set.v0"
-  packages = ["."]
-  revision = "57907de300222151a123d29255ed17f5ed43fad3"
-  version = "v0.1.0"
-
-[[projects]]
   branch = "v2"
   name = "gopkg.in/karalabe/cookiejar.v2"
   packages = ["collections/prque"]
@@ -517,6 +511,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1def6cfd50eac90b3f2fa0cca996a49fc9aa52871f338eb09d86c9e54415074b"
+  inputs-digest = "7cb65c35c5e6d1e2eaf1080fa7eb09381f4511e53cfc73d3f8ac9bbe8493d1fe"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -245,7 +245,7 @@ func TestPeerMessageExpiration(t *testing.T) {
 		}
 	}
 	// Check that the message is inside the cache
-	if !peer.known.Has(envelope.Hash()) {
+	if !peer.marked(envelope) {
 		t.Fatalf("message not found in cache")
 	}
 	// Discard messages until expiration and check cache again
@@ -255,7 +255,7 @@ func TestPeerMessageExpiration(t *testing.T) {
 			t.Fatalf("message mismatch: %v", err)
 		}
 	}
-	if peer.known.Has(envelope.Hash()) {
+	if peer.marked(envelope) {
 		t.Fatalf("message not expired from cache")
 	}
 }
