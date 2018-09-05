@@ -17,7 +17,6 @@
 package adapters
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -215,7 +214,6 @@ func (self *SimNode) Snapshots() (map[string][]byte, error) {
 
 // Start registers the services and starts the underlying devp2p node
 func (self *SimNode) Start(snapshots map[string][]byte) error {
-	ctx := context.TODO()
 	newService := func(name string) func(ctx *node.ServiceContext) (node.Service, error) {
 		return func(nodeCtx *node.ServiceContext) (node.Service, error) {
 			ctx := &ServiceContext{
@@ -251,7 +249,7 @@ func (self *SimNode) Start(snapshots map[string][]byte) error {
 		return regErr
 	}
 
-	if err := self.node.Start(ctx); err != nil {
+	if err := self.node.Start(); err != nil {
 		return err
 	}
 

@@ -89,7 +89,7 @@ func TestTxPool(t *testing.T) {
 	)
 	gspec.MustCommit(ldb)
 	// Assemble the test environment
-	blockchain, _ := core.NewBlockChain(ctx, sdb, nil, params.TestChainConfig, ethash.NewFullFaker(), vm.Config{})
+	blockchain, _ := core.NewBlockChain(sdb, nil, params.TestChainConfig, ethash.NewFullFaker(), vm.Config{})
 	gchain, _ := core.GenerateChain(ctx, params.TestChainConfig, genesis, ethash.NewFaker(), sdb, poolTestBlocks, txPoolTestChainGen)
 	if _, err := blockchain.InsertChain(ctx, gchain); err != nil {
 		panic(err)

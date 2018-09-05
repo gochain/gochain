@@ -24,6 +24,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.opencensus.io/trace"
+
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/consensus"
 	"github.com/gochain-io/gochain/core"
@@ -54,7 +56,7 @@ type Agent interface {
 	Work() chan<- *Work
 	SetReturnCh(chan<- *Result)
 	Stop()
-	Start(ctx context.Context)
+	Start()
 	GetHashRate() int64
 }
 
@@ -132,7 +134,7 @@ type worker struct {
 	atWork int32
 }
 
-func newWorker(ctx context.Context, config *params.ChainConfig, engine consensus.Engine, coinbase common.Address, eth Backend, mux *event.TypeMux) *worker {
+func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase common.Address, eth Backend, mux *event.TypeMux) *worker {
 	worker := &worker{
 		config:         config,
 		engine:         engine,
@@ -155,10 +157,10 @@ func newWorker(ctx context.Context, config *params.ChainConfig, engine consensus
 	// Subscribe events for blockchain
 	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
 	worker.chainSideSub = eth.BlockChain().SubscribeChainSideEvent(worker.chainSideCh)
-	go worker.update(ctx)
+	go worker.update()
 
-	go worker.wait(ctx)
-	worker.commitNewWork(ctx)
+	go worker.wait()
+	worker.commitNewWork(context.Background())
 
 	return worker
 }
@@ -175,19 +177,19 @@ func (w *worker) setExtra(extra []byte) {
 	w.extra = extra
 }
 
-func (w *worker) pending() (*types.Block, *state.StateDB) {
+func (w *worker) pending(ctx context.Context) (*types.Block, *state.StateDB) {
 	if atomic.LoadInt32(&w.mining) == 0 {
 		// return a snapshot to avoid contention on currentMu mutex
 		w.snapshotMu.RLock()
 		defer w.snapshotMu.RUnlock()
-		return w.snapshotBlock, w.snapshotState.Copy()
+		return w.snapshotBlock, w.snapshotState.Copy(ctx)
 	}
 
 	w.currentMu.RLock()
 	defer w.currentMu.RUnlock()
 	w.current.stateMu.RLock()
 	defer w.current.stateMu.RUnlock()
-	return w.current.Block, w.current.state.Copy()
+	return w.current.Block, w.current.state.Copy(ctx)
 }
 
 func (w *worker) pendingQuery(fn func(*state.StateDB) error) error {
@@ -222,7 +224,7 @@ func (w *worker) pendingBlock() *types.Block {
 	return w.current.Block
 }
 
-func (w *worker) start(ctx context.Context) {
+func (w *worker) start() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
@@ -230,7 +232,7 @@ func (w *worker) start(ctx context.Context) {
 
 	// spin up agents
 	for agent := range w.agents {
-		agent.Start(ctx)
+		agent.Start()
 	}
 }
 
@@ -262,7 +264,7 @@ func (w *worker) unregister(agent Agent) {
 	agent.Stop()
 }
 
-func (w *worker) update(ctx context.Context) {
+func (w *worker) update() {
 	defer w.txsSub.Unsubscribe()
 	defer w.chainHeadSub.Unsubscribe()
 	defer w.chainSideSub.Unsubscribe()
@@ -272,7 +274,9 @@ func (w *worker) update(ctx context.Context) {
 		select {
 		// Handle ChainHeadEvent
 		case <-w.chainHeadCh:
+			ctx, span := trace.StartSpan(context.Background(), "worker.update-chainheadCh")
 			w.commitNewWork(ctx)
+			span.End()
 
 		// Handle ChainSideEvent
 		case ev := <-w.chainSideCh:
@@ -282,6 +286,7 @@ func (w *worker) update(ctx context.Context) {
 
 		// Handle NewTxsEvent
 		case ev := <-w.txsCh:
+			ctx, span := trace.StartSpan(context.Background(), "worker.update-txsCh")
 			// Apply transaction to the pending state if we're not mining
 			//
 			// Note all transactions received may not be continuous with transactions
@@ -298,7 +303,7 @@ func (w *worker) update(ctx context.Context) {
 				}
 				txset := types.NewTransactionsByPriceAndNonce(ctx, w.current.signer, txs)
 				w.current.commitTransactions(ctx, w.mux, txset, w.chain, w.coinbase)
-				w.updateSnapshot()
+				w.updateSnapshot(ctx)
 
 				w.current.stateMu.Unlock()
 				w.currentMu.Unlock()
@@ -308,6 +313,7 @@ func (w *worker) update(ctx context.Context) {
 					w.commitNewWork(ctx)
 				}
 			}
+			span.End()
 
 		// System stopped
 		case <-w.txsSub.Err():
@@ -320,7 +326,7 @@ func (w *worker) update(ctx context.Context) {
 	}
 }
 
-func (w *worker) wait(ctx context.Context) {
+func (w *worker) wait() {
 	for {
 		mustCommitNewWork := true
 		for result := range w.recv {
@@ -331,6 +337,11 @@ func (w *worker) wait(ctx context.Context) {
 			}
 			block := result.Block
 			work := result.Work
+			ctx, span := trace.StartSpan(context.Background(), "worker.wait-recv")
+			span.AddAttributes(
+				trace.Int64Attribute("num", int64(block.NumberU64())),
+				trace.Int64Attribute("txs", int64(len(block.Transactions()))),
+			)
 
 			// Update the block hash in all logs since it is now available and not when the
 			// receipt/log of individual transactions were created.
@@ -344,10 +355,11 @@ func (w *worker) wait(ctx context.Context) {
 			for _, log := range work.state.Logs() {
 				log.BlockHash = block.Hash()
 			}
-			stat, err := w.chain.WriteBlockWithState(block, work.receipts, work.state)
+			stat, err := w.chain.WriteBlockWithState(ctx, block, work.receipts, work.state)
 			work.stateMu.Unlock()
 			if err != nil {
 				log.Error("Failed writing block to chain", "err", err)
+				span.End()
 				continue
 			}
 			// check if canon block and write transactions
@@ -370,7 +382,7 @@ func (w *worker) wait(ctx context.Context) {
 			if stat == core.CanonStatTy {
 				events = append(events, core.ChainHeadEvent{Block: block})
 			}
-			w.chain.PostChainEvents(events, logs)
+			w.chain.PostChainEvents(ctx, events, logs)
 
 			// Insert the block into the set of pending ones to wait for confirmations
 			w.unconfirmed.Insert(block.NumberU64(), block.Hash())
@@ -378,6 +390,7 @@ func (w *worker) wait(ctx context.Context) {
 			if mustCommitNewWork {
 				w.commitNewWork(ctx)
 			}
+			span.End()
 		}
 	}
 }
@@ -429,6 +442,9 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 }
 
 func (w *worker) commitNewWork(ctx context.Context) {
+	ctx, span := trace.StartSpan(ctx, "worker.commitNewWork")
+	defer span.End()
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.uncleMu.Lock()
@@ -437,7 +453,7 @@ func (w *worker) commitNewWork(ctx context.Context) {
 	defer w.currentMu.Unlock()
 
 	tstart := time.Now()
-	parent := w.chain.CurrentBlock()
+	parent := w.chain.CurrentBlockCtx(ctx)
 
 	tstamp := tstart.Unix()
 	if parent.Time().Cmp(new(big.Int).SetInt64(tstamp)) >= 0 {
@@ -516,7 +532,7 @@ func (w *worker) commitNewWork(ctx context.Context) {
 		w.unconfirmed.Shift(work.Block.NumberU64() - 1)
 	}
 	w.push(work)
-	w.updateSnapshot()
+	w.updateSnapshot(ctx)
 }
 
 func (*worker) commitUncle(work *Work, uncle *types.Header) error {
@@ -540,7 +556,9 @@ func (*worker) commitUncle(work *Work, uncle *types.Header) error {
 }
 
 // updateSnapshot updates snapshotState. Caller must hold currentMu.
-func (w *worker) updateSnapshot() {
+func (w *worker) updateSnapshot(ctx context.Context) {
+	ctx, span := trace.StartSpan(ctx, "worker.updateSnapshot")
+	defer span.End()
 	w.snapshotMu.Lock()
 	defer w.snapshotMu.Unlock()
 
@@ -550,10 +568,13 @@ func (w *worker) updateSnapshot() {
 		nil,
 		w.current.receipts,
 	)
-	w.snapshotState = w.current.state.Copy()
+	w.snapshotState = w.current.state.Copy(ctx)
 }
 
 func (env *Work) commitTransactions(ctx context.Context, mux *event.TypeMux, txs *types.TransactionsByPriceAndNonce, bc *core.BlockChain, coinbase common.Address) {
+	ctx, span := trace.StartSpan(ctx, "Work.commitTransactions")
+	defer span.End()
+
 	if env.gasPool == nil {
 		env.gasPool = new(core.GasPool).AddGas(env.header.GasLimit)
 	}

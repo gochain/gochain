@@ -60,18 +60,18 @@ func newTestProtocolManager(ctx context.Context, mode downloader.SyncMode, block
 			Alloc:  core.GenesisAlloc{testBank: {Balance: big.NewInt(1000000)}},
 		}
 		genesis       = gspec.MustCommit(db)
-		blockchain, _ = core.NewBlockChain(ctx, db, nil, gspec.Config, engine, vm.Config{})
+		blockchain, _ = core.NewBlockChain(db, nil, gspec.Config, engine, vm.Config{})
 	)
 	chain, _ := core.GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), db, blocks, generator)
 	if _, err := blockchain.InsertChain(ctx, chain); err != nil {
 		panic(err)
 	}
 
-	pm, err := NewProtocolManager(ctx, gspec.Config, mode, DefaultConfig.NetworkId, evmux, &testTxPool{added: newtx}, engine, blockchain, db)
+	pm, err := NewProtocolManager(gspec.Config, mode, DefaultConfig.NetworkId, evmux, &testTxPool{added: newtx}, engine, blockchain, db)
 	if err != nil {
 		return nil, nil, err
 	}
-	pm.Start(ctx, 1000)
+	pm.Start(1000)
 	return pm, db, nil
 }
 
@@ -167,7 +167,7 @@ func newTestPeer(ctx context.Context, name string, version int, pm *ProtocolMana
 	go func() {
 		select {
 		case pm.newPeerCh <- peer:
-			errc <- pm.handle(ctx, peer)
+			errc <- pm.handle(peer)
 		case <-pm.quitSync:
 			errc <- p2p.DiscQuitting
 		}

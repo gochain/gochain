@@ -342,7 +342,6 @@ type execNodeConfig struct {
 // argv[0] being "p2p-node", reading the service / ID from argv[1] / argv[2]
 // and the node config from the _P2P_NODE_CONFIG environment variable
 func execP2PNode() {
-	ctx := context.TODO()
 	glogger := log.NewGlogHandler(log.StreamHandler(os.Stderr, log.LogfmtFormat()))
 	glogger.Verbosity(log.LvlInfo)
 	log.Root().SetHandler(glogger)
@@ -426,7 +425,7 @@ func execP2PNode() {
 	}
 
 	// start the stack
-	if err := stack.Start(ctx); err != nil {
+	if err := stack.Start(); err != nil {
 		log.Crit("error stating node stack", "err", err)
 	}
 
@@ -462,7 +461,7 @@ func (s *snapshotService) Protocols() []p2p.Protocol {
 	return nil
 }
 
-func (s *snapshotService) Start(context.Context, *p2p.Server) error {
+func (s *snapshotService) Start(*p2p.Server) error {
 	return nil
 }
 

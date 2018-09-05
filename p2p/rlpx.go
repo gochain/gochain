@@ -18,6 +18,7 @@ package p2p
 
 import (
 	"bytes"
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ecdsa"
@@ -25,6 +26,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"hash"
@@ -35,7 +37,8 @@ import (
 	"sync"
 	"time"
 
-	"encoding/hex"
+	"github.com/golang/snappy"
+	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/crypto/ecies"
@@ -44,7 +47,6 @@ import (
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/p2p/discover"
 	"github.com/gochain-io/gochain/rlp"
-	"github.com/golang/snappy"
 )
 
 const (
@@ -102,13 +104,16 @@ func (t *rlpx) ReadMsg() (Msg, error) {
 	return t.rw.ReadMsg()
 }
 
-func (t *rlpx) WriteMsg(msg Msg) error {
+func (t *rlpx) WriteMsg(ctx context.Context, msg Msg) error {
+	ctx, span := trace.StartSpan(ctx, "rlpx.WriteMsg")
+	defer span.End()
+
 	t.wmu.Lock()
 	defer t.wmu.Unlock()
 	if err := t.fd.SetWriteDeadline(time.Now().Add(frameWriteTimeout)); err != nil {
 		return err
 	}
-	return t.rw.WriteMsg(msg)
+	return t.rw.WriteMsg(ctx, msg)
 }
 
 func (t *rlpx) close(err error) {
@@ -134,13 +139,13 @@ func (t *rlpx) close(err error) {
 // messages. the protocol handshake is the first authenticated message
 // and also verifies whether the encryption handshake 'worked' and the
 // remote side actually provided the right public key.
-func (t *rlpx) doProtoHandshake(our *protoHandshake) (their *protoHandshake, err error) {
+func (t *rlpx) doProtoHandshake(ctx context.Context, our *protoHandshake) (their *protoHandshake, err error) {
 	// Writing our handshake happens concurrently, we prefer
 	// returning the handshake read error. If the remote side
 	// disconnects us early with a valid reason, we should return it
 	// as the error so it can be tracked elsewhere.
 	werr := make(chan error, 1)
-	go func() { werr <- Send(t.rw, handshakeMsg, our) }()
+	go func() { werr <- SendCtx(ctx, t.rw, handshakeMsg, our) }()
 	if their, err = readProtocolHandshake(t.rw, our); err != nil {
 		<-werr // make sure the write terminates too
 		return nil, err
@@ -191,13 +196,16 @@ func readProtocolHandshake(rw MsgReader, our *protoHandshake) (*protoHandshake, 
 	return &hs, nil
 }
 
-func (t *rlpx) doEncHandshake(prv *ecdsa.PrivateKey, dial *discover.Node) (discover.NodeID, error) {
+func (t *rlpx) doEncHandshake(ctx context.Context, prv *ecdsa.PrivateKey, dial *discover.Node) (discover.NodeID, error) {
+	ctx, span := trace.StartSpan(ctx, "rlpx.doEncHandshake")
+	defer span.End()
+
 	var (
 		sec secrets
 		err error
 	)
 	if dial == nil {
-		sec, err = receiverEncHandshake(t.fd, prv, nil)
+		sec, err = receiverEncHandshake(ctx, t.fd, prv, nil)
 	} else {
 		sec, err = initiatorEncHandshake(t.fd, prv, dial.ID, nil)
 	}
@@ -369,7 +377,10 @@ func (h *encHandshake) handleAuthResp(msg *authRespV4) (err error) {
 //
 // prv is the local client's private key.
 // token is the token from a previous session with this node.
-func receiverEncHandshake(conn io.ReadWriter, prv *ecdsa.PrivateKey, token []byte) (s secrets, err error) {
+func receiverEncHandshake(ctx context.Context, conn io.ReadWriter, prv *ecdsa.PrivateKey, token []byte) (s secrets, err error) {
+	ctx, span := trace.StartSpan(ctx, "receiverEncHandshake")
+	defer span.End()
+
 	authMsg := new(authMsgV4)
 	authPacket, err := readHandshakeMsg(authMsg, encAuthMsgLen, prv, conn)
 	if err != nil {
@@ -613,7 +624,10 @@ func newRLPXFrameRW(conn io.ReadWriter, s secrets) *rlpxFrameRW {
 	}
 }
 
-func (rw *rlpxFrameRW) WriteMsg(msg Msg) error {
+func (rw *rlpxFrameRW) WriteMsg(ctx context.Context, msg Msg) error {
+	ctx, span := trace.StartSpan(ctx, "rlpxFrameRW.WriteMsg")
+	defer span.End()
+
 	ptype, _ := rlp.EncodeToBytes(msg.Code)
 
 	// if snappy is enabled, compress message now

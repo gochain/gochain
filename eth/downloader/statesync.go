@@ -17,10 +17,13 @@
 package downloader
 
 import (
+	"context"
 	"fmt"
 	"hash"
 	"sync"
 	"time"
+
+	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/state"
@@ -343,6 +346,8 @@ func (s *stateSync) commit(force bool) error {
 // assignTasks attempts to assing new tasks to all idle peers, either from the
 // batch currently being retried, or fetching new data from the trie sync itself.
 func (s *stateSync) assignTasks() {
+	ctx, span := trace.StartSpan(context.Background(), "stateSync.assignTasks")
+	defer span.End()
 	// Iterate over all idle peers and try to assign them state fetches
 	peers, _ := s.d.peers.NodeDataIdlePeers()
 	for _, p := range peers {
@@ -356,7 +361,7 @@ func (s *stateSync) assignTasks() {
 			req.peer.log.Trace("Requesting new batch of data", "type", "state", "count", len(req.items))
 			select {
 			case s.d.trackStateReq <- req:
-				req.peer.FetchNodeData(req.items)
+				req.peer.FetchNodeData(ctx, req.items)
 			case <-s.cancel:
 			case <-s.d.cancelCh:
 			}

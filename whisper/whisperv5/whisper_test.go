@@ -18,7 +18,6 @@ package whisperv5
 
 import (
 	"bytes"
-	"context"
 	"crypto/ecdsa"
 	mrand "math/rand"
 	"testing"
@@ -476,13 +475,12 @@ func TestWhisperSymKeyManagement(t *testing.T) {
 }
 
 func TestExpiry(t *testing.T) {
-	ctx := context.Background()
 	InitSingleTest()
 
 	w := New(&DefaultConfig)
 	w.SetMinimumPoW(0.0000001)
 	defer w.SetMinimumPoW(DefaultMinimumPoW)
-	w.Start(ctx, nil)
+	w.Start(nil)
 	defer w.Stop()
 
 	params, err := generateMessageParams()
@@ -534,13 +532,12 @@ func TestExpiry(t *testing.T) {
 }
 
 func TestCustomization(t *testing.T) {
-	ctx := context.Background()
 	InitSingleTest()
 
 	w := New(&DefaultConfig)
 	defer w.SetMinimumPoW(DefaultMinimumPoW)
 	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
-	w.Start(ctx, nil)
+	w.Start(nil)
 	defer w.Stop()
 
 	const smallPoW = 0.00001
@@ -631,13 +628,12 @@ func TestCustomization(t *testing.T) {
 }
 
 func TestSymmetricSendCycle(t *testing.T) {
-	ctx := context.Background()
 	InitSingleTest()
 
 	w := New(&DefaultConfig)
 	defer w.SetMinimumPoW(DefaultMinimumPoW)
 	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
-	w.Start(ctx, nil)
+	w.Start(nil)
 	defer w.Stop()
 
 	filter1, err := generateFilter(t, true)
@@ -721,13 +717,12 @@ func TestSymmetricSendCycle(t *testing.T) {
 }
 
 func TestSymmetricSendWithoutAKey(t *testing.T) {
-	ctx := context.Background()
 	InitSingleTest()
 
 	w := New(&DefaultConfig)
 	defer w.SetMinimumPoW(DefaultMinimumPoW)
 	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
-	w.Start(ctx, nil)
+	w.Start(nil)
 	defer w.Stop()
 
 	filter, err := generateFilter(t, true)
@@ -790,13 +785,12 @@ func TestSymmetricSendWithoutAKey(t *testing.T) {
 }
 
 func TestSymmetricSendKeyMismatch(t *testing.T) {
-	ctx := context.Background()
 	InitSingleTest()
 
 	w := New(&DefaultConfig)
 	defer w.SetMinimumPoW(DefaultMinimumPoW)
 	defer w.SetMaxMessageSize(DefaultMaxMessageSize)
-	w.Start(ctx, nil)
+	w.Start(nil)
 	defer w.Stop()
 
 	filter, err := generateFilter(t, true)

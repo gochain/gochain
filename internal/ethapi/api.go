@@ -28,6 +28,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
+	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/accounts"
 	"github.com/gochain-io/gochain/accounts/keystore"
@@ -535,6 +536,8 @@ func (s *PublicBlockChainAPI) GenesisAlloc(ctx context.Context) (core.GenesisAll
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
 func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*big.Int, error) {
+	ctx, span := trace.StartSpan(ctx, "PublicBlockChainAPI.GetBalance")
+	defer span.End()
 	var bal *big.Int
 	err := s.b.StateQuery(ctx, blockNr, func(state *state.StateDB) (err error) {
 		bal, err = state.GetBalanceErr(address)
@@ -546,6 +549,8 @@ func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Add
 // GetBlockByNumber returns the requested block. When blockNr is -1 the chain head is returned. When fullTx is true all
 // transactions in the block are returned in full detail, otherwise only the transaction hash is returned.
 func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
+	ctx, span := trace.StartSpan(ctx, "PublicBlockChainAPI.GetBlockByNumber")
+	defer span.End()
 	block, err := s.b.BlockByNumber(ctx, blockNr)
 	if block != nil {
 		response, err := s.rpcOutputBlock(ctx, block, true, fullTx)
@@ -563,6 +568,8 @@ func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.
 // GetBlockByHash returns the requested block. When fullTx is true all transactions in the block are returned in full
 // detail, otherwise only the transaction hash is returned.
 func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash common.Hash, fullTx bool) (map[string]interface{}, error) {
+	ctx, span := trace.StartSpan(ctx, "PublicBlockChainAPI.GetBlockByHash")
+	defer span.End()
 	block, err := s.b.GetBlock(ctx, blockHash)
 	if block != nil {
 		return s.rpcOutputBlock(ctx, block, true, fullTx)
@@ -1034,6 +1041,8 @@ func (s *PublicTransactionPoolAPI) GetRawTransactionByBlockHashAndIndex(ctx cont
 
 // GetTransactionCount returns the number of transactions the given address has sent for the given block number
 func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*hexutil.Uint64, error) {
+	ctx, span := trace.StartSpan(ctx, "PublicTransactionPoolAPI.GetTransactionCount")
+	defer span.End()
 	var nonce uint64
 	err := s.b.StateQuery(ctx, blockNr, func(state *state.StateDB) (err error) {
 		nonce, err = state.GetNonceErr(address)
@@ -1193,6 +1202,9 @@ func (args *SendTxArgs) toTransaction() *types.Transaction {
 
 // submitTransaction is a helper function that submits tx to txPool and logs a message.
 func submitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (common.Hash, error) {
+	ctx, span := trace.StartSpan(ctx, "submitTransaction")
+	defer span.End()
+
 	if err := b.SendTx(ctx, tx); err != nil {
 		return common.Hash{}, err
 	}
@@ -1255,6 +1267,8 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 // SendRawTransaction will add the signed transaction to the transaction pool.
 // The sender is responsible for signing the transaction and using the correct nonce.
 func (s *PublicTransactionPoolAPI) SendRawTransaction(ctx context.Context, encodedTx hexutil.Bytes) (common.Hash, error) {
+	ctx, span := trace.StartSpan(ctx, "PublicTransactionPoolAPI.SendRawTransaction")
+	defer span.End()
 	tx := new(types.Transaction)
 	if err := rlp.DecodeBytes(encodedTx, tx); err != nil {
 		return common.Hash{}, err

@@ -26,6 +26,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/rcrowley/go-metrics"
+	"go.opencensus.io/trace"
+
 	"github.com/gochain-io/gochain"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/types"
@@ -33,7 +36,6 @@ import (
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
-	"github.com/rcrowley/go-metrics"
 )
 
 var (
@@ -399,6 +401,9 @@ func (d *Downloader) synchronise(ctx context.Context, id string, hash common.Has
 // syncWithPeer starts a block synchronization based on the hash chain from the
 // specified peer and head hash.
 func (d *Downloader) syncWithPeer(ctx context.Context, p *peerConnection, hash common.Hash, td *big.Int) (err error) {
+	ctx, span := trace.StartSpan(ctx, "Downloader.syncWithPeer")
+	defer span.End()
+
 	d.mux.Post(StartEvent{})
 	defer func() {
 		// reset on error
@@ -418,7 +423,7 @@ func (d *Downloader) syncWithPeer(ctx context.Context, p *peerConnection, hash c
 	}(time.Now())
 
 	// Look up the sync boundaries: the common ancestor and the target block
-	latest, err := d.fetchHeight(p)
+	latest, err := d.fetchHeight(ctx, p)
 	if err != nil {
 		return err
 	}
@@ -458,9 +463,9 @@ func (d *Downloader) syncWithPeer(ctx context.Context, p *peerConnection, hash c
 	}
 
 	fetchers := []func(ctx context.Context) error{
-		func(ctx context.Context) error { return d.fetchHeaders(p, origin+1, pivot) }, // Headers are always retrieved
-		func(ctx context.Context) error { return d.fetchBodies(origin + 1) },          // Bodies are retrieved during normal and fast sync
-		func(ctx context.Context) error { return d.fetchReceipts(origin + 1) },        // Receipts are retrieved during fast sync
+		func(ctx context.Context) error { return d.fetchHeaders(ctx, p, origin+1, pivot) }, // Headers are always retrieved
+		func(ctx context.Context) error { return d.fetchBodies(ctx, origin+1) },            // Bodies are retrieved during normal and fast sync
+		func(ctx context.Context) error { return d.fetchReceipts(ctx, origin+1) },          // Receipts are retrieved during fast sync
 		func(ctx context.Context) error { return d.processHeaders(ctx, origin+1, pivot, td) },
 	}
 	if d.mode == FastSync {
@@ -540,12 +545,12 @@ func (d *Downloader) Terminate() {
 
 // fetchHeight retrieves the head header of the remote peer to aid in estimating
 // the total time a pending synchronisation would take.
-func (d *Downloader) fetchHeight(p *peerConnection) (*types.Header, error) {
+func (d *Downloader) fetchHeight(ctx context.Context, p *peerConnection) (*types.Header, error) {
 	p.log.Debug("Retrieving remote chain height")
 
 	// Request the advertised remote head block and wait for the response
 	head, _ := p.peer.Head()
-	go p.peer.RequestHeadersByHash(head, 1, 0, false)
+	go p.peer.RequestHeadersByHash(ctx, head, 1, 0, false)
 
 	ttl := d.requestTTL()
 	timeout := time.After(ttl)
@@ -615,7 +620,7 @@ func (d *Downloader) findAncestor(p *peerConnection, height uint64) (uint64, err
 	if count > limit {
 		count = limit
 	}
-	go p.peer.RequestHeadersByNumber(uint64(from), count, 15, false)
+	go p.peer.RequestHeadersByNumber(context.Background(), uint64(from), count, 15, false)
 
 	// Wait for the remote response to the head fetch
 	number, hash := uint64(0), common.Hash{}
@@ -697,7 +702,7 @@ func (d *Downloader) findAncestor(p *peerConnection, height uint64) (uint64, err
 		ttl := d.requestTTL()
 		timeout := time.After(ttl)
 
-		go p.peer.RequestHeadersByNumber(check, 1, 0, false)
+		go p.peer.RequestHeadersByNumber(context.Background(), check, 1, 0, false)
 
 		// Wait until a reply arrives to this request
 		for arrived := false; !arrived; {
@@ -758,7 +763,10 @@ func (d *Downloader) findAncestor(p *peerConnection, height uint64) (uint64, err
 // other peers are only accepted if they map cleanly to the skeleton. If no one
 // can fill in the skeleton - not even the origin peer - it's assumed invalid and
 // the origin is dropped.
-func (d *Downloader) fetchHeaders(p *peerConnection, from uint64, pivot uint64) error {
+func (d *Downloader) fetchHeaders(ctx context.Context, p *peerConnection, from uint64, pivot uint64) error {
+	ctx, span := trace.StartSpan(ctx, "Downloader.fetchHeaders")
+	defer span.End()
+
 	p.log.Debug("Directing header downloads", "origin", from)
 	defer p.log.Debug("Header download terminated")
 
@@ -778,10 +786,10 @@ func (d *Downloader) fetchHeaders(p *peerConnection, from uint64, pivot uint64) 
 
 		if skeleton {
 			p.log.Trace("Fetching skeleton headers", "count", MaxHeaderFetch, "from", from)
-			go p.peer.RequestHeadersByNumber(from+uint64(MaxHeaderFetch)-1, MaxSkeletonSize, MaxHeaderFetch-1, false)
+			go p.peer.RequestHeadersByNumber(context.Background(), from+uint64(MaxHeaderFetch)-1, MaxSkeletonSize, MaxHeaderFetch-1, false)
 		} else {
 			p.log.Trace("Fetching full headers", "count", MaxHeaderFetch, "from", from)
-			go p.peer.RequestHeadersByNumber(from, MaxHeaderFetch, 0, false)
+			go p.peer.RequestHeadersByNumber(context.Background(), from, MaxHeaderFetch, 0, false)
 		}
 	}
 	// Start pulling the header chain skeleton until all is done
@@ -833,7 +841,7 @@ func (d *Downloader) fetchHeaders(p *peerConnection, from uint64, pivot uint64) 
 
 			// If we received a skeleton batch, resolve internals concurrently
 			if skeleton {
-				filled, proced, err := d.fillHeaderSkeleton(from, headers)
+				filled, proced, err := d.fillHeaderSkeleton(ctx, from, headers)
 				if err != nil {
 					p.log.Debug("Skeleton chain invalid", "err", err)
 					return errInvalidChain
@@ -890,8 +898,10 @@ func (d *Downloader) fetchHeaders(p *peerConnection, from uint64, pivot uint64) 
 //
 // The method returs the entire filled skeleton and also the number of headers
 // already forwarded for processing.
-func (d *Downloader) fillHeaderSkeleton(from uint64, skeleton []*types.Header) ([]*types.Header, int, error) {
+func (d *Downloader) fillHeaderSkeleton(ctx context.Context, from uint64, skeleton []*types.Header) ([]*types.Header, int, error) {
 	log.Debug("Filling up skeleton", "from", from)
+	ctx, span := trace.StartSpan(ctx, "Downloader.fillHeaderSkeleton")
+	defer span.End()
 	d.queue.ScheduleSkeleton(from, skeleton)
 
 	var (
@@ -904,11 +914,13 @@ func (d *Downloader) fillHeaderSkeleton(from uint64, skeleton []*types.Header) (
 		reserve  = func(p *peerConnection, count int) (*fetchRequest, bool, error) {
 			return d.queue.ReserveHeaders(p, count), false, nil
 		}
-		fetch    = func(p *peerConnection, req *fetchRequest) error { return p.FetchHeaders(req.From, MaxHeaderFetch) }
+		fetch = func(ctx context.Context, p *peerConnection, req *fetchRequest) error {
+			return p.FetchHeaders(ctx, req.From, MaxHeaderFetch)
+		}
 		capacity = func(p *peerConnection) int { return p.HeaderCapacity(d.requestRTT()) }
 		setIdle  = func(p *peerConnection, accepted int) { p.SetHeadersIdle(accepted) }
 	)
-	err := d.fetchParts(errCancelHeaderFetch, d.headerCh, deliver, d.queue.headerContCh, expire,
+	err := d.fetchParts(ctx, errCancelHeaderFetch, d.headerCh, deliver, d.queue.headerContCh, expire,
 		d.queue.PendingHeaders, d.queue.InFlightHeaders, throttle, reserve,
 		nil, fetch, d.queue.CancelHeaders, capacity, d.peers.HeaderIdlePeers, setIdle, "headers")
 
@@ -921,8 +933,10 @@ func (d *Downloader) fillHeaderSkeleton(from uint64, skeleton []*types.Header) (
 // fetchBodies iteratively downloads the scheduled block bodies, taking any
 // available peers, reserving a chunk of blocks for each, waiting for delivery
 // and also periodically checking for timeouts.
-func (d *Downloader) fetchBodies(from uint64) error {
+func (d *Downloader) fetchBodies(ctx context.Context, from uint64) error {
 	log.Debug("Downloading block bodies", "origin", from)
+	ctx, span := trace.StartSpan(ctx, "Downloader.fetchBodies")
+	defer span.End()
 
 	var (
 		deliver = func(packet dataPack) (int, error) {
@@ -930,11 +944,11 @@ func (d *Downloader) fetchBodies(from uint64) error {
 			return d.queue.DeliverBodies(pack.peerId, pack.transactions, pack.uncles)
 		}
 		expire   = func() map[string]int { return d.queue.ExpireBodies(d.requestTTL()) }
-		fetch    = func(p *peerConnection, req *fetchRequest) error { return p.FetchBodies(req) }
+		fetch    = func(ctx context.Context, p *peerConnection, req *fetchRequest) error { return p.FetchBodies(ctx, req) }
 		capacity = func(p *peerConnection) int { return p.BlockCapacity(d.requestRTT()) }
 		setIdle  = func(p *peerConnection, accepted int) { p.SetBodiesIdle(accepted) }
 	)
-	err := d.fetchParts(errCancelBodyFetch, d.bodyCh, deliver, d.bodyWakeCh, expire,
+	err := d.fetchParts(ctx, errCancelBodyFetch, d.bodyCh, deliver, d.bodyWakeCh, expire,
 		d.queue.PendingBlocks, d.queue.InFlightBlocks, d.queue.ShouldThrottleBlocks, d.queue.ReserveBodies,
 		d.bodyFetchHook, fetch, d.queue.CancelBodies, capacity, d.peers.BodyIdlePeers, setIdle, "bodies")
 
@@ -945,20 +959,24 @@ func (d *Downloader) fetchBodies(from uint64) error {
 // fetchReceipts iteratively downloads the scheduled block receipts, taking any
 // available peers, reserving a chunk of receipts for each, waiting for delivery
 // and also periodically checking for timeouts.
-func (d *Downloader) fetchReceipts(from uint64) error {
+func (d *Downloader) fetchReceipts(ctx context.Context, from uint64) error {
 	log.Debug("Downloading transaction receipts", "origin", from)
+	ctx, span := trace.StartSpan(ctx, "Downloader.fetchReceipts")
+	defer span.End()
 
 	var (
 		deliver = func(packet dataPack) (int, error) {
 			pack := packet.(*receiptPack)
 			return d.queue.DeliverReceipts(pack.peerId, pack.receipts)
 		}
-		expire   = func() map[string]int { return d.queue.ExpireReceipts(d.requestTTL()) }
-		fetch    = func(p *peerConnection, req *fetchRequest) error { return p.FetchReceipts(req) }
+		expire = func() map[string]int { return d.queue.ExpireReceipts(d.requestTTL()) }
+		fetch  = func(ctx context.Context, p *peerConnection, req *fetchRequest) error {
+			return p.FetchReceipts(ctx, req)
+		}
 		capacity = func(p *peerConnection) int { return p.ReceiptCapacity(d.requestRTT()) }
 		setIdle  = func(p *peerConnection, accepted int) { p.SetReceiptsIdle(accepted) }
 	)
-	err := d.fetchParts(errCancelReceiptFetch, d.receiptCh, deliver, d.receiptWakeCh, expire,
+	err := d.fetchParts(ctx, errCancelReceiptFetch, d.receiptCh, deliver, d.receiptWakeCh, expire,
 		d.queue.PendingReceipts, d.queue.InFlightReceipts, d.queue.ShouldThrottleReceipts, d.queue.ReserveReceipts,
 		d.receiptFetchHook, fetch, d.queue.CancelReceipts, capacity, d.peers.ReceiptIdlePeers, setIdle, "receipts")
 
@@ -991,9 +1009,9 @@ func (d *Downloader) fetchReceipts(from uint64) error {
 //  - idle:        network callback to retrieve the currently (type specific) idle peers that can be assigned tasks
 //  - setIdle:     network callback to set a peer back to idle and update its estimated capacity (traffic shaping)
 //  - kind:        textual label of the type being downloaded to display in log mesages
-func (d *Downloader) fetchParts(errCancel error, deliveryCh chan dataPack, deliver func(dataPack) (int, error), wakeCh chan bool,
+func (d *Downloader) fetchParts(ctx context.Context, errCancel error, deliveryCh chan dataPack, deliver func(dataPack) (int, error), wakeCh chan bool,
 	expire func() map[string]int, pending func() int, inFlight func() bool, throttle func() bool, reserve func(*peerConnection, int) (*fetchRequest, bool, error),
-	fetchHook func([]*types.Header), fetch func(*peerConnection, *fetchRequest) error, cancel func(*fetchRequest), capacity func(*peerConnection) int,
+	fetchHook func([]*types.Header), fetch func(context.Context, *peerConnection, *fetchRequest) error, cancel func(*fetchRequest), capacity func(*peerConnection) int,
 	idle func() ([]*peerConnection, int), setIdle func(*peerConnection, int), kind string) error {
 
 	// Create a ticker to detect expired retrieval tasks
@@ -1063,6 +1081,7 @@ func (d *Downloader) fetchParts(errCancel error, deliveryCh chan dataPack, deliv
 			if d.peers.Len() == 0 {
 				return errNoPeers
 			}
+			ctx, span := trace.StartSpan(ctx, "update")
 			// Check for fetch request timeouts and demote the responsible peers
 			for pid, fails := range expire() {
 				if peer := d.peers.Peer(pid); peer != nil {
@@ -1090,6 +1109,7 @@ func (d *Downloader) fetchParts(errCancel error, deliveryCh chan dataPack, deliv
 			}
 			// If there's nothing more to fetch, wait or terminate
 			if pending() == 0 {
+				span.End()
 				if !inFlight() && finished {
 					log.Debug("Data fetching completed", "type", kind)
 					return nil
@@ -1115,6 +1135,7 @@ func (d *Downloader) fetchParts(errCancel error, deliveryCh chan dataPack, deliv
 				// have them.
 				request, progress, err := reserve(peer, capacity(peer))
 				if err != nil {
+					span.End()
 					return err
 				}
 				if progress {
@@ -1132,7 +1153,7 @@ func (d *Downloader) fetchParts(errCancel error, deliveryCh chan dataPack, deliv
 				if fetchHook != nil {
 					fetchHook(request.Headers)
 				}
-				if err := fetch(peer, request); err != nil {
+				if err := fetch(ctx, peer, request); err != nil {
 					// Although we could try and make an attempt to fix this, this error really
 					// means that we've double allocated a fetch task to a peer. If that is the
 					// case, the internal state of the downloader and the queue is very wrong so
@@ -1142,6 +1163,7 @@ func (d *Downloader) fetchParts(errCancel error, deliveryCh chan dataPack, deliv
 				}
 				running = true
 			}
+			span.End()
 			// Make sure that we have peers available for fetching. If all peers have been tried
 			// and all failed throw an error
 			if !progressed && !throttled && !running && len(idles) == total && pending() > 0 {

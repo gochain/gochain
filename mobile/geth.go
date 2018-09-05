@@ -184,8 +184,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 
 // Start creates a live P2P node and starts running it.
 func (n *Node) Start() error {
-	ctx := context.TODO()
-	return n.node.Start(ctx)
+	return n.node.Start()
 }
 
 // Stop terminates a running node along with all it's services. In the node was

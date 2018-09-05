@@ -101,7 +101,7 @@ func newTester() *fetcherTester {
 }
 
 // getBlock retrieves a block from the tester's block chain.
-func (f *fetcherTester) getBlock(hash common.Hash) *types.Block {
+func (f *fetcherTester) getBlock(ctx context.Context, hash common.Hash) *types.Block {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 
@@ -109,12 +109,12 @@ func (f *fetcherTester) getBlock(hash common.Hash) *types.Block {
 }
 
 // verifyHeader is a nop placeholder for the block header verification.
-func (f *fetcherTester) verifyHeader(header *types.Header) error {
+func (f *fetcherTester) verifyHeader(ctx context.Context, header *types.Header) error {
 	return nil
 }
 
 // broadcastBlock is a nop placeholder for the block broadcasting.
-func (f *fetcherTester) broadcastBlock(block *types.Block, propagate bool) {
+func (f *fetcherTester) broadcastBlock(ctx context.Context, block *types.Block, propagate bool) {
 }
 
 // chainHeight retrieves the current height (block number) of the chain.
@@ -126,7 +126,7 @@ func (f *fetcherTester) chainHeight() uint64 {
 }
 
 // insertChain injects a new blocks into the simulated chain.
-func (f *fetcherTester) insertChain(blocks types.Blocks) (int, error) {
+func (f *fetcherTester) insertChain(ctx context.Context, blocks types.Blocks) (int, error) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -162,7 +162,7 @@ func (f *fetcherTester) makeHeaderFetcher(peer string, blocks map[common.Hash]*t
 		closure[hash] = block
 	}
 	// Create a function that return a header from the closure
-	return func(hash common.Hash) error {
+	return func(ctx context.Context, hash common.Hash) error {
 		// Gather the blocks to return
 		headers := make([]*types.Header, 0, 1)
 		if block, ok := closure[hash]; ok {
@@ -182,7 +182,7 @@ func (f *fetcherTester) makeBodyFetcher(peer string, blocks map[common.Hash]*typ
 		closure[hash] = block
 	}
 	// Create a function that returns blocks from the closure
-	return func(hashes []common.Hash) error {
+	return func(ctx context.Context, hashes []common.Hash) error {
 		// Gather the block bodies to return
 		transactions := make([][]*types.Transaction, 0, len(hashes))
 		uncles := make([][]*types.Header, 0, len(hashes))
@@ -310,13 +310,13 @@ func TestConcurrentAnnouncements(t *testing.T) {
 	secondBodyFetcher := tester.makeBodyFetcher("second", blocks, 0)
 
 	counter := uint32(0)
-	firstHeaderWrapper := func(hash common.Hash) error {
+	firstHeaderWrapper := func(ctx context.Context, hash common.Hash) error {
 		atomic.AddUint32(&counter, 1)
-		return firstHeaderFetcher(hash)
+		return firstHeaderFetcher(ctx, hash)
 	}
-	secondHeaderWrapper := func(hash common.Hash) error {
+	secondHeaderWrapper := func(ctx context.Context, hash common.Hash) error {
 		atomic.AddUint32(&counter, 1)
-		return secondHeaderFetcher(hash)
+		return secondHeaderFetcher(ctx, hash)
 	}
 	// Iteratively announce blocks until all are imported
 	imported := make(chan *types.Block)
@@ -379,18 +379,18 @@ func TestPendingDeduplication(t *testing.T) {
 
 	delay := 50 * time.Millisecond
 	counter := uint32(0)
-	headerWrapper := func(hash common.Hash) error {
+	headerWrapper := func(ctx context.Context, hash common.Hash) error {
 		atomic.AddUint32(&counter, 1)
 
 		// Simulate a long running fetch
 		go func() {
 			time.Sleep(delay)
-			headerFetcher(hash)
+			headerFetcher(ctx, hash)
 		}()
 		return nil
 	}
 	// Announce the same block many times until it's fetched (wait for any pending ops)
-	for tester.getBlock(hashes[0]) == nil {
+	for tester.getBlock(context.Background(), hashes[0]) == nil {
 		tester.fetcher.Notify("repeater", hashes[0], 1, time.Now().Add(-arriveTimeout), headerWrapper, bodyFetcher)
 		time.Sleep(time.Millisecond)
 	}
@@ -471,9 +471,9 @@ func TestImportDeduplication(t *testing.T) {
 	bodyFetcher := tester.makeBodyFetcher("valid", blocks, 0)
 
 	counter := uint32(0)
-	tester.fetcher.insertChain = func(blocks types.Blocks) (int, error) {
+	tester.fetcher.insertChain = func(ctx context.Context, blocks types.Blocks) (int, error) {
 		atomic.AddUint32(&counter, uint32(len(blocks)))
-		return tester.insertChain(blocks)
+		return tester.insertChain(ctx, blocks)
 	}
 	// Instrument the fetching and imported events
 	fetching := make(chan []common.Hash)

@@ -18,6 +18,7 @@
 package les
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/binary"
 	"errors"
@@ -25,6 +26,8 @@ import (
 	"math/big"
 	"sync"
 	"time"
+
+	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/types"
@@ -97,7 +100,7 @@ func (p *peer) canQueue() bool {
 	return p.sendQueue.canQueue()
 }
 
-func (p *peer) queueSend(f func()) {
+func (p *peer) queueSend(f func(context.Context)) {
 	p.sendQueue.queue(f)
 }
 
@@ -148,19 +151,26 @@ func (p *peer) waitBefore(maxCost uint64) (time.Duration, float64) {
 }
 
 func sendRequest(w p2p.MsgWriter, msgcode, reqID, cost uint64, data interface{}) error {
+	return sendRequestCtx(context.Background(), w, msgcode, reqID, cost, data)
+}
+func sendRequestCtx(ctx context.Context, w p2p.MsgWriter, msgcode, reqID, cost uint64, data interface{}) error {
 	type req struct {
 		ReqID uint64
 		Data  interface{}
 	}
-	return p2p.Send(w, msgcode, req{reqID, data})
+	return p2p.SendCtx(ctx, w, msgcode, req{reqID, data})
 }
 
 func sendResponse(w p2p.MsgWriter, msgcode, reqID, bv uint64, data interface{}) error {
+	return sendResponseCtx(context.Background(), w, msgcode, reqID, bv, data)
+}
+
+func sendResponseCtx(ctx context.Context, w p2p.MsgWriter, msgcode, reqID, bv uint64, data interface{}) error {
 	type resp struct {
 		ReqID, BV uint64
 		Data      interface{}
 	}
-	return p2p.Send(w, msgcode, resp{reqID, bv, data})
+	return p2p.SendCtx(ctx, w, msgcode, resp{reqID, bv, data})
 }
 
 func (p *peer) GetRequestCost(msgcode uint64, amount int) uint64 {
@@ -184,8 +194,8 @@ func (p *peer) HasBlock(hash common.Hash, number uint64) bool {
 
 // SendAnnounce announces the availability of a number of blocks through
 // a hash notification.
-func (p *peer) SendAnnounce(request announceData) error {
-	return p2p.Send(p.rw, AnnounceMsg, request)
+func (p *peer) SendAnnounce(ctx context.Context, request announceData) error {
+	return p2p.SendCtx(ctx, p.rw, AnnounceMsg, request)
 }
 
 // SendBlockHeaders sends a batch of block headers to the remote peer.
@@ -238,36 +248,36 @@ func (p *peer) SendTxStatus(reqID, bv uint64, stats []txStatus) error {
 
 // RequestHeadersByHash fetches a batch of blocks' headers corresponding to the
 // specified header query, based on the hash of an origin block.
-func (p *peer) RequestHeadersByHash(reqID, cost uint64, origin common.Hash, amount int, skip int, reverse bool) error {
+func (p *peer) RequestHeadersByHash(ctx context.Context, reqID, cost uint64, origin common.Hash, amount int, skip int, reverse bool) error {
 	p.Log().Debug("Fetching batch of headers", "count", amount, "fromhash", origin, "skip", skip, "reverse", reverse)
-	return sendRequest(p.rw, GetBlockHeadersMsg, reqID, cost, &getBlockHeadersData{Origin: hashOrNumber{Hash: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
+	return sendRequestCtx(ctx, p.rw, GetBlockHeadersMsg, reqID, cost, &getBlockHeadersData{Origin: hashOrNumber{Hash: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
 }
 
 // RequestHeadersByNumber fetches a batch of blocks' headers corresponding to the
 // specified header query, based on the number of an origin block.
-func (p *peer) RequestHeadersByNumber(reqID, cost, origin uint64, amount int, skip int, reverse bool) error {
+func (p *peer) RequestHeadersByNumber(ctx context.Context, reqID, cost, origin uint64, amount int, skip int, reverse bool) error {
 	p.Log().Debug("Fetching batch of headers", "count", amount, "fromnum", origin, "skip", skip, "reverse", reverse)
-	return sendRequest(p.rw, GetBlockHeadersMsg, reqID, cost, &getBlockHeadersData{Origin: hashOrNumber{Number: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
+	return sendRequestCtx(ctx, p.rw, GetBlockHeadersMsg, reqID, cost, &getBlockHeadersData{Origin: hashOrNumber{Number: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
 }
 
 // RequestBodies fetches a batch of blocks' bodies corresponding to the hashes
 // specified.
-func (p *peer) RequestBodies(reqID, cost uint64, hashes []common.Hash) error {
+func (p *peer) RequestBodies(ctx context.Context, reqID, cost uint64, hashes []common.Hash) error {
 	p.Log().Debug("Fetching batch of block bodies", "count", len(hashes))
-	return sendRequest(p.rw, GetBlockBodiesMsg, reqID, cost, hashes)
+	return sendRequestCtx(ctx, p.rw, GetBlockBodiesMsg, reqID, cost, hashes)
 }
 
 // RequestCode fetches a batch of arbitrary data from a node's known state
 // data, corresponding to the specified hashes.
-func (p *peer) RequestCode(reqID, cost uint64, reqs []CodeReq) error {
+func (p *peer) RequestCode(ctx context.Context, reqID, cost uint64, reqs []CodeReq) error {
 	p.Log().Debug("Fetching batch of codes", "count", len(reqs))
-	return sendRequest(p.rw, GetCodeMsg, reqID, cost, reqs)
+	return sendRequestCtx(ctx, p.rw, GetCodeMsg, reqID, cost, reqs)
 }
 
 // RequestReceipts fetches a batch of transaction receipts from a remote node.
-func (p *peer) RequestReceipts(reqID, cost uint64, hashes []common.Hash) error {
+func (p *peer) RequestReceipts(ctx context.Context, reqID, cost uint64, hashes []common.Hash) error {
 	p.Log().Debug("Fetching batch of receipts", "count", len(hashes))
-	return sendRequest(p.rw, GetReceiptsMsg, reqID, cost, hashes)
+	return sendRequestCtx(ctx, p.rw, GetReceiptsMsg, reqID, cost, hashes)
 }
 
 // RequestProofs fetches a batch of merkle proofs from a remote node.
@@ -284,7 +294,7 @@ func (p *peer) RequestProofs(reqID, cost uint64, reqs []ProofReq) error {
 }
 
 // RequestHelperTrieProofs fetches a batch of HelperTrie merkle proofs from a remote node.
-func (p *peer) RequestHelperTrieProofs(reqID, cost uint64, reqs []HelperTrieReq) error {
+func (p *peer) RequestHelperTrieProofs(ctx context.Context, reqID, cost uint64, reqs []HelperTrieReq) error {
 	p.Log().Debug("Fetching batch of HelperTrie proofs", "count", len(reqs))
 	switch p.version {
 	case lpv1:
@@ -297,9 +307,9 @@ func (p *peer) RequestHelperTrieProofs(reqID, cost uint64, reqs []HelperTrieReq)
 			// convert HelperTrie request to old CHT request
 			reqsV1[i] = ChtReq{ChtNum: (req.TrieIdx + 1) * (light.CHTFrequencyClient / light.CHTFrequencyServer), BlockNum: blockNum, FromLevel: req.FromLevel}
 		}
-		return sendRequest(p.rw, GetHeaderProofsMsg, reqID, cost, reqsV1)
+		return sendRequestCtx(ctx, p.rw, GetHeaderProofsMsg, reqID, cost, reqsV1)
 	case lpv2:
-		return sendRequest(p.rw, GetHelperTrieProofsMsg, reqID, cost, reqs)
+		return sendRequestCtx(ctx, p.rw, GetHelperTrieProofsMsg, reqID, cost, reqs)
 	default:
 		panic(nil)
 	}
@@ -312,13 +322,13 @@ func (p *peer) RequestTxStatus(reqID, cost uint64, txHashes []common.Hash) error
 }
 
 // SendTxStatus sends a batch of transactions to be added to the remote transaction pool.
-func (p *peer) SendTxs(reqID, cost uint64, txs types.Transactions) error {
+func (p *peer) SendTxs(ctx context.Context, reqID, cost uint64, txs types.Transactions) error {
 	p.Log().Debug("Fetching batch of transactions", "count", len(txs))
 	switch p.version {
 	case lpv1:
-		return p2p.Send(p.rw, SendTxMsg, txs) // old message format does not include reqID
+		return p2p.SendCtx(ctx, p.rw, SendTxMsg, txs) // old message format does not include reqID
 	case lpv2:
-		return sendRequest(p.rw, SendTxV2Msg, reqID, cost, txs)
+		return sendRequestCtx(ctx, p.rw, SendTxV2Msg, reqID, cost, txs)
 	default:
 		panic(nil)
 	}
@@ -363,11 +373,14 @@ func (m keyValueMap) get(key string, val interface{}) error {
 	return rlp.DecodeBytes(enc, val)
 }
 
-func (p *peer) sendReceiveHandshake(sendList keyValueList) (keyValueList, error) {
+func (p *peer) sendReceiveHandshake(ctx context.Context, sendList keyValueList) (keyValueList, error) {
+	ctx, span := trace.StartSpan(ctx, "peer.sendReceiveHandshake")
+	defer span.End()
+
 	// Send out own handshake in a new thread
 	errc := make(chan error, 1)
 	go func() {
-		errc <- p2p.Send(p.rw, StatusMsg, sendList)
+		errc <- p2p.SendCtx(ctx, p.rw, StatusMsg, sendList)
 	}()
 	// In the mean time retrieve the remote status message
 	msg, err := p.rw.ReadMsg()
@@ -393,7 +406,9 @@ func (p *peer) sendReceiveHandshake(sendList keyValueList) (keyValueList, error)
 
 // Handshake executes the les protocol handshake, negotiating version number,
 // network IDs, difficulties, head and genesis blocks.
-func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis common.Hash, server *LesServer) error {
+func (p *peer) Handshake(ctx context.Context, td *big.Int, head common.Hash, headNum uint64, genesis common.Hash, server *LesServer) error {
+	ctx, span := trace.StartSpan(ctx, "peer.Handshake")
+	defer span.End()
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -418,7 +433,7 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis 
 		p.requestAnnounceType = announceTypeSimple // set to default until "very light" client mode is implemented
 		send = send.add("announceType", p.requestAnnounceType)
 	}
-	recvList, err := p.sendReceiveHandshake(send)
+	recvList, err := p.sendReceiveHandshake(ctx, send)
 	if err != nil {
 		return err
 	}

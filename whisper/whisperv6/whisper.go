@@ -18,6 +18,7 @@ package whisperv6
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"fmt"
@@ -25,6 +26,8 @@ import (
 	"runtime"
 	"sync"
 	"time"
+
+	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/crypto"
@@ -228,7 +231,10 @@ func (whisper *Whisper) SetMaxMessageSize(size uint32) error {
 }
 
 // SetBloomFilter sets the new bloom filter
-func (whisper *Whisper) SetBloomFilter(bloom []byte) error {
+func (whisper *Whisper) SetBloomFilter(ctx context.Context, bloom []byte) error {
+	ctx, span := trace.StartSpan(ctx, "Whisper.SetBloomFilter")
+	defer span.End()
+
 	if len(bloom) != bloomFilterSize {
 		return fmt.Errorf("invalid bloom filter size: %d", len(bloom))
 	}
@@ -237,7 +243,7 @@ func (whisper *Whisper) SetBloomFilter(bloom []byte) error {
 	copy(b, bloom)
 
 	whisper.settings.Store(bloomFilterIdx, b)
-	whisper.notifyPeersAboutBloomFilterChange(b)
+	whisper.notifyPeersAboutBloomFilterChange(ctx, b)
 
 	go func() {
 		// allow some time before all the peers have processed the notification
@@ -249,13 +255,13 @@ func (whisper *Whisper) SetBloomFilter(bloom []byte) error {
 }
 
 // SetMinimumPoW sets the minimal PoW required by this node
-func (whisper *Whisper) SetMinimumPoW(val float64) error {
+func (whisper *Whisper) SetMinimumPoW(ctx context.Context, val float64) error {
 	if val < 0.0 {
 		return fmt.Errorf("invalid PoW: %f", val)
 	}
 
 	whisper.settings.Store(minPowIdx, val)
-	whisper.notifyPeersAboutPowRequirementChange(val)
+	whisper.notifyPeersAboutPowRequirementChange(ctx, val)
 
 	go func() {
 		// allow some time before all the peers have processed the notification
@@ -267,19 +273,24 @@ func (whisper *Whisper) SetMinimumPoW(val float64) error {
 }
 
 // SetMinimumPowTest sets the minimal PoW in test environment
-func (whisper *Whisper) SetMinimumPowTest(val float64) {
+func (whisper *Whisper) SetMinimumPowTest(ctx context.Context, val float64) {
+	ctx, span := trace.StartSpan(ctx, "Whisper.SetMinimumPowTest")
+	defer span.End()
 	whisper.settings.Store(minPowIdx, val)
-	whisper.notifyPeersAboutPowRequirementChange(val)
+	whisper.notifyPeersAboutPowRequirementChange(ctx, val)
 	whisper.settings.Store(minPowToleranceIdx, val)
 }
 
-func (whisper *Whisper) notifyPeersAboutPowRequirementChange(pow float64) {
+func (whisper *Whisper) notifyPeersAboutPowRequirementChange(ctx context.Context, pow float64) {
+	ctx, span := trace.StartSpan(ctx, "whisper.notifyPeersaboutPowRewuirementChange")
+	defer span.End()
+
 	arr := whisper.getPeers()
 	for _, p := range arr {
-		err := p.notifyAboutPowRequirementChange(pow)
+		err := p.notifyAboutPowRequirementChange(ctx, pow)
 		if err != nil {
 			// allow one retry
-			err = p.notifyAboutPowRequirementChange(pow)
+			err = p.notifyAboutPowRequirementChange(ctx, pow)
 		}
 		if err != nil {
 			log.Warn("failed to notify peer about new pow requirement", "peer", p.ID(), "error", err)
@@ -287,13 +298,16 @@ func (whisper *Whisper) notifyPeersAboutPowRequirementChange(pow float64) {
 	}
 }
 
-func (whisper *Whisper) notifyPeersAboutBloomFilterChange(bloom []byte) {
+func (whisper *Whisper) notifyPeersAboutBloomFilterChange(ctx context.Context, bloom []byte) {
+	ctx, span := trace.StartSpan(ctx, "Whisper.notifyPeersAboutBloomFilterChange")
+	defer span.End()
+
 	arr := whisper.getPeers()
 	for _, p := range arr {
-		err := p.notifyAboutBloomFilterChange(bloom)
+		err := p.notifyAboutBloomFilterChange(ctx, bloom)
 		if err != nil {
 			// allow one retry
-			err = p.notifyAboutBloomFilterChange(bloom)
+			err = p.notifyAboutBloomFilterChange(ctx, bloom)
 		}
 		if err != nil {
 			log.Warn("failed to notify peer about new bloom filter", "peer", p.ID(), "error", err)
@@ -344,7 +358,7 @@ func (whisper *Whisper) AllowP2PMessagesFromPeer(peerID []byte) error {
 // request and respond with a number of peer-to-peer messages (possibly expired),
 // which are not supposed to be forwarded any further.
 // The whisper protocol is agnostic of the format and contents of envelope.
-func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelope) error {
+func (whisper *Whisper) RequestHistoricMessages(ctx context.Context, peerID []byte, envelope *Envelope) error {
 	p, err := whisper.getPeer(peerID)
 	if err != nil {
 		return err
@@ -352,21 +366,21 @@ func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelop
 	p.mu.Lock()
 	p.trusted = true
 	p.mu.Unlock()
-	return p2p.Send(p.ws, p2pRequestCode, envelope)
+	return p2p.SendCtx(ctx, p.ws, p2pRequestCode, envelope)
 }
 
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
-func (whisper *Whisper) SendP2PMessage(peerID []byte, envelope *Envelope) error {
+func (whisper *Whisper) SendP2PMessage(ctx context.Context, peerID []byte, envelope *Envelope) error {
 	p, err := whisper.getPeer(peerID)
 	if err != nil {
 		return err
 	}
-	return whisper.SendP2PDirect(p, envelope)
+	return whisper.SendP2PDirect(ctx, p, envelope)
 }
 
 // SendP2PDirect sends a peer-to-peer message to a specific peer.
-func (whisper *Whisper) SendP2PDirect(peer *Peer, envelope *Envelope) error {
-	return p2p.Send(peer.ws, p2pMessageCode, envelope)
+func (whisper *Whisper) SendP2PDirect(ctx context.Context, peer *Peer, envelope *Envelope) error {
+	return p2p.SendCtx(ctx, peer.ws, p2pMessageCode, envelope)
 }
 
 // NewKeyPair generates a new cryptographic identity for the client, and injects
@@ -551,14 +565,16 @@ func (whisper *Whisper) GetSymKey(id string) ([]byte, error) {
 func (whisper *Whisper) Subscribe(f *Filter) (string, error) {
 	s, err := whisper.filters.Install(f)
 	if err == nil {
-		whisper.updateBloomFilter(f)
+		whisper.updateBloomFilter(context.Background(), f)
 	}
 	return s, err
 }
 
 // updateBloomFilter recalculates the new value of bloom filter,
 // and informs the peers if necessary.
-func (whisper *Whisper) updateBloomFilter(f *Filter) {
+func (whisper *Whisper) updateBloomFilter(ctx context.Context, f *Filter) {
+	ctx, span := trace.StartSpan(ctx, "Whisper.updateBloomFilter")
+	defer span.End()
 	aggregate := make([]byte, bloomFilterSize)
 	for _, t := range f.Topics {
 		top := BytesToTopic(t)
@@ -569,7 +585,7 @@ func (whisper *Whisper) updateBloomFilter(f *Filter) {
 	if !bloomFilterMatch(whisper.BloomFilter(), aggregate) {
 		// existing bloom filter must be updated
 		aggregate = addBloom(whisper.BloomFilter(), aggregate)
-		whisper.SetBloomFilter(aggregate)
+		whisper.SetBloomFilter(ctx, aggregate)
 	}
 }
 

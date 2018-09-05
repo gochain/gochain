@@ -18,15 +18,18 @@
 package fetcher
 
 import (
+	"context"
 	"errors"
 	"math/rand"
 	"time"
+
+	"go.opencensus.io/trace"
+	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/consensus"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/log"
-	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 )
 
 const (
@@ -44,25 +47,25 @@ var (
 )
 
 // blockRetrievalFn is a callback type for retrieving a block from the local chain.
-type blockRetrievalFn func(common.Hash) *types.Block
+type blockRetrievalFn func(context.Context, common.Hash) *types.Block
 
 // headerRequesterFn is a callback type for sending a header retrieval request.
-type headerRequesterFn func(common.Hash) error
+type headerRequesterFn func(context.Context, common.Hash) error
 
 // bodyRequesterFn is a callback type for sending a body retrieval request.
-type bodyRequesterFn func([]common.Hash) error
+type bodyRequesterFn func(context.Context, []common.Hash) error
 
 // headerVerifierFn is a callback type to verify a block's header for fast propagation.
-type headerVerifierFn func(header *types.Header) error
+type headerVerifierFn func(ctx context.Context, header *types.Header) error
 
 // blockBroadcasterFn is a callback type for broadcasting a block to connected peers.
-type blockBroadcasterFn func(block *types.Block, propagate bool)
+type blockBroadcasterFn func(ctx context.Context, block *types.Block, propagate bool)
 
 // chainHeightFn is a callback type to retrieve the current chain height.
 type chainHeightFn func() uint64
 
 // chainInsertFn is a callback type to insert a batch of blocks into the local chain.
-type chainInsertFn func(types.Blocks) (int, error)
+type chainInsertFn func(context.Context, types.Blocks) (int, error)
 
 // peerDropFn is a callback type for dropping a peer detected as malicious.
 type peerDropFn func(id string)
@@ -306,11 +309,11 @@ func (f *Fetcher) loop() {
 				break
 			}
 			// Otherwise if fresh and still unknown, try and import
-			if number+maxUncleDist < height || f.getBlock(hash) != nil {
+			if number+maxUncleDist < height || f.getBlock(context.Background(), hash) != nil {
 				f.forgetBlock(hash)
 				continue
 			}
-			f.insert(op.origin, op.block)
+			go f.insert(op.origin, op.block)
 		}
 		// Wait for an outside event to occur
 		select {
@@ -363,6 +366,7 @@ func (f *Fetcher) loop() {
 			f.forgetBlock(hash)
 
 		case <-fetchTimer.C:
+			ctx, span := trace.StartSpan(context.Background(), "Fetcher.loop-fetchTimer")
 			// At least one block's timer ran out, check for needing retrieval
 			request := make(map[string][]common.Hash)
 
@@ -373,7 +377,7 @@ func (f *Fetcher) loop() {
 					f.forgetHash(hash)
 
 					// If the block still didn't arrive, queue for fetching
-					if f.getBlock(hash) == nil {
+					if f.getBlock(ctx, hash) == nil {
 						request[announce.origin] = append(request[announce.origin], hash)
 						f.fetching[hash] = announce
 					}
@@ -389,19 +393,24 @@ func (f *Fetcher) loop() {
 				// Create a closure of the fetch and schedule in on a new thread
 				fetchHeader, hashes := f.fetching[hashes[0]].fetchHeader, hashes
 				go func() {
+					ctx, span := trace.StartSpan(ctx, "fetchHeader")
+					defer span.End()
+
 					if f.fetchingHook != nil {
 						f.fetchingHook(hashes)
 					}
 					for _, hash := range hashes {
 						headerFetchMeter.Mark(1)
-						fetchHeader(hash) // Suboptimal, but protocol doesn't allow batch header retrievals
+						fetchHeader(ctx, hash) // Suboptimal, but protocol doesn't allow batch header retrievals
 					}
 				}()
 			}
+			span.End()
 			// Schedule the next fetch if blocks are still pending
 			f.rescheduleFetch(fetchTimer)
 
 		case <-completeTimer.C:
+			ctx, span := trace.StartSpan(context.Background(), "Fetcher.loop-completeTimer")
 			// At least one header's timer ran out, retrieve everything
 			request := make(map[string][]common.Hash)
 
@@ -411,7 +420,7 @@ func (f *Fetcher) loop() {
 				f.forgetHash(hash)
 
 				// If the block still didn't arrive, queue for completion
-				if f.getBlock(hash) == nil {
+				if f.getBlock(ctx, hash) == nil {
 					request[announce.origin] = append(request[announce.origin], hash)
 					f.completing[hash] = announce
 				}
@@ -428,8 +437,13 @@ func (f *Fetcher) loop() {
 					f.completingHook(hashes)
 				}
 				bodyFetchMeter.Mark(int64(len(hashes)))
-				go f.completing[hashes[0]].fetchBodies(hashes)
+				go func() {
+					ctx, span := trace.StartSpan(context.Background(), "fetchBody")
+					defer span.End()
+					f.completing[hashes[0]].fetchBodies(ctx, hashes)
+				}()
 			}
+			span.End()
 			// Schedule the next fetch if blocks are still pending
 			f.rescheduleComplete(completeTimer)
 
@@ -445,6 +459,7 @@ func (f *Fetcher) loop() {
 			}
 			headerFilterInMeter.Mark(int64(len(task.headers)))
 
+			ctx, span := trace.StartSpan(context.Background(), "Fetcher.loop-headerFilter")
 			tracing := log.Tracing()
 			// Split the batch of headers into unknown ones (to return to the caller),
 			// known incomplete ones (requiring body retrievals) and completed blocks.
@@ -464,7 +479,7 @@ func (f *Fetcher) loop() {
 						continue
 					}
 					// Only keep if not imported by other means
-					if f.getBlock(hash) == nil {
+					if f.getBlock(ctx, hash) == nil {
 						announce.header = header
 						announce.time = task.time
 
@@ -498,6 +513,7 @@ func (f *Fetcher) loop() {
 			select {
 			case filter <- &headerFilterTask{headers: unknown, time: task.time}:
 			case <-f.quit:
+				span.End()
 				return
 			}
 			// Schedule the retrieved headers for body completion
@@ -517,6 +533,7 @@ func (f *Fetcher) loop() {
 					f.enqueue(announce.origin, block)
 				}
 			}
+			span.End()
 
 		case filter := <-f.bodyFilter:
 			// Block bodies arrived, extract any explicitly requested blocks, return the rest
@@ -527,6 +544,8 @@ func (f *Fetcher) loop() {
 				return
 			}
 			bodyFilterInMeter.Mark(int64(len(task.transactions)))
+
+			ctx, span := trace.StartSpan(context.Background(), "Fetcher.loop-bodyFilter")
 
 			blocks := []*types.Block{}
 			for i := 0; i < len(task.transactions) && i < len(task.uncles); i++ {
@@ -542,7 +561,7 @@ func (f *Fetcher) loop() {
 							// Mark the body matched, reassemble if still unknown
 							matched = true
 
-							if f.getBlock(hash) == nil {
+							if f.getBlock(ctx, hash) == nil {
 								block := types.NewBlockWithHeader(announce.header).WithBody(task.transactions[i], task.uncles[i])
 								block.ReceivedAt = task.time
 
@@ -565,6 +584,7 @@ func (f *Fetcher) loop() {
 			select {
 			case filter <- task:
 			case <-f.quit:
+				span.End()
 				return
 			}
 			// Schedule the retrieved blocks for ordered import
@@ -573,6 +593,7 @@ func (f *Fetcher) loop() {
 					f.enqueue(announce.origin, block)
 				}
 			}
+			span.End()
 		}
 	}
 }
@@ -650,48 +671,48 @@ func (f *Fetcher) enqueue(peer string, block *types.Block) {
 // the phase states accordingly.
 func (f *Fetcher) insert(peer string, block *types.Block) {
 	hash := block.Hash()
+	defer func() { f.done <- hash }()
+	ctx, span := trace.StartSpan(context.Background(), "Fetcher.insert")
+	defer span.End()
+	span.AddAttributes(trace.Int64Attribute("num", int64(block.NumberU64())))
 
-	// Run the import on a new thread
 	log.Debug("Importing propagated block", "peer", peer, "number", block.Number(), "hash", hash)
-	go func() {
-		defer func() { f.done <- hash }()
 
-		// If the parent's unknown, abort insertion
-		parent := f.getBlock(block.ParentHash())
-		if parent == nil {
-			log.Debug("Unknown parent of propagated block", "peer", peer, "number", block.Number(), "hash", hash, "parent", block.ParentHash())
-			return
-		}
-		// Quickly validate the header and propagate the block if it passes
-		switch err := f.verifyHeader(block.Header()); err {
-		case nil:
-			// All ok, quickly propagate to our peers
-			propBroadcastOutTimer.UpdateSince(block.ReceivedAt)
-			go f.broadcastBlock(block, true)
+	// If the parent's unknown, abort insertion
+	parent := f.getBlock(ctx, block.ParentHash())
+	if parent == nil {
+		log.Debug("Unknown parent of propagated block", "peer", peer, "number", block.Number(), "hash", hash, "parent", block.ParentHash())
+		return
+	}
+	// Quickly validate the header and propagate the block if it passes
+	switch err := f.verifyHeader(ctx, block.Header()); err {
+	case nil:
+		// All ok, quickly propagate to our peers
+		propBroadcastOutTimer.UpdateSince(block.ReceivedAt)
+		go f.broadcastBlock(context.Background(), block, true)
 
-		case consensus.ErrFutureBlock:
-			// Weird future block, don't fail, but neither propagate
+	case consensus.ErrFutureBlock:
+		// Weird future block, don't fail, but neither propagate
 
-		default:
-			// Something went very wrong, drop the peer
-			log.Debug("Propagated block verification failed", "peer", peer, "number", block.Number(), "hash", hash, "err", err)
-			f.dropPeer(peer)
-			return
-		}
-		// Run the actual import and log any issues
-		if _, err := f.insertChain(types.Blocks{block}); err != nil {
-			log.Debug("Propagated block import failed", "peer", peer, "number", block.Number(), "hash", hash, "err", err)
-			return
-		}
-		// If import succeeded, broadcast the block
-		propAnnounceOutTimer.UpdateSince(block.ReceivedAt)
-		go f.broadcastBlock(block, false)
+	default:
+		// Something went very wrong, drop the peer
+		log.Debug("Propagated block verification failed", "peer", peer, "number", block.Number(), "hash", hash, "err", err)
+		f.dropPeer(peer)
+		return
+	}
+	// Run the actual import and log any issues
+	if _, err := f.insertChain(ctx, types.Blocks{block}); err != nil {
+		log.Debug("Propagated block import failed", "peer", peer, "number", block.Number(), "hash", hash, "err", err)
+		return
+	}
+	// If import succeeded, broadcast the block
+	propAnnounceOutTimer.UpdateSince(block.ReceivedAt)
+	go f.broadcastBlock(context.Background(), block, false)
 
-		// Invoke the testing hook if needed
-		if f.importedHook != nil {
-			f.importedHook(block)
-		}
-	}()
+	// Invoke the testing hook if needed
+	if f.importedHook != nil {
+		f.importedHook(block)
+	}
 }
 
 // forgetHash removes all traces of a block announcement from the fetcher's

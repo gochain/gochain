@@ -78,7 +78,7 @@ func (a *RemoteAgent) SetReturnCh(returnCh chan<- *Result) {
 	a.returnCh = returnCh
 }
 
-func (a *RemoteAgent) Start(ctx context.Context) {
+func (a *RemoteAgent) Start() {
 	if !atomic.CompareAndSwapInt32(&a.running, 0, 1) {
 		return
 	}

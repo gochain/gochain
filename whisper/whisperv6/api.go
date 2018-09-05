@@ -24,6 +24,8 @@ import (
 	"sync"
 	"time"
 
+	"go.opencensus.io/trace"
+
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/crypto"
@@ -119,12 +121,14 @@ func (api *PublicWhisperAPI) SetMaxMessageSize(ctx context.Context, size uint32)
 
 // SetMinPoW sets the minimum PoW, and notifies the peers.
 func (api *PublicWhisperAPI) SetMinPoW(ctx context.Context, pow float64) (bool, error) {
-	return true, api.w.SetMinimumPoW(pow)
+	return true, api.w.SetMinimumPoW(ctx, pow)
 }
 
 // SetBloomFilter sets the new value of bloom filter, and notifies the peers.
 func (api *PublicWhisperAPI) SetBloomFilter(ctx context.Context, bloom hexutil.Bytes) (bool, error) {
-	return true, api.w.SetBloomFilter(bloom)
+	ctx, span := trace.StartSpan(ctx, "PublicWhisperAPI.SetBloomFilter")
+	defer span.End()
+	return true, api.w.SetBloomFilter(ctx, bloom)
 }
 
 // MarkTrustedPeer marks a peer trusted, which will allow it to send historic (expired) messages.
@@ -243,6 +247,9 @@ type newMessageOverride struct {
 
 // Post a message on the Whisper network.
 func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, error) {
+	ctx, span := trace.StartSpan(ctx, "PublicWhisperApi.Post")
+	defer span.End()
+
 	var (
 		symKeyGiven = len(req.SymKeyID) > 0
 		pubKeyGiven = len(req.PublicKey) > 0
@@ -308,7 +315,7 @@ func (api *PublicWhisperAPI) Post(ctx context.Context, req NewMessage) (bool, er
 		if err != nil {
 			return false, fmt.Errorf("failed to parse target peer: %s", err)
 		}
-		return true, api.w.SendP2PMessage(n.ID[:], env)
+		return true, api.w.SendP2PMessage(ctx, n.ID[:], env)
 	}
 
 	// ensure that the message PoW meets the node's minimum accepted PoW

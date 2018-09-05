@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/common/perfutils"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
@@ -74,7 +73,6 @@ func TestStateProcessor(t *testing.T) {
 	numTxs := 10000
 
 	ctx := context.Background()
-	ctx = perfutils.WithTimer(ctx)
 	start := time.Now()
 	key, _ := crypto.GenerateKey()
 	address := crypto.PubkeyToAddress(key.PublicKey)
@@ -98,7 +96,7 @@ func TestStateProcessor(t *testing.T) {
 	// 	if err != nil {
 	// 		t.Fatal(err)
 	// 	}
-	perfTimer := perfutils.GetTimer(ctx)
+
 	txs := make([]*types.Transaction, numTxs)
 	for i := 0; i < numTxs; i++ {
 		tx := types.NewTransaction(uint64(i), common.Address{}, big.NewInt(100), 100000, big.NewInt(1), nil)
@@ -114,12 +112,9 @@ func TestStateProcessor(t *testing.T) {
 		t.Fatal(err)
 	}
 	start = time.Now()
-	ps := perfTimer.Start(perfutils.Process)
 	_, _, _, err = bc.Processor().Process(ctx, block, statedb, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ps.Stop()
-	t.Log(perfTimer.Print())
 	t.Logf("process() duration: %s", time.Since(start))
 }

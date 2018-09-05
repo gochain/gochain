@@ -27,10 +27,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/golang-lru"
+	"go.opencensus.io/trace"
+
 	"github.com/gochain-io/gochain/accounts"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/hexutil"
-	"github.com/gochain-io/gochain/common/perfutils"
 	"github.com/gochain-io/gochain/consensus"
 	"github.com/gochain-io/gochain/consensus/misc"
 	"github.com/gochain-io/gochain/core/types"
@@ -41,7 +43,6 @@ import (
 	"github.com/gochain-io/gochain/params"
 	"github.com/gochain-io/gochain/rlp"
 	"github.com/gochain-io/gochain/rpc"
-	"github.com/hashicorp/golang-lru"
 )
 
 const (
@@ -252,6 +253,8 @@ func (c *Clique) Author(header *types.Header) (common.Address, error) {
 
 // VerifyHeader checks whether a header conforms to the consensus rules.
 func (c *Clique) VerifyHeader(ctx context.Context, chain consensus.ChainReader, header *types.Header, seal bool) error {
+	ctx, span := trace.StartSpan(ctx, "Clique.VerifyHeader")
+	defer span.End()
 	return c.verifyHeader(ctx, chain, header, nil)
 }
 
@@ -259,6 +262,9 @@ func (c *Clique) VerifyHeader(ctx context.Context, chain consensus.ChainReader, 
 // method returns a quit channel to abort the operations and a results channel to
 // retrieve the async verifications (the order is that of the input slice).
 func (c *Clique) VerifyHeaders(ctx context.Context, chain consensus.ChainReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
+	ctx, span := trace.StartSpan(ctx, "Clique.VerifyHeaders")
+	defer span.End()
+
 	abort := make(chan struct{})
 	results := make(chan error, len(headers))
 
@@ -281,6 +287,9 @@ func (c *Clique) VerifyHeaders(ctx context.Context, chain consensus.ChainReader,
 // looking those up from the database. This is useful for concurrently verifying
 // a batch of new headers.
 func (c *Clique) verifyHeader(ctx context.Context, chain consensus.ChainReader, header *types.Header, parents []*types.Header) error {
+	ctx, span := trace.StartSpan(ctx, "Clique.verifyHeader")
+	defer span.End()
+
 	if header.Number == nil {
 		return errUnknownBlock
 	}
@@ -347,6 +356,9 @@ func (c *Clique) verifyHeader(ctx context.Context, chain consensus.ChainReader, 
 // in a batch of parents (ascending order) to avoid looking those up from the
 // database. This is useful for concurrently verifying a batch of new headers.
 func (c *Clique) verifyCascadingFields(ctx context.Context, chain consensus.ChainReader, header *types.Header, parents []*types.Header) error {
+	ctx, span := trace.StartSpan(ctx, "Clique.verifyCascadingFields")
+	defer span.End()
+
 	// The genesis block is the always valid dead-end
 	number := header.Number.Uint64()
 	if number == 0 {
@@ -389,9 +401,9 @@ func (c *Clique) verifyCascadingFields(ctx context.Context, chain consensus.Chai
 
 // snapshot retrieves the authorization snapshot at a given point in time.
 func (c *Clique) snapshot(ctx context.Context, chain consensus.ChainReader, number uint64, hash common.Hash, parents []*types.Header) (*Snapshot, error) {
-	pt := perfutils.GetTimer(ctx)
-	ps := pt.Start(perfutils.CliqueSnapshot)
-	defer ps.Stop()
+	ctx, span := trace.StartSpan(ctx, "Clique.snapshot")
+	defer span.End()
+
 	// Search for a snapshot in memory or on disk for checkpoints
 	var (
 		headers []*types.Header
@@ -483,9 +495,9 @@ func (c *Clique) VerifySeal(ctx context.Context, chain consensus.ChainReader, he
 // headers that aren't yet part of the local blockchain to generate the snapshots
 // from.
 func (c *Clique) verifySeal(ctx context.Context, chain consensus.ChainReader, header *types.Header, parents []*types.Header) error {
-	pt := perfutils.GetTimer(ctx)
-	ps := pt.Start(perfutils.CliqueVerifySeal)
-	defer ps.Stop()
+	ctx, span := trace.StartSpan(ctx, "Clique.verifySeal")
+	defer span.End()
+
 	// Verifying the genesis block is not supported
 	number := header.Number.Uint64()
 	if number == 0 {
@@ -523,9 +535,9 @@ func (c *Clique) verifySeal(ctx context.Context, chain consensus.ChainReader, he
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
 func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, header *types.Header) error {
-	pt := perfutils.GetTimer(ctx)
-	ps := pt.Start(perfutils.CliqueSeal)
-	defer ps.Stop()
+	ctx, span := trace.StartSpan(ctx, "Clique.Prepare")
+	defer span.End()
+
 	// If the block isn't a checkpoint, cast a random vote (good enough for now)
 	header.Nonce = types.BlockNonce{}
 
@@ -597,9 +609,9 @@ func (c *Clique) Authorize(signer common.Address, signFn SignerFn) {
 // Seal implements consensus.Engine, attempting to create a sealed block using
 // the local signing credentials.
 func (c *Clique) Seal(ctx context.Context, chain consensus.ChainReader, block *types.Block, stop <-chan struct{}) (*types.Block, error) {
-	pt := perfutils.GetTimer(ctx)
-	ps := pt.Start(perfutils.CliqueSeal)
-	defer ps.Stop()
+	ctx, span := trace.StartSpan(ctx, "Clique.Seal")
+	defer span.End()
+
 	header := block.Header()
 
 	// Sealing the genesis block is not supported

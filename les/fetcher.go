@@ -433,7 +433,7 @@ func (f *lightFetcher) nextRequest() (*distReq, uint64) {
 				fp := f.peers[p]
 				return fp != nil && fp.nodeByHash[bestHash] != nil
 			},
-			request: func(dp distPeer) func() {
+			request: func(dp distPeer) func(context.Context) {
 				go func() {
 					p := dp.(*peer)
 					p.Log().Debug("Synchronisation started")
@@ -461,7 +461,7 @@ func (f *lightFetcher) nextRequest() (*distReq, uint64) {
 				n := fp.nodeByHash[bestHash]
 				return n != nil && !n.requested
 			},
-			request: func(dp distPeer) func() {
+			request: func(dp distPeer) func(context.Context) {
 				p := dp.(*peer)
 				f.lock.Lock()
 				fp := f.peers[p]
@@ -482,8 +482,8 @@ func (f *lightFetcher) nextRequest() (*distReq, uint64) {
 					time.Sleep(hardRequestTimeout)
 					f.timeoutChn <- reqID
 				}()
-				return func() {
-					if err := p.RequestHeadersByHash(reqID, cost, bestHash, int(bestAmount), 0, true); err != nil {
+				return func(ctx context.Context) {
+					if err := p.RequestHeadersByHash(ctx, reqID, cost, bestHash, int(bestAmount), 0, true); err != nil {
 						log.Error("Cannot request headers by hash", "req_id", reqID, "err", err)
 					}
 				}

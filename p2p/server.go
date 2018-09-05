@@ -18,12 +18,15 @@
 package p2p
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"net"
 	"sync"
 	"time"
+
+	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/mclock"
@@ -208,8 +211,8 @@ type conn struct {
 
 type transport interface {
 	// The two handshakes.
-	doEncHandshake(prv *ecdsa.PrivateKey, dialDest *discover.Node) (discover.NodeID, error)
-	doProtoHandshake(our *protoHandshake) (*protoHandshake, error)
+	doEncHandshake(ctx context.Context, prv *ecdsa.PrivateKey, dialDest *discover.Node) (discover.NodeID, error)
+	doProtoHandshake(ctx context.Context, our *protoHandshake) (*protoHandshake, error)
 	// The MsgReadWriter can only be used after the encryption
 	// handshake has completed. The code uses conn.id to track this
 	// by setting it to a non-nil value after the encryption handshake.
@@ -798,12 +801,15 @@ func (srv *Server) listenLoop() {
 // as a peer. It returns when the connection has been added as a peer
 // or the handshakes have failed.
 func (srv *Server) SetupConn(fd net.Conn, flags connFlag, dialDest *discover.Node) error {
+	ctx, span := trace.StartSpan(context.Background(), "Server.SetupConn")
+	defer span.End()
+
 	self := srv.Self()
 	if self == nil {
 		return errors.New("shutdown")
 	}
 	c := &conn{fd: fd, transport: srv.newTransport(fd), flags: flags, cont: make(chan error)}
-	err := srv.setupConn(c, flags, dialDest)
+	err := srv.setupConn(ctx, c, flags, dialDest)
 	if err != nil {
 		c.close(err)
 		srv.log.Trace("Setting up connection failed", "id", c.id, "err", err)
@@ -811,7 +817,10 @@ func (srv *Server) SetupConn(fd net.Conn, flags connFlag, dialDest *discover.Nod
 	return err
 }
 
-func (srv *Server) setupConn(c *conn, flags connFlag, dialDest *discover.Node) error {
+func (srv *Server) setupConn(ctx context.Context, c *conn, flags connFlag, dialDest *discover.Node) error {
+	ctx, span := trace.StartSpan(ctx, "Server.setupConn")
+	defer span.End()
+
 	// Prevent leftover pending conns from entering the handshake.
 	srv.lock.Lock()
 	running := srv.running
@@ -821,7 +830,7 @@ func (srv *Server) setupConn(c *conn, flags connFlag, dialDest *discover.Node) e
 	}
 	// Run the encryption handshake.
 	var err error
-	if c.id, err = c.doEncHandshake(srv.PrivateKey, dialDest); err != nil {
+	if c.id, err = c.doEncHandshake(ctx, srv.PrivateKey, dialDest); err != nil {
 		srv.log.Trace("Failed RLPx handshake", "addr", c.fd.RemoteAddr(), "conn", c.flags, "err", err)
 		return err
 	}
@@ -831,13 +840,13 @@ func (srv *Server) setupConn(c *conn, flags connFlag, dialDest *discover.Node) e
 		clog.Trace("Dialed identity mismatch", "want", c, dialDest.ID)
 		return DiscUnexpectedIdentity
 	}
-	err = srv.checkpoint(c, srv.posthandshake)
+	err = srv.checkpoint(ctx, c, srv.posthandshake)
 	if err != nil {
 		clog.Trace("Rejected peer before protocol handshake", "err", err)
 		return err
 	}
 	// Run the protocol handshake
-	phs, err := c.doProtoHandshake(srv.ourHandshake)
+	phs, err := c.doProtoHandshake(ctx, srv.ourHandshake)
 	if err != nil {
 		clog.Trace("Failed proto handshake", "err", err)
 		return err
@@ -847,7 +856,7 @@ func (srv *Server) setupConn(c *conn, flags connFlag, dialDest *discover.Node) e
 		return DiscUnexpectedIdentity
 	}
 	c.caps, c.name = phs.Caps, phs.Name
-	err = srv.checkpoint(c, srv.addpeer)
+	err = srv.checkpoint(ctx, c, srv.addpeer)
 	if err != nil {
 		clog.Trace("Rejected peer", "err", err)
 		return err
@@ -867,7 +876,10 @@ func truncateName(s string) string {
 
 // checkpoint sends the conn to run, which performs the
 // post-handshake checks for the stage (posthandshake, addpeer).
-func (srv *Server) checkpoint(c *conn, stage chan<- *conn) error {
+func (srv *Server) checkpoint(ctx context.Context, c *conn, stage chan<- *conn) error {
+	ctx, span := trace.StartSpan(ctx, "Server.checkpoint")
+	defer span.End()
+
 	select {
 	case stage <- c:
 	case <-srv.quit:

@@ -25,6 +25,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"go.opencensus.io/trace"
+
 	"github.com/gochain-io/gochain/log"
 )
 
@@ -126,7 +128,7 @@ func (s *Server) RegisterName(name string, rcvr interface{}) error {
 // If singleShot is true it will process a single request, otherwise it will handle
 // requests until the codec returns an error when reading a request (in most cases
 // an EOF). It executes requests in parallel when singleShot is false.
-func (s *Server) serveRequest(codec ServerCodec, singleShot bool, options CodecOption) error {
+func (s *Server) serveRequest(ctx context.Context, codec ServerCodec, singleShot bool, options CodecOption) error {
 	var pend sync.WaitGroup
 
 	defer func() {
@@ -141,7 +143,7 @@ func (s *Server) serveRequest(codec ServerCodec, singleShot bool, options CodecO
 		s.codecsMu.Unlock()
 	}()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	// if the codec supports notification include a notifier that callbacks can use
@@ -222,7 +224,7 @@ func (s *Server) serveRequest(codec ServerCodec, singleShot bool, options CodecO
 // stopped. In either case the codec is closed.
 func (s *Server) ServeCodec(codec ServerCodec, options CodecOption) {
 	defer codec.Close()
-	if err := s.serveRequest(codec, false, options); err != nil {
+	if err := s.serveRequest(context.Background(), codec, false, options); err != nil {
 		log.Error("Cannot serve codec request", "err", err)
 	}
 }
@@ -230,8 +232,8 @@ func (s *Server) ServeCodec(codec ServerCodec, options CodecOption) {
 // ServeSingleRequest reads and processes a single RPC request from the given codec. It will not
 // close the codec unless a non-recoverable error has occurred. Note, this method will return after
 // a single request has been processed!
-func (s *Server) ServeSingleRequest(codec ServerCodec, options CodecOption) {
-	if err := s.serveRequest(codec, true, options); err != nil {
+func (s *Server) ServeSingleRequest(ctx context.Context, codec ServerCodec, options CodecOption) {
+	if err := s.serveRequest(ctx, codec, true, options); err != nil {
 		log.Error("Cannot serve single request", "err", err)
 	}
 }
@@ -335,6 +337,9 @@ func (s *Server) handle(ctx context.Context, codec ServerCodec, req *serverReque
 
 // exec executes the given request and writes the result back using the codec.
 func (s *Server) exec(ctx context.Context, codec ServerCodec, req *serverRequest) {
+	ctx, span := trace.StartSpan(ctx, "Server.exec")
+	defer span.End()
+
 	var response interface{}
 	var callback func()
 	if req.err != nil {
@@ -357,6 +362,9 @@ func (s *Server) exec(ctx context.Context, codec ServerCodec, req *serverRequest
 // execBatch executes the given requests and writes the result back using the codec.
 // It will only write the response back when the last request is processed.
 func (s *Server) execBatch(ctx context.Context, codec ServerCodec, requests []*serverRequest) {
+	ctx, span := trace.StartSpan(ctx, "Server.execBatch")
+	defer span.End()
+
 	responses := make([]interface{}, len(requests))
 	var callbacks []func()
 	for i, req := range requests {

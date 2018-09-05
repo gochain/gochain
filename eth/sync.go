@@ -22,6 +22,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.opencensus.io/trace"
+
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/eth/downloader"
@@ -45,8 +47,9 @@ type txsync struct {
 }
 
 // syncTransactions starts sending all currently pending transactions to the given peer.
-func (pm *ProtocolManager) syncTransactions(p *peer) {
-	ctx := context.TODO()
+func (pm *ProtocolManager) syncTransactions(ctx context.Context, p *peer) {
+	ctx, span := trace.StartSpan(context.Background(), "ProtocolManager.syncTransactions")
+	defer span.End()
 	txs := pm.txpool.PendingList(ctx)
 	if len(txs) == 0 {
 		return
@@ -102,6 +105,9 @@ func (pm *ProtocolManager) txsyncLoop() {
 
 	// send starts a sending a pack of transactions from the sync.
 	send := func(s *txsync) {
+		_, span := trace.StartSpan(context.Background(), "ProtocolManager.txsyncLoop-send")
+		defer span.End()
+
 		// Fill pack with transactions up to the target size.
 		size := common.StorageSize(0)
 		pack.p = s.p
@@ -118,7 +124,7 @@ func (pm *ProtocolManager) txsyncLoop() {
 		// Send the pack in the background.
 		s.p.Log().Trace("Sending batch of transactions", "count", len(pack.txs), "bytes", size)
 		sending = true
-		go func() { done <- pack.p.SendTransactions(pack.txs) }()
+		go func() { done <- pack.p.SendTransactions(context.Background(), pack.txs) }()
 	}
 
 	// pick chooses the next pending sync.
@@ -155,7 +161,7 @@ func (pm *ProtocolManager) txsyncLoop() {
 
 // syncer is responsible for periodically synchronising with the network, both
 // downloading hashes and blocks as well as handling the announcement handler.
-func (pm *ProtocolManager) syncer(ctx context.Context) {
+func (pm *ProtocolManager) syncer() {
 	// Start and ensure cleanup of sync mechanisms
 	pm.fetcher.Start()
 	defer pm.fetcher.Stop()
@@ -172,11 +178,20 @@ func (pm *ProtocolManager) syncer(ctx context.Context) {
 			if pm.peers.Len() < minDesiredPeerCount {
 				break
 			}
-			go pm.synchronise(ctx, pm.peers.BestPeer())
+
+			go func() {
+				ctx, span := trace.StartSpan(context.Background(), "protocolManager.syncer-newPeerCh")
+				defer span.End()
+				pm.synchronise(ctx, pm.peers.BestPeer(ctx))
+			}()
 
 		case <-forceSync.C:
 			// Force a sync even if not enough peers are present
-			go pm.synchronise(ctx, pm.peers.BestPeer())
+			go func() {
+				ctx, span := trace.StartSpan(context.Background(), "protocolManager.syncer-forceSync")
+				defer span.End()
+				pm.synchronise(ctx, pm.peers.BestPeer(ctx))
+			}()
 
 		case <-pm.noMorePeers:
 			return
@@ -186,12 +201,15 @@ func (pm *ProtocolManager) syncer(ctx context.Context) {
 
 // synchronise tries to sync up our local block chain with a remote peer.
 func (pm *ProtocolManager) synchronise(ctx context.Context, peer *peer) {
+	ctx, span := trace.StartSpan(ctx, "ProtocolManager.synchronise")
+	defer span.End()
+
 	// Short circuit if no peers are available
 	if peer == nil {
 		return
 	}
 	// Make sure the peer's TD is higher than our own
-	currentBlock := pm.blockchain.CurrentBlock()
+	currentBlock := pm.blockchain.CurrentBlockCtx(ctx)
 	td := pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())
 
 	pHead, pTd := peer.Head()
@@ -229,13 +247,13 @@ func (pm *ProtocolManager) synchronise(ctx context.Context, peer *peer) {
 		atomic.StoreUint32(&pm.fastSync, 0)
 	}
 	atomic.StoreUint32(&pm.acceptTxs, 1) // Mark initial sync done
-	if head := pm.blockchain.CurrentBlock(); head.NumberU64() > 0 {
+	if head := pm.blockchain.CurrentBlockCtx(ctx); head.NumberU64() > 0 {
 		// We've completed a sync cycle, notify all peers of new state. This path is
 		// essential in star-topology networks where a gateway node needs to notify
 		// all its out-of-date peers of the availability of a new block. This failure
 		// scenario will most often crop up in private and hackathon networks with
 		// degenerate connectivity, but it should be healthy for the mainnet too to
 		// more reliably update peers or the local TD state.
-		go pm.BroadcastBlock(head, false)
+		go pm.BroadcastBlock(context.Background(), head, false)
 	}
 }

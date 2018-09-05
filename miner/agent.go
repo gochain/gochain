@@ -19,8 +19,9 @@ package miner
 import (
 	"context"
 	"sync"
-
 	"sync/atomic"
+
+	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/consensus"
 	"github.com/gochain-io/gochain/log"
@@ -69,18 +70,22 @@ done:
 	}
 }
 
-func (self *CpuAgent) Start(ctx context.Context) {
+func (self *CpuAgent) Start() {
 	if !atomic.CompareAndSwapInt32(&self.isMining, 0, 1) {
 		return // agent already started
 	}
-	go self.update(ctx)
+	go self.update()
 }
 
-func (self *CpuAgent) update(ctx context.Context) {
-out:
+func (self *CpuAgent) update() {
 	for {
 		select {
 		case work := <-self.workCh:
+			ctx, span := trace.StartSpan(context.Background(), "CpuAgent.update-workCh")
+			span.AddAttributes(
+				trace.Int64Attribute("num", work.header.Number.Int64()),
+				trace.Int64Attribute("txs", int64(len(work.Block.Transactions()))),
+			)
 			self.mu.Lock()
 			if self.quitCurrentOp != nil {
 				close(self.quitCurrentOp)
@@ -88,6 +93,8 @@ out:
 			self.quitCurrentOp = make(chan struct{})
 			go self.mine(ctx, work, self.quitCurrentOp)
 			self.mu.Unlock()
+			span.End()
+
 		case <-self.stop:
 			self.mu.Lock()
 			if self.quitCurrentOp != nil {
@@ -95,7 +102,7 @@ out:
 				self.quitCurrentOp = nil
 			}
 			self.mu.Unlock()
-			break out
+			return
 		}
 	}
 }

@@ -21,6 +21,7 @@
 package keystore
 
 import (
+	"context"
 	"crypto/ecdsa"
 	crand "crypto/rand"
 	"errors"
@@ -32,6 +33,8 @@ import (
 	"runtime"
 	"sync"
 	"time"
+
+	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/accounts"
 	"github.com/gochain-io/gochain/common"
@@ -132,6 +135,9 @@ func (ks *KeyStore) Wallets() []accounts.Wallet {
 // refreshWallets retrieves the current account list and based on that does any
 // necessary wallet refreshes.
 func (ks *KeyStore) refreshWallets() {
+	ctx, span := trace.StartSpan(context.Background(), "KeyStore.refreshWallets")
+	defer span.End()
+
 	// Retrieve the current list of accounts
 	ks.mu.Lock()
 	accs := ks.cache.accounts()
@@ -170,7 +176,7 @@ func (ks *KeyStore) refreshWallets() {
 
 	// Fire all wallet events and return
 	for _, event := range events {
-		ks.updateFeed.Send(event)
+		ks.updateFeed.SendCtx(ctx, event)
 	}
 }
 

@@ -94,9 +94,9 @@ func (api *PublicMinerAPI) SubmitWork(ctx context.Context, nonce types.BlockNonc
 // result[0], 32 bytes hex encoded current block header pow-hash
 // result[1], 32 bytes hex encoded seed hash used for DAG
 // result[2], 32 bytes hex encoded boundary condition ("target"), 2^256/difficulty
-func (api *PublicMinerAPI) GetWork(ctx context.Context) ([3]string, error) {
+func (api *PublicMinerAPI) GetWork() ([3]string, error) {
 	if !api.e.IsMining() {
-		if err := api.e.StartMining(ctx, false); err != nil {
+		if err := api.e.StartMining(false); err != nil {
 			return [3]string{}, err
 		}
 	}
@@ -130,7 +130,7 @@ func NewPrivateMinerAPI(e *GoChain) *PrivateMinerAPI {
 // of workers started is equal to the number of logical CPUs that are usable by
 // this process. If mining is already running, this method adjust the number of
 // threads allowed to use.
-func (api *PrivateMinerAPI) Start(ctx context.Context, threads *int) error {
+func (api *PrivateMinerAPI) Start(threads *int) error {
 	// Set the number of threads if the seal engine supports it
 	if threads == nil {
 		threads = new(int)
@@ -151,8 +151,8 @@ func (api *PrivateMinerAPI) Start(ctx context.Context, threads *int) error {
 		price := api.e.gasPrice
 		api.e.lock.RUnlock()
 
-		api.e.txPool.SetGasPrice(ctx, price)
-		return api.e.StartMining(ctx, true)
+		api.e.txPool.SetGasPrice(context.Background(), price)
+		return api.e.StartMining(true)
 	}
 	return nil
 }
@@ -317,17 +317,17 @@ func NewPublicDebugAPI(eth *GoChain) *PublicDebugAPI {
 }
 
 // DumpBlock retrieves the entire state of the database at a given block.
-func (api *PublicDebugAPI) DumpBlock(blockNr rpc.BlockNumber) (state.Dump, error) {
+func (api *PublicDebugAPI) DumpBlock(ctx context.Context, blockNr rpc.BlockNumber) (state.Dump, error) {
 	if blockNr == rpc.PendingBlockNumber {
 		// If we're dumping the pending state, we need to request
 		// both the pending block as well as the pending state from
 		// the miner and operate on those
-		_, stateDb := api.eth.miner.Pending()
+		_, stateDb := api.eth.miner.Pending(ctx)
 		return stateDb.RawDump(), nil
 	}
 	var block *types.Block
 	if blockNr == rpc.LatestBlockNumber {
-		block = api.eth.blockchain.CurrentBlock()
+		block = api.eth.blockchain.CurrentBlockCtx(ctx)
 	} else {
 		block = api.eth.blockchain.GetBlockByNumber(uint64(blockNr))
 	}

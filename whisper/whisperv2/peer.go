@@ -17,9 +17,12 @@
 package whisperv2
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
+
+	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/log"
@@ -66,10 +69,13 @@ func (self *peer) stop() {
 // handshake sends the protocol initiation status message to the remote peer and
 // verifies the remote status too.
 func (self *peer) handshake() error {
+	ctx, span := trace.StartSpan(context.Background(), "peer.handshake")
+	defer span.End()
+
 	// Send the handshake status message asynchronously
 	errc := make(chan error, 1)
 	go func() {
-		errc <- p2p.SendItems(self.ws, statusCode, protocolVersion)
+		errc <- p2p.SendItemsCtx(ctx, self.ws, statusCode, protocolVersion)
 	}()
 	// Fetch the remote status packet and verify protocol match
 	packet, err := self.ws.ReadMsg()
