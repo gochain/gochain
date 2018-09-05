@@ -343,12 +343,12 @@ func GetTransaction(db common.Database, hash common.Hash) (*types.Transaction, c
 
 // GetReceipt retrieves a specific transaction receipt from the database, along with
 // its added positional metadata.
-func GetReceipt(db DatabaseReader, hash common.Hash) (*types.Receipt, common.Hash, uint64, uint64) {
+func GetReceipt(db common.Database, hash common.Hash) (*types.Receipt, common.Hash, uint64, uint64) {
 	// Retrieve the lookup metadata and resolve the receipt from the receipts
-	blockHash, blockNumber, receiptIndex := GetTxLookupEntry(db, hash)
+	blockHash, blockNumber, receiptIndex := GetTxLookupEntry(db.GlobalTable(), hash)
 
 	if blockHash != (common.Hash{}) {
-		receipts := GetBlockReceipts(db, blockHash, blockNumber)
+		receipts := GetBlockReceipts(db.ReceiptTable(), blockHash, blockNumber)
 		if len(receipts) <= int(receiptIndex) {
 			log.Error("Receipt refereced missing", "number", blockNumber, "hash", blockHash, "index", receiptIndex)
 			return nil, common.Hash{}, 0, 0
@@ -356,7 +356,7 @@ func GetReceipt(db DatabaseReader, hash common.Hash) (*types.Receipt, common.Has
 		return receipts[receiptIndex], blockHash, blockNumber, receiptIndex
 	}
 	// Old receipt representation, load the receipt and set an unknown metadata
-	data, _ := db.Get(append(oldReceiptsPrefix, hash[:]...))
+	data, _ := db.GlobalTable().Get(append(oldReceiptsPrefix, hash[:]...))
 	if len(data) == 0 {
 		return nil, common.Hash{}, 0, 0
 	}
