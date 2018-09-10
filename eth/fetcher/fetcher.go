@@ -426,6 +426,12 @@ func (f *Fetcher) loop() {
 				}
 			}
 			tracing := log.Tracing()
+			spanCtx := span.SpanContext()
+			link := trace.Link{
+				Type:    trace.LinkTypeParent,
+				TraceID: spanCtx.TraceID,
+				SpanID:  spanCtx.SpanID,
+			}
 			// Send out all block body requests
 			for peer, hashes := range request {
 				if tracing {
@@ -437,12 +443,14 @@ func (f *Fetcher) loop() {
 					f.completingHook(hashes)
 				}
 				bodyFetchMeter.Mark(int64(len(hashes)))
-				go func() {
-					ctx, span := trace.StartSpan(context.Background(), "fetchBody")
-					defer span.End()
-					f.completing[hashes[0]].fetchBodies(ctx, hashes)
-				}()
+				go func(ann *announce) {
+					ctx, bs := trace.StartSpan(context.Background(), "Fetcher.loop-fetchBodies")
+					defer bs.End()
+					bs.AddLink(link)
+					ann.fetchBodies(ctx, hashes)
+				}(f.completing[hashes[0]])
 			}
+
 			span.End()
 			// Schedule the next fetch if blocks are still pending
 			f.rescheduleComplete(completeTimer)
@@ -689,7 +697,17 @@ func (f *Fetcher) insert(peer string, block *types.Block) {
 	case nil:
 		// All ok, quickly propagate to our peers
 		propBroadcastOutTimer.UpdateSince(block.ReceivedAt)
-		go f.broadcastBlock(context.Background(), block, true)
+		go func() {
+			ctx, bs := trace.StartSpan(context.Background(), "Fetcher.insert-broadcast")
+			defer bs.End()
+			parent := span.SpanContext()
+			bs.AddLink(trace.Link{
+				Type:    trace.LinkTypeParent,
+				TraceID: parent.TraceID,
+				SpanID:  parent.SpanID,
+			})
+			f.broadcastBlock(ctx, block, true)
+		}()
 
 	case consensus.ErrFutureBlock:
 		// Weird future block, don't fail, but neither propagate
@@ -707,7 +725,17 @@ func (f *Fetcher) insert(peer string, block *types.Block) {
 	}
 	// If import succeeded, broadcast the block
 	propAnnounceOutTimer.UpdateSince(block.ReceivedAt)
-	go f.broadcastBlock(context.Background(), block, false)
+	go func() {
+		ctx, bs := trace.StartSpan(context.Background(), "Fetcher.insert-announce")
+		defer bs.End()
+		parent := span.SpanContext()
+		bs.AddLink(trace.Link{
+			Type:    trace.LinkTypeParent,
+			TraceID: parent.TraceID,
+			SpanID:  parent.SpanID,
+		})
+		f.broadcastBlock(ctx, block, false)
+	}()
 
 	// Invoke the testing hook if needed
 	if f.importedHook != nil {

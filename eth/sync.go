@@ -124,7 +124,17 @@ func (pm *ProtocolManager) txsyncLoop() {
 		// Send the pack in the background.
 		s.p.Log().Trace("Sending batch of transactions", "count", len(pack.txs), "bytes", size)
 		sending = true
-		go func() { done <- pack.p.SendTransactions(context.Background(), pack.txs) }()
+		go func() {
+			ctx, ss := trace.StartSpan(context.Background(), "ProtocolManager.txSyncLoop-send-txs")
+			defer ss.End()
+			parent := span.SpanContext()
+			ss.AddLink(trace.Link{
+				Type:    trace.LinkTypeParent,
+				TraceID: parent.TraceID,
+				SpanID:  parent.SpanID,
+			})
+			done <- pack.p.SendTransactions(ctx, pack.txs)
+		}()
 	}
 
 	// pick chooses the next pending sync.
@@ -254,6 +264,16 @@ func (pm *ProtocolManager) synchronise(ctx context.Context, peer *peer) {
 		// scenario will most often crop up in private and hackathon networks with
 		// degenerate connectivity, but it should be healthy for the mainnet too to
 		// more reliably update peers or the local TD state.
-		go pm.BroadcastBlock(context.Background(), head, false)
+		go func() {
+			ctx, bs := trace.StartSpan(context.Background(), "ProtocolManager.syncronise-announce")
+			defer bs.End()
+			parent := span.SpanContext()
+			bs.AddLink(trace.Link{
+				Type:    trace.LinkTypeParent,
+				TraceID: parent.TraceID,
+				SpanID:  parent.SpanID,
+			})
+			pm.BroadcastBlock(ctx, head, false)
+		}()
 	}
 }
