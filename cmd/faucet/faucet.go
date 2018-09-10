@@ -256,7 +256,7 @@ func newFaucet(genesis *core.Genesis, port int, enodes []*discv5.Node, network u
 		}
 	}
 	// Boot up the client and ensure it connects to bootnodes
-	if err := stack.Start(ctx); err != nil {
+	if err := stack.Start(); err != nil {
 		return nil, err
 	}
 	for _, boot := range enodes {

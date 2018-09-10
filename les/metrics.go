@@ -17,6 +17,8 @@
 package les
 
 import (
+	"context"
+
 	"github.com/gochain-io/gochain/metrics"
 	"github.com/gochain-io/gochain/p2p"
 )
@@ -100,12 +102,12 @@ func (rw *meteredMsgReadWriter) ReadMsg() (p2p.Msg, error) {
 	return msg, err
 }
 
-func (rw *meteredMsgReadWriter) WriteMsg(msg p2p.Msg) error {
+func (rw *meteredMsgReadWriter) WriteMsg(ctx context.Context, msg p2p.Msg) error {
 	// Account for the data traffic
 	packets, traffic := miscOutPacketsMeter, miscOutTrafficMeter
 	packets.Mark(1)
 	traffic.Mark(int64(msg.Size))
 
 	// Send the packet to the p2p layer
-	return rw.MsgReadWriter.WriteMsg(msg)
+	return rw.MsgReadWriter.WriteMsg(ctx, msg)
 }

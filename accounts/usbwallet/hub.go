@@ -17,10 +17,13 @@
 package usbwallet
 
 import (
+	"context"
 	"errors"
 	"runtime"
 	"sync"
 	"time"
+
+	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/accounts"
 	"github.com/gochain-io/gochain/event"
@@ -111,6 +114,9 @@ func (hub *Hub) Wallets() []accounts.Wallet {
 // refreshWallets scans the USB devices attached to the machine and updates the
 // list of wallets based on the found devices.
 func (hub *Hub) refreshWallets() {
+	ctx, span := trace.StartSpan(context.Background(), "Hub.refreshWallets")
+	defer span.End()
+
 	// Don't scan the USB like crazy it the user fetches wallets in a loop
 	hub.stateLock.RLock()
 	elapsed := time.Since(hub.refreshed)
@@ -193,7 +199,7 @@ func (hub *Hub) refreshWallets() {
 
 	// Fire all wallet events and return
 	for _, event := range events {
-		hub.updateFeed.Send(event)
+		hub.updateFeed.SendCtx(ctx, event)
 	}
 }
 

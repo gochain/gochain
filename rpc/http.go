@@ -27,11 +27,13 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/rs/cors"
-	"strings"
+	"go.opencensus.io/plugin/ochttp"
+	"go.opencensus.io/trace"
 )
 
 const (
@@ -149,10 +151,13 @@ func (t *httpReadWriteNopCloser) Close() error {
 // NewHTTPServer creates a new HTTP RPC server around an API provider.
 //
 // Deprecated: Server implements http.Handler
-func NewHTTPServer(cors []string, vhosts []string, srv *Server) *http.Server {
+func NewHTTPServer(cors []string, vhosts []string, srv *Server, tracing bool) *http.Server {
 	// Wrap the CORS-handler within a host-handler
 	handler := newCorsHandler(srv, cors)
 	handler = newVHostHandler(vhosts, handler)
+	if tracing {
+		handler = &ochttp.Handler{Handler: handler, IsPublicEndpoint: true}
+	}
 	return &http.Server{Handler: handler}
 }
 
@@ -162,8 +167,14 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet && r.ContentLength == 0 && r.URL.RawQuery == "" {
 		return
 	}
+	ctx := r.Context()
+	span := trace.FromContext(ctx)
 	if code, err := validateRequest(r); err != nil {
 		http.Error(w, err.Error(), code)
+		span.SetStatus(trace.Status{
+			Code:    trace.StatusCodeInvalidArgument,
+			Message: err.Error(),
+		})
 		return
 	}
 	// All checks passed, create a codec that reads direct from the request body
@@ -173,7 +184,7 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer codec.Close()
 
 	w.Header().Set("content-type", contentType)
-	srv.ServeSingleRequest(codec, OptionMethodInvocation)
+	srv.ServeSingleRequest(ctx, codec, OptionMethodInvocation)
 }
 
 // validateRequest returns a non-zero response code and error message if the

@@ -17,9 +17,12 @@
 package whisperv6
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"time"
+
+	"go.opencensus.io/trace"
 
 	"sync"
 
@@ -78,13 +81,16 @@ func (peer *Peer) stop() {
 // handshake sends the protocol initiation status message to the remote peer and
 // verifies the remote status too.
 func (peer *Peer) handshake() error {
+	ctx, span := trace.StartSpan(context.Background(), "Peer.handshake")
+	defer span.End()
+
 	// Send the handshake status message asynchronously
 	errc := make(chan error, 1)
 	go func() {
 		pow := peer.host.MinPow()
 		powConverted := math.Float64bits(pow)
 		bloom := peer.host.BloomFilter()
-		errc <- p2p.SendItems(peer.ws, statusCode, ProtocolVersion, powConverted, bloom)
+		errc <- p2p.SendItemsCtx(ctx, peer.ws, statusCode, ProtocolVersion, powConverted, bloom)
 	}()
 
 	// Fetch the remote status packet and verify protocol match
@@ -151,10 +157,17 @@ func (peer *Peer) update() {
 			peer.expire()
 
 		case <-transmit.C:
-			if err := peer.broadcast(); err != nil {
+			ctx, span := trace.StartSpan(context.Background(), "Peer.update.transmit")
+			if err := peer.broadcast(ctx); err != nil {
 				log.Trace("broadcast failed", "reason", err, "peer", peer.ID())
+				span.SetStatus(trace.Status{
+					Code:    trace.StatusCodeInternal,
+					Message: err.Error(),
+				})
+				span.End()
 				return
 			}
+			span.End()
 
 		case <-peer.quit:
 			return
@@ -198,7 +211,7 @@ func (peer *Peer) expire() {
 
 // broadcast iterates over the collection of envelopes and transmits yet unknown
 // ones over the network.
-func (peer *Peer) broadcast() error {
+func (peer *Peer) broadcast(ctx context.Context) error {
 	envelopes := peer.host.Envelopes()
 	bundle := make([]*Envelope, 0, len(envelopes))
 	for _, envelope := range envelopes {
@@ -212,7 +225,7 @@ func (peer *Peer) broadcast() error {
 
 	if len(bundle) > 0 {
 		// transmit the batch of envelopes
-		if err := p2p.Send(peer.ws, messagesCode, bundle); err != nil {
+		if err := p2p.SendCtx(ctx, peer.ws, messagesCode, bundle); err != nil {
 			return err
 		}
 
@@ -232,13 +245,13 @@ func (peer *Peer) ID() []byte {
 	return id[:]
 }
 
-func (peer *Peer) notifyAboutPowRequirementChange(pow float64) error {
+func (peer *Peer) notifyAboutPowRequirementChange(ctx context.Context, pow float64) error {
 	i := math.Float64bits(pow)
-	return p2p.Send(peer.ws, powRequirementCode, i)
+	return p2p.SendCtx(ctx, peer.ws, powRequirementCode, i)
 }
 
-func (peer *Peer) notifyAboutBloomFilterChange(bloom []byte) error {
-	return p2p.Send(peer.ws, bloomFilterExCode, bloom)
+func (peer *Peer) notifyAboutBloomFilterChange(ctx context.Context, bloom []byte) error {
+	return p2p.SendCtx(ctx, peer.ws, bloomFilterExCode, bloom)
 }
 
 func (peer *Peer) bloomMatch(env *Envelope) bool {

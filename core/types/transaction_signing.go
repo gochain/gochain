@@ -23,8 +23,9 @@ import (
 	"fmt"
 	"math/big"
 
+	"go.opencensus.io/trace"
+
 	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/common/perfutils"
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/params"
 )
@@ -81,13 +82,14 @@ func Sender(ctx context.Context, signer Signer, tx *Transaction) (common.Address
 			return sigCache.from, nil
 		}
 	}
-	perfTimer := perfutils.GetTimer(ctx)
-	ps := perfTimer.Start(perfutils.SignerSender)
+
+	_, span := trace.StartSpan(ctx, "signer.Sender")
 	addr, err := signer.Sender(tx)
+	span.End()
 	if err != nil {
 		return common.Address{}, err
 	}
-	ps.Stop()
+
 	tx.from.Store(sigCache{signer: signer, from: addr})
 	return addr, nil
 }

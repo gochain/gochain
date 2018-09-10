@@ -20,6 +20,7 @@ package les
 
 import (
 	"container/list"
+	"context"
 	"errors"
 	"sync"
 	"time"
@@ -49,7 +50,7 @@ type requestDistributor struct {
 type distPeer interface {
 	waitBefore(uint64) (time.Duration, float64)
 	canQueue() bool
-	queueSend(f func())
+	queueSend(f func(context.Context))
 }
 
 // distReq is the request abstraction used by the distributor. It is based on
@@ -63,7 +64,7 @@ type distPeer interface {
 type distReq struct {
 	getCost func(distPeer) uint64
 	canSend func(distPeer) bool
-	request func(distPeer) func()
+	request func(distPeer) func(context.Context)
 
 	reqOrder uint64
 	sentChn  chan distPeer

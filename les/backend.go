@@ -237,7 +237,7 @@ func (s *LightGoChain) Protocols() []p2p.Protocol {
 
 // Start implements node.Service, starting all internal goroutines needed by the
 // GoChain protocol implementation.
-func (s *LightGoChain) Start(ctx context.Context, srvr *p2p.Server) error {
+func (s *LightGoChain) Start(srvr *p2p.Server) error {
 	s.startBloomHandlers()
 	log.Warn("Light client mode is an experimental feature")
 	s.netRPCService = ethapi.NewPublicNetAPI(srvr, s.networkId)

@@ -17,7 +17,6 @@
 package node
 
 import (
-	"context"
 	"errors"
 	"io/ioutil"
 	"os"
@@ -43,7 +42,6 @@ func testNodeConfig() *Config {
 
 // Tests that an empty protocol stack can be started, restarted and stopped.
 func TestNodeLifeCycle(t *testing.T) {
-	ctx := context.Background()
 	stack, err := New(testNodeConfig())
 	if err != nil {
 		t.Fatalf("failed to create protocol stack: %v", err)
@@ -55,15 +53,15 @@ func TestNodeLifeCycle(t *testing.T) {
 		}
 	}
 	// Ensure that a node can be successfully started, but only once
-	if err := stack.Start(ctx); err != nil {
+	if err := stack.Start(); err != nil {
 		t.Fatalf("failed to start node: %v", err)
 	}
-	if err := stack.Start(ctx); err != ErrNodeRunning {
+	if err := stack.Start(); err != ErrNodeRunning {
 		t.Fatalf("start failure mismatch: have %v, want %v ", err, ErrNodeRunning)
 	}
 	// Ensure that a node can be restarted arbitrarily many times
 	for i := 0; i < 3; i++ {
-		if err := stack.Restart(ctx); err != nil {
+		if err := stack.Restart(); err != nil {
 			t.Fatalf("iter %d: failed to restart node: %v", i, err)
 		}
 	}
@@ -78,7 +76,6 @@ func TestNodeLifeCycle(t *testing.T) {
 
 // Tests that if the data dir is already in use, an appropriate error is returned.
 func TestNodeUsedDataDir(t *testing.T) {
-	ctx := context.Background()
 	// Create a temporary folder to use as the data directory
 	dir, err := ioutil.TempDir("", "")
 	if err != nil {
@@ -91,7 +88,7 @@ func TestNodeUsedDataDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create original protocol stack: %v", err)
 	}
-	if err := original.Start(ctx); err != nil {
+	if err := original.Start(); err != nil {
 		t.Fatalf("failed to start original protocol stack: %v", err)
 	}
 	defer original.Stop()
@@ -101,14 +98,13 @@ func TestNodeUsedDataDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create duplicate protocol stack: %v", err)
 	}
-	if err := duplicate.Start(ctx); err != ErrDatadirUsed {
+	if err := duplicate.Start(); err != ErrDatadirUsed {
 		t.Fatalf("duplicate datadir failure mismatch: have %v, want %v", err, ErrDatadirUsed)
 	}
 }
 
 // Tests whether services can be registered and duplicates caught.
 func TestServiceRegistry(t *testing.T) {
-	ctx := context.Background()
 	stack, err := New(testNodeConfig())
 	if err != nil {
 		t.Fatalf("failed to create protocol stack: %v", err)
@@ -120,7 +116,7 @@ func TestServiceRegistry(t *testing.T) {
 			t.Fatalf("service #%d: registration failed: %v", i, err)
 		}
 	}
-	if err := stack.Start(ctx); err != nil {
+	if err := stack.Start(); err != nil {
 		t.Fatalf("failed to start original service stack: %v", err)
 	}
 	if err := stack.Stop(); err != nil {
@@ -130,7 +126,7 @@ func TestServiceRegistry(t *testing.T) {
 	if err := stack.Register(NewNoopServiceB); err != nil {
 		t.Fatalf("duplicate registration failed: %v", err)
 	}
-	if err := stack.Start(ctx); err == nil {
+	if err := stack.Start(); err == nil {
 		t.Fatalf("duplicate service started")
 	} else {
 		if _, ok := err.(*DuplicateServiceError); !ok {
@@ -141,7 +137,6 @@ func TestServiceRegistry(t *testing.T) {
 
 // Tests that registered services get started and stopped correctly.
 func TestServiceLifeCycle(t *testing.T) {
-	ctx := context.Background()
 	stack, err := New(testNodeConfig())
 	if err != nil {
 		t.Fatalf("failed to create protocol stack: %v", err)
@@ -159,7 +154,7 @@ func TestServiceLifeCycle(t *testing.T) {
 		id := id // Closure for the constructor
 		constructor := func(*ServiceContext) (Service, error) {
 			return &InstrumentedService{
-				startHook: func(context.Context, *p2p.Server) { started[id] = true },
+				startHook: func(*p2p.Server) { started[id] = true },
 				stopHook:  func() { stopped[id] = true },
 			}, nil
 		}
@@ -168,7 +163,7 @@ func TestServiceLifeCycle(t *testing.T) {
 		}
 	}
 	// Start the node and check that all services are running
-	if err := stack.Start(ctx); err != nil {
+	if err := stack.Start(); err != nil {
 		t.Fatalf("failed to start protocol stack: %v", err)
 	}
 	for id := range services {
@@ -192,7 +187,6 @@ func TestServiceLifeCycle(t *testing.T) {
 
 // Tests that services are restarted cleanly as new instances.
 func TestServiceRestarts(t *testing.T) {
-	ctx := context.Background()
 	stack, err := New(testNodeConfig())
 	if err != nil {
 		t.Fatalf("failed to create protocol stack: %v", err)
@@ -206,7 +200,7 @@ func TestServiceRestarts(t *testing.T) {
 		running = false
 
 		return &InstrumentedService{
-			startHook: func(context.Context, *p2p.Server) {
+			startHook: func(*p2p.Server) {
 				if running {
 					panic("already running")
 				}
@@ -219,7 +213,7 @@ func TestServiceRestarts(t *testing.T) {
 	if err := stack.Register(constructor); err != nil {
 		t.Fatalf("failed to register the service: %v", err)
 	}
-	if err := stack.Start(ctx); err != nil {
+	if err := stack.Start(); err != nil {
 		t.Fatalf("failed to start protocol stack: %v", err)
 	}
 	defer stack.Stop()
@@ -229,7 +223,7 @@ func TestServiceRestarts(t *testing.T) {
 	}
 	// Restart the stack a few times and check successful service restarts
 	for i := 0; i < 3; i++ {
-		if err := stack.Restart(ctx); err != nil {
+		if err := stack.Restart(); err != nil {
 			t.Fatalf("iter %d: failed to restart stack: %v", i, err)
 		}
 	}
@@ -241,7 +235,6 @@ func TestServiceRestarts(t *testing.T) {
 // Tests that if a service fails to initialize itself, none of the other services
 // will be allowed to even start.
 func TestServiceConstructionAbortion(t *testing.T) {
-	ctx := context.Background()
 	stack, err := New(testNodeConfig())
 	if err != nil {
 		t.Fatalf("failed to create protocol stack: %v", err)
@@ -257,7 +250,7 @@ func TestServiceConstructionAbortion(t *testing.T) {
 		id := id // Closure for the constructor
 		constructor := func(*ServiceContext) (Service, error) {
 			return &InstrumentedService{
-				startHook: func(context.Context, *p2p.Server) { started[id] = true },
+				startHook: func(*p2p.Server) { started[id] = true },
 			}, nil
 		}
 		if err := stack.Register(maker(constructor)); err != nil {
@@ -274,7 +267,7 @@ func TestServiceConstructionAbortion(t *testing.T) {
 	}
 	// Start the protocol stack and ensure none of the services get started
 	for i := 0; i < 100; i++ {
-		if err := stack.Start(ctx); err != failure {
+		if err := stack.Start(); err != failure {
 			t.Fatalf("iter %d: stack startup failure mismatch: have %v, want %v", i, err, failure)
 		}
 		for id := range services {
@@ -289,7 +282,6 @@ func TestServiceConstructionAbortion(t *testing.T) {
 // Tests that if a service fails to start, all others started before it will be
 // shut down.
 func TestServiceStartupAbortion(t *testing.T) {
-	ctx := context.Background()
 	stack, err := New(testNodeConfig())
 	if err != nil {
 		t.Fatalf("failed to create protocol stack: %v", err)
@@ -307,7 +299,7 @@ func TestServiceStartupAbortion(t *testing.T) {
 		id := id // Closure for the constructor
 		constructor := func(*ServiceContext) (Service, error) {
 			return &InstrumentedService{
-				startHook: func(context.Context, *p2p.Server) { started[id] = true },
+				startHook: func(*p2p.Server) { started[id] = true },
 				stopHook:  func() { stopped[id] = true },
 			}, nil
 		}
@@ -327,7 +319,7 @@ func TestServiceStartupAbortion(t *testing.T) {
 	}
 	// Start the protocol stack and ensure all started services stop
 	for i := 0; i < 100; i++ {
-		if err := stack.Start(ctx); err != failure {
+		if err := stack.Start(); err != failure {
 			t.Fatalf("iter %d: stack startup failure mismatch: have %v, want %v", i, err, failure)
 		}
 		for id := range services {
@@ -343,7 +335,6 @@ func TestServiceStartupAbortion(t *testing.T) {
 // Tests that even if a registered service fails to shut down cleanly, it does
 // not influece the rest of the shutdown invocations.
 func TestServiceTerminationGuarantee(t *testing.T) {
-	ctx := context.Background()
 	stack, err := New(testNodeConfig())
 	if err != nil {
 		t.Fatalf("failed to create protocol stack: %v", err)
@@ -361,7 +352,7 @@ func TestServiceTerminationGuarantee(t *testing.T) {
 		id := id // Closure for the constructor
 		constructor := func(*ServiceContext) (Service, error) {
 			return &InstrumentedService{
-				startHook: func(context.Context, *p2p.Server) { started[id] = true },
+				startHook: func(*p2p.Server) { started[id] = true },
 				stopHook:  func() { stopped[id] = true },
 			}, nil
 		}
@@ -382,7 +373,7 @@ func TestServiceTerminationGuarantee(t *testing.T) {
 	// Start the protocol stack, and ensure that a failing shut down terminates all
 	for i := 0; i < 100; i++ {
 		// Start the stack and make sure all is online
-		if err := stack.Start(ctx); err != nil {
+		if err := stack.Start(); err != nil {
 			t.Fatalf("iter %d: failed to start protocol stack: %v", i, err)
 		}
 		for id := range services {
@@ -418,7 +409,6 @@ func TestServiceTerminationGuarantee(t *testing.T) {
 
 // TestServiceRetrieval tests that individual services can be retrieved.
 func TestServiceRetrieval(t *testing.T) {
-	ctx := context.Background()
 	// Create a simple stack and register two service types
 	stack, err := New(testNodeConfig())
 	if err != nil {
@@ -440,7 +430,7 @@ func TestServiceRetrieval(t *testing.T) {
 		t.Fatalf("instrumented service retrieval mismatch: have %v, want %v", err, ErrNodeStopped)
 	}
 	// Start the stack and ensure everything is retrievable now
-	if err := stack.Start(ctx); err != nil {
+	if err := stack.Start(); err != nil {
 		t.Fatalf("failed to start stack: %v", err)
 	}
 	defer stack.Stop()
@@ -455,7 +445,6 @@ func TestServiceRetrieval(t *testing.T) {
 
 // Tests that all protocols defined by individual services get launched.
 func TestProtocolGather(t *testing.T) {
-	ctx := context.Background()
 	stack, err := New(testNodeConfig())
 	if err != nil {
 		t.Fatalf("failed to create protocol stack: %v", err)
@@ -485,7 +474,7 @@ func TestProtocolGather(t *testing.T) {
 		}
 	}
 	// Start the services and ensure all protocols start successfully
-	if err := stack.Start(ctx); err != nil {
+	if err := stack.Start(); err != nil {
 		t.Fatalf("failed to start protocol stack: %v", err)
 	}
 	defer stack.Stop()
@@ -512,7 +501,6 @@ func TestProtocolGather(t *testing.T) {
 
 // Tests that all APIs defined by individual services get exposed.
 func TestAPIGather(t *testing.T) {
-	ctx := context.Background()
 	stack, err := New(testNodeConfig())
 	if err != nil {
 		t.Fatalf("failed to create protocol stack: %v", err)
@@ -550,7 +538,7 @@ func TestAPIGather(t *testing.T) {
 		}
 	}
 	// Start the services and ensure all API start successfully
-	if err := stack.Start(ctx); err != nil {
+	if err := stack.Start(); err != nil {
 		t.Fatalf("failed to start protocol stack: %v", err)
 	}
 	defer stack.Stop()

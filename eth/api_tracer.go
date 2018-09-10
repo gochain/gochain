@@ -97,17 +97,17 @@ func (api *PrivateDebugAPI) TraceChain(ctx context.Context, start, end rpc.Block
 
 	switch start {
 	case rpc.PendingBlockNumber:
-		from = api.eth.miner.PendingBlock()
+		from = api.eth.miner.PendingBlock(ctx)
 	case rpc.LatestBlockNumber:
-		from = api.eth.blockchain.CurrentBlock()
+		from = api.eth.blockchain.CurrentBlockCtx(ctx)
 	default:
 		from = api.eth.blockchain.GetBlockByNumber(uint64(start))
 	}
 	switch end {
 	case rpc.PendingBlockNumber:
-		to = api.eth.miner.PendingBlock()
+		to = api.eth.miner.PendingBlock(ctx)
 	case rpc.LatestBlockNumber:
-		to = api.eth.blockchain.CurrentBlock()
+		to = api.eth.blockchain.CurrentBlockCtx(ctx)
 	default:
 		to = api.eth.blockchain.GetBlockByNumber(uint64(end))
 	}
@@ -268,7 +268,7 @@ func (api *PrivateDebugAPI) traceChain(ctx context.Context, start, end *types.Bl
 				txs := block.Transactions()
 
 				select {
-				case tasks <- &blockTraceTask{statedb: statedb.Copy(), block: block, rootref: proot, results: make([]*txTraceResult, len(txs))}:
+				case tasks <- &blockTraceTask{statedb: statedb.Copy(ctx), block: block, rootref: proot, results: make([]*txTraceResult, len(txs))}:
 				case <-notifier.Closed():
 					return
 				}
@@ -344,9 +344,9 @@ func (api *PrivateDebugAPI) TraceBlockByNumber(ctx context.Context, number rpc.B
 
 	switch number {
 	case rpc.PendingBlockNumber:
-		block = api.eth.miner.PendingBlock()
+		block = api.eth.miner.PendingBlock(ctx)
 	case rpc.LatestBlockNumber:
-		block = api.eth.blockchain.CurrentBlock()
+		block = api.eth.blockchain.CurrentBlockCtx(ctx)
 	default:
 		block = api.eth.blockchain.GetBlockByNumber(uint64(number))
 	}
@@ -444,7 +444,7 @@ func (api *PrivateDebugAPI) traceBlock(ctx context.Context, block *types.Block, 
 	var failed error
 	for i, tx := range txs {
 		// Send the trace task over for execution
-		jobs <- &txTraceTask{statedb: statedb.Copy(), index: i}
+		jobs <- &txTraceTask{statedb: statedb.Copy(ctx), index: i}
 
 		// Generate the next state snapshot fast without tracing
 		msg, _ := tx.AsMessage(ctx, signer)

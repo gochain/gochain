@@ -65,11 +65,10 @@ type SimulatedBackend struct {
 // NewSimulatedBackend creates a new binding backend using a simulated blockchain
 // for testing purposes.
 func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
-	ctx := context.TODO()
 	database := ethdb.NewMemDatabase()
 	genesis := core.Genesis{Config: params.AllEthashProtocolChanges, Alloc: alloc}
 	genesis.MustCommit(database)
-	blockchain, _ := core.NewBlockChain(ctx, database, nil, genesis.Config, ethash.NewFaker(), vm.Config{})
+	blockchain, _ := core.NewBlockChain(database, nil, genesis.Config, ethash.NewFaker(), vm.Config{})
 
 	backend := &SimulatedBackend{
 		database:   database,
@@ -103,7 +102,7 @@ func (b *SimulatedBackend) Rollback() {
 
 func (b *SimulatedBackend) rollback() {
 	ctx := context.TODO()
-	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlock(), ethash.NewFaker(), b.database, 1, func(context.Context, int, *core.BlockGen) {})
+	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlockCtx(ctx), ethash.NewFaker(), b.database, 1, func(context.Context, int, *core.BlockGen) {})
 	statedb, _ := b.blockchain.State()
 
 	b.pendingBlock = blocks[0]
@@ -115,7 +114,7 @@ func (b *SimulatedBackend) CodeAt(ctx context.Context, contract common.Address, 
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlock().Number()) != 0 {
+	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlockCtx(ctx).Number()) != 0 {
 		return nil, errBlockNumberUnsupported
 	}
 	statedb, _ := b.blockchain.State()
@@ -127,7 +126,7 @@ func (b *SimulatedBackend) BalanceAt(ctx context.Context, contract common.Addres
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlock().Number()) != 0 {
+	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlockCtx(ctx).Number()) != 0 {
 		return nil, errBlockNumberUnsupported
 	}
 	statedb, _ := b.blockchain.State()
@@ -139,7 +138,7 @@ func (b *SimulatedBackend) NonceAt(ctx context.Context, contract common.Address,
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlock().Number()) != 0 {
+	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlockCtx(ctx).Number()) != 0 {
 		return 0, errBlockNumberUnsupported
 	}
 	statedb, _ := b.blockchain.State()
@@ -151,7 +150,7 @@ func (b *SimulatedBackend) StorageAt(ctx context.Context, contract common.Addres
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlock().Number()) != 0 {
+	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlockCtx(ctx).Number()) != 0 {
 		return nil, errBlockNumberUnsupported
 	}
 	statedb, _ := b.blockchain.State()
@@ -178,14 +177,14 @@ func (b *SimulatedBackend) CallContract(ctx context.Context, call gochain.CallMs
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlock().Number()) != 0 {
+	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlockCtx(ctx).Number()) != 0 {
 		return nil, errBlockNumberUnsupported
 	}
 	state, err := b.blockchain.State()
 	if err != nil {
 		return nil, err
 	}
-	rval, _, _, err := b.callContract(ctx, call, b.blockchain.CurrentBlock(), state)
+	rval, _, _, err := b.callContract(ctx, call, b.blockchain.CurrentBlockCtx(ctx), state)
 	return rval, err
 }
 
@@ -307,7 +306,7 @@ func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx *types.Transa
 		panic(fmt.Errorf("invalid transaction nonce: got %d, want %d", tx.Nonce(), nonce))
 	}
 
-	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlock(), ethash.NewFaker(), b.database, 1, func(ctx context.Context, number int, block *core.BlockGen) {
+	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlockCtx(ctx), ethash.NewFaker(), b.database, 1, func(ctx context.Context, number int, block *core.BlockGen) {
 		for _, tx := range b.pendingBlock.Transactions() {
 			block.AddTx(ctx, tx)
 		}

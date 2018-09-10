@@ -18,6 +18,7 @@ package whisperv6
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"fmt"
 	mrand "math/rand"
@@ -160,12 +161,12 @@ func TestSimulation(t *testing.T) {
 func resetParams() {
 	// change pow only for node zero
 	masterPow = 7777777.0
-	nodes[0].shh.SetMinimumPoW(masterPow)
+	nodes[0].shh.SetMinimumPoW(context.Background(), masterPow)
 
 	// change bloom for all nodes
 	masterBloomFilter = TopicToBloom(sharedTopic)
 	for i := 0; i < NumNodes; i++ {
-		nodes[i].shh.SetBloomFilter(masterBloomFilter)
+		nodes[i].shh.SetBloomFilter(context.Background(), masterBloomFilter)
 	}
 
 	round++
@@ -201,8 +202,8 @@ func initialize(t *testing.T) {
 		b := make([]byte, bloomFilterSize)
 		copy(b, masterBloomFilter)
 		node.shh = New(&DefaultConfig)
-		node.shh.SetMinimumPoW(masterPow)
-		node.shh.SetBloomFilter(b)
+		node.shh.SetMinimumPoW(context.Background(), masterPow)
+		node.shh.SetBloomFilter(context.Background(), b)
 		if !bytes.Equal(node.shh.BloomFilter(), masterBloomFilter) {
 			t.Fatalf("bloom mismatch on init.")
 		}

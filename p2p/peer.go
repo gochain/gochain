@@ -18,6 +18,8 @@ package p2p
 
 import (
 	"bytes"
+	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -25,7 +27,7 @@ import (
 	"sync"
 	"time"
 
-	"encoding/hex"
+	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/common/mclock"
 	"github.com/gochain-io/gochain/event"
@@ -395,14 +397,17 @@ type protoRW struct {
 	w      MsgWriter
 }
 
-func (rw *protoRW) WriteMsg(msg Msg) (err error) {
+func (rw *protoRW) WriteMsg(ctx context.Context, msg Msg) (err error) {
+	ctx, span := trace.StartSpan(ctx, "protoRW.WriteMsg")
+	defer span.End()
+
 	if msg.Code >= rw.Length {
 		return newPeerError(errInvalidMsgCode, "not handled")
 	}
 	msg.Code += rw.offset
 	select {
 	case <-rw.wstart:
-		err = rw.w.WriteMsg(msg)
+		err = rw.w.WriteMsg(ctx, msg)
 		// Report write status back to Peer.run. It will initiate
 		// shutdown if the error is non-nil and unblock the next write
 		// otherwise. The calling protocol code should exit for errors

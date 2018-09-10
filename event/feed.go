@@ -17,11 +17,14 @@
 package event
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
 	"sync"
 	"time"
+
+	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/log"
 )
@@ -135,6 +138,13 @@ func (f *Feed) remove(sub *feedSub) {
 // Send delivers to all subscribed channels simultaneously.
 // It returns the number of subscribers that the value was sent to.
 func (f *Feed) Send(value interface{}) (nsent int) {
+	return f.SendCtx(context.Background(), value)
+}
+
+func (f *Feed) SendCtx(ctx context.Context, value interface{}) (nsent int) {
+	ctx, span := trace.StartSpan(ctx, "Feed.Send")
+	defer span.End()
+
 	rvalue := reflect.ValueOf(value)
 
 	f.once.Do(f.init)

@@ -20,6 +20,8 @@ import (
 	"context"
 	"math/big"
 
+	"go.opencensus.io/trace"
+
 	"github.com/gochain-io/gochain/accounts"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/math"
@@ -71,9 +73,11 @@ func (b *EthApiBackend) SetHead(number uint64) {
 }
 
 func (b *EthApiBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error) {
+	ctx, span := trace.StartSpan(ctx, "EthApiBackend.HeaderByNumber")
+	defer span.End()
 	// Pending block is only known by the miner
 	if blockNr == rpc.PendingBlockNumber {
-		block := b.eth.miner.PendingBlock()
+		block := b.eth.miner.PendingBlock(ctx)
 		if block == nil {
 			return nil, nil
 		}
@@ -81,25 +85,30 @@ func (b *EthApiBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNum
 	}
 	// Otherwise resolve and return the block
 	if blockNr == rpc.LatestBlockNumber {
-		return b.eth.blockchain.CurrentBlock().Header(), nil
+		return b.eth.blockchain.CurrentBlockCtx(ctx).Header(), nil
 	}
 	return b.eth.blockchain.GetHeaderByNumber(uint64(blockNr)), nil
 }
 
 func (b *EthApiBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error) {
+	ctx, span := trace.StartSpan(ctx, "EthApiBackend.BlockByNumber")
+	defer span.End()
+	span.AddAttributes(trace.Int64Attribute("num", int64(blockNr)))
 	// Pending block is only known by the miner
 	if blockNr == rpc.PendingBlockNumber {
-		block := b.eth.miner.PendingBlock()
+		block := b.eth.miner.PendingBlock(ctx)
 		return block, nil
 	}
 	// Otherwise resolve and return the block
 	if blockNr == rpc.LatestBlockNumber {
-		return b.eth.blockchain.CurrentBlock(), nil
+		return b.eth.blockchain.CurrentBlockCtx(ctx), nil
 	}
 	return b.eth.blockchain.GetBlockByNumber(uint64(blockNr)), nil
 }
 
 func (b *EthApiBackend) StateQuery(ctx context.Context, blockNr rpc.BlockNumber, fn func(*state.StateDB) error) error {
+	ctx, span := trace.StartSpan(ctx, "EthApiBackend.StateQuery")
+	defer span.End()
 	// Pending state is only known by the miner
 	if blockNr == rpc.PendingBlockNumber {
 		return b.eth.miner.PendingQuery(fn)
@@ -116,9 +125,11 @@ func (b *EthApiBackend) StateQuery(ctx context.Context, blockNr rpc.BlockNumber,
 }
 
 func (b *EthApiBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.StateDB, *types.Header, error) {
+	ctx, span := trace.StartSpan(ctx, "EthApiBackend.StateAndHeaderByNumber")
+	defer span.End()
 	// Pending state is only known by the miner
 	if blockNr == rpc.PendingBlockNumber {
-		block, state := b.eth.miner.Pending()
+		block, state := b.eth.miner.Pending(ctx)
 		return state, block.Header(), nil
 	}
 	// Otherwise resolve the block number and return its state
@@ -131,10 +142,14 @@ func (b *EthApiBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.
 }
 
 func (b *EthApiBackend) GetBlock(ctx context.Context, blockHash common.Hash) (*types.Block, error) {
+	ctx, span := trace.StartSpan(ctx, "EthApiBackend.GetBlock")
+	defer span.End()
 	return b.eth.blockchain.GetBlockByHash(blockHash), nil
 }
 
 func (b *EthApiBackend) GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error) {
+	ctx, span := trace.StartSpan(ctx, "EthApiBackend.GetReceipts")
+	defer span.End()
 	return core.GetBlockReceipts(b.eth.chainDb, blockHash, core.GetBlockNumber(b.eth.chainDb, blockHash)), nil
 }
 
@@ -143,6 +158,8 @@ func (b *EthApiBackend) GetTd(blockHash common.Hash) *big.Int {
 }
 
 func (b *EthApiBackend) GetEVM(ctx context.Context, msg core.Message, state *state.StateDB, header *types.Header, vmCfg vm.Config) (*vm.EVM, error) {
+	ctx, span := trace.StartSpan(ctx, "EthApiBackend.GetEVM")
+	defer span.End()
 	state.SetBalance(msg.From(), math.MaxBig256)
 
 	context := core.NewEVMContext(msg, header, b.eth.BlockChain(), nil)
@@ -187,10 +204,14 @@ func (b *EthApiBackend) GetPoolNonce(ctx context.Context, addr common.Address) (
 }
 
 func (b *EthApiBackend) Stats() (pending int, queued int) {
-	return b.eth.txPool.Stats()
+	ctx, span := trace.StartSpan(context.Background(), "EthApiBackend.Stats")
+	defer span.End()
+	return b.eth.txPool.StatsCtx(ctx)
 }
 
 func (b *EthApiBackend) TxPoolContent(ctx context.Context) (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
+	ctx, span := trace.StartSpan(ctx, "EthApiBackend.TxPoolContent")
+	defer span.End()
 	return b.eth.TxPool().Content(ctx)
 }
 

@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/golang-lru"
+	"go.opencensus.io/trace"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 
 	"github.com/gochain-io/gochain/common"
@@ -137,7 +138,7 @@ type BlockChain struct {
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum Validator and
 // Processor.
-func NewBlockChain(ctx context.Context, db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config) (*BlockChain, error) {
+func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
 			TrieNodeLimit: 256 * 1024 * 1024,
@@ -197,7 +198,7 @@ func NewBlockChain(ctx context.Context, db ethdb.Database, cacheConfig *CacheCon
 		}
 	}
 	// Take ownership of this particular state
-	go bc.update(ctx)
+	go bc.update()
 	return bc, nil
 }
 
@@ -346,6 +347,12 @@ func (bc *BlockChain) GasLimit() uint64 {
 // CurrentBlock retrieves the current head block of the canonical chain. The
 // block is retrieved from the blockchain's internal cache.
 func (bc *BlockChain) CurrentBlock() *types.Block {
+	return bc.CurrentBlockCtx(context.Background())
+}
+
+func (bc *BlockChain) CurrentBlockCtx(ctx context.Context) *types.Block {
+	ctx, span := trace.StartSpan(ctx, "BlockChain.CurrentBlockCtx")
+	defer span.End()
 	bc.mu.RLock()
 	defer bc.mu.RUnlock()
 
@@ -880,7 +887,10 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 }
 
 // WriteBlockWithState writes the block and all associated state to the database.
-func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, state *state.StateDB) (status WriteStatus, err error) {
+func (bc *BlockChain) WriteBlockWithState(ctx context.Context, block *types.Block, receipts []*types.Receipt, state *state.StateDB) (status WriteStatus, err error) {
+	ctx, span := trace.StartSpan(ctx, "BlockChain.WriteBlockWithState")
+	defer span.End()
+
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
@@ -973,7 +983,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	if reorg {
 		// Reorganise the chain if the parent is not the head block
 		if block.ParentHash() != bc.currentBlock.Hash() {
-			if err := bc.reorg(bc.currentBlock, block); err != nil {
+			if err := bc.reorg(ctx, bc.currentBlock, block); err != nil {
 				return NonStatTy, err
 			}
 		}
@@ -1008,8 +1018,12 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 //
 // After insertion is done, all accumulated events will be fired.
 func (bc *BlockChain) InsertChain(ctx context.Context, chain types.Blocks) (int, error) {
+	ctx, span := trace.StartSpan(ctx, "BlockChain.InsertChain")
+	defer span.End()
+	span.AddAttributes(trace.Int64Attribute("len", int64(len(chain))))
+
 	n, events, logs, err := bc.insertChain(ctx, chain)
-	bc.PostChainEvents(events, logs)
+	bc.PostChainEvents(ctx, events, logs)
 	return n, err
 }
 
@@ -1017,6 +1031,9 @@ func (bc *BlockChain) InsertChain(ctx context.Context, chain types.Blocks) (int,
 // only reason this method exists as a separate one is to make locking cleaner
 // with deferred statements.
 func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int, []interface{}, []*types.Log, error) {
+	ctx, span := trace.StartSpan(ctx, "BlockChain.insertChain")
+	defer span.End()
+
 	// Sanity check that we have something meaningful to import.
 	if len(chain) == 0 {
 		return 0, nil, nil, nil
@@ -1059,8 +1076,11 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 	abort, results := bc.engine.VerifyHeaders(ctx, bc, headers, seals)
 	defer close(abort)
 
+	// Pre-compute and cache sender ecrecover for each transaction.
 	go func() {
-		// Pre-compute and cache sender ecrecover for each transaction.
+		ctx, span := trace.StartSpan(ctx, "parWorkers")
+		defer span.End()
+
 		for _, block := range chain {
 			signer := types.MakeSigner(bc.Config(), block.Number())
 			var wi int32 = -1
@@ -1071,6 +1091,8 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 			for s := 0; s < bc.parWorkers; s++ {
 				go func() {
 					defer wg.Done()
+					ctx, span := trace.StartSpan(ctx, "parWorker")
+					defer span.End()
 					for i := atomic.AddInt32(&wi, 1); i < l32; i = atomic.AddInt32(&wi, 1) {
 						txs[i].Hash()
 						if _, err := types.Sender(ctx, signer, txs[i]); err != nil {
@@ -1080,6 +1102,10 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 				}()
 			}
 			wg.Wait()
+			span.Annotate([]trace.Attribute{
+				trace.Int64Attribute("num", int64(block.NumberU64())),
+				trace.Int64Attribute("txs", int64(l32)),
+			}, "finished block")
 		}
 	}()
 
@@ -1106,7 +1132,7 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 		case err == ErrKnownBlock:
 			// Block and state both already known. However if the current block is below
 			// this number we did a rollback and we should reimport it nonetheless.
-			if bc.CurrentBlock().NumberU64() >= block.NumberU64() {
+			if bc.CurrentBlockCtx(ctx).NumberU64() >= block.NumberU64() {
 				stats.ignored++
 				continue
 			}
@@ -1190,7 +1216,7 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 		proctime := time.Since(bstart)
 
 		// Write the block to the chain and get the status.
-		status, err := bc.WriteBlockWithState(block, receipts, state)
+		status, err := bc.WriteBlockWithState(ctx, block, receipts, state)
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
@@ -1221,7 +1247,7 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 		stats.report(chain, i, cache)
 	}
 	// Append a single chain head event if we've progressed the chain
-	if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {
+	if lastCanon != nil && bc.CurrentBlockCtx(ctx).Hash() == lastCanon.Hash() {
 		events = append(events, ChainHeadEvent{lastCanon})
 	}
 	return 0, events, coalescedLogs, nil
@@ -1280,7 +1306,10 @@ func countTransactions(chain []*types.Block) (c int) {
 // reorgs takes two blocks, an old chain and a new chain and will reconstruct the blocks and inserts them
 // to be part of the new canonical chain and accumulates potential missing transactions and post an
 // event about them
-func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
+func (bc *BlockChain) reorg(ctx context.Context, oldBlock, newBlock *types.Block) error {
+	ctx, span := trace.StartSpan(ctx, "BlockChain.reorg")
+	defer span.End()
+
 	var (
 		newChain    types.Blocks
 		oldChain    types.Blocks
@@ -1397,32 +1426,37 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 // PostChainEvents iterates over the events generated by a chain insertion and
 // posts them into the event feed.
 // TODO: Should not expose PostChainEvents. The chain events should be posted in WriteBlock.
-func (bc *BlockChain) PostChainEvents(events []interface{}, logs []*types.Log) {
+func (bc *BlockChain) PostChainEvents(ctx context.Context, events []interface{}, logs []*types.Log) {
+	ctx, span := trace.StartSpan(ctx, "BlockChain.PostChainEvents")
+	defer span.End()
+
 	// post event logs for further processing
 	if logs != nil {
-		bc.logsFeed.Send(logs)
+		bc.logsFeed.SendCtx(ctx, logs)
 	}
 	for _, event := range events {
 		switch ev := event.(type) {
 		case ChainEvent:
-			bc.chainFeed.Send(ev)
+			bc.chainFeed.SendCtx(ctx, ev)
 
 		case ChainHeadEvent:
-			bc.chainHeadFeed.Send(ev)
+			bc.chainHeadFeed.SendCtx(ctx, ev)
 
 		case ChainSideEvent:
-			bc.chainSideFeed.Send(ev)
+			bc.chainSideFeed.SendCtx(ctx, ev)
 		}
 	}
 }
 
-func (bc *BlockChain) update(ctx context.Context) {
+func (bc *BlockChain) update() {
 	futureTimer := time.NewTicker(5 * time.Second)
 	defer futureTimer.Stop()
 	for {
 		select {
 		case <-futureTimer.C:
+			ctx, span := trace.StartSpan(context.Background(), "BlockChain.update-futureTimer")
 			bc.procFutureBlocks(ctx)
+			span.End()
 		case <-bc.quit:
 			return
 		}

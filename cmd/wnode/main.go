@@ -21,6 +21,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"crypto/ecdsa"
 	"crypto/sha512"
 	"encoding/binary"
@@ -221,7 +222,7 @@ func initialize() {
 	}
 
 	if *argPoW != whisper.DefaultMinimumPoW {
-		err := shh.SetMinimumPoW(*argPoW)
+		err := shh.SetMinimumPoW(context.Background(), *argPoW)
 		if err != nil {
 			utils.Fatalf("Failed to set PoW: %s", err)
 		}
@@ -668,7 +669,7 @@ func requestExpiredMessagesLoop() {
 			utils.Fatalf("Wrap failed: %s", err)
 		}
 
-		err = shh.RequestHistoricMessages(peerID, env)
+		err = shh.RequestHistoricMessages(context.Background(), peerID, env)
 		if err != nil {
 			utils.Fatalf("Failed to send P2P message: %s", err)
 		}

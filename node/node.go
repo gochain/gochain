@@ -17,7 +17,6 @@
 package node
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -72,6 +71,8 @@ type Node struct {
 	lock sync.RWMutex
 
 	log log.Logger
+
+	tracing bool
 }
 
 // New creates a new P2P node, ready for protocol registration.
@@ -119,6 +120,7 @@ func New(conf *Config) (*Node, error) {
 		wsEndpoint:        conf.WSEndpoint(),
 		eventmux:          new(event.TypeMux),
 		log:               conf.Logger,
+		tracing:           conf.HTTPTracing,
 	}, nil
 }
 
@@ -136,7 +138,7 @@ func (n *Node) Register(constructor ServiceConstructor) error {
 }
 
 // Start create a live P2P node and starts running it.
-func (n *Node) Start(ctx context.Context) error {
+func (n *Node) Start() error {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
@@ -201,7 +203,7 @@ func (n *Node) Start(ctx context.Context) error {
 	started := []reflect.Type{}
 	for kind, service := range services {
 		// Start the next service, stopping all previous upon failure
-		if err := service.Start(ctx, running); err != nil {
+		if err := service.Start(running); err != nil {
 			for _, kind := range started {
 				if err := services[kind].Stop(); err != nil {
 					log.Error("Cannot stop node service", "err", err)
@@ -268,7 +270,7 @@ func (n *Node) startRPC(services map[reflect.Type]Service) error {
 		n.stopInProc()
 		return err
 	}
-	if err := n.startHTTP(n.httpEndpoint, apis, n.config.HTTPModules, n.config.HTTPCors, n.config.HTTPVirtualHosts); err != nil {
+	if err := n.startHTTP(n.httpEndpoint, apis, n.config.HTTPModules, n.config.HTTPCors, n.config.HTTPVirtualHosts, n.config.HTTPTracing); err != nil {
 		n.stopIPC()
 		n.stopInProc()
 		return err
@@ -372,7 +374,7 @@ func (n *Node) stopIPC() {
 }
 
 // startHTTP initializes and starts the HTTP RPC endpoint.
-func (n *Node) startHTTP(endpoint string, apis []rpc.API, modules []string, cors []string, vhosts []string) error {
+func (n *Node) startHTTP(endpoint string, apis []rpc.API, modules []string, cors []string, vhosts []string, tracing bool) error {
 	// Short circuit if the HTTP endpoint isn't being exposed
 	if endpoint == "" {
 		return nil
@@ -400,7 +402,8 @@ func (n *Node) startHTTP(endpoint string, apis []rpc.API, modules []string, cors
 	if listener, err = net.Listen("tcp", endpoint); err != nil {
 		return err
 	}
-	go rpc.NewHTTPServer(cors, vhosts, handler).Serve(listener)
+
+	go rpc.NewHTTPServer(cors, vhosts, handler, tracing).Serve(listener)
 	n.log.Info("HTTP endpoint opened", "url", fmt.Sprintf("http://%s", endpoint), "cors", strings.Join(cors, ","), "vhosts", strings.Join(vhosts, ","))
 	// All listeners booted successfully
 	n.httpEndpoint = endpoint
@@ -552,11 +555,11 @@ func (n *Node) Wait() {
 
 // Restart terminates a running node and boots up a new one in its place. If the
 // node isn't running, an error is returned.
-func (n *Node) Restart(ctx context.Context) error {
+func (n *Node) Restart() error {
 	if err := n.Stop(); err != nil {
 		return err
 	}
-	if err := n.Start(ctx); err != nil {
+	if err := n.Start(); err != nil {
 		return err
 	}
 	return nil

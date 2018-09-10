@@ -18,6 +18,7 @@ package p2p
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -25,10 +26,64 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.opencensus.io/trace"
+
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/p2p/discover"
 	"github.com/gochain-io/gochain/rlp"
 )
+
+// eth protocol message codes
+const (
+	// Protocol messages belonging to eth/62
+	StatusMsg          = 0x00
+	NewBlockHashesMsg  = 0x01
+	TxMsg              = 0x02
+	GetBlockHeadersMsg = 0x03
+	BlockHeadersMsg    = 0x04
+	GetBlockBodiesMsg  = 0x05
+	BlockBodiesMsg     = 0x06
+	NewBlockMsg        = 0x07
+
+	// Protocol messages belonging to eth/63
+	GetNodeDataMsg = 0x0d
+	NodeDataMsg    = 0x0e
+	GetReceiptsMsg = 0x0f
+	ReceiptsMsg    = 0x10
+)
+
+func MsgCodeString(code uint64) string {
+	switch code {
+	case StatusMsg:
+		return "Status"
+	case NewBlockHashesMsg:
+		return "NewBlockHashes"
+	case TxMsg:
+		return "Tx"
+	case GetBlockHeadersMsg:
+		return "GetBlockHeaders"
+	case BlockHeadersMsg:
+		return "BlockHeaders"
+	case GetBlockBodiesMsg:
+		return "GetBlockBodies"
+	case BlockBodiesMsg:
+		return "BlockBodiesMsg"
+	case NewBlockMsg:
+		return "NewBlock"
+
+	case GetNodeDataMsg:
+		return "GetNodeData"
+	case NodeDataMsg:
+		return "NodeData"
+	case GetReceiptsMsg:
+		return "GetReceipts"
+	case ReceiptsMsg:
+		return "Receipts"
+
+	default:
+		return fmt.Sprintf("Unrecognized: %x", code)
+	}
+}
 
 // Msg defines the structure of a p2p message.
 //
@@ -77,7 +132,7 @@ type MsgWriter interface {
 	//
 	// Note that messages can be sent only once because their
 	// payload reader is drained.
-	WriteMsg(Msg) error
+	WriteMsg(context.Context, Msg) error
 }
 
 // MsgReadWriter provides reading and writing of encoded messages.
@@ -90,12 +145,21 @@ type MsgReadWriter interface {
 
 // Send writes an RLP-encoded message with the given code.
 // data should encode as an RLP list.
+// Deprecated. Use SendCtx instead.
 func Send(w MsgWriter, msgcode uint64, data interface{}) error {
+	return SendCtx(context.Background(), w, msgcode, data)
+}
+
+func SendCtx(ctx context.Context, w MsgWriter, msgcode uint64, data interface{}) error {
+	ctx, span := trace.StartSpan(ctx, "Send")
+	defer span.End()
+
 	size, r, err := rlp.EncodeToReader(data)
 	if err != nil {
 		return err
 	}
-	return w.WriteMsg(Msg{Code: msgcode, Size: uint32(size), Payload: r})
+
+	return w.WriteMsg(ctx, Msg{Code: msgcode, Size: uint32(size), Payload: r})
 }
 
 // SendItems writes an RLP with the given code and data elements.
@@ -109,6 +173,10 @@ func Send(w MsgWriter, msgcode uint64, data interface{}) error {
 //
 func SendItems(w MsgWriter, msgcode uint64, elems ...interface{}) error {
 	return Send(w, msgcode, elems)
+}
+
+func SendItemsCtx(ctx context.Context, w MsgWriter, msgcode uint64, elems ...interface{}) error {
+	return SendCtx(ctx, w, msgcode, elems)
 }
 
 // eofSignal wraps a reader with eof signaling. the eof channel is
@@ -172,7 +240,15 @@ type MsgPipeRW struct {
 
 // WriteMsg sends a messsage on the pipe.
 // It blocks until the receiver has consumed the message payload.
-func (p *MsgPipeRW) WriteMsg(msg Msg) error {
+func (p *MsgPipeRW) WriteMsg(ctx context.Context, msg Msg) error {
+	ctx, span := trace.StartSpan(ctx, "MsgPipeRW.WriteMsg")
+	defer span.End()
+
+	span.AddAttributes(
+		trace.StringAttribute("code", MsgCodeString(msg.Code)),
+		trace.Int64Attribute("size", int64(msg.Size)),
+	)
+
 	if atomic.LoadInt32(p.closed) == 0 {
 		consumed := make(chan struct{}, 1)
 		msg.Payload = &eofSignal{msg.Payload, msg.Size, consumed}
@@ -189,6 +265,10 @@ func (p *MsgPipeRW) WriteMsg(msg Msg) error {
 		case <-p.closing:
 		}
 	}
+	span.SetStatus(trace.Status{
+		Code:    trace.StatusCodeInternal,
+		Message: ErrPipeClosed.Error(),
+	})
 	return ErrPipeClosed
 }
 
@@ -289,12 +369,15 @@ func (self *msgEventer) ReadMsg() (Msg, error) {
 
 // WriteMsg writes a message to the underlying MsgReadWriter and emits a
 // "message sent" event
-func (self *msgEventer) WriteMsg(msg Msg) error {
-	err := self.MsgReadWriter.WriteMsg(msg)
+func (self *msgEventer) WriteMsg(ctx context.Context, msg Msg) error {
+	ctx, span := trace.StartSpan(ctx, "msgEventer.WriteMsg")
+	defer span.End()
+
+	err := self.MsgReadWriter.WriteMsg(ctx, msg)
 	if err != nil {
 		return err
 	}
-	self.feed.Send(&PeerEvent{
+	self.feed.SendCtx(ctx, &PeerEvent{
 		Type:     PeerEventTypeMsgSend,
 		Peer:     self.peerID,
 		Protocol: self.Protocol,

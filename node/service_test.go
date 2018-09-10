@@ -17,7 +17,6 @@
 package node
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -64,7 +63,6 @@ func TestContextDatabases(t *testing.T) {
 
 // Tests that already constructed services can be retrieves by later ones.
 func TestContextServices(t *testing.T) {
-	ctx := context.Background()
 	stack, err := New(testNodeConfig())
 	if err != nil {
 		t.Fatalf("failed to create protocol stack: %v", err)
@@ -92,7 +90,7 @@ func TestContextServices(t *testing.T) {
 		t.Fatalf("latter failed to register service: %v", err)
 	}
 	// Start the protocol stack and ensure services are constructed in order
-	if err := stack.Start(ctx); err != nil {
+	if err := stack.Start(); err != nil {
 		t.Fatalf("failed to start stack: %v", err)
 	}
 	defer stack.Stop()

@@ -18,6 +18,7 @@ package state
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -133,7 +134,7 @@ func TestCopy(t *testing.T) {
 	orig.Finalise(false)
 
 	// Copy the state, modify both in-memory
-	copy := orig.Copy()
+	copy := orig.Copy(context.Background())
 
 	for i := byte(0); i < 255; i++ {
 		origObj := orig.GetOrNewStateObject(common.BytesToAddress([]byte{i}))

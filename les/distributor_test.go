@@ -19,6 +19,7 @@
 package les
 
 import (
+	"context"
 	"math/rand"
 	"sync"
 	"testing"
@@ -39,8 +40,8 @@ func (r *testDistReq) canSend(dp distPeer) bool {
 	return ok
 }
 
-func (r *testDistReq) request(dp distPeer) func() {
-	return func() { dp.(*testDistPeer).send(r) }
+func (r *testDistReq) request(dp distPeer) func(context.Context) {
+	return func(context.Context) { dp.(*testDistPeer).send(r) }
 }
 
 type testDistPeer struct {
@@ -106,8 +107,8 @@ func (p *testDistPeer) canQueue() bool {
 	return true
 }
 
-func (p *testDistPeer) queueSend(f func()) {
-	f()
+func (p *testDistPeer) queueSend(f func(context.Context)) {
+	f(context.Background())
 }
 
 func TestRequestDistributor(t *testing.T) {

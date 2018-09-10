@@ -18,13 +18,16 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"runtime"
 	"sort"
 	"strings"
 	"time"
+
+	"go.opencensus.io/exporter/stackdriver"
+	"go.opencensus.io/trace"
+	"gopkg.in/urfave/cli.v1"
 
 	"github.com/gochain-io/gochain/accounts"
 	"github.com/gochain-io/gochain/accounts/keystore"
@@ -37,7 +40,6 @@ import (
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/metrics"
 	"github.com/gochain-io/gochain/node"
-	"gopkg.in/urfave/cli.v1"
 )
 
 const (
@@ -116,6 +118,8 @@ var (
 		utils.RPCVirtualHostsFlag,
 		utils.NetStatsURLFlag,
 		utils.MetricsEnabledFlag,
+		utils.TracingStackdriverFlag,
+		utils.TracingSampleRateFlag,
 		utils.FakePoWFlag,
 		utils.NoCompactionFlag,
 		utils.GpoBlocksFlag,
@@ -220,6 +224,26 @@ func main() {
 // It creates a default node based on the command line arguments and runs it in
 // blocking mode, waiting for it to be shut down.
 func gochain(ctx *cli.Context) error {
+	if ctx.GlobalIsSet(utils.TracingStackdriverFlag.Name) {
+		gcpProjectID := ctx.GlobalString(utils.TracingStackdriverFlag.Name)
+		// Enable the Stackdriver Tracing exporter.
+		sd, err := stackdriver.NewExporter(stackdriver.Options{
+			ProjectID: gcpProjectID,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create the Stackdriver exporter: %v", err)
+		}
+		defer sd.Flush()
+
+		// Register/enable the trace exporter.
+		trace.RegisterExporter(sd)
+
+		if ctx.GlobalIsSet(utils.TracingSampleRateFlag.Name) {
+			rate := ctx.GlobalFloat64(utils.TracingSampleRateFlag.Name)
+			trace.ApplyConfig(trace.Config{DefaultSampler: trace.ProbabilitySampler(rate)})
+		}
+	}
+
 	node := makeFullNode(ctx)
 	startNode(ctx, node)
 	node.Wait()
@@ -231,7 +255,7 @@ func gochain(ctx *cli.Context) error {
 // miner.
 func startNode(ctx *cli.Context, stack *node.Node) {
 	// Start up the node itself
-	utils.StartNode(context.TODO(), stack)
+	utils.StartNode(stack)
 
 	// Unlock any account specifically requested
 	ks := stack.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
@@ -303,7 +327,7 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 				th.SetThreads(threads)
 			}
 		}
-		if err := gochain.StartMining(context.TODO(), true); err != nil {
+		if err := gochain.StartMining(true); err != nil {
 			utils.Fatalf("Failed to start mining: %v", err)
 		}
 	}

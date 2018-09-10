@@ -28,6 +28,8 @@ import (
 	"sync"
 	"time"
 
+	"go.opencensus.io/trace"
+
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/consensus"
 	"github.com/gochain-io/gochain/core"
@@ -264,6 +266,9 @@ func (pm *ProtocolManager) newPeer(pv int, nv uint64, p *p2p.Peer, rw p2p.MsgRea
 // handle is the callback invoked to manage the life cycle of a les peer. When
 // this function terminates, the peer is disconnected.
 func (pm *ProtocolManager) handle(ctx context.Context, p *peer) error {
+	ctx, span := trace.StartSpan(ctx, "ProtocolManager.handle")
+	defer span.End()
+
 	// Ignore maxPeers if this is a trusted peer
 	if pm.peers.Len() >= pm.maxPeers && !p.Peer.Info().Network.Trusted {
 		return p2p.DiscTooManyPeers
@@ -279,7 +284,7 @@ func (pm *ProtocolManager) handle(ctx context.Context, p *peer) error {
 		number  = head.Number.Uint64()
 		td      = pm.blockchain.GetTd(hash, number)
 	)
-	if err := p.Handshake(td, hash, number, genesis.Hash(), pm.server); err != nil {
+	if err := p.Handshake(ctx, td, hash, number, genesis.Hash(), pm.server); err != nil {
 		p.Log().Debug("Light Ethereum handshake failed", "err", err)
 		return err
 	}
@@ -318,9 +323,11 @@ func (pm *ProtocolManager) handle(ctx context.Context, p *peer) error {
 		for {
 			select {
 			case announce := <-p.announceChn:
-				if err := p.SendAnnounce(announce); err != nil {
+				ctx, span := trace.StartSpan(context.Background(), "ProtocolManager.handle-announceCh")
+				if err := p.SendAnnounce(ctx, announce); err != nil {
 					log.Error("Cannot send announce", "id", p.id, "err", err)
 				}
+				span.End()
 			case <-stop:
 				return
 			}
@@ -1220,7 +1227,7 @@ func (pc *peerConnection) Head() (common.Hash, *big.Int) {
 	return pc.peer.HeadAndTd()
 }
 
-func (pc *peerConnection) RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool) error {
+func (pc *peerConnection) RequestHeadersByHash(ctx context.Context, origin common.Hash, amount int, skip int, reverse bool) error {
 	reqID := genReqID()
 	rq := &distReq{
 		getCost: func(dp distPeer) uint64 {
@@ -1230,12 +1237,12 @@ func (pc *peerConnection) RequestHeadersByHash(origin common.Hash, amount int, s
 		canSend: func(dp distPeer) bool {
 			return dp.(*peer) == pc.peer
 		},
-		request: func(dp distPeer) func() {
+		request: func(dp distPeer) func(context.Context) {
 			peer := dp.(*peer)
 			cost := peer.GetRequestCost(GetBlockHeadersMsg, amount)
 			peer.fcServer.QueueRequest(reqID, cost)
-			return func() {
-				if err := peer.RequestHeadersByHash(reqID, cost, origin, amount, skip, reverse); err != nil {
+			return func(ctx context.Context) {
+				if err := peer.RequestHeadersByHash(ctx, reqID, cost, origin, amount, skip, reverse); err != nil {
 					log.Error("Cannot recursively request headers by hash", "req_id", reqID, "err", err)
 				}
 			}
@@ -1248,7 +1255,7 @@ func (pc *peerConnection) RequestHeadersByHash(origin common.Hash, amount int, s
 	return nil
 }
 
-func (pc *peerConnection) RequestHeadersByNumber(origin uint64, amount int, skip int, reverse bool) error {
+func (pc *peerConnection) RequestHeadersByNumber(ctx context.Context, origin uint64, amount int, skip int, reverse bool) error {
 	reqID := genReqID()
 	rq := &distReq{
 		getCost: func(dp distPeer) uint64 {
@@ -1258,12 +1265,12 @@ func (pc *peerConnection) RequestHeadersByNumber(origin uint64, amount int, skip
 		canSend: func(dp distPeer) bool {
 			return dp.(*peer) == pc.peer
 		},
-		request: func(dp distPeer) func() {
+		request: func(dp distPeer) func(context.Context) {
 			peer := dp.(*peer)
 			cost := peer.GetRequestCost(GetBlockHeadersMsg, amount)
 			peer.fcServer.QueueRequest(reqID, cost)
-			return func() {
-				if err := peer.RequestHeadersByNumber(reqID, cost, origin, amount, skip, reverse); err != nil {
+			return func(ctx context.Context) {
+				if err := peer.RequestHeadersByNumber(ctx, reqID, cost, origin, amount, skip, reverse); err != nil {
 					log.Error("Cannot recursively request headers by number", "req_id", reqID, "err", err)
 				}
 			}

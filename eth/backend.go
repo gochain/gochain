@@ -18,7 +18,6 @@
 package eth
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -101,7 +100,7 @@ func (gc *GoChain) AddLesServer(ls LesServer) {
 
 // New creates a new GoChain object (including the
 // initialisation of the common GoChain object)
-func New(ctx context.Context, sctx *node.ServiceContext, config *Config) (*GoChain, error) {
+func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 	if config.SyncMode == downloader.LightSync {
 		return nil, errors.New("can't run eth.GoChain in light sync mode, use les.LightGoChain")
 	}
@@ -168,7 +167,7 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *Config) (*GoCha
 		vmConfig    = vm.Config{EnablePreimageRecording: config.EnablePreimageRecording}
 		cacheConfig = &core.CacheConfig{Disabled: config.NoPruning, TrieNodeLimit: config.TrieCache, TrieTimeLimit: config.TrieTimeout}
 	)
-	eth.blockchain, err = core.NewBlockChain(ctx, chainDb, cacheConfig, eth.chainConfig, eth.engine, vmConfig)
+	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, eth.chainConfig, eth.engine, vmConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -198,12 +197,12 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *Config) (*GoCha
 	if config.TxPool.Journal != "" {
 		config.TxPool.Journal = sctx.ResolvePath(config.TxPool.Journal)
 	}
-	eth.txPool = core.NewTxPool(ctx, config.TxPool, eth.chainConfig, eth.blockchain)
+	eth.txPool = core.NewTxPool(config.TxPool, eth.chainConfig, eth.blockchain)
 
-	if eth.protocolManager, err = NewProtocolManager(ctx, eth.chainConfig, config.SyncMode, config.NetworkId, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb); err != nil {
+	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.SyncMode, config.NetworkId, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb); err != nil {
 		return nil, err
 	}
-	eth.miner = miner.New(ctx, eth, eth.chainConfig, eth.EventMux(), eth.engine)
+	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine)
 	if err := eth.miner.SetExtra(makeExtraData(config.ExtraData)); err != nil {
 		log.Error("Cannot set extra chain data", "err", err)
 	}
@@ -380,7 +379,7 @@ func (gc *GoChain) SetEtherbase(etherbase common.Address) {
 	gc.miner.SetEtherbase(etherbase)
 }
 
-func (gc *GoChain) StartMining(ctx context.Context, local bool) error {
+func (gc *GoChain) StartMining(local bool) error {
 	eb, err := gc.Etherbase()
 	if err != nil {
 		log.Error("Cannot start mining without etherbase", "err", err)
@@ -401,7 +400,7 @@ func (gc *GoChain) StartMining(ctx context.Context, local bool) error {
 		// will ensure that private networks work in single miner mode too.
 		atomic.StoreUint32(&gc.protocolManager.acceptTxs, 1)
 	}
-	go gc.miner.Start(ctx, eb)
+	go gc.miner.Start(eb)
 	return nil
 }
 
@@ -431,7 +430,7 @@ func (gc *GoChain) Protocols() []p2p.Protocol {
 
 // Start implements node.Service, starting all internal goroutines needed by the
 // GoChain protocol implementation.
-func (gc *GoChain) Start(ctx context.Context, srvr *p2p.Server) error {
+func (gc *GoChain) Start(srvr *p2p.Server) error {
 	// Start the bloom bits servicing goroutines
 	gc.startBloomHandlers()
 
@@ -447,7 +446,7 @@ func (gc *GoChain) Start(ctx context.Context, srvr *p2p.Server) error {
 		maxPeers -= gc.config.LightPeers
 	}
 	// Start the networking layer and the light server if requested
-	gc.protocolManager.Start(ctx, maxPeers)
+	gc.protocolManager.Start(maxPeers)
 	if gc.lesServer != nil {
 		gc.lesServer.Start(srvr)
 	}

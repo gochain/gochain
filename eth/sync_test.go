@@ -44,11 +44,11 @@ func TestFastSyncDisabling(t *testing.T) {
 	// Sync up the two peers
 	io1, io2 := p2p.MsgPipe()
 
-	go pmFull.handle(ctx, pmFull.newPeer(63, p2p.NewPeer(discover.NodeID{}, "empty", nil), io2))
-	go pmEmpty.handle(ctx, pmEmpty.newPeer(63, p2p.NewPeer(discover.NodeID{}, "full", nil), io1))
+	go pmFull.handle(pmFull.newPeer(63, p2p.NewPeer(discover.NodeID{}, "empty", nil), io2))
+	go pmEmpty.handle(pmEmpty.newPeer(63, p2p.NewPeer(discover.NodeID{}, "full", nil), io1))
 
 	time.Sleep(250 * time.Millisecond)
-	pmEmpty.synchronise(ctx, pmEmpty.peers.BestPeer())
+	pmEmpty.synchronise(ctx, pmEmpty.peers.BestPeer(context.Background()))
 
 	// Check that fast sync was disabled
 	if atomic.LoadUint32(&pmEmpty.fastSync) == 1 {
