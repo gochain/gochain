@@ -553,13 +553,15 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 	if err != nil {
 		return err
 	}
-	// Check that we can sign.
-	if _, ok := snap.Signers[c.signer]; !ok {
-		return fmt.Errorf("not authorized to sign: %s", c.signer.Hex())
+	if c.signer != (common.Address{}) {
+		// Check that we can sign.
+		if _, ok := snap.Signers[c.signer]; !ok {
+			return fmt.Errorf("not authorized to sign: %s", c.signer.Hex())
+		}
 	}
 	// Calculate and validate the difficulty.
 	diff := CalcDifficulty(snap.Signers, c.signer)
-	if diff == 0 {
+	if c.signer != (common.Address{}) && diff == 0 {
 		return fmt.Errorf("signed too recently: %s", c.signer.Hex())
 	}
 	header.Difficulty = new(big.Int).SetUint64(diff)
