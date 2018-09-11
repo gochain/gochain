@@ -18,6 +18,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/gochain-io/gochain/consensus"
@@ -60,10 +61,10 @@ func (v *BlockValidator) ValidateBody(ctx context.Context, block *types.Block) e
 		}
 		return consensus.ErrPrunedAncestor
 	}
-	// Header validity is known at this point, check the uncles and transactions
+	// Header validity is known at this point, check the transactions
 	header := block.Header()
-	if err := v.engine.VerifyUncles(ctx, v.bc, block); err != nil {
-		return err
+	if len(block.Uncles()) > 0 {
+		return errors.New("uncles not allowed")
 	}
 	if hash := types.CalcUncleHash(block.Uncles()); hash != header.UncleHash {
 		return fmt.Errorf("uncle root hash mismatch: have %x, want %x", hash, header.UncleHash)
@@ -97,7 +98,7 @@ func (v *BlockValidator) ValidateState(ctx context.Context, block, parent *types
 	// Validate the state root against the received state root and throw
 	// an error if they don't match.
 	if root := statedb.IntermediateRoot(v.config.IsEIP158(header.Number)); header.Root != root {
-		return fmt.Errorf("invalid merkle root (remote: %x local: %x)", header.Root, root)
+		return fmt.Errorf("invalid merkle root #%s (remote: %x local: %x)", header.Number, header.Root, root)
 	}
 	return nil
 }

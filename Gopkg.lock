@@ -69,8 +69,8 @@
 [[projects]]
   name = "github.com/cespare/cp"
   packages = ["."]
-  revision = "165db2f241fd235aec29ba6d9b1ccd5f1c14637c"
-  version = "v0.1.0"
+  revision = "118c73cfdf4dfc44f5cd1efa4ee578ebea52767f"
+  version = "v1.0.0"
 
 [[projects]]
   name = "github.com/davecgh/go-spew"
@@ -95,12 +95,6 @@
   name = "github.com/dustin/go-humanize"
   packages = ["."]
   revision = "02af3965c54e8cacf948b97fef38925c4120652c"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/edsrzf/mmap-go"
-  packages = ["."]
-  revision = "0bce6a6887123b67a60366d2c9fe2dfb74289d2e"
 
 [[projects]]
   branch = "master"
@@ -667,6 +661,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d77646c02a91404db93cee523750747fb59345d31fe51d9079ad3e67fb49a311"
+  inputs-digest = "92046a1d1a441aa6629c6895cd310df94afa43b3c926d0cc7b2196130e461269"
   solver-name = "gps-cdcl"
   solver-version = 1

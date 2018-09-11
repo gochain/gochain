@@ -28,7 +28,7 @@ import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/common/math"
-	"github.com/gochain-io/gochain/consensus/ethash"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
@@ -112,7 +112,7 @@ func (t *BlockTest) Run() error {
 		return fmt.Errorf("genesis block state root does not match test: computed=%x, test=%x", gblock.Root().Bytes()[:6], t.json.Genesis.StateRoot[:6])
 	}
 
-	chain, err := core.NewBlockChain(db, nil, config, ethash.NewShared(), vm.Config{})
+	chain, err := core.NewBlockChain(db, nil, config, clique.New(params.DefaultCliqueConfig(), db), vm.Config{})
 	if err != nil {
 		return err
 	}

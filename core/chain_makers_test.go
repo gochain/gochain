@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/gochain-io/gochain/consensus/ethash"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
 	"github.com/gochain-io/gochain/crypto"
@@ -43,16 +43,17 @@ func ExampleGenerateChain() {
 
 	// Ensure that key1 has some funds in the genesis block.
 	gspec := &Genesis{
-		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
+		Config: &params.ChainConfig{HomesteadBlock: new(big.Int), Clique: params.DefaultCliqueConfig()},
 		Alloc:  GenesisAlloc{addr1: {Balance: big.NewInt(1000000)}},
 	}
 	genesis := gspec.MustCommit(db)
+	engine := clique.NewFaker()
 
 	// This call generates a chain of 5 blocks. The function runs for
 	// each block and adds different features to gen based on the
 	// block index.
 	signer := types.HomesteadSigner{}
-	chain, _ := GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), db, 5, func(ctx context.Context, i int, gen *BlockGen) {
+	chain, _ := GenerateChain(ctx, gspec.Config, genesis, engine, db, 5, func(ctx context.Context, i int, gen *BlockGen) {
 		switch i {
 		case 0:
 			// In block 1, addr1 sends addr2 some ether.
@@ -70,18 +71,16 @@ func ExampleGenerateChain() {
 			gen.SetCoinbase(addr3)
 			gen.SetExtra([]byte("yeehaw"))
 		case 3:
-			// Block 4 includes blocks 2 and 3 as uncle headers (with modified extra data).
+			// Block 4 includes modified extra data.
 			b2 := gen.PrevBlock(1).Header()
 			b2.Extra = []byte("foo")
-			gen.AddUncle(b2)
 			b3 := gen.PrevBlock(2).Header()
 			b3.Extra = []byte("foo")
-			gen.AddUncle(b3)
 		}
 	})
 
 	// Import the chain. This runs all block validation rules.
-	blockchain, _ := NewBlockChain(db, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
+	blockchain, _ := NewBlockChain(db, nil, gspec.Config, engine, vm.Config{})
 	defer blockchain.Stop()
 
 	if i, err := blockchain.InsertChain(ctx, chain); err != nil {
@@ -98,5 +97,5 @@ func ExampleGenerateChain() {
 	// last block: #5
 	// balance of addr1: 989000
 	// balance of addr2: 10000
-	// balance of addr3: 19687500000000001000
+	// balance of addr3: 7000000000000001000
 }

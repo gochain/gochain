@@ -26,8 +26,9 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+
 	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/consensus/ethash"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core/vm"
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/params"
@@ -50,16 +51,22 @@ func TestDefaultGenesisBlockHash(t *testing.T) {
 func TestSetupGenesis(t *testing.T) {
 	ctx := context.Background()
 	var (
-		customghash = common.HexToHash("0x7c3428c4a706481debbf2a273a35f1e14ad5e97873d35b72f893b4e8b242eb13")
+		customghash = common.HexToHash("0x2ba5deb4ad470a1b170475fe5004f0e0cefffa8e18469e6510937e74db11094a")
 		customg     = Genesis{
-			Config: &params.ChainConfig{HomesteadBlock: big.NewInt(3)},
+			Config: &params.ChainConfig{
+				HomesteadBlock: big.NewInt(3),
+				Clique:         params.DefaultCliqueConfig(),
+			},
 			Alloc: GenesisAlloc{
 				{1}: {Balance: big.NewInt(1), Storage: map[common.Hash]common.Hash{{1}: {1}}},
 			},
 		}
 		oldcustomg = customg
 	)
-	oldcustomg.Config = &params.ChainConfig{HomesteadBlock: big.NewInt(2)}
+	oldcustomg.Config = &params.ChainConfig{
+		HomesteadBlock: big.NewInt(2),
+		Clique:         params.DefaultCliqueConfig(),
+	}
 	tests := []struct {
 		name       string
 		fn         func(ethdb.Database) (*params.ChainConfig, common.Hash, error)
@@ -73,7 +80,7 @@ func TestSetupGenesis(t *testing.T) {
 				return SetupGenesisBlock(db, new(Genesis))
 			},
 			wantErr:    errGenesisNoConfig,
-			wantConfig: params.AllEthashProtocolChanges,
+			wantConfig: params.AllCliqueProtocolChanges,
 		},
 		{
 			name: "no block in DB, genesis == nil",
@@ -127,11 +134,14 @@ func TestSetupGenesis(t *testing.T) {
 				// Advance to block #4, past the homestead transition block of customg.
 				genesis := oldcustomg.MustCommit(db)
 
-				bc, _ := NewBlockChain(db, nil, oldcustomg.Config, ethash.NewFullFaker(), vm.Config{})
+				bc, _ := NewBlockChain(db, nil, oldcustomg.Config, clique.NewFullFaker(), vm.Config{})
 				defer bc.Stop()
 
-				blocks, _ := GenerateChain(ctx, oldcustomg.Config, genesis, ethash.NewFaker(), db, 4, nil)
-				bc.InsertChain(ctx, blocks)
+				blocks, _ := GenerateChain(ctx, oldcustomg.Config, genesis, clique.NewFaker(), db, 4, nil)
+				_, err := bc.InsertChain(ctx, blocks)
+				if err != nil {
+					return nil, common.Hash{}, err
+				}
 				bc.CurrentBlock()
 				// This should return a compatibility error.
 				return SetupGenesisBlock(db, &customg)
@@ -153,13 +163,13 @@ func TestSetupGenesis(t *testing.T) {
 		// Check the return values.
 		if !reflect.DeepEqual(err, test.wantErr) {
 			spew := spew.ConfigState{DisablePointerAddresses: true, DisableCapacities: true}
-			t.Errorf("%s: returned error %#v, want %#v", test.name, spew.NewFormatter(err), spew.NewFormatter(test.wantErr))
+			t.Fatalf("%s:\nhave: %#v\nwant: %#v\n", test.name, spew.NewFormatter(err), spew.NewFormatter(test.wantErr))
 		}
 		if !reflect.DeepEqual(config, test.wantConfig) {
-			t.Errorf("%s:\nreturned %v\nwant     %v", test.name, config, test.wantConfig)
+			t.Errorf("%s:\nhave: %v\nwant: %v\n", test.name, config, test.wantConfig)
 		}
 		if hash != test.wantHash {
-			t.Errorf("%s: returned hash %s, want %s", test.name, hash.Hex(), test.wantHash.Hex())
+			t.Errorf("%s:\nhave: %s\nwant: %s\n", test.name, hash.Hex(), test.wantHash.Hex())
 		} else if err == nil {
 			// Check database content.
 			stored := GetBlock(db, test.wantHash, 0)

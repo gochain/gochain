@@ -27,6 +27,7 @@ import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/consensus"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/bloombits"
 	"github.com/gochain-io/gochain/core/types"
@@ -102,6 +103,9 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *eth.Config) (*L
 	peers := newPeerSet()
 	quitSync := make(chan struct{})
 
+	if chainConfig.Clique == nil {
+		return nil, fmt.Errorf("invalid configuration, clique is nil: %v", chainConfig)
+	}
 	leth := &LightGoChain{
 		config:           config,
 		chainConfig:      chainConfig,
@@ -110,7 +114,7 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *eth.Config) (*L
 		peers:            peers,
 		reqDist:          newRequestDistributor(peers, quitSync),
 		accountManager:   sctx.AccountManager,
-		engine:           eth.CreateConsensusEngine(sctx, &config.Ethash, chainConfig, chainDb),
+		engine:           clique.New(chainConfig.Clique, chainDb),
 		shutdownChan:     make(chan bool),
 		networkId:        config.NetworkId,
 		bloomRequests:    make(chan chan *bloombits.Retrieval),

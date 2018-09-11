@@ -27,7 +27,8 @@ import (
 	"testing"
 
 	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/consensus/ethash"
+	"github.com/gochain-io/gochain/common/hexutil"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
@@ -111,13 +112,11 @@ func testChainGen(ctx context.Context, i int, block *core.BlockGen) {
 		tx, _ := types.SignTx(types.NewTransaction(block.TxNonce(testBankAddress), testContractAddr, big.NewInt(0), 100000, nil, data), signer, testBankKey)
 		block.AddTx(ctx, tx)
 	case 3:
-		// Block 4 includes blocks 2 and 3 as uncle headers (with modified extra data).
+		// Block 4 includes modified extra data.
 		b2 := block.PrevBlock(1).Header()
 		b2.Extra = []byte("foo")
-		block.AddUncle(b2)
 		b3 := block.PrevBlock(2).Header()
 		b3.Extra = []byte("foo")
-		block.AddUncle(b3)
 		data := common.Hex2Bytes("C16431B900000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002")
 		tx, _ := types.SignTx(types.NewTransaction(block.TxNonce(testBankAddress), testContractAddr, big.NewInt(0), 100000, nil, data), signer, testBankKey)
 		block.AddTx(ctx, tx)
@@ -140,10 +139,13 @@ func testRCL() RequestCostList {
 func newTestProtocolManager(ctx context.Context, lightSync bool, blocks int, generator func(context.Context, int, *core.BlockGen), peers *peerSet, odr *LesOdr, db ethdb.Database) (*ProtocolManager, error) {
 	var (
 		evmux  = new(event.TypeMux)
-		engine = ethash.NewFaker()
+		engine = clique.NewFaker()
 		gspec  = core.Genesis{
-			Config: params.TestChainConfig,
-			Alloc:  core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
+			Config:  params.TestChainConfig,
+			Alloc:   core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
+			Voters:  []common.Address{{}},
+			Signers: []common.Address{{}},
+			Signer:  hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
 		}
 		genesis = gspec.MustCommit(db)
 		chain   BlockChain
@@ -166,7 +168,7 @@ func newTestProtocolManager(ctx context.Context, lightSync bool, blocks int, gen
 		bloomIndexer.AddChildIndexer(bbtIndexer)
 		bloomIndexer.Start(blockchain)
 
-		gchain, _ := core.GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), db, blocks, generator)
+		gchain, _ := core.GenerateChain(ctx, gspec.Config, genesis, clique.NewFaker(), db, blocks, generator)
 		if _, err := blockchain.InsertChain(ctx, gchain); err != nil {
 			panic(err)
 		}

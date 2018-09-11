@@ -34,7 +34,6 @@ import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/consensus"
-	"github.com/gochain-io/gochain/consensus/misc"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/crypto/sha3"
@@ -55,9 +54,6 @@ const (
 
 // Clique proof-of-authority protocol constants.
 var (
-	epochLength = uint64(30000) // Default number of blocks after which to checkpoint and reset the pending votes
-	blockPeriod = uint64(5)     // Default minimum difference between two consecutive block's timestamps
-
 	signatureLength = 65
 
 	extraVanity  = 32                       // Fixed number of extra-data prefix bytes reserved for signer vanity.
@@ -139,10 +135,6 @@ var (
 	errWaitTransactions = errors.New("waiting for transactions")
 )
 
-// SignerFn is a signer callback function to request a hash to be signed by a
-// backing account.
-type SignerFn func(accounts.Account, []byte) ([]byte, error)
-
 // sigHash returns the hash which is used as input for the proof-of-authority
 // signing. It is the hash of the entire header apart from the 65 byte signature
 // contained at the end of the extra data.
@@ -218,9 +210,9 @@ type Clique struct {
 
 	proposals map[common.Address]propose // Current list of proposals we are pushing
 
-	signer common.Address // Ethereum address of the signing key
-	signFn SignerFn       // Signer function to authorize hashes with
-	lock   sync.RWMutex   // Protects the signer fields
+	signer common.Address     // Address of the signing key
+	signFn consensus.SignerFn // Signer function to authorize hashes with
+	lock   sync.RWMutex       // Protects the signer fields
 }
 
 // New creates a Clique proof-of-authority consensus engine with the initial
@@ -229,7 +221,7 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 	// Set any missing consensus parameters to their defaults
 	conf := *config
 	if conf.Epoch == 0 {
-		conf.Epoch = epochLength
+		conf.Epoch = params.DefaultCliqueEpoch
 	}
 	// Allocate the snapshot caches and create the engine
 	recents, _ := lru.NewARC(inmemorySnapshots)
@@ -244,33 +236,49 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 	}
 }
 
-// Author implements consensus.Engine, returning the Ethereum address recovered
+// Author implements consensus.Engine, returning the address recovered
 // from the signature in the header's extra-data section.
 func (c *Clique) Author(header *types.Header) (common.Address, error) {
-	return header.Coinbase, nil
-	//return ecrecover(header, c.signatures)
+	return ecrecover(header, c.signatures)
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules.
-func (c *Clique) VerifyHeader(ctx context.Context, chain consensus.ChainReader, header *types.Header, seal bool) error {
+func (c *Clique) VerifyHeader(ctx context.Context, chain consensus.ChainReader, header *types.Header) error {
 	ctx, span := trace.StartSpan(ctx, "Clique.VerifyHeader")
 	defer span.End()
-	return c.verifyHeader(ctx, chain, header, nil)
+	if err := c.verifyHeader(ctx, chain, header, nil); err != nil {
+		return err
+	}
+	if err := c.verifyCascadingFields(ctx, chain, header, nil); err != nil {
+		return err
+	}
+	return c.verifySeal(ctx, chain, header, nil)
 }
 
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers. The
 // method returns a quit channel to abort the operations and a results channel to
 // retrieve the async verifications (the order is that of the input slice).
-func (c *Clique) VerifyHeaders(ctx context.Context, chain consensus.ChainReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
+func (c *Clique) VerifyHeaders(ctx context.Context, chain consensus.ChainReader, headers []*types.Header) (chan<- struct{}, <-chan error) {
 	ctx, span := trace.StartSpan(ctx, "Clique.VerifyHeaders")
 	defer span.End()
+	verify := []verifyFn{c.verifyHeader, c.verifyCascadingFields, c.verifySeal}
+	return c.verifyHeaders(ctx, chain, headers, verify)
+}
 
+func (c *Clique) verifyHeaders(ctx context.Context, chain consensus.ChainReader, headers []*types.Header, verify []verifyFn) (chan<- struct{}, <-chan error) {
 	abort := make(chan struct{})
 	results := make(chan error, len(headers))
 
 	go func() {
 		for i, header := range headers {
-			err := c.verifyHeader(ctx, chain, header, headers[:i])
+			parents := headers[:i]
+			var err error
+			for _, fn := range verify {
+				err = fn(ctx, chain, header, parents)
+				if err != nil {
+					break
+				}
+			}
 
 			select {
 			case <-abort:
@@ -281,6 +289,8 @@ func (c *Clique) VerifyHeaders(ctx context.Context, chain consensus.ChainReader,
 	}()
 	return abort, results
 }
+
+type verifyFn func(ctx context.Context, chain consensus.ChainReader, header *types.Header, parents []*types.Header) error
 
 // verifyHeader checks whether a header conforms to the consensus rules.The
 // caller may optionally pass in a batch of parents (ascending order) to avoid
@@ -295,10 +305,6 @@ func (c *Clique) verifyHeader(ctx context.Context, chain consensus.ChainReader, 
 	}
 	number := header.Number.Uint64()
 
-	// Don't waste time checking blocks from the future
-	if header.Time.Cmp(big.NewInt(time.Now().Unix())) > 0 {
-		return consensus.ErrFutureBlock
-	}
 	// Checkpoint blocks need to enforce zero beneficiary
 	checkpoint := (number % c.config.Epoch) == 0
 	if checkpoint && len(header.Extra) > extraVanity {
@@ -344,11 +350,24 @@ func (c *Clique) verifyHeader(ctx context.Context, chain consensus.ChainReader, 
 		}
 	}
 	// If all checks passed, validate any special fields for hard forks
-	if err := misc.VerifyForkHashes(chain.Config(), header, false); err != nil {
+	if err := verifyForkHashes(chain.Config(), header); err != nil {
 		return err
 	}
-	// All basic checks passed, verify cascading fields
-	return c.verifyCascadingFields(ctx, chain, header, parents)
+	return nil
+}
+
+// verifyForkHashes verifies that blocks conforming to network hard-forks do have
+// the correct hashes, to avoid clients going off on different chains. This is an
+// optional feature.
+func verifyForkHashes(config *params.ChainConfig, header *types.Header) error {
+	// If the homestead reprice hash is set, validate it
+	if config.EIP150Block != nil && config.EIP150Block.Cmp(header.Number) == 0 {
+		if config.EIP150Hash != (common.Hash{}) && config.EIP150Hash != header.Hash() {
+			return fmt.Errorf("homestead gas reprice fork: have 0x%x, want 0x%x", header.Hash(), config.EIP150Hash)
+		}
+	}
+	// All ok, return
+	return nil
 }
 
 // verifyCascadingFields verifies all the header fields that are not standalone,
@@ -359,6 +378,10 @@ func (c *Clique) verifyCascadingFields(ctx context.Context, chain consensus.Chai
 	ctx, span := trace.StartSpan(ctx, "Clique.verifyCascadingFields")
 	defer span.End()
 
+	// Don't waste time checking blocks from the future
+	if header.Time.Cmp(big.NewInt(time.Now().Unix())) > 0 {
+		return consensus.ErrFutureBlock
+	}
 	// The genesis block is the always valid dead-end
 	number := header.Number.Uint64()
 	if number == 0 {
@@ -395,8 +418,7 @@ func (c *Clique) verifyCascadingFields(ctx context.Context, chain consensus.Chai
 			}
 		}
 	}
-	// All basic checks passed, verify the seal and return
-	return c.verifySeal(ctx, chain, header, parents)
+	return nil
 }
 
 // snapshot retrieves the authorization snapshot at a given point in time.
@@ -426,7 +448,7 @@ func (c *Clique) snapshot(ctx context.Context, chain consensus.ChainReader, numb
 		// If we're at block zero, make a snapshot
 		if number == 0 {
 			genesis := chain.GetHeaderByNumber(0)
-			if err := c.VerifyHeader(ctx, chain, genesis, false); err != nil {
+			if err := c.VerifyHeader(ctx, chain, genesis); err != nil {
 				return nil, err
 			}
 			snap = newGenesisSnapshot(c.config, c.signatures, 0, genesis.Hash(), genesis.Signers, genesis.Voters)
@@ -475,21 +497,6 @@ func (c *Clique) snapshot(ctx context.Context, chain consensus.ChainReader, numb
 	return snap, err
 }
 
-// VerifyUncles implements consensus.Engine, always returning an error for any
-// uncles as this consensus mechanism doesn't permit uncles.
-func (c *Clique) VerifyUncles(ctx context.Context, chain consensus.ChainReader, block *types.Block) error {
-	if len(block.Uncles()) > 0 {
-		return errors.New("uncles not allowed")
-	}
-	return nil
-}
-
-// VerifySeal implements consensus.Engine, checking whether the signature contained
-// in the header satisfies the consensus protocol requirements.
-func (c *Clique) VerifySeal(ctx context.Context, chain consensus.ChainReader, header *types.Header) error {
-	return c.verifySeal(ctx, chain, header, nil)
-}
-
 // verifySeal checks whether the signature contained in the header satisfies the
 // consensus protocol requirements. The method accepts an optional list of parent
 // headers that aren't yet part of the local blockchain to generate the snapshots
@@ -498,17 +505,16 @@ func (c *Clique) verifySeal(ctx context.Context, chain consensus.ChainReader, he
 	ctx, span := trace.StartSpan(ctx, "Clique.verifySeal")
 	defer span.End()
 
-	// Verifying the genesis block is not supported
+	// The genesis block is the always valid dead-end
 	number := header.Number.Uint64()
 	if number == 0 {
-		return errUnknownBlock
+		return nil
 	}
 	// Retrieve the snapshot needed to verify this header and cache it
 	snap, err := c.snapshot(ctx, chain, number-1, header.ParentHash, parents)
 	if err != nil {
 		return err
 	}
-
 	// Resolve the authorization key and check against signers
 	signer, err := ecrecover(header, c.signatures)
 	if err != nil {
@@ -547,6 +553,17 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 	if err != nil {
 		return err
 	}
+	// Check that we can sign.
+	if _, ok := snap.Signers[c.signer]; !ok {
+		return fmt.Errorf("not authorized to sign: %s", c.signer.Hex())
+	}
+	// Calculate and validate the difficulty.
+	diff := CalcDifficulty(snap.Signers, c.signer)
+	if diff == 0 {
+		return fmt.Errorf("signed too recently: %s", c.signer.Hex())
+	}
+	header.Difficulty = new(big.Int).SetUint64(diff)
+
 	header.Extra = ExtraEnsureVanity(header.Extra)
 	//if not checkpoint
 	if number%c.config.Epoch != 0 {
@@ -573,8 +590,6 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 		}
 		c.lock.RUnlock()
 	}
-	// Set the correct difficulty
-	header.Difficulty = new(big.Int).SetUint64(CalcDifficulty(snap.Signers, c.signer))
 
 	if number%c.config.Epoch == 0 {
 		header.Signers = snap.signers()
@@ -596,9 +611,7 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 	return nil
 }
 
-// Authorize injects a private key into the consensus engine to mint new blocks
-// with.
-func (c *Clique) Authorize(signer common.Address, signFn SignerFn) {
+func (c *Clique) Authorize(signer common.Address, signFn consensus.SignerFn) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -680,17 +693,6 @@ func (c *Clique) Seal(ctx context.Context, chain consensus.ChainReader, block *t
 	header.Signer = sighash
 
 	return block.WithSeal(header), nil
-}
-
-// CalcDifficulty is the difficulty adjustment algorithm. It returns the difficulty
-// that a new block should have based on the previous blocks in the chain and the
-// current signer.
-func (c *Clique) CalcDifficulty(ctx context.Context, chain consensus.ChainReader, time uint64, parent *types.Header) *big.Int {
-	snap, err := c.snapshot(ctx, chain, parent.Number.Uint64(), parent.Hash(), nil)
-	if err != nil {
-		return nil
-	}
-	return new(big.Int).SetUint64(CalcDifficulty(snap.Signers, c.signer))
 }
 
 // CalcDifficulty returns the difficulty for signer, given all signers and their most recently signed block numbers,

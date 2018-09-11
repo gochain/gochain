@@ -22,7 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain-io/gochain/consensus/ethash"
+	"github.com/gochain-io/gochain/common/hexutil"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
 	"github.com/gochain-io/gochain/ethdb"
@@ -32,19 +33,23 @@ import (
 // Tests that simple header verification works, for both good and bad blocks.
 func TestHeaderVerification(t *testing.T) {
 	ctx := context.Background()
+
 	// Create a simple chain to verify
 	var (
-		testdb    = ethdb.NewMemDatabase()
-		gspec     = &Genesis{Config: params.TestChainConfig}
+		testdb = ethdb.NewMemDatabase()
+		gspec  = &Genesis{
+			Config: params.TestChainConfig,
+			Signer: hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		}
 		genesis   = gspec.MustCommit(testdb)
-		blocks, _ = GenerateChain(ctx, params.TestChainConfig, genesis, ethash.NewFaker(), testdb, 8, nil)
+		blocks, _ = GenerateChain(ctx, params.TestChainConfig, genesis, clique.NewFaker(), testdb, 8, nil)
 	)
 	headers := make([]*types.Header, len(blocks))
 	for i, block := range blocks {
 		headers[i] = block.Header()
 	}
 	// Run the header checker for blocks one-by-one, checking for both valid and invalid nonces
-	chain, _ := NewBlockChain(testdb, nil, params.TestChainConfig, ethash.NewFaker(), vm.Config{})
+	chain, _ := NewBlockChain(testdb, nil, params.TestChainConfig, clique.NewFaker(), vm.Config{})
 	defer chain.Stop()
 
 	for i := 0; i < len(blocks); i++ {
@@ -52,17 +57,19 @@ func TestHeaderVerification(t *testing.T) {
 			var results <-chan error
 
 			if valid {
-				engine := ethash.NewFaker()
-				_, results = engine.VerifyHeaders(ctx, chain, []*types.Header{headers[i]}, []bool{true})
+				engine := clique.NewFaker()
+				_, results = engine.VerifyHeaders(ctx, chain, []*types.Header{headers[i]})
 			} else {
-				engine := ethash.NewFakeFailer(headers[i].Number.Uint64())
-				_, results = engine.VerifyHeaders(ctx, chain, []*types.Header{headers[i]}, []bool{true})
+				engine := clique.NewFakeFailer(headers[i].Number.Uint64())
+				_, results = engine.VerifyHeaders(ctx, chain, []*types.Header{headers[i]})
 			}
 			// Wait for the verification result
 			select {
-			case result := <-results:
-				if (result == nil) != valid {
-					t.Errorf("test %d.%d: validity mismatch: have %v, want %v", i, j, result, valid)
+			case err := <-results:
+				if err == nil && !valid {
+					t.Errorf("test %d.%d: expected error", i, j)
+				} else if err != nil && valid {
+					t.Errorf("test %d.%d: unexpected error: %v", i, j, err)
 				}
 			case <-time.After(time.Second):
 				t.Fatalf("test %d.%d: verification timeout", i, j)
@@ -87,10 +94,13 @@ func testHeaderConcurrentVerification(t *testing.T, threads int) {
 	ctx := context.Background()
 	// Create a simple chain to verify
 	var (
-		testdb    = ethdb.NewMemDatabase()
-		gspec     = &Genesis{Config: params.TestChainConfig}
+		testdb = ethdb.NewMemDatabase()
+		gspec  = &Genesis{
+			Config: params.TestChainConfig,
+			Signer: hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		}
 		genesis   = gspec.MustCommit(testdb)
-		blocks, _ = GenerateChain(ctx, params.TestChainConfig, genesis, ethash.NewFaker(), testdb, 8, nil)
+		blocks, _ = GenerateChain(ctx, params.TestChainConfig, genesis, clique.NewFaker(), testdb, 8, nil)
 	)
 	headers := make([]*types.Header, len(blocks))
 	seals := make([]bool, len(blocks))
@@ -109,20 +119,20 @@ func testHeaderConcurrentVerification(t *testing.T, threads int) {
 		var results <-chan error
 
 		if valid {
-			chain, _ := NewBlockChain(testdb, nil, params.TestChainConfig, ethash.NewFaker(), vm.Config{})
-			_, results = chain.engine.VerifyHeaders(ctx, chain, headers, seals)
+			chain, _ := NewBlockChain(testdb, nil, params.TestChainConfig, clique.NewFaker(), vm.Config{})
+			_, results = chain.engine.VerifyHeaders(ctx, chain, headers)
 			chain.Stop()
 		} else {
-			chain, _ := NewBlockChain(testdb, nil, params.TestChainConfig, ethash.NewFakeFailer(uint64(len(headers)-1)), vm.Config{})
-			_, results = chain.engine.VerifyHeaders(ctx, chain, headers, seals)
+			chain, _ := NewBlockChain(testdb, nil, params.TestChainConfig, clique.NewFakeFailer(uint64(len(headers)-1)), vm.Config{})
+			_, results = chain.engine.VerifyHeaders(ctx, chain, headers)
 			chain.Stop()
 		}
 		// Wait for all the verification results
-		checks := make(map[int]error)
+		errs := make(map[int]error)
 		for j := 0; j < len(blocks); j++ {
 			select {
 			case result := <-results:
-				checks[j] = result
+				errs[j] = result
 
 			case <-time.After(time.Second):
 				t.Fatalf("test %d.%d: verification timeout", i, j)
@@ -130,11 +140,14 @@ func testHeaderConcurrentVerification(t *testing.T, threads int) {
 		}
 		// Check nonce check validity
 		for j := 0; j < len(blocks); j++ {
-			want := valid || (j < len(blocks)-2) // We chose the last-but-one nonce in the chain to fail
-			if (checks[j] == nil) != want {
-				t.Errorf("test %d.%d: validity mismatch: have %v, want %v", i, j, checks[j], want)
+			expValid := valid || (j < len(blocks)-2) // We chose the last-but-one nonce in the chain to fail
+			if expValid && errs[j] != nil {
+				t.Errorf("test %d.%d: unexpected error: %v", i, j, errs[j])
 			}
-			if !want {
+			if !expValid {
+				if errs[j] == nil {
+					t.Errorf("test %d.%d: expected error", i, j)
+				}
 				// A few blocks after the first error may pass verification due to concurrent
 				// workers. We don't care about those in this test, just that the correct block
 				// errors out.
@@ -163,7 +176,7 @@ func testHeaderConcurrentAbortion(t *testing.T, threads int) {
 		testdb    = ethdb.NewMemDatabase()
 		gspec     = &Genesis{Config: params.TestChainConfig}
 		genesis   = gspec.MustCommit(testdb)
-		blocks, _ = GenerateChain(ctx, params.TestChainConfig, genesis, ethash.NewFaker(), testdb, 1024, nil)
+		blocks, _ = GenerateChain(ctx, params.TestChainConfig, genesis, clique.NewFaker(), testdb, 1024, nil)
 	)
 	headers := make([]*types.Header, len(blocks))
 	seals := make([]bool, len(blocks))
@@ -177,10 +190,10 @@ func testHeaderConcurrentAbortion(t *testing.T, threads int) {
 	defer runtime.GOMAXPROCS(old)
 
 	// Start the verifications and immediately abort
-	chain, _ := NewBlockChain(testdb, nil, params.TestChainConfig, ethash.NewFakeDelayer(time.Millisecond), vm.Config{})
+	chain, _ := NewBlockChain(testdb, nil, params.TestChainConfig, clique.NewFakeDelayer(time.Millisecond), vm.Config{})
 	defer chain.Stop()
 
-	abort, results := chain.engine.VerifyHeaders(ctx, chain, headers, seals)
+	abort, results := chain.engine.VerifyHeaders(ctx, chain, headers)
 	close(abort)
 
 	// Deplete the results channel

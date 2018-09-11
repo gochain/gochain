@@ -22,13 +22,13 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
-	"time"
 
 	"github.com/gochain-io/gochain"
 	"github.com/gochain-io/gochain/accounts/abi/bind"
 	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/common/math"
-	"github.com/gochain-io/gochain/consensus/ethash"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/bloombits"
 	"github.com/gochain-io/gochain/core/state"
@@ -66,9 +66,14 @@ type SimulatedBackend struct {
 // for testing purposes.
 func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
 	database := ethdb.NewMemDatabase()
-	genesis := core.Genesis{Config: params.AllEthashProtocolChanges, Alloc: alloc}
+	genesis := core.Genesis{Config: params.AllCliqueProtocolChanges, Alloc: alloc,
+		Signer: hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+	}
 	genesis.MustCommit(database)
-	blockchain, _ := core.NewBlockChain(database, nil, genesis.Config, ethash.NewFaker(), vm.Config{})
+	blockchain, err := core.NewBlockChain(database, nil, genesis.Config, clique.NewFaker(), vm.Config{})
+	if err != nil {
+		panic(err)
+	}
 
 	backend := &SimulatedBackend{
 		database:   database,
@@ -92,21 +97,20 @@ func (b *SimulatedBackend) Commit(ctx context.Context) {
 	b.rollback()
 }
 
-// Rollback aborts all pending transactions, reverting to the last committed state.
-func (b *SimulatedBackend) Rollback() {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	b.rollback()
-}
-
+// rollback aborts all pending transactions, reverting to the last committed state.
 func (b *SimulatedBackend) rollback() {
 	ctx := context.TODO()
-	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlockCtx(ctx), ethash.NewFaker(), b.database, 1, func(context.Context, int, *core.BlockGen) {})
-	statedb, _ := b.blockchain.State()
-
+	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlockCtx(ctx), clique.NewFaker(), b.database, 1, nil)
+	statedb, err := b.blockchain.State()
+	if err != nil {
+		panic(err)
+	}
 	b.pendingBlock = blocks[0]
-	b.pendingState, _ = state.New(b.pendingBlock.Root(), statedb.Database())
+	st, err := state.New(b.pendingBlock.Root(), statedb.Database())
+	if st == nil || err != nil {
+		panic(err)
+	}
+	b.pendingState = st
 }
 
 // CodeAt returns the code associated with a certain account in the blockchain.
@@ -306,7 +310,7 @@ func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx *types.Transa
 		panic(fmt.Errorf("invalid transaction nonce: got %d, want %d", tx.Nonce(), nonce))
 	}
 
-	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlockCtx(ctx), ethash.NewFaker(), b.database, 1, func(ctx context.Context, number int, block *core.BlockGen) {
+	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlockCtx(ctx), clique.NewFaker(), b.database, 1, func(ctx context.Context, number int, block *core.BlockGen) {
 		for _, tx := range b.pendingBlock.Transactions() {
 			block.AddTx(ctx, tx)
 		}
@@ -379,25 +383,6 @@ func (b *SimulatedBackend) SubscribeFilterLogs(ctx context.Context, query gochai
 			}
 		}
 	}), nil
-}
-
-// AdjustTime adds a time shift to the simulated clock.
-func (b *SimulatedBackend) AdjustTime(adjustment time.Duration) error {
-	ctx := context.TODO()
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlock(), ethash.NewFaker(), b.database, 1, func(ctx context.Context, number int, block *core.BlockGen) {
-		for _, tx := range b.pendingBlock.Transactions() {
-			block.AddTx(ctx, tx)
-		}
-		block.OffsetTime(int64(adjustment.Seconds()))
-	})
-	statedb, _ := b.blockchain.State()
-
-	b.pendingBlock = blocks[0]
-	b.pendingState, _ = state.New(b.pendingBlock.Root(), statedb.Database())
-
-	return nil
 }
 
 // callmsg implements core.Message to allow passing it as a transaction simulator.

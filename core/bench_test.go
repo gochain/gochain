@@ -25,8 +25,9 @@ import (
 	"testing"
 
 	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/common/math"
-	"github.com/gochain-io/gochain/consensus/ethash"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
 	"github.com/gochain-io/gochain/crypto"
@@ -57,14 +58,6 @@ func BenchmarkInsertChain_valueTx_100kB_memdb(b *testing.B) {
 func BenchmarkInsertChain_valueTx_100kB_diskdb(b *testing.B) {
 	ctx := context.Background()
 	benchInsertChain(ctx, b, true, genValueTx(ctx, 100*1024))
-}
-func BenchmarkInsertChain_uncles_memdb(b *testing.B) {
-	ctx := context.Background()
-	benchInsertChain(ctx, b, false, genUncles)
-}
-func BenchmarkInsertChain_uncles_diskdb(b *testing.B) {
-	ctx := context.Background()
-	benchInsertChain(ctx, b, true, genUncles)
 }
 func BenchmarkInsertChain_ring200_memdb(b *testing.B) {
 	ctx := context.Background()
@@ -145,18 +138,6 @@ func genTxRing(ctx context.Context, naccounts int) func(context.Context, int, *B
 	}
 }
 
-// genUncles generates blocks with two uncle headers.
-func genUncles(ctx context.Context, i int, gen *BlockGen) {
-	if i >= 6 {
-		b2 := gen.PrevBlock(i - 6).Header()
-		b2.Extra = []byte("foo")
-		gen.AddUncle(b2)
-		b3 := gen.PrevBlock(i - 6).Header()
-		b3.Extra = []byte("bar")
-		gen.AddUncle(b3)
-	}
-}
-
 func benchInsertChain(ctx context.Context, b *testing.B, disk bool, gen func(context.Context, int, *BlockGen)) {
 	// Create the database in memory or in a temporary directory.
 	var db ethdb.Database
@@ -180,13 +161,15 @@ func benchInsertChain(ctx context.Context, b *testing.B, disk bool, gen func(con
 	gspec := Genesis{
 		Config: params.TestChainConfig,
 		Alloc:  GenesisAlloc{benchRootAddr: {Balance: benchRootFunds}},
+		Signer: hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
 	}
 	genesis := gspec.MustCommit(db)
-	chain, _ := GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), db, b.N, gen)
+	engine := clique.NewFaker()
+	chain, _ := GenerateChain(ctx, gspec.Config, genesis, engine, db, b.N, gen)
 
 	// Time the insertion of the new chain.
 	// State and blocks are stored in the same DB.
-	chainman, _ := NewBlockChain(db, nil, gspec.Config, ethash.NewFaker(), vm.Config{})
+	chainman, _ := NewBlockChain(db, nil, gspec.Config, engine, vm.Config{})
 	defer chainman.Stop()
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -296,7 +279,7 @@ func benchReadChain(b *testing.B, full bool, count uint64) {
 		if err != nil {
 			b.Fatalf("error opening database at %v: %v", dir, err)
 		}
-		chain, err := NewBlockChain(db, nil, params.TestChainConfig, ethash.NewFaker(), vm.Config{})
+		chain, err := NewBlockChain(db, nil, params.TestChainConfig, clique.NewFaker(), vm.Config{})
 		if err != nil {
 			b.Fatalf("error creating chain: %v", err)
 		}

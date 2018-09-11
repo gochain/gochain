@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/consensus/ethash"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/crypto"
@@ -67,7 +67,7 @@ func BenchmarkFilters(b *testing.B) {
 	defer db.Close()
 
 	genesis := core.GenesisBlockForTesting(db, addr1, big.NewInt(1000000))
-	chain, receipts := core.GenerateChain(ctx, params.TestChainConfig, genesis, ethash.NewFaker(), db, 100010, func(ctx context.Context, i int, gen *core.BlockGen) {
+	chain, receipts := core.GenerateChain(ctx, params.TestChainConfig, genesis, clique.NewFaker(), db, 100010, func(ctx context.Context, i int, gen *core.BlockGen) {
 		switch i {
 		case 2403:
 			receipt := makeReceipt(addr1)
@@ -135,7 +135,7 @@ func TestFilters(t *testing.T) {
 	defer db.Close()
 
 	genesis := core.GenesisBlockForTesting(db, addr, big.NewInt(1000000))
-	chain, receipts := core.GenerateChain(ctx, params.TestChainConfig, genesis, ethash.NewFaker(), db, 1000, func(ctx context.Context, i int, gen *core.BlockGen) {
+	chain, receipts := core.GenerateChain(ctx, params.TestChainConfig, genesis, clique.NewFaker(), db, 1000, func(ctx context.Context, i int, gen *core.BlockGen) {
 		switch i {
 		case 1:
 			receipt := types.NewReceipt(nil, false, 0)

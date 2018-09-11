@@ -465,7 +465,7 @@ func (tt *votingTest) run(t *testing.T) {
 	for j, vote := range tt.votes {
 		headers[j] = &types.Header{
 			Number: big.NewInt(int64(j) + 1),
-			Time:   big.NewInt(int64(j) * int64(blockPeriod)),
+			Time:   big.NewInt(int64(j) * int64(params.DefaultCliquePeriod)),
 			Signer: make([]byte, signatureLength),
 			Extra:  make([]byte, extraVanity),
 		}

@@ -36,7 +36,6 @@ import (
 	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/common/math"
 	"github.com/gochain-io/gochain/consensus/clique"
-	"github.com/gochain-io/gochain/consensus/ethash"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
@@ -519,7 +518,7 @@ func (s *PublicBlockChainAPI) TotalSupply(ctx context.Context, blockNr rpc.Block
 			n = n.Add(big.NewInt(1), header.Number)
 		}
 	}
-	rewards := new(big.Int).Mul(n, clique.GochainBlockReward)
+	rewards := new(big.Int).Mul(n, clique.BlockReward)
 	return rewards.Add(rewards, initial), nil
 }
 
@@ -1431,15 +1430,6 @@ func (api *PublicDebugAPI) PrintBlock(ctx context.Context, number uint64) (strin
 		return "", fmt.Errorf("block #%d not found", number)
 	}
 	return spew.Sdump(block), nil
-}
-
-// SeedHash retrieves the seed hash of a block.
-func (api *PublicDebugAPI) SeedHash(ctx context.Context, number uint64) (string, error) {
-	block, _ := api.b.BlockByNumber(ctx, rpc.BlockNumber(number))
-	if block == nil {
-		return "", fmt.Errorf("block #%d not found", number)
-	}
-	return fmt.Sprintf("0x%x", ethash.SeedHash(number)), nil
 }
 
 // PrivateDebugAPI is the collection of Ethereum APIs exposed over the private

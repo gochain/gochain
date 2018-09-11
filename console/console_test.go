@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/consensus/ethash"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/eth"
 	"github.com/gochain-io/gochain/internal/jsre"
@@ -98,9 +97,6 @@ func newTester(t *testing.T, confOverride func(*eth.Config)) *tester {
 	ethConf := &eth.Config{
 		Genesis:   core.DeveloperGenesisBlock(15, common.Address{}),
 		Etherbase: common.HexToAddress(testAddress),
-		Ethash: ethash.Config{
-			PowMode: ethash.ModeTest,
-		},
 	}
 	if confOverride != nil {
 		confOverride(ethConf)

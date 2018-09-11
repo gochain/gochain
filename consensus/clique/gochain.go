@@ -8,12 +8,20 @@ import (
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/params"
+)
+
+var (
+	// Block reward in wei for successfully sealing a block.
+	BlockReward = big.NewInt(7e+18)
 )
 
 // Finalize implements consensus.Engine, ensuring no uncles are set, but this does give rewards.
-func (c *Clique) Finalize(ctx context.Context, chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt, block bool) *types.Block {
-	accumulateRewards(chain.Config(), state, header, uncles)
+func (c *Clique) Finalize(ctx context.Context, chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt, block bool) *types.Block {
+	log.Info("Issuing", "number", header.Number, "hash", header.Hash(), "count", len(txs), "reward", BlockReward, "coinbase", header.Coinbase)
+
+	// Reward the signer.
+	state.AddBalance(header.Coinbase, BlockReward)
+
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	header.UncleHash = types.CalcUncleHash(nil)
 
@@ -29,30 +37,3 @@ var (
 	big8  = big.NewInt(8)
 	big32 = big.NewInt(32)
 )
-var (
-	// GochainBlockReward Block reward in wei for successfully sealing a block
-	GochainBlockReward = big.NewInt(7e+18)
-)
-
-// AccumulateRewards credits the coinbase of the given block with the mining
-// reward. The total reward consists of the static block reward and rewards for
-// included uncles. The coinbase of each uncle block is also rewarded.
-func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
-	// Select the correct block reward based on chain progression
-	blockReward := GochainBlockReward
-	// Accumulate the rewards for the miner and any included uncles
-	reward := new(big.Int).Set(blockReward)
-	//	r := new(big.Int)
-	//	for _, uncle := range uncles {
-	//		r.Add(uncle.Number, big8)
-	//		r.Sub(r, header.Number)
-	//		r.Mul(r, blockReward)
-	//		r.Div(r, big8)
-	//		state.AddBalance(uncle.Coinbase, r)
-	//
-	//		r.Div(blockReward, big32)
-	//		reward.Add(reward, r)
-	//	}
-	log.Info("Issuing", "number", header.Number, "hash", header.Hash(), "reward:", reward.String(), "Coinbase", header.Coinbase)
-	state.AddBalance(header.Coinbase, reward)
-}

@@ -26,7 +26,7 @@ import (
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/math"
-	"github.com/gochain-io/gochain/consensus/ethash"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
@@ -218,13 +218,11 @@ func testChainGen(ctx context.Context, i int, block *core.BlockGen) {
 		tx, _ := types.SignTx(types.NewTransaction(block.TxNonce(testBankAddress), testContractAddr, big.NewInt(0), 100000, nil, data), signer, testBankKey)
 		block.AddTx(ctx, tx)
 	case 3:
-		// Block 4 includes blocks 2 and 3 as uncle headers (with modified extra data).
+		// Block 4 includes modified extra data.
 		b2 := block.PrevBlock(1).Header()
 		b2.Extra = []byte("foo")
-		block.AddUncle(b2)
 		b3 := block.PrevBlock(2).Header()
 		b3.Extra = []byte("foo")
-		block.AddUncle(b3)
 		data := common.Hex2Bytes("C16431B900000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002")
 		tx, _ := types.SignTx(types.NewTransaction(block.TxNonce(testBankAddress), testContractAddr, big.NewInt(0), 100000, nil, data), signer, testBankKey)
 		block.AddTx(ctx, tx)
@@ -241,14 +239,14 @@ func testChainOdr(t *testing.T, protocol int, fn odrTestFn) {
 	)
 	gspec.MustCommit(ldb)
 	// Assemble the test environment
-	blockchain, _ := core.NewBlockChain(sdb, nil, params.TestChainConfig, ethash.NewFullFaker(), vm.Config{})
-	gchain, _ := core.GenerateChain(ctx, params.TestChainConfig, genesis, ethash.NewFaker(), sdb, 4, testChainGen)
+	blockchain, _ := core.NewBlockChain(sdb, nil, params.TestChainConfig, clique.NewFullFaker(), vm.Config{})
+	gchain, _ := core.GenerateChain(ctx, params.TestChainConfig, genesis, clique.NewFaker(), sdb, 4, testChainGen)
 	if _, err := blockchain.InsertChain(ctx, gchain); err != nil {
 		t.Fatal(err)
 	}
 
 	odr := &testOdr{sdb: sdb, ldb: ldb}
-	lightchain, err := NewLightChain(odr, params.TestChainConfig, ethash.NewFullFaker())
+	lightchain, err := NewLightChain(odr, params.TestChainConfig, clique.NewFullFaker())
 	if err != nil {
 		t.Fatal(err)
 	}

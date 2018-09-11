@@ -169,7 +169,7 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 		return blockchain.GetBlockByHash(hash)
 	}
 	verifyHeader := func(ctx context.Context, header *types.Header) error {
-		return engine.VerifyHeader(ctx, blockchain, header, true)
+		return engine.VerifyHeader(ctx, blockchain, header)
 	}
 	heighter := func() uint64 {
 		return blockchain.CurrentBlock().NumberU64()

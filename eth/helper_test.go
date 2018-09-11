@@ -29,7 +29,8 @@ import (
 	"testing"
 
 	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/consensus/ethash"
+	"github.com/gochain-io/gochain/common/hexutil"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
@@ -53,16 +54,17 @@ var (
 func newTestProtocolManager(ctx context.Context, mode downloader.SyncMode, blocks int, generator func(context.Context, int, *core.BlockGen), newtx chan<- []*types.Transaction) (*ProtocolManager, *ethdb.MemDatabase, error) {
 	var (
 		evmux  = new(event.TypeMux)
-		engine = ethash.NewFaker()
 		db     = ethdb.NewMemDatabase()
+		engine = clique.NewFaker()
 		gspec  = &core.Genesis{
 			Config: params.TestChainConfig,
 			Alloc:  core.GenesisAlloc{testBank: {Balance: big.NewInt(1000000)}},
+			Signer: hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
 		}
 		genesis       = gspec.MustCommit(db)
 		blockchain, _ = core.NewBlockChain(db, nil, gspec.Config, engine, vm.Config{})
 	)
-	chain, _ := core.GenerateChain(ctx, gspec.Config, genesis, ethash.NewFaker(), db, blocks, generator)
+	chain, _ := core.GenerateChain(ctx, gspec.Config, genesis, engine, db, blocks, generator)
 	if _, err := blockchain.InsertChain(ctx, chain); err != nil {
 		panic(err)
 	}
