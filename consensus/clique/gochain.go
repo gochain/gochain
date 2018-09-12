@@ -7,7 +7,6 @@ import (
 	"github.com/gochain-io/gochain/consensus"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/log"
 )
 
 var (
@@ -17,8 +16,6 @@ var (
 
 // Finalize implements consensus.Engine, ensuring no uncles are set, but this does give rewards.
 func (c *Clique) Finalize(ctx context.Context, chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt, block bool) *types.Block {
-	log.Info("Issuing", "number", header.Number, "hash", header.Hash(), "count", len(txs), "reward", BlockReward, "coinbase", header.Coinbase)
-
 	// Reward the signer.
 	state.AddBalance(header.Coinbase, BlockReward)
 

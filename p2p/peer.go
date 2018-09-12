@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -55,6 +56,8 @@ const (
 	getPeersMsg  = 0x04
 	peersMsg     = 0x05
 )
+
+var ErrShuttingDown = errors.New("shutting down")
 
 // protoHandshake is the RLP structure of the protocol handshake.
 type protoHandshake struct {
@@ -414,7 +417,7 @@ func (rw *protoRW) WriteMsg(ctx context.Context, msg Msg) (err error) {
 		// as well but we don't want to rely on that.
 		rw.werr <- err
 	case <-rw.closed:
-		err = fmt.Errorf("shutting down")
+		err = ErrShuttingDown
 	}
 	return err
 }

@@ -19,6 +19,8 @@ package core
 import (
 	"context"
 
+	"github.com/gochain-io/gochain/log"
+
 	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/consensus"
@@ -92,6 +94,7 @@ func (p *StateProcessor) Process(ctx context.Context, block *types.Block, stated
 	}
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
 	_ = p.engine.Finalize(ctx, p.bc, header, statedb, block.Transactions(), receipts, false)
+	log.Info("Processed Block", "number", header.Number, "hash", header.Hash(), "count", len(txs), "reward", BlockReward, "coinbase", header.Coinbase)
 
 	return receipts, allLogs, *usedGas, nil
 }

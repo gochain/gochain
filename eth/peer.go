@@ -196,7 +196,9 @@ func (p *peer) broadcast() {
 			ctx, span := trace.StartSpan(context.Background(), "peer.broadcast-queuedTxs")
 			span.AddAttributes(trace.Int64Attribute("txs", int64(len(txs))))
 			if err := p.SendTransactions(ctx, txs); err != nil {
-				p.Log().Error("Failed to broadcast txs", "len", len(txs), "err", err)
+				if err != p2p.ErrShuttingDown {
+					p.Log().Error("Failed to broadcast txs", "len", len(txs), "err", err)
+				}
 				span.SetStatus(trace.Status{
 					Code:    trace.StatusCodeInternal,
 					Message: err.Error(),
