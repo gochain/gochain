@@ -19,8 +19,6 @@ package core
 import (
 	"context"
 
-	"github.com/gochain-io/gochain/log"
-
 	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/consensus"
@@ -28,6 +26,7 @@ import (
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
 	"github.com/gochain-io/gochain/crypto"
+	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 )
 

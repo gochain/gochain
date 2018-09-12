@@ -20,4 +20,5 @@ import (
 	"math/big"
 )
 
-var BlockReward = big.NewInt(5e+18)
+// Block reward in wei for successfully sealing a block.
+var BlockReward = big.NewInt(7e+18)
