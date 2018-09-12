@@ -35,7 +35,6 @@ import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/common/math"
-	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
@@ -518,7 +517,7 @@ func (s *PublicBlockChainAPI) TotalSupply(ctx context.Context, blockNr rpc.Block
 			n = n.Add(big.NewInt(1), header.Number)
 		}
 	}
-	rewards := new(big.Int).Mul(n, clique.BlockReward)
+	rewards := new(big.Int).Mul(n, core.BlockReward)
 	return rewards.Add(rewards, initial), nil
 }
 
