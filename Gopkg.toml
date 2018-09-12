@@ -85,6 +85,10 @@
   name = "github.com/rjeczalik/notify"
   branch = "master"
 
+[[constraint]]
+  name = "golang.org/x/sys"
+  branch = "master"
+
 [prune]
   go-tests = true
   unused-packages = true
