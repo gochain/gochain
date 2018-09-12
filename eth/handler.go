@@ -578,8 +578,13 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	case msg.Code == NewBlockHashesMsg:
 		var announces newBlockHashesData
 		if err := msg.Decode(&announces); err != nil {
+			span.SetStatus(trace.Status{
+				Code:    trace.StatusCodeInternal,
+				Message: err.Error(),
+			})
 			return errResp(ErrDecode, "%v: %v", msg, err)
 		}
+		span.AddAttributes(trace.Int64Attribute("cnt", int64(len(announces))))
 		// Mark the hashes as present at the remote node
 		for _, block := range announces {
 			p.MarkBlock(ctx, block.Hash)
@@ -591,11 +596,22 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 				unknown = append(unknown, block)
 			}
 		}
-		for _, block := range unknown {
-			if err := pm.fetcher.Notify(p.id, block.Hash, block.Number, time.Now(), p.RequestOneHeader, p.RequestBodies); err != nil {
-				log.Error("Cannot notify fetcher of new block hashes", "err", err)
+		go func() {
+			_, ns := trace.StartSpan(context.Background(), "ProtocolManager.handleMsg-notify-unknown-blocks")
+			defer ns.End()
+			ns.AddAttributes(trace.Int64Attribute("cnt", int64(len(unknown))))
+			parent := span.SpanContext()
+			ns.AddLink(trace.Link{
+				TraceID: parent.TraceID,
+				SpanID:  parent.SpanID,
+				Type:    trace.LinkTypeParent,
+			})
+			for _, block := range unknown {
+				if err := pm.fetcher.Notify(p.id, block.Hash, block.Number, time.Now(), p.RequestOneHeader, p.RequestBodies); err != nil {
+					log.Error("Cannot notify fetcher of new block hashes", "err", err)
+				}
 			}
-		}
+		}()
 
 	case msg.Code == NewBlockMsg:
 		// Retrieve and decode the propagated block
