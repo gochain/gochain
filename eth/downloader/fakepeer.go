@@ -122,17 +122,12 @@ func (p *FakePeer) RequestHeadersByNumber(ctx context.Context, number uint64, am
 // RequestBodies implements downloader.Peer, returning a batch of block bodies
 // corresponding to the specified block hashes.
 func (p *FakePeer) RequestBodies(ctx context.Context, hashes []common.Hash) error {
-	var (
-		txs    [][]*types.Transaction
-		uncles [][]*types.Header
-	)
+	var txs [][]*types.Transaction
 	for _, hash := range hashes {
 		block := core.GetBlock(p.db, hash, p.hc.GetBlockNumber(hash))
-
 		txs = append(txs, block.Transactions())
-		uncles = append(uncles, block.Uncles())
 	}
-	p.dl.DeliverBodies(p.id, txs, uncles)
+	p.dl.DeliverBodies(p.id, txs)
 	return nil
 }
 

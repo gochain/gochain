@@ -470,19 +470,16 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 		// Deliver them all to the downloader for queuing
 		trasactions := make([][]*types.Transaction, len(request))
-		uncles := make([][]*types.Header, len(request))
 
 		for i, body := range request {
 			trasactions[i] = body.Transactions
-			uncles[i] = body.Uncles
 		}
 		// Filter out any explicitly requested bodies, deliver the rest to the downloader
-		filter := len(trasactions) > 0 || len(uncles) > 0
-		if filter {
-			trasactions, uncles = pm.fetcher.FilterBodies(p.id, trasactions, uncles, time.Now())
+		if len(trasactions) > 0 {
+			trasactions = pm.fetcher.FilterBodies(p.id, trasactions, time.Now())
 		}
-		if len(trasactions) > 0 || len(uncles) > 0 || !filter {
-			err := pm.downloader.DeliverBodies(p.id, trasactions, uncles)
+		if len(trasactions) > 0 {
+			err := pm.downloader.DeliverBodies(p.id, trasactions)
 			if err != nil {
 				log.Debug("Failed to deliver bodies", "err", err)
 			}

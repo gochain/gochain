@@ -465,7 +465,7 @@ func (w *worker) commitNewWork(ctx context.Context) {
 	work.Block = w.engine.Finalize(ctx, w.chain, header, work.state, work.txs, work.receipts, true)
 	// We only care about logging if we're actually mining.
 	if atomic.LoadInt32(&w.mining) == 1 {
-		log.Info("Commit new mining work", "number", work.Block.Number(), "txs", work.tcount, "uncles", len(work.Block.Uncles()), "elapsed", common.PrettyDuration(time.Since(tstart)))
+		log.Info("Commit new mining work", "number", work.Block.Number(), "diff", work.Block.Difficulty(), "txs", work.tcount, "elapsed", common.PrettyDuration(time.Since(tstart)))
 		w.unconfirmed.Shift(work.Block.NumberU64() - 1)
 	}
 	w.push(work)
