@@ -1066,9 +1066,6 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
-	bc.chainmu.Lock()
-	defer bc.chainmu.Unlock()
-
 	// A queued approach to delivering events. This is generally
 	// faster than direct delivery and requires much less mutex
 	// acquiring.
@@ -1121,6 +1118,9 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 			}, "finished block")
 		}
 	}()
+
+	bc.chainmu.Lock()
+	defer bc.chainmu.Unlock()
 
 	// Iterate over the blocks and insert when the verifier permits
 	for i, block := range chain {
