@@ -13,7 +13,13 @@ import (
 
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/metrics"
 	"github.com/minio/minio-go"
+)
+
+var (
+	uploadBytesMeter   = metrics.NewMeter("ethdb/s3/upload/bytes")
+	downloadBytesMeter = metrics.NewMeter("ethdb/s3/download/bytes")
 )
 
 const (
@@ -116,6 +122,13 @@ func (c *Client) tryFGetObject(ctx context.Context, key, path string) (err error
 		return err
 	}
 
+	// Measure size downloaded.
+	if fi, err := os.Stat(tmpPath); err != nil {
+		return err
+	} else {
+		downloadBytesMeter.Mark(fi.Size())
+	}
+
 	// Verify file segment checksum matches computed.
 	if err := ethdb.VerifyFileSegment(tmpPath); err != nil {
 		os.Remove(tmpPath)
@@ -132,12 +145,16 @@ func (c *Client) tryFGetObject(ctx context.Context, key, path string) (err error
 
 // PutObject writes an object to a key.
 func (c *Client) PutObject(ctx context.Context, key string, value []byte) (n int64, err error) {
-	return c.client.PutObjectWithContext(ctx, c.Bucket, key, bytes.NewReader(value), int64(len(value)), minio.PutObjectOptions{})
+	n, err = c.client.PutObjectWithContext(ctx, c.Bucket, key, bytes.NewReader(value), int64(len(value)), minio.PutObjectOptions{})
+	uploadBytesMeter.Mark(n)
+	return n, err
 }
 
 // FPutObject writes an object to key from a file at path.
 func (c *Client) FPutObject(ctx context.Context, key, path string) (n int64, err error) {
-	return c.client.FPutObjectWithContext(ctx, c.Bucket, key, path, minio.PutObjectOptions{})
+	n, err = c.client.FPutObjectWithContext(ctx, c.Bucket, key, path, minio.PutObjectOptions{})
+	uploadBytesMeter.Mark(n)
+	return n, err
 }
 
 // RemoveObject removes an object by key.

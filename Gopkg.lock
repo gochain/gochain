@@ -434,25 +434,11 @@
 
 [[projects]]
   branch = "master"
-<<<<<<< d53b55d1a5c820d709d0ae15b7d396ff9c77a255
-=======
-  digest = "1:a16e70ee324590c9f04f5a91401df5c805939ed12ffc5c25365d67658531d386"
-  name = "github.com/rcrowley/go-metrics"
-  packages = [
-    ".",
-    "exp",
-  ]
-  pruneopts = "UT"
-  revision = "e2704e165165ec55d062f5919b4b29494e9fa790"
-
-[[projects]]
-  branch = "master"
   digest = "1:d3d891dc5a896524ae4b202034129c3c3279eeb4b416b0a4922c12074bb53226"
->>>>>>> Update dockerfile & dep
   name = "github.com/rjeczalik/notify"
   packages = ["."]
   pruneopts = "UT"
-  revision = "d152f3ce359a5464dc41e84a8919fc67e55bbbf0"
+  revision = "0f065fa99b48b842c3fd3e2c8b194c6f2b69f6b8"
 
 [[projects]]
   branch = "master"
