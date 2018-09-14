@@ -276,6 +276,9 @@ func (p *Peer) readLoop(errc chan<- error) {
 }
 
 func (p *Peer) handle(msg Msg) error {
+	_, span := trace.StartSpan(context.Background(), "Peer.handle")
+	defer span.End()
+	span.AddAttributes(trace.StringAttribute("code", MsgCodeString(msg.Code)))
 	switch {
 	case msg.Code == pingMsg:
 		msg.Discard()
