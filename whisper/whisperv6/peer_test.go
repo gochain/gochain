@@ -132,9 +132,6 @@ func TestSimulation(t *testing.T) {
 	if err := try(iterations, sleep, checkBloomFilterExchange); err != nil {
 		t.Error(err)
 	}
-	if err := checkPowExchange(); err != nil {
-		t.Error(err)
-	}
 
 	// send new pow and bloom exchange messages
 	resetParams()
@@ -469,39 +466,16 @@ func try(iterations int, sleep time.Duration, fn func() error) (err error) {
 
 func checkPowExchangeForNodeZero() error {
 	cnt := 0
-	for i, node := range nodes {
+	for _, node := range nodes {
 		for _, peer := range node.shh.getPeers() {
 			fmt.Println(peer.peer.ID().String())
 			if peer.peer.ID() == discover.PubkeyID(&nodes[0].id.PublicKey) {
 				cnt++
-				peer.mu.RLock()
-				pow := peer.powRequirement
-				peer.mu.RUnlock()
-				if pow != masterPow {
-					return fmt.Errorf("node %d: failed to set the new pow requirement for node zero", i)
-				}
 			}
 		}
 	}
 	if cnt == 0 {
 		return fmt.Errorf("looking for node zero: no matching peers found")
-	}
-	return nil
-}
-
-func checkPowExchange() error {
-	for i, node := range nodes {
-		for _, peer := range node.shh.getPeers() {
-			if peer.peer.ID() != discover.PubkeyID(&nodes[0].id.PublicKey) {
-				peer.mu.RLock()
-				pow := peer.powRequirement
-				peer.mu.RUnlock()
-				if pow != masterPow {
-					return fmt.Errorf("node %d: failed to exchange pow requirement in round %d; expected %f, got %f",
-						i, round, masterPow, pow)
-				}
-			}
-		}
 	}
 	return nil
 }

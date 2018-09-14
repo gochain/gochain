@@ -38,11 +38,10 @@ type Peer struct {
 	peer *p2p.Peer
 	ws   p2p.MsgReadWriter
 
-	mu             sync.RWMutex
-	trusted        bool
-	powRequirement float64
-	bloomFilter    []byte
-	fullNode       bool
+	mu          sync.RWMutex
+	trusted     bool
+	bloomFilter []byte
+	fullNode    bool
 
 	knownMu sync.RWMutex
 	known   map[common.Hash]struct{} // Messages already known by the peer to avoid wasting bandwidth
@@ -53,15 +52,14 @@ type Peer struct {
 // newPeer creates a new whisper peer object, but does not run the handshake itself.
 func newPeer(host *Whisper, remote *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 	return &Peer{
-		host:           host,
-		peer:           remote,
-		ws:             rw,
-		trusted:        false,
-		powRequirement: 0.0,
-		known:          make(map[common.Hash]struct{}),
-		quit:           make(chan struct{}),
-		bloomFilter:    makeFullNodeBloom(),
-		fullNode:       true,
+		host:        host,
+		peer:        remote,
+		ws:          rw,
+		trusted:     false,
+		known:       make(map[common.Hash]struct{}),
+		quit:        make(chan struct{}),
+		bloomFilter: makeFullNodeBloom(),
+		fullNode:    true,
 	}
 }
 
@@ -116,16 +114,8 @@ func (peer *Peer) handshake() error {
 	}
 
 	// only version is mandatory, subsequent parameters are optional
-	powRaw, err := s.Uint()
+	_, err = s.Uint()
 	if err == nil {
-		pow := math.Float64frombits(powRaw)
-		if math.IsInf(pow, 0) || math.IsNaN(pow) || pow < 0.0 {
-			return fmt.Errorf("peer [%x] sent bad status message: invalid pow", peer.ID())
-		}
-		peer.mu.Lock()
-		peer.powRequirement = pow
-		peer.mu.Unlock()
-
 		var bloom []byte
 		err = s.Decode(&bloom)
 		if err == nil {
@@ -215,10 +205,7 @@ func (peer *Peer) broadcast(ctx context.Context) error {
 	envelopes := peer.host.Envelopes()
 	bundle := make([]*Envelope, 0, len(envelopes))
 	for _, envelope := range envelopes {
-		peer.mu.RLock()
-		pow := peer.powRequirement
-		peer.mu.RUnlock()
-		if !peer.marked(envelope) && envelope.PoW() >= pow && peer.bloomMatch(envelope) {
+		if !peer.marked(envelope) && peer.bloomMatch(envelope) {
 			bundle = append(bundle, envelope)
 		}
 	}

@@ -22,7 +22,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"fmt"
-	"math"
 	"runtime"
 	"sync"
 	"time"
@@ -707,20 +706,12 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			}
 		case powRequirementCode:
 			s := rlp.NewStream(packet.Payload, uint64(packet.Size))
-			i, err := s.Uint()
+			_, err := s.Uint()
 			rlp.Discard(s)
 			if err != nil {
 				log.Warn("failed to decode powRequirementCode message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 				return errors.New("invalid powRequirementCode message")
 			}
-			f := math.Float64frombits(i)
-			if math.IsInf(f, 0) || math.IsNaN(f) || f < 0.0 {
-				log.Warn("invalid value in powRequirementCode message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
-				return errors.New("invalid value in powRequirementCode message")
-			}
-			p.mu.Lock()
-			p.powRequirement = f
-			p.mu.Unlock()
 		case bloomFilterExCode:
 			var bloom []byte
 			err := packet.Decode(&bloom)
