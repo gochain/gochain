@@ -1075,16 +1075,31 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 		lastCanon     *types.Block
 		coalescedLogs []*types.Log
 	)
-	// Start the parallel header verifier
+	// Start the parallel header and body verifiers.
 	headers := make([]*types.Header, len(chain))
-	seals := make([]bool, len(chain))
-
 	for i, block := range chain {
 		headers[i] = block.Header()
-		seals[i] = true
 	}
-	abort, results := bc.engine.VerifyHeaders(ctx, bc, headers)
-	defer close(abort)
+	abortHeaders, verHeaders := bc.engine.VerifyHeaders(ctx, bc, headers)
+	defer close(abortHeaders)
+
+	abortBodies := make(chan struct{})
+	defer close(abortBodies)
+	valBodies := make(chan error, len(chain))
+	go func() {
+		ctx, span := trace.StartSpan(context.Background(), "BlockChain.insertChain-validate-bodies")
+		defer span.End()
+		defer close(valBodies)
+		for i, block := range chain {
+			err := bc.Validator().ValidateBody(ctx, block, i == 0)
+
+			select {
+			case <-abortBodies:
+				return
+			case valBodies <- err:
+			}
+		}
+	}()
 
 	// Pre-compute and cache sender ecrecover for each transaction.
 	go func() {
@@ -1122,7 +1137,8 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
 
-	// Iterate over the blocks and insert when the verifier permits
+	// Iterate over the blocks and insert when the verifiers permit.
+	var noParentState bool
 	for i, block := range chain {
 		// If the chain is terminating, stop processing blocks
 		if atomic.LoadInt32(&bc.procInterrupt) == 1 {
@@ -1137,9 +1153,9 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 		// Wait for the block's verification to complete
 		bstart := time.Now()
 
-		err := <-results
+		err := <-verHeaders
 		if err == nil {
-			err = bc.Validator().ValidateBody(ctx, block)
+			err = <-valBodies
 		}
 		switch {
 		case err == ErrKnownBlock:
@@ -1166,7 +1182,7 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 			stats.queued++
 			continue
 
-		case err == consensus.ErrPrunedAncestor:
+		case err == consensus.ErrPrunedAncestor || noParentState:
 			// Block competing with the canonical chain, store in the db, but don't process
 			// until the competitor TD goes above the canonical TD
 			localTd := bc.GetTd(bc.currentBlock.Hash(), bc.currentBlock.NumberU64())
@@ -1175,6 +1191,7 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 				if err = bc.WriteBlockWithoutState(block, externTd); err != nil {
 					return i, events, coalescedLogs, err
 				}
+				noParentState = true
 				continue
 			}
 			// Competitor chain beat canonical, gather all blocks from the common ancestor
@@ -1197,6 +1214,7 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 			if err != nil {
 				return i, events, coalescedLogs, err
 			}
+			noParentState = false
 
 		case err != nil:
 			bc.reportBlock(block, nil, err)
@@ -1233,9 +1251,10 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
+		noParentState = false
 		switch status {
 		case CanonStatTy:
-			log.Debug("Inserted new block", "number", block.Number(), "hash", block.Hash(), "diff", block.Difficulty(),
+			log.Info("Inserted new block", "number", block.Number(), "hash", block.Hash(), "diff", block.Difficulty(),
 				"txs", len(block.Transactions()), "gas", block.GasUsed(), "elapsed", common.PrettyDuration(time.Since(bstart)))
 
 			coalescedLogs = append(coalescedLogs, logs...)
@@ -1247,7 +1266,7 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 			bc.gcproc += proctime
 
 		case SideStatTy:
-			log.Debug("Inserted forked block", "number", block.Number(), "hash", block.Hash(), "diff", block.Difficulty(),
+			log.Info("Inserted forked block", "number", block.Number(), "hash", block.Hash(), "diff", block.Difficulty(),
 				"txs", len(block.Transactions()), "gas", block.GasUsed(), "elapsed", common.PrettyDuration(time.Since(bstart)))
 
 			blockInsertTimer.UpdateSince(bstart)

@@ -76,8 +76,10 @@ func TestHeaderVerification(t *testing.T) {
 			}
 			// Make sure no more data is returned
 			select {
-			case result := <-results:
-				t.Fatalf("test %d.%d: unexpected result returned: %v", i, j, result)
+			case result, ok := <-results:
+				if ok {
+					t.Fatalf("test %d.%d: unexpected result returned: %v", i, j, result)
+				}
 			case <-time.After(25 * time.Millisecond):
 			}
 		}
@@ -156,8 +158,10 @@ func testHeaderConcurrentVerification(t *testing.T, threads int) {
 		}
 		// Make sure no more data is returned
 		select {
-		case result := <-results:
-			t.Fatalf("test %d: unexpected result returned: %v", i, result)
+		case result, ok := <-results:
+			if ok {
+				t.Fatalf("test %d: unexpected result returned: %v", i, result)
+			}
 		case <-time.After(25 * time.Millisecond):
 		}
 	}
@@ -200,7 +204,11 @@ func testHeaderConcurrentAbortion(t *testing.T, threads int) {
 	verified := 0
 	for depleted := false; !depleted; {
 		select {
-		case result := <-results:
+		case result, ok := <-results:
+			if !ok {
+				depleted = true
+				break
+			}
 			if result != nil {
 				t.Errorf("header %d: validation failed: %v", verified, result)
 			}

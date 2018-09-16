@@ -259,8 +259,6 @@ func (c *Clique) VerifyHeader(ctx context.Context, chain consensus.ChainReader, 
 // method returns a quit channel to abort the operations and a results channel to
 // retrieve the async verifications (the order is that of the input slice).
 func (c *Clique) VerifyHeaders(ctx context.Context, chain consensus.ChainReader, headers []*types.Header) (chan<- struct{}, <-chan error) {
-	ctx, span := trace.StartSpan(ctx, "Clique.VerifyHeaders")
-	defer span.End()
 	verify := []verifyFn{c.verifyHeader, c.verifyCascadingFields, c.verifySeal}
 	return c.verifyHeaders(ctx, chain, headers, verify)
 }
@@ -270,6 +268,9 @@ func (c *Clique) verifyHeaders(ctx context.Context, chain consensus.ChainReader,
 	results := make(chan error, len(headers))
 
 	go func() {
+		ctx, span := trace.StartSpan(context.Background(), "Clique.verifyHeaders")
+		defer span.End()
+		defer close(results)
 		for i, header := range headers {
 			parents := headers[:i]
 			var err error
