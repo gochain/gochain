@@ -428,6 +428,15 @@ func writeRawValue(val reflect.Value, w *encbuf) error {
 	return nil
 }
 
+func WriteRawValueTo(w io.Writer, v RawValue) (n int64, err error) {
+	nn, err := w.Write(v)
+	return int64(nn), err
+}
+
+func RawValueSize(v RawValue) int {
+	return len(v)
+}
+
 func writeUint(val reflect.Value, w *encbuf) error {
 	i := val.Uint()
 	if i == 0 {
@@ -444,6 +453,32 @@ func writeUint(val reflect.Value, w *encbuf) error {
 	return nil
 }
 
+func WriteUint64To(w io.Writer, v uint64) (n int64, err error) {
+	if v == 0 {
+		nn, err := w.Write([]byte{0x80})
+		return int64(nn), err
+	} else if v < 128 {
+		// fits single byte
+		nn, err := w.Write([]byte{byte(v)})
+		return int64(nn), err
+	}
+
+	// Encode value to bytes.
+	buf := make([]byte, 9)
+	sz := putint(buf[1:], v)
+	buf[0] = 0x80 + byte(sz)
+
+	nn, err := w.Write(buf[:sz+1])
+	return int64(nn), err
+}
+
+func Uint64Size(v uint64) int {
+	if v < 128 {
+		return 1
+	}
+	return intsize(v) + 1
+}
+
 func writeBool(val reflect.Value, w *encbuf) error {
 	if val.Bool() {
 		w.str = append(w.str, 0x01)
@@ -451,6 +486,19 @@ func writeBool(val reflect.Value, w *encbuf) error {
 		w.str = append(w.str, 0x80)
 	}
 	return nil
+}
+
+func WriteBoolTo(w io.Writer, v bool) (n int64, err error) {
+	if v {
+		nn, err := w.Write([]byte{0x01})
+		return int64(nn), err
+	}
+	nn, err := w.Write([]byte{0x80})
+	return int64(nn), err
+}
+
+func BoolSize(v uint64) int {
+	return 1
 }
 
 func writeBigIntPtr(val reflect.Value, w *encbuf) error {
@@ -476,6 +524,30 @@ func writeBigInt(i *big.Int, w *encbuf) error {
 		w.encodeString(i.Bytes())
 	}
 	return nil
+}
+
+func WriteBigIntTo(w io.Writer, v *big.Int) (n int64, err error) {
+	if v == nil {
+		nn, err := w.Write([]byte{0x80})
+		return int64(nn), err
+	} else if cmp := v.Cmp(big0); cmp == 0 {
+		nn, err := w.Write([]byte{0x80})
+		return int64(nn), err
+	} else if cmp == -1 {
+		return 0, fmt.Errorf("rlp: cannot write negative *big.Int")
+	}
+	return WriteBytesTo(w, v.Bytes())
+}
+
+func BigIntSize(v *big.Int) int {
+	if v == nil {
+		return 1
+	} else if cmp := v.Cmp(big0); cmp == 0 {
+		return 1
+	} else if cmp == -1 {
+		return 0
+	}
+	return BytesSize(v.Bytes())
 }
 
 func writeBytes(val reflect.Value, w *encbuf) error {
@@ -507,6 +579,60 @@ func writeString(val reflect.Value, w *encbuf) error {
 		w.str = append(w.str, s...)
 	}
 	return nil
+}
+
+func WriteBytesTo(w io.Writer, v []byte) (n int64, err error) {
+	// Fits single byte, no string header
+	if len(v) == 1 && v[0] <= 0x7F {
+		nn, err := w.Write(v)
+		return int64(nn), err
+	}
+
+	// Write header.
+	if len(v) < 56 {
+		nn, err := w.Write([]byte{0x80 + byte(len(v))})
+		if n += int64(nn); err != nil {
+			return n, err
+		}
+	} else {
+		buf := make([]byte, 9)
+		sz := putint(buf[1:], uint64(len(v)))
+		buf[0] = 0xB7 + byte(sz)
+		nn, err := w.Write(buf[:sz+1])
+		if n += int64(nn); err != nil {
+			return n, err
+		}
+	}
+
+	nn, err := w.Write(v)
+	n += int64(nn)
+	return n, err
+}
+
+func BytesSize(v []byte) int {
+	if len(v) == 1 && v[0] <= 0x7F {
+		return 1
+	} else if len(v) < 56 {
+		return 1 + len(v)
+	}
+	return intsize(uint64(len(v))) + 1 + len(v)
+}
+
+func WriteListHeaderTo(w io.Writer, v int) (n int64, err error) {
+	if v < 56 {
+		nn, err := w.Write([]byte{0xC0 + byte(v)})
+		return int64(nn), err
+	}
+
+	buf := make([]byte, 9)
+	sz := putint(buf[1:], uint64(v))
+	buf[0] = 0xF7 + byte(sz)
+	nn, err := w.Write(buf[:sz+1])
+	return int64(nn), err
+}
+
+func ListHeaderSize(sz int) int {
+	return headsize(uint64(sz))
 }
 
 func writeEncoder(val reflect.Value, w *encbuf) error {

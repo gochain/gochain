@@ -107,6 +107,29 @@ type Account struct {
 	CodeHash common.Hash
 }
 
+// EncodeRLP implements rlp.Encoder.
+func (a *Account) EncodeRLP(w io.Writer) error {
+	sz := rlp.Uint64Size(a.Nonce) +
+		rlp.BigIntSize(a.Balance) +
+		rlp.BytesSize([]byte(a.Root[:])) +
+		rlp.BytesSize([]byte(a.CodeHash[:]))
+
+	if _, err := rlp.WriteListHeaderTo(w, sz); err != nil {
+		return err
+	}
+
+	if _, err := rlp.WriteUint64To(w, a.Nonce); err != nil {
+		return err
+	} else if _, err := rlp.WriteBigIntTo(w, a.Balance); err != nil {
+		return err
+	} else if _, err := rlp.WriteBytesTo(w, []byte(a.Root[:])); err != nil {
+		return err
+	} else if _, err := rlp.WriteBytesTo(w, []byte(a.CodeHash[:])); err != nil {
+		return err
+	}
+	return nil
+}
+
 // newObject creates a state object.
 func newObject(db *StateDB, address common.Address, data Account, onDirty func(addr common.Address)) *stateObject {
 	if data.Balance == nil {
@@ -128,7 +151,17 @@ func newObject(db *StateDB, address common.Address, data Account, onDirty func(a
 
 // EncodeRLP implements rlp.Encoder.
 func (so *stateObject) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, so.data)
+	// var newbuf, oldbuf bytes.Buffer
+	// if err := so.data.EncodeRLP2(&newbuf); err != nil {
+	// panic(err)
+	// } else if err := rlp.Encode(&oldbuf, so.data); err != nil {
+	// panic(err)
+	// } else if newb, oldb := newbuf.Bytes(), oldbuf.Bytes(); !bytes.Equal(newb, oldb) {
+	// fmt.Printf("OLD: %x\nNEW: %x\n", oldb, newb)
+	// panic("STOP")
+	// }
+	return so.data.EncodeRLP(w)
+	// return rlp.Encode(w, so.data)
 }
 
 // setError remembers the first non-nil error it is called with.
