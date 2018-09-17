@@ -107,14 +107,16 @@ type Account struct {
 	CodeHash common.Hash
 }
 
-// EncodeRLP implements rlp.Encoder.
-func (a *Account) EncodeRLP(w io.Writer) error {
-	sz := rlp.Uint64Size(a.Nonce) +
+func (a *Account) RLPSize() int {
+	return rlp.Uint64Size(a.Nonce) +
 		rlp.BigIntSize(a.Balance) +
 		rlp.BytesSize([]byte(a.Root[:])) +
 		rlp.BytesSize([]byte(a.CodeHash[:]))
+}
 
-	if _, err := rlp.WriteListHeaderTo(w, sz); err != nil {
+// EncodeRLP implements rlp.Encoder.
+func (a *Account) EncodeRLP(w io.Writer) error {
+	if _, err := rlp.WriteListHeaderTo(w, a.RLPSize()); err != nil {
 		return err
 	}
 
@@ -147,6 +149,11 @@ func newObject(db *StateDB, address common.Address, data Account, onDirty func(a
 		dirtyStorage:  make(Storage),
 		onDirty:       onDirty,
 	}
+}
+
+// RLPSize returns the size of the encoded RLP object.
+func (so *stateObject) RLPSize() int {
+	return so.data.RLPSize()
 }
 
 // EncodeRLP implements rlp.Encoder.
