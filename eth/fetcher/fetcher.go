@@ -670,9 +670,8 @@ func (f *Fetcher) enqueue(peer string, block *types.Block) {
 	}
 }
 
-// insert spawns a new goroutine to run a block insertion into the chain. If the
-// block's number is at the same height as the current import phase, if updates
-// the phase states accordingly.
+// insert inserts a block into the chain. It is safe to run in a separate goroutine. If the block's number
+// is at the same height as the current import phase, if updates the phase states accordingly.
 func (f *Fetcher) insert(peer string, block *types.Block) {
 	hash := block.Hash()
 	defer func() { f.done <- hash }()

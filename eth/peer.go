@@ -338,7 +338,7 @@ func (p *peer) SendNewBlockHash(ctx context.Context, hash common.Hash, number ui
 	ctx, span := trace.StartSpan(ctx, "peer.SendNewBlockHash")
 	defer span.End()
 
-	b, err := rlp.EncodeToBytes(newBlockHashesData{{Hash: hash, Number: number}})
+	b, err := rlp.EncodeToBytesCtx(ctx, newBlockHashesData{{Hash: hash, Number: number}})
 	if err != nil {
 		return err
 	}
@@ -356,7 +356,7 @@ func (p *peer) SendNewBlock(ctx context.Context, block *types.Block, td *big.Int
 	ctx, span := trace.StartSpan(ctx, "peer.SendNewBlock")
 	defer span.End()
 
-	b, err := rlp.EncodeToBytes([]interface{}{block, td})
+	b, err := rlp.EncodeToBytesCtx(ctx, []interface{}{block, td})
 	if err != nil {
 		return err
 	}

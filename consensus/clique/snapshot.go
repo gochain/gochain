@@ -18,6 +18,7 @@ package clique
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -181,7 +182,7 @@ func (s *Snapshot) uncast(address common.Address, authorize bool) bool {
 
 // apply creates a new authorization snapshot by applying the given headers to
 // the original one.
-func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
+func (s *Snapshot) apply(ctx context.Context, headers []*types.Header) (*Snapshot, error) {
 	// Allow passing in no headers for cleaner code
 	if len(headers) == 0 {
 		return s, nil
@@ -206,7 +207,7 @@ func (s *Snapshot) apply(headers []*types.Header) (*Snapshot, error) {
 			snap.Tally = make(map[common.Address]Tally)
 		}
 		// Resolve the authorization key and check against signers
-		signer, err := ecrecover(header, s.sigcache)
+		signer, err := ecrecover(ctx, header, s.sigcache)
 		if err != nil {
 			return nil, err
 		}

@@ -608,7 +608,7 @@ func (s *Service) assembleBlockStats(ctx context.Context, block *types.Block) *b
 		txs = []txStats{}
 	}
 	// Assemble and return the block stats
-	author, _ := s.engine.Author(header)
+	author, _ := s.engine.Author(ctx, header)
 
 	return &blockStats{
 		Number:     header.Number,
