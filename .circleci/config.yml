@@ -151,6 +151,33 @@ jobs:
               ./release.sh
             fi
 
+  docker:
+    <<: *defaults
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - attach_workspace:
+          at: .
+      - run:
+          name: Store Service Account
+          command: echo $ACCT_AUTH > ${HOME}/gcloud-service-key.json
+      - run:
+          name: install dependencies
+          command: |
+            wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-204.0.0-linux-x86_64.tar.gz --directory-prefix=tmp
+            tar -xvzf tmp/google-cloud-sdk-204.0.0-linux-x86_64.tar.gz -C tmp
+            ./tmp/google-cloud-sdk/install.sh -q
+      - deploy:
+          command: |
+            echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+            docker build . -t gochain/gochain:${CIRCLE_BRANCH}
+            docker push gochain/gochain:${CIRCLE_BRANCH}
+            echo $ACCT_AUTH > ${HOME}/gcloud-service-key.json
+            ./tmp/google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
+            docker login -u _json_key -p "$(cat ${HOME}/gcloud-service-key.json)" https://gcr.io
+            docker tag gochain/gochain:${CIRCLE_BRANCH} gcr.io/gochain-core/gochain:${CIRCLE_BRANCH}
+            docker push gcr.io/gochain-core/gochain:${CIRCLE_BRANCH}
+
 workflows:
   version: 2
   prepare-accept-deploy:
@@ -179,3 +206,22 @@ workflows:
             - test
             - test-fuse
             - race
+
+      - approve-docker:
+          type: approval
+          filters:
+            branches:
+              ignore:
+              - master
+              - stable
+              - testnet
+              - latest
+          requires:
+            - test
+            - build
+            - test-fuse
+            - race
+
+      - docker:
+          requires:
+            - approve-docker
