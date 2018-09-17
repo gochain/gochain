@@ -426,7 +426,7 @@ func (self *TxPool) Add(ctx context.Context, tx *types.Transaction) error {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 
-	data, err := rlp.EncodeToBytes(tx)
+	data, err := rlp.EncodeToBytesCtx(ctx, tx)
 	if err != nil {
 		return err
 	}

@@ -69,7 +69,7 @@ func (e *fakeEngine) Authorize(signer common.Address, fn consensus.SignerFn) {
 	e.real.Authorize(signer, fn)
 }
 
-func (e *fakeEngine) Author(header *types.Header) (common.Address, error) {
+func (e *fakeEngine) Author(_ context.Context, header *types.Header) (common.Address, error) {
 	return header.Coinbase, nil
 }
 

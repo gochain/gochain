@@ -396,7 +396,7 @@ func (s *PrivateAccountAPI) SignTransaction(ctx context.Context, args SendTxArgs
 	if err != nil {
 		return nil, err
 	}
-	data, err := rlp.EncodeToBytes(signed)
+	data, err := rlp.EncodeToBytesCtx(ctx, signed)
 	if err != nil {
 		return nil, err
 	}
@@ -1076,7 +1076,7 @@ func (s *PublicTransactionPoolAPI) GetRawTransactionByHash(ctx context.Context, 
 		}
 	}
 	// Serialize to RLP and return
-	return rlp.EncodeToBytes(tx)
+	return rlp.EncodeToBytesCtx(ctx, tx)
 }
 
 // GetTransactionReceipt returns the transaction receipt for the given transaction hash.
@@ -1326,7 +1326,7 @@ func (s *PublicTransactionPoolAPI) SignTransaction(ctx context.Context, args Sen
 	if err != nil {
 		return nil, err
 	}
-	data, err := rlp.EncodeToBytes(tx)
+	data, err := rlp.EncodeToBytesCtx(ctx, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -1416,7 +1416,7 @@ func (api *PublicDebugAPI) GetBlockRlp(ctx context.Context, number uint64) (stri
 	if block == nil {
 		return "", fmt.Errorf("block #%d not found", number)
 	}
-	encoded, err := rlp.EncodeToBytes(block)
+	encoded, err := rlp.EncodeToBytesCtx(ctx, block)
 	if err != nil {
 		return "", err
 	}

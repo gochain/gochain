@@ -154,7 +154,7 @@ func SendCtx(ctx context.Context, w MsgWriter, msgcode uint64, data interface{})
 	ctx, span := trace.StartSpan(ctx, "Send")
 	defer span.End()
 
-	size, r, err := rlp.EncodeToReader(data)
+	size, r, err := rlp.EncodeToReaderCtx(ctx, data)
 	if err != nil {
 		return err
 	}

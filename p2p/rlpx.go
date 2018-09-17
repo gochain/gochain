@@ -628,7 +628,7 @@ func (rw *rlpxFrameRW) WriteMsg(ctx context.Context, msg Msg) error {
 	ctx, span := trace.StartSpan(ctx, "rlpxFrameRW.WriteMsg")
 	defer span.End()
 
-	ptype, _ := rlp.EncodeToBytes(msg.Code)
+	ptype, _ := rlp.EncodeToBytesCtx(ctx, msg.Code)
 
 	// if snappy is enabled, compress message now
 	if rw.snappy {

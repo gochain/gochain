@@ -449,7 +449,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		)
 		for bytes < softResponseLimit && len(bodies) < downloader.MaxBlockFetch {
 			// Retrieve the hash of the next block
-			if err := msgStream.Decode(&hash); err == rlp.EOL {
+			if err := msgStream.DecodeCtx(ctx, &hash); err == rlp.EOL {
 				break
 			} else if err != nil {
 				return errResp(ErrDecode, "msg %v: %v", msg, err)
@@ -500,7 +500,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		)
 		for bytes < softResponseLimit && len(data) < downloader.MaxStateFetch {
 			// Retrieve the hash of the next state entry
-			if err := msgStream.Decode(&hash); err == rlp.EOL {
+			if err := msgStream.DecodeCtx(ctx, &hash); err == rlp.EOL {
 				break
 			} else if err != nil {
 				return errResp(ErrDecode, "msg %v: %v", msg, err)
@@ -539,7 +539,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		)
 		for bytes < softResponseLimit && len(receipts) < downloader.MaxReceiptFetch {
 			// Retrieve the hash of the next block
-			if err := msgStream.Decode(&hash); err == rlp.EOL {
+			if err := msgStream.DecodeCtx(ctx, &hash); err == rlp.EOL {
 				break
 			} else if err != nil {
 				return errResp(ErrDecode, "msg %v: %v", msg, err)
@@ -552,7 +552,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 				}
 			}
 			// If known, encode and queue for response packet
-			if encoded, err := rlp.EncodeToBytes(results); err != nil {
+			if encoded, err := rlp.EncodeToBytesCtx(ctx, results); err != nil {
 				log.Error("Failed to encode receipt", "err", err)
 			} else {
 				receipts = append(receipts, encoded)

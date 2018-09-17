@@ -142,10 +142,10 @@ var (
 // Note, the method requires the extra data to be at least 65 bytes, otherwise it
 // panics. This is done to avoid accidentally using both forms (signature present
 // or not), which could be abused to produce different hashes for the same header.
-func sigHash(header *types.Header) (hash common.Hash) {
+func sigHash(ctx context.Context, header *types.Header) (hash common.Hash) {
 	hasher := sha3.NewKeccak256SingleSum()
 
-	rlp.Encode(hasher, []interface{}{
+	rlp.EncodeCtx(ctx, hasher, []interface{}{
 		header.ParentHash,
 		header.UncleHash,
 		header.Coinbase,
@@ -169,7 +169,7 @@ func sigHash(header *types.Header) (hash common.Hash) {
 }
 
 // ecrecover extracts the Ethereum account address from a signed header.
-func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, error) {
+func ecrecover(ctx context.Context, header *types.Header, sigcache *lru.ARCCache) (common.Address, error) {
 	// If the signature's already cached, return that
 	hash := header.Hash()
 	if address, known := sigcache.Get(hash); known {
@@ -182,7 +182,7 @@ func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, er
 	signature := header.Signer
 
 	// Recover the public key and the Ethereum address
-	pubkey, err := crypto.Ecrecover(sigHash(header).Bytes(), signature)
+	pubkey, err := crypto.Ecrecover(sigHash(ctx, header).Bytes(), signature)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -238,8 +238,8 @@ func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
 
 // Author implements consensus.Engine, returning the address recovered
 // from the signature in the header's extra-data section.
-func (c *Clique) Author(header *types.Header) (common.Address, error) {
-	return ecrecover(header, c.signatures)
+func (c *Clique) Author(ctx context.Context, header *types.Header) (common.Address, error) {
+	return ecrecover(ctx, header, c.signatures)
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules.
@@ -482,7 +482,7 @@ func (c *Clique) snapshot(ctx context.Context, chain consensus.ChainReader, numb
 	for i := 0; i < len(headers)/2; i++ {
 		headers[i], headers[len(headers)-1-i] = headers[len(headers)-1-i], headers[i]
 	}
-	snap, err := snap.apply(headers)
+	snap, err := snap.apply(ctx, headers)
 	if err != nil {
 		return nil, err
 	}
@@ -517,7 +517,7 @@ func (c *Clique) verifySeal(ctx context.Context, chain consensus.ChainReader, he
 		return err
 	}
 	// Resolve the authorization key and check against signers
-	signer, err := ecrecover(header, c.signatures)
+	signer, err := ecrecover(ctx, header, c.signatures)
 	if err != nil {
 		return err
 	}
@@ -689,7 +689,7 @@ func (c *Clique) Seal(ctx context.Context, chain consensus.ChainReader, block *t
 	}
 
 	// Sign all the things!
-	sighash, err := signFn(accounts.Account{Address: signer}, sigHash(header).Bytes())
+	sighash, err := signFn(accounts.Account{Address: signer}, sigHash(ctx, header).Bytes())
 	if err != nil {
 		return nil, err
 	}
