@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 
+	"go.opencensus.io/trace"
+
 	"github.com/gochain-io/gochain/consensus"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
@@ -50,26 +52,28 @@ func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engin
 // ValidateBody validates the given block's uncles and verifies the the block
 // header's transaction and uncle roots. The headers are assumed to be already
 // validated at this point.
-func (v *BlockValidator) ValidateBody(ctx context.Context, block *types.Block) error {
+func (v *BlockValidator) ValidateBody(ctx context.Context, block *types.Block, checkParent bool) error {
+	ctx, span := trace.StartSpan(ctx, "BlockValidator.ValidateBody")
+	defer span.End()
+
 	// Check whether the block's known, and if not, that it's linkable
 	if v.bc.HasBlockAndState(block.Hash(), block.NumberU64()) {
 		return ErrKnownBlock
 	}
-	if !v.bc.HasBlockAndState(block.ParentHash(), block.NumberU64()-1) {
-		if !v.bc.HasBlock(block.ParentHash(), block.NumberU64()-1) {
-			return consensus.ErrUnknownAncestor
+	if checkParent {
+		if !v.bc.HasBlockAndState(block.ParentHash(), block.NumberU64()-1) {
+			if !v.bc.HasBlock(block.ParentHash(), block.NumberU64()-1) {
+				return consensus.ErrUnknownAncestor
+			}
+			return consensus.ErrPrunedAncestor
 		}
-		return consensus.ErrPrunedAncestor
 	}
-	// Header validity is known at this point, check the transactions
-	header := block.Header()
 	if len(block.Uncles()) > 0 {
 		return errors.New("uncles not allowed")
 	}
-	if hash := types.CalcUncleHash(block.Uncles()); hash != header.UncleHash {
-		return fmt.Errorf("uncle root hash mismatch: have %x, want %x", hash, header.UncleHash)
-	}
-	if hash := types.DeriveSha(block.Transactions()); hash != header.TxHash {
+	// Header validity is known at this point, check the transactions
+	header := block.Header()
+	if hash := types.DeriveShaCtx(ctx, block.Transactions()); hash != header.TxHash {
 		return fmt.Errorf("transaction root hash mismatch: have %x, want %x", hash, header.TxHash)
 	}
 	return nil
@@ -80,6 +84,9 @@ func (v *BlockValidator) ValidateBody(ctx context.Context, block *types.Block) e
 // itself. ValidateState returns a database batch if the validation was a success
 // otherwise nil and an error is returned.
 func (v *BlockValidator) ValidateState(ctx context.Context, block, parent *types.Block, statedb *state.StateDB, receipts types.Receipts, usedGas uint64) error {
+	ctx, span := trace.StartSpan(ctx, "BlockValidator.ValidateState")
+	defer span.End()
+
 	header := block.Header()
 	if block.GasUsed() != usedGas {
 		return fmt.Errorf("invalid gas used (remote: %d local: %d)", block.GasUsed(), usedGas)

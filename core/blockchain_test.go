@@ -171,11 +171,11 @@ func testFork(t *testing.T, blockchain *BlockChain, i, n int, full bool, compara
 // testBlockChainImport tries to process a chain of blocks, writing them into
 // the database if successful.
 func testBlockChainImport(ctx context.Context, chain types.Blocks, blockchain *BlockChain) error {
-	for _, block := range chain {
+	for i, block := range chain {
 		// Try and process the block
 		err := blockchain.engine.VerifyHeader(ctx, blockchain, block.Header())
 		if err == nil {
-			err = blockchain.validator.ValidateBody(ctx, block)
+			err = blockchain.validator.ValidateBody(ctx, block, i == 0)
 		}
 		if err != nil {
 			if err == ErrKnownBlock {
@@ -395,7 +395,7 @@ func testBrokenChain(t *testing.T, full bool) {
 
 type bproc struct{}
 
-func (bproc) ValidateBody(context.Context, *types.Block) error { return nil }
+func (bproc) ValidateBody(context.Context, *types.Block, bool) error { return nil }
 func (bproc) ValidateState(ctx context.Context, block, parent *types.Block, state *state.StateDB, receipts types.Receipts, usedGas uint64) error {
 	return nil
 }

@@ -18,6 +18,9 @@ package types
 
 import (
 	"bytes"
+	"context"
+
+	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/rlp"
@@ -27,6 +30,12 @@ import (
 type DerivableList interface {
 	Len() int
 	GetRlp(i int) []byte
+}
+
+func DeriveShaCtx(ctx context.Context, list DerivableList) common.Hash {
+	ctx, span := trace.StartSpan(ctx, "DeriveShaCtx")
+	defer span.End()
+	return DeriveSha(list)
 }
 
 func DeriveSha(list DerivableList) common.Hash {
