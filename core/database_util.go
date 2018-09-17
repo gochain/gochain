@@ -18,6 +18,7 @@ package core
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -343,7 +344,7 @@ func GetTransaction(db common.Database, hash common.Hash) (*types.Transaction, c
 
 // GetReceipt retrieves a specific transaction receipt from the database, along with
 // its added positional metadata.
-func GetReceipt(db common.Database, hash common.Hash) (*types.Receipt, common.Hash, uint64, uint64) {
+func GetReceipt(ctx context.Context, db common.Database, hash common.Hash) (*types.Receipt, common.Hash, uint64, uint64) {
 	// Retrieve the lookup metadata and resolve the receipt from the receipts
 	blockHash, blockNumber, receiptIndex := GetTxLookupEntry(db.GlobalTable(), hash)
 
