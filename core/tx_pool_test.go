@@ -43,6 +43,10 @@ var testTxPoolConfig TxPoolConfig
 
 func init() {
 	testTxPoolConfig = DefaultTxPoolConfig
+	testTxPoolConfig.AccountSlots = 512
+	testTxPoolConfig.GlobalSlots = 4096
+	testTxPoolConfig.AccountQueue = 256
+	testTxPoolConfig.GlobalQueue = 1024
 	testTxPoolConfig.Journal = ""
 	testTxPoolConfig.PriceLimit = 1
 }
