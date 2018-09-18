@@ -163,10 +163,10 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	PriceLimit: gasprice.Default.Uint64(),
 	PriceBump:  10,
 
-	AccountSlots: 2048,
-	GlobalSlots:  32768,
-	AccountQueue: 1024,
-	GlobalQueue:  8192,
+	AccountSlots: 8192,
+	GlobalSlots:  131072,
+	AccountQueue: 4096,
+	GlobalQueue:  32768,
 
 	Lifetime: 3 * time.Hour,
 }
