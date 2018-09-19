@@ -132,6 +132,19 @@ func (a *Account) EncodeRLP(w io.Writer) error {
 	return nil
 }
 
+// MarshalRLP returns an RLP encoded byte slice.
+func (a *Account) MarshalRLP() (_ []byte, err error) {
+	buf := make([]byte, rlp.MaxHeadSize, rlp.MaxHeadSize+rlp.Uint64Size(a.Nonce)+rlp.MaxBigIntSize+rlp.BytesSize([]byte(a.Root[:]))+rlp.BytesSize([]byte(a.CodeHash[:])))
+	buf = rlp.AppendUint64(buf, a.Nonce)
+	if buf, err = rlp.AppendBigInt(buf, a.Balance); err != nil {
+		return nil, err
+	}
+	buf = rlp.AppendBytes(buf, []byte(a.Root[:]))
+	buf = rlp.AppendBytes(buf, []byte(a.CodeHash[:]))
+	buf = rlp.PrependListHeader(buf)
+	return buf, nil
+}
+
 // newObject creates a state object.
 func newObject(db *StateDB, address common.Address, data Account, onDirty func(addr common.Address)) *stateObject {
 	if data.Balance == nil {
@@ -158,17 +171,13 @@ func (so *stateObject) RLPSize() int {
 
 // EncodeRLP implements rlp.Encoder.
 func (so *stateObject) EncodeRLP(w io.Writer) error {
-	// var newbuf, oldbuf bytes.Buffer
-	// if err := so.data.EncodeRLP2(&newbuf); err != nil {
-	// panic(err)
-	// } else if err := rlp.Encode(&oldbuf, so.data); err != nil {
-	// panic(err)
-	// } else if newb, oldb := newbuf.Bytes(), oldbuf.Bytes(); !bytes.Equal(newb, oldb) {
-	// fmt.Printf("OLD: %x\nNEW: %x\n", oldb, newb)
-	// panic("STOP")
-	// }
 	return so.data.EncodeRLP(w)
 	// return rlp.Encode(w, so.data)
+}
+
+// MarshalRLP returns an RLP encoded byte slice.
+func (so *stateObject) MarshalRLP() ([]byte, error) {
+	return so.data.MarshalRLP()
 }
 
 // setError remembers the first non-nil error it is called with.
