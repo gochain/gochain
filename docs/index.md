@@ -1,0 +1,3 @@
+# GoChain Documentation
+
+Coming soon.
