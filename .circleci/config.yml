@@ -127,9 +127,6 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Store Service Account
-          command: echo $ACCT_AUTH > ${HOME}/gcloud-service-key.json
-      - run:
           name: install dependencies
           command: |
             wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-204.0.0-linux-x86_64.tar.gz --directory-prefix=tmp
@@ -144,10 +141,11 @@ jobs:
       - deploy:
           command: |
             if [[ "${CIRCLE_BRANCH}" == "master" && -z "${CIRCLE_PR_REPONAME}" ]]; then
-              echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
               git config --global user.email "ci@gochain.io"
               git config --global user.name "CI"
               git branch --set-upstream-to=origin/${CIRCLE_BRANCH} ${CIRCLE_BRANCH}
+              echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+              echo $DOCKER_PASS | docker login -u _json_key --password-stdin https://gcr.io
               ./release.sh
             fi
 
@@ -159,9 +157,6 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Store Service Account
-          command: echo $ACCT_AUTH > ${HOME}/gcloud-service-key.json
-      - run:
           name: install dependencies
           command: |
             wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-204.0.0-linux-x86_64.tar.gz --directory-prefix=tmp
@@ -172,9 +167,9 @@ jobs:
             echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
             docker build . -t gochain/gochain:${CIRCLE_BRANCH}
             docker push gochain/gochain:${CIRCLE_BRANCH}
-            echo $ACCT_AUTH > ${HOME}/gcloud-service-key.json
+            echo $GOOGLE_AUTH > ${HOME}/gcloud-service-key.json
+            echo $GOOGLE_AUTH | docker login -u _json_key --password-stdin https://gcr.io
             ./tmp/google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
-            docker login -u _json_key -p "$(cat ${HOME}/gcloud-service-key.json)" https://gcr.io
             docker tag gochain/gochain:${CIRCLE_BRANCH} gcr.io/gochain-core/gochain:${CIRCLE_BRANCH}
             docker push gcr.io/gochain-core/gochain:${CIRCLE_BRANCH}
 
