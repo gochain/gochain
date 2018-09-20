@@ -68,8 +68,14 @@ func (pm *ProtocolManager) syncTransactionsAllPeers() {
 		return
 	}
 	peers := pm.peers.All()
-	peers = peers[:int(math.Sqrt(float64(len(peers))))]
-	for _, p := range peers {
+	max := int(math.Sqrt(float64(len(peers))))
+	if max < minBroadcastPeers {
+		max = minBroadcastPeers
+	}
+	if max > len(peers) {
+		max = len(peers)
+	}
+	for _, p := range peers[:max] {
 		select {
 		case pm.txsyncCh <- &txsync{p, txs}:
 		case <-pm.quitSync:
