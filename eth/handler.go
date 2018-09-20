@@ -51,10 +51,9 @@ const (
 	// txChanSize is the size of channel listening to NewTxsEvent.
 	// The number is referenced from the size of tx pool.
 	txChanSize = 4096
-)
 
-var (
-	daoChallengeTimeout = 15 * time.Second // Time allowance for a node to reply to the DAO handshake challenge
+	// The smallest subset of peers to broadcast to.
+	minBroadcastPeers = 4
 )
 
 // errIncompatibleConfig is returned if the requested protocols and configs are
@@ -707,6 +706,9 @@ func (pm *ProtocolManager) BroadcastBlock(ctx context.Context, block *types.Bloc
 		}
 		// Send the block to a subset of our peers (at most, square root of total peers).
 		max := int(math.Sqrt(float64(cap(peers))))
+		if max < minBroadcastPeers {
+			max = minBroadcastPeers
+		}
 		if max > len(peers) {
 			max = len(peers)
 		}
