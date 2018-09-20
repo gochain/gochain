@@ -2,5 +2,3 @@
 site_name: GoChain Documentation
 site_url: https://gochain.io
 repo_url: https://github.com/gochain-io/gochain
-nav:
-  - Home: index.md
