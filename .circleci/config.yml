@@ -145,7 +145,8 @@ jobs:
               git config --global user.name "CI"
               git branch --set-upstream-to=origin/${CIRCLE_BRANCH} ${CIRCLE_BRANCH}
               echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-              echo $DOCKER_PASS | docker login -u _json_key --password-stdin https://gcr.io
+              echo $GOOGLE_AUTH > ${HOME}/gcloud-service-key.json
+              echo $GOOGLE_AUTH | docker login -u _json_key --password-stdin https://gcr.io
               ./release.sh
             fi
 
