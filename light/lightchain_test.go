@@ -273,7 +273,8 @@ func makeHeaderChainWithDiff(genesis *types.Block, d []int, seed byte) []*types.
 
 type dummyOdr struct {
 	OdrBackend
-	db common.Database
+	db            common.Database
+	indexerConfig *IndexerConfig
 }
 
 func (odr *dummyOdr) Database() common.Database {
@@ -282,6 +283,10 @@ func (odr *dummyOdr) Database() common.Database {
 
 func (odr *dummyOdr) Retrieve(ctx context.Context, req OdrRequest) error {
 	return nil
+}
+
+func (odr *dummyOdr) IndexerConfig() *IndexerConfig {
+	return odr.indexerConfig
 }
 
 // Tests that reorganizing a long difficult chain after a short easy one
@@ -337,7 +342,7 @@ func TestReorgBadHeaderHashes(t *testing.T) {
 	ctx := context.Background()
 	bc := newTestLightChain()
 
-	// Create a chain, import and ban aferwards
+	// Create a chain, import and ban afterwards
 	headers := makeHeaderChainWithDiff(bc.genesisBlock, []int{1, 2, 3, 4}, 10)
 
 	if _, err := bc.InsertHeaderChain(ctx, headers, 1); err != nil {

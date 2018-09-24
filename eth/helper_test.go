@@ -39,7 +39,7 @@ import (
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/p2p"
-	"github.com/gochain-io/gochain/p2p/discover"
+	"github.com/gochain-io/gochain/p2p/enode"
 	"github.com/gochain-io/gochain/params"
 )
 
@@ -62,7 +62,7 @@ func newTestProtocolManager(ctx context.Context, mode downloader.SyncMode, block
 			Signer: hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
 		}
 		genesis       = gspec.MustCommit(db)
-		blockchain, _ = core.NewBlockChain(ctx, db, nil, gspec.Config, engine, vm.Config{})
+		blockchain, _ = core.NewBlockChain(db, nil, gspec.Config, engine, vm.Config{})
 	)
 	chain, _ := core.GenerateChain(ctx, gspec.Config, genesis, engine, db, blocks, generator)
 	if _, err := blockchain.InsertChain(ctx, chain); err != nil {
@@ -163,7 +163,7 @@ func newTestPeer(ctx context.Context, name string, version int, pm *ProtocolMana
 	app, net := p2p.MsgPipe()
 
 	// Generate a random id and create the peer
-	var id discover.NodeID
+	var id enode.ID
 	rand.Read(id[:])
 
 	peer := pm.newPeer(version, p2p.NewPeer(id, name, nil), net)

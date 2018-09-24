@@ -92,8 +92,8 @@ type stateObject struct {
 }
 
 // empty returns whether the account is considered empty.
-func (so *stateObject) empty() bool {
-	return so.data.Nonce == 0 && so.data.Balance.Sign() == 0 && so.data.CodeHash == emptyCodeHash
+func (s *stateObject) empty() bool {
+	return s.data.Nonce == 0 && s.data.Balance.Sign() == 0 && s.data.CodeHash == emptyCodeHash
 }
 
 // Account is the Ethereum consensus representation of accounts.

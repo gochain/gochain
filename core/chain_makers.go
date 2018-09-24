@@ -32,12 +32,11 @@ import (
 // BlockGen creates blocks for testing.
 // See GenerateChain for a detailed explanation.
 type BlockGen struct {
-	i           int
-	parent      *types.Block
-	chain       []*types.Block
-	chainReader consensus.ChainReader
-	header      *types.Header
-	statedb     *state.StateDB
+	i       int
+	parent  *types.Block
+	chain   []*types.Block
+	header  *types.Header
+	statedb *state.StateDB
 
 	gasPool  *GasPool
 	txs      []*types.Transaction
@@ -148,16 +147,12 @@ func GenerateChain(ctx context.Context, config *params.ChainConfig, first *types
 		config = params.TestChainConfig
 	}
 	blocks, receipts := make(types.Blocks, n), make([]types.Receipts, n)
-
+	chainreader := &fakeChainReader{config: config}
 	genblock := func(i int, parent *types.Block, statedb *state.StateDB) (*types.Block, types.Receipts) {
-		// TODO(karalabe): This is needed for clique, which depends on multiple blocks.
-		// It's nonetheless ugly to spin up a blockchain here. Get rid of this somehow.
-		blockchain, _ := NewBlockChain(ctx, db, nil, config, engine, vm.Config{})
-		defer blockchain.Stop()
-		b := &BlockGen{i: i, parent: parent, chain: blocks, chainReader: blockchain, statedb: statedb, config: config, engine: engine}
+		b := &BlockGen{i: i, parent: parent, chain: blocks, statedb: statedb, config: config, engine: engine}
 
 		b.header = &types.Header{
-			Root:       statedb.IntermediateRoot(b.config.IsEIP158(parent.Number())),
+			Root:       statedb.IntermediateRoot(chainreader.config.IsEIP158(parent.Number())),
 			ParentHash: parent.Hash(),
 			GasLimit:   CalcGasLimit(parent, parent.GasLimit(), parent.GasLimit()),
 			Number:     new(big.Int).Add(parent.Number(), common.Big1),
@@ -172,13 +167,13 @@ func GenerateChain(ctx context.Context, config *params.ChainConfig, first *types
 		}
 
 		if b.engine != nil {
-			if err := b.engine.Prepare(ctx, b.chainReader, b.header); err != nil {
+			if err := b.engine.Prepare(ctx, chainreader, b.header); err != nil {
 				panic(fmt.Sprintf("failed to prepare %d: %v", b.header.Number.Uint64(), err))
 			}
-			block := b.engine.Finalize(ctx, b.chainReader, b.header, statedb, b.txs, b.receipts, true)
+			block := b.engine.Finalize(ctx, chainreader, b.header, statedb, b.txs, b.receipts, true)
 
 			stop := make(chan struct{})
-			block, _, err := b.engine.Seal(ctx, b.chainReader, block, stop)
+			block, _, err := b.engine.Seal(ctx, chainreader, block, stop)
 			close(stop)
 			if err != nil {
 				panic(fmt.Sprintf("block seal error: %v", err))
@@ -226,3 +221,19 @@ func makeBlockChain(ctx context.Context, parent *types.Block, n int, engine cons
 	})
 	return blocks
 }
+
+type fakeChainReader struct {
+	config  *params.ChainConfig
+	genesis *types.Block
+}
+
+// Config returns the chain configuration.
+func (cr *fakeChainReader) Config() *params.ChainConfig {
+	return cr.config
+}
+
+func (cr *fakeChainReader) CurrentHeader() *types.Header                            { return nil }
+func (cr *fakeChainReader) GetHeaderByNumber(number uint64) *types.Header           { return nil }
+func (cr *fakeChainReader) GetHeaderByHash(hash common.Hash) *types.Header          { return nil }
+func (cr *fakeChainReader) GetHeader(hash common.Hash, number uint64) *types.Header { return nil }
+func (cr *fakeChainReader) GetBlock(hash common.Hash, number uint64) *types.Block   { return nil }

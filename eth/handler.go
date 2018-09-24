@@ -37,7 +37,7 @@ import (
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/p2p"
-	"github.com/gochain-io/gochain/p2p/discover"
+	"github.com/gochain-io/gochain/p2p/enode"
 	"github.com/gochain-io/gochain/params"
 	"github.com/gochain-io/gochain/rlp"
 )
@@ -145,7 +145,7 @@ func NewProtocolManager(ctx context.Context, config *params.ChainConfig, mode do
 			NodeInfo: func() interface{} {
 				return manager.NodeInfo()
 			},
-			PeerInfo: func(id discover.NodeID) interface{} {
+			PeerInfo: func(id enode.ID) interface{} {
 				if p := manager.peers.Peer(fmt.Sprintf("%x", id[:8])); p != nil {
 					return p.Info()
 				}

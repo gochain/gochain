@@ -71,7 +71,7 @@ func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
 		Signer: hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
 	}
 	genesis.MustCommit(database)
-	blockchain, err := core.NewBlockChain(context.Background(), database, nil, genesis.Config, clique.NewFaker(), vm.Config{})
+	blockchain, err := core.NewBlockChain(database, nil, genesis.Config, clique.NewFaker(), vm.Config{})
 	if err != nil {
 		panic(err)
 	}
@@ -98,7 +98,14 @@ func (b *SimulatedBackend) Commit(ctx context.Context) {
 	b.rollback()
 }
 
-// rollback aborts all pending transactions, reverting to the last committed state.
+// Rollback aborts all pending transactions, reverting to the last committed state.
+func (b *SimulatedBackend) Rollback() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.rollback()
+}
+
 func (b *SimulatedBackend) rollback() {
 	ctx := context.TODO()
 	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlock(), clique.NewFaker(), b.database, 1, nil)

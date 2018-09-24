@@ -37,11 +37,8 @@ type SampleService struct{}
 
 func (s *SampleService) Protocols() []p2p.Protocol { return nil }
 func (s *SampleService) APIs() []rpc.API           { return nil }
-func (s *SampleService) Start(*p2p.Server) error {
-	fmt.Println("Service starting...")
-	return nil
-}
-func (s *SampleService) Stop() error { fmt.Println("Service stopping..."); return nil }
+func (s *SampleService) Start(*p2p.Server) error   { fmt.Println("Service starting..."); return nil }
+func (s *SampleService) Stop() error               { fmt.Println("Service stopping..."); return nil }
 
 func ExampleService() {
 	// Create a network node to run protocols with the default values.

@@ -3,16 +3,20 @@ package log
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
+	"path/filepath"
 	"reflect"
+	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/go-stack/stack"
 )
 
+// Handler defines where and how log records are written.
 // A Logger prints its log records by writing to a Handler.
-// The Handler interface defines where and how log records are written.
 // Handlers are composable, providing you great flexibility in combining
 // them to achieve the logging structure that suits your applications.
 type Handler interface {
@@ -83,6 +87,111 @@ func FileHandler(path string, fmtr Format) (Handler, error) {
 	return closingHandler{f, StreamHandler(f, fmtr)}, nil
 }
 
+// countingWriter wraps a WriteCloser object in order to count the written bytes.
+type countingWriter struct {
+	w     io.WriteCloser // the wrapped object
+	count uint           // number of bytes written
+}
+
+// Write increments the byte counter by the number of bytes written.
+// Implements the WriteCloser interface.
+func (w *countingWriter) Write(p []byte) (n int, err error) {
+	n, err = w.w.Write(p)
+	w.count += uint(n)
+	return n, err
+}
+
+// Close implements the WriteCloser interface.
+func (w *countingWriter) Close() error {
+	return w.w.Close()
+}
+
+// prepFile opens the log file at the given path, and cuts off the invalid part
+// from the end, because the previous execution could have been finished by interruption.
+// Assumes that every line ended by '\n' contains a valid log record.
+func prepFile(path string) (*countingWriter, error) {
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND, 0600)
+	if err != nil {
+		return nil, err
+	}
+	_, err = f.Seek(-1, io.SeekEnd)
+	if err != nil {
+		return nil, err
+	}
+	buf := make([]byte, 1)
+	var cut int64
+	for {
+		if _, err := f.Read(buf); err != nil {
+			return nil, err
+		}
+		if buf[0] == '\n' {
+			break
+		}
+		if _, err = f.Seek(-2, io.SeekCurrent); err != nil {
+			return nil, err
+		}
+		cut++
+	}
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	ns := fi.Size() - cut
+	if err = f.Truncate(ns); err != nil {
+		return nil, err
+	}
+	return &countingWriter{w: f, count: uint(ns)}, nil
+}
+
+// RotatingFileHandler returns a handler which writes log records to file chunks
+// at the given path. When a file's size reaches the limit, the handler creates
+// a new file named after the timestamp of the first log record it will contain.
+func RotatingFileHandler(path string, limit uint, formatter Format) (Handler, error) {
+	if err := os.MkdirAll(path, 0700); err != nil {
+		return nil, err
+	}
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+	re := regexp.MustCompile(`\.log$`)
+	last := len(files) - 1
+	for last >= 0 && (!files[last].Mode().IsRegular() || !re.MatchString(files[last].Name())) {
+		last--
+	}
+	var counter *countingWriter
+	if last >= 0 && files[last].Size() < int64(limit) {
+		// Open the last file, and continue to write into it until it's size reaches the limit.
+		if counter, err = prepFile(filepath.Join(path, files[last].Name())); err != nil {
+			return nil, err
+		}
+	}
+	if counter == nil {
+		counter = new(countingWriter)
+	}
+	h := StreamHandler(counter, formatter)
+
+	return FuncHandler(func(r *Record) error {
+		if counter.count > limit {
+			counter.Close()
+			counter.w = nil
+		}
+		if counter.w == nil {
+			f, err := os.OpenFile(
+				filepath.Join(path, fmt.Sprintf("%s.log", strings.Replace(r.Time.Format("060102150405.00"), ".", "", 1))),
+				os.O_CREATE|os.O_APPEND|os.O_WRONLY,
+				0600,
+			)
+			if err != nil {
+				return err
+			}
+			counter.w = f
+			counter.count = 0
+		}
+		return h.Log(r)
+	}, h.IsLogging), nil
+}
+
 // NetHandler opens a socket to the given address and writes records
 // over the connection.
 func NetHandler(network, addr string, fmtr Format) (Handler, error) {
@@ -104,6 +213,15 @@ type closingHandler struct {
 
 func (h *closingHandler) Close() error {
 	return h.WriteCloser.Close()
+}
+
+// CallerFileHandler returns a Handler that adds the line number and file of
+// the calling function to the context with key "caller".
+func CallerFileHandler(h Handler) Handler {
+	return FuncHandler(func(r *Record) error {
+		r.Ctx = append(r.Ctx, "caller", fmt.Sprint(r.Call))
+		return h.Log(r)
+	}, h.IsLogging)
 }
 
 // FilterHandler returns a Handler that only writes records to the
@@ -139,6 +257,32 @@ func LvlFilterHandler(maxLvl Lvl, h Handler) Handler {
 	return FilterHandler(func(r *Record) (pass bool) {
 		return r.Lvl <= maxLvl
 	}, h)
+}
+
+// MultiHandler dispatches any write to each of its handlers.
+// This is useful for writing different types of log information
+// to different locations. For example, to log to a file and
+// standard error:
+//
+//     log.MultiHandler(
+//         log.Must.FileHandler("/var/log/app.log", log.LogfmtFormat()),
+//         log.StderrHandler)
+//
+func MultiHandler(hs ...Handler) Handler {
+	return FuncHandler(func(r *Record) error {
+		for _, h := range hs {
+			// what to do about failures?
+			h.Log(r)
+		}
+		return nil
+	}, func(lvl Lvl) bool {
+		for _, h := range hs {
+			if h.IsLogging(lvl) {
+				return true
+			}
+		}
+		return false
+	})
 }
 
 // LazyHandler writes all values to the wrapped handler after evaluating

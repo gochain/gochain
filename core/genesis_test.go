@@ -135,7 +135,7 @@ func TestSetupGenesis(t *testing.T) {
 				// Advance to block #4, past the homestead transition block of customg.
 				genesis := oldcustomg.MustCommit(db)
 
-				bc, _ := NewBlockChain(ctx, db, nil, oldcustomg.Config, clique.NewFullFaker(), vm.Config{})
+				bc, _ := NewBlockChain(db, nil, oldcustomg.Config, clique.NewFullFaker(), vm.Config{})
 				defer bc.Stop()
 
 				blocks, _ := GenerateChain(ctx, oldcustomg.Config, genesis, clique.NewFaker(), db, 4, nil)

@@ -25,12 +25,13 @@ import (
 	"runtime"
 
 	"github.com/fjl/memsize/memsizeui"
+	colorable "github.com/mattn/go-colorable"
+	"github.com/mattn/go-isatty"
+	"gopkg.in/urfave/cli.v1"
+
 	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/log/term"
 	"github.com/gochain-io/gochain/metrics"
 	"github.com/gochain-io/gochain/metrics/exp"
-	colorable "github.com/mattn/go-colorable"
-	"gopkg.in/urfave/cli.v1"
 )
 
 var Memsize memsizeui.Handler
@@ -100,22 +101,37 @@ var Flags = []cli.Flag{
 	blockprofilerateFlag, mutexProfileFractionFlag,
 }
 
-var glogger *log.GlogHandler
+var (
+	ostream log.Handler
+	glogger *log.GlogHandler
+)
 
 func init() {
-	usecolor := term.IsTty(os.Stderr.Fd()) && os.Getenv("TERM") != "dumb"
+	usecolor := (isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd())) && os.Getenv("TERM") != "dumb"
 	output := io.Writer(os.Stderr)
 	if usecolor {
 		output = colorable.NewColorableStderr()
 	}
-	glogger = log.NewGlogHandler(log.StreamHandler(output, log.TerminalFormat(usecolor)))
+	ostream = log.StreamHandler(output, log.TerminalFormat(usecolor))
+	glogger = log.NewGlogHandler(ostream)
 }
 
 // Setup initializes profiling and logging based on the CLI flags.
 // It should be called as early as possible in the program.
-func Setup(ctx *cli.Context) error {
+func Setup(ctx *cli.Context, logdir string) error {
 	// logging
 	log.PrintOrigins(ctx.GlobalBool(debugFlag.Name))
+	if logdir != "" {
+		rfh, err := log.RotatingFileHandler(
+			logdir,
+			262144,
+			log.JSONFormatOrderedEx(false, true),
+		)
+		if err != nil {
+			return err
+		}
+		glogger.SetHandler(log.MultiHandler(ostream, rfh))
+	}
 	glogger.Verbosity(log.Lvl(ctx.GlobalInt(verbosityFlag.Name)))
 	glogger.Vmodule(ctx.GlobalString(vmoduleFlag.Name))
 	glogger.BacktraceAt(ctx.GlobalString(backtraceAtFlag.Name))

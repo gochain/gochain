@@ -57,8 +57,10 @@ func (b *testBackend) EventMux() *event.TypeMux {
 }
 
 func (b *testBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error) {
-	var hash common.Hash
-	var num uint64
+	var (
+		hash common.Hash
+		num  uint64
+	)
 	if blockNr == rpc.LatestBlockNumber {
 		hash = rawdb.ReadHeadBlockHash(b.db.GlobalTable())
 		number := rawdb.ReadHeaderNumber(b.db.GlobalTable(), hash)

@@ -19,7 +19,6 @@ package rawdb
 // DatabaseReader wraps the Has and Get method of a backing data store.
 type DatabaseReader interface {
 	Has(key []byte) (bool, error)
-	// Get returns the data for key, or an error. Must return common.ErrNotFound when not found.
 	Get(key []byte) ([]byte, error)
 }
 

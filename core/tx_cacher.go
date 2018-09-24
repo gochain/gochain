@@ -17,13 +17,8 @@
 package core
 
 import (
-	"runtime"
-
 	"github.com/gochain-io/gochain/core/types"
 )
-
-// senderCacher is a concurrent transaction sender recoverer anc cacher.
-var senderCacher = newTxSenderCacher(runtime.NumCPU())
 
 // txSenderCacherRequest is a request for recovering transaction senders with a
 // specific signature scheme and caching it into the transactions themselves.
@@ -55,6 +50,10 @@ func newTxSenderCacher(threads int) *txSenderCacher {
 		go cacher.cache()
 	}
 	return cacher
+}
+
+func (cacher *txSenderCacher) close() {
+	close(cacher.tasks)
 }
 
 // cache is an infinite loop, caching transaction senders from various forms of

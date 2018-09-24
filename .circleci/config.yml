@@ -53,7 +53,7 @@ jobs:
               - /tmp/go/cache
       - attach_workspace:
           at: .
-      - run: go test -p=8 $(go list ./... | grep -v /swarm/fuse)
+      - run: go test -p=4 $(go list ./... | grep -v /swarm/fuse | grep -v /cmd/swarm)
       - save_cache:
           key: test-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
           paths:
@@ -95,7 +95,7 @@ jobs:
             go get -u github.com/golang/dep/cmd/dep
             ${GOPATH}/bin/dep ensure --vendor-only
       - run: make all
-      - run: go test ./swarm/fuse
+      - run: go test ./swarm/fuse ./cmd/swarm/...
       - save_cache:
           key: test-fuse-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
           paths:
@@ -113,7 +113,7 @@ jobs:
               - /tmp/go/cache
       - attach_workspace:
           at: .
-      - run: go test -race ./core/...
+      - run: go test -p=4 -race ./core/...
       - save_cache:
           key: race-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
           paths:

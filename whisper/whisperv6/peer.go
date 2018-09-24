@@ -20,11 +20,10 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"go.opencensus.io/trace"
-
-	"sync"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/log"
@@ -38,9 +37,9 @@ type Peer struct {
 	peer *p2p.Peer
 	ws   p2p.MsgReadWriter
 
-	mu             sync.RWMutex
 	trusted        bool
 	powRequirement float64
+	bloomMu        sync.Mutex
 	bloomFilter    []byte
 	fullNode       bool
 
@@ -60,7 +59,7 @@ func newPeer(host *Whisper, remote *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 		powRequirement: 0.0,
 		known:          make(map[common.Hash]struct{}),
 		quit:           make(chan struct{}),
-		bloomFilter:    makeFullNodeBloom(),
+		bloomFilter:    MakeFullNodeBloom(),
 		fullNode:       true,
 	}
 }
@@ -86,6 +85,8 @@ func (peer *Peer) handshake() error {
 
 	// Send the handshake status message asynchronously
 	errc := make(chan error, 1)
+	isLightNode := peer.host.LightClientMode()
+	isRestrictedLightNodeConnection := peer.host.LightClientModeConnectionRestricted()
 	go func() {
 		pow := peer.host.MinPow()
 		powConverted := math.Float64bits(pow)
@@ -102,7 +103,6 @@ func (peer *Peer) handshake() error {
 		return fmt.Errorf("peer [%x] sent packet %x before status packet", peer.ID(), packet.Code)
 	}
 	s := rlp.NewStream(packet.Payload, uint64(packet.Size))
-	defer rlp.Discard(s)
 	_, err = s.List()
 	if err != nil {
 		return fmt.Errorf("peer [%x] sent bad status message: %v", peer.ID(), err)
@@ -122,19 +122,22 @@ func (peer *Peer) handshake() error {
 		if math.IsInf(pow, 0) || math.IsNaN(pow) || pow < 0.0 {
 			return fmt.Errorf("peer [%x] sent bad status message: invalid pow", peer.ID())
 		}
-		peer.mu.Lock()
 		peer.powRequirement = pow
-		peer.mu.Unlock()
 
 		var bloom []byte
 		err = s.Decode(&bloom)
 		if err == nil {
 			sz := len(bloom)
-			if sz != bloomFilterSize && sz != 0 {
+			if sz != BloomFilterSize && sz != 0 {
 				return fmt.Errorf("peer [%x] sent bad status message: wrong bloom filter size %d", peer.ID(), sz)
 			}
 			peer.setBloomFilter(bloom)
 		}
+	}
+
+	isRemotePeerLightNode, err := s.Bool()
+	if isRemotePeerLightNode && isLightNode && isRestrictedLightNodeConnection {
+		return fmt.Errorf("peer [%x] is useless: two light client communication restricted", peer.ID())
 	}
 
 	if err := <-errc; err != nil {
@@ -215,10 +218,7 @@ func (peer *Peer) broadcast(ctx context.Context) error {
 	envelopes := peer.host.Envelopes()
 	bundle := make([]*Envelope, 0, len(envelopes))
 	for _, envelope := range envelopes {
-		peer.mu.RLock()
-		pow := peer.powRequirement
-		peer.mu.RUnlock()
-		if !peer.marked(envelope) && envelope.PoW() >= pow && peer.bloomMatch(envelope) {
+		if !peer.marked(envelope) && envelope.PoW() >= peer.powRequirement && peer.bloomMatch(envelope) {
 			bundle = append(bundle, envelope)
 		}
 	}
@@ -255,25 +255,24 @@ func (peer *Peer) notifyAboutBloomFilterChange(ctx context.Context, bloom []byte
 }
 
 func (peer *Peer) bloomMatch(env *Envelope) bool {
-	peer.mu.RLock()
-	bf := peer.bloomFilter
-	peer.mu.RUnlock()
-	return peer.fullNode || bloomFilterMatch(bf, env.Bloom())
+	peer.bloomMu.Lock()
+	defer peer.bloomMu.Unlock()
+	return peer.fullNode || BloomFilterMatch(peer.bloomFilter, env.Bloom())
 }
 
 func (peer *Peer) setBloomFilter(bloom []byte) {
-	peer.mu.Lock()
-	defer peer.mu.Unlock()
+	peer.bloomMu.Lock()
+	defer peer.bloomMu.Unlock()
 	peer.bloomFilter = bloom
 	peer.fullNode = isFullNode(bloom)
 	if peer.fullNode && peer.bloomFilter == nil {
-		peer.bloomFilter = makeFullNodeBloom()
+		peer.bloomFilter = MakeFullNodeBloom()
 	}
 }
 
-func makeFullNodeBloom() []byte {
-	bloom := make([]byte, bloomFilterSize)
-	for i := 0; i < bloomFilterSize; i++ {
+func MakeFullNodeBloom() []byte {
+	bloom := make([]byte, BloomFilterSize)
+	for i := 0; i < BloomFilterSize; i++ {
 		bloom[i] = 0xFF
 	}
 	return bloom

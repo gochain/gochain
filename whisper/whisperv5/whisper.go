@@ -290,7 +290,7 @@ func (w *Whisper) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
 	return id, nil
 }
 
-// HasKeyPair checks if the the whisper node is configured with the private key
+// HasKeyPair checks if the whisper node is configured with the private key
 // of the specified public pair.
 func (w *Whisper) HasKeyPair(id string) bool {
 	w.keyMu.RLock()
@@ -835,9 +835,8 @@ func deriveKeyMaterial(key []byte, version uint64) (derivedKey []byte, err error
 		// because it's a once in a session experience
 		derivedKey := pbkdf2.Key(key, nil, 65356, aesKeyLength, sha256.New)
 		return derivedKey, nil
-	} else {
-		return nil, unknownVersionError(version)
 	}
+	return nil, unknownVersionError(version)
 }
 
 // GenerateRandomID generates a random string, which is then returned to be used as a key id

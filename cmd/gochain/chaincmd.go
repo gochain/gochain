@@ -47,7 +47,6 @@ var (
 		ArgsUsage: "<genesisPath>",
 		Flags: []cli.Flag{
 			utils.DataDirFlag,
-			utils.LightModeFlag,
 		},
 		Category: "BLOCKCHAIN COMMANDS",
 		Description: `
@@ -65,7 +64,7 @@ It expects the genesis file as argument.`,
 		Flags: []cli.Flag{
 			utils.DataDirFlag,
 			utils.CacheFlag,
-			utils.LightModeFlag,
+			utils.SyncModeFlag,
 			utils.GCModeFlag,
 			utils.CacheDatabaseFlag,
 			utils.CacheGCFlag,
@@ -86,7 +85,7 @@ processing will proceed even if an individual RLP-file import failure occurs.`,
 		Flags: []cli.Flag{
 			utils.DataDirFlag,
 			utils.CacheFlag,
-			utils.LightModeFlag,
+			utils.SyncModeFlag,
 		},
 		Category: "BLOCKCHAIN COMMANDS",
 		Description: `
@@ -118,7 +117,6 @@ The first argument must be the directory containing the blockchain to download f
 		ArgsUsage: " ",
 		Flags: []cli.Flag{
 			utils.DataDirFlag,
-			utils.LightModeFlag,
 		},
 		Category: "BLOCKCHAIN COMMANDS",
 		Description: `
@@ -132,7 +130,7 @@ Remove blockchain and state databases`,
 		Flags: []cli.Flag{
 			utils.DataDirFlag,
 			utils.CacheFlag,
-			utils.LightModeFlag,
+			utils.SyncModeFlag,
 		},
 		Category: "BLOCKCHAIN COMMANDS",
 		Description: `
@@ -145,8 +143,14 @@ Use "ethereum dump 0" to dump the genesis block.`,
 // the zero'd block (i.e. genesis) or will fail hard if it can't succeed.
 func initGenesis(ctx *cli.Context) error {
 	var genesis *core.Genesis
+	// Make sure we have a valid genesis JSON
 	genesisPath := ctx.Args().First()
-	if len(genesisPath) > 0 {
+	if len(genesisPath) == 0 {
+		genesis = utils.MakeGenesis(ctx)
+		if genesis == nil {
+			utils.Fatalf("No default genesis available.")
+		}
+	} else {
 		file, err := os.Open(genesisPath)
 		if err != nil {
 			utils.Fatalf("Failed to read genesis file: %v", err)
@@ -156,11 +160,6 @@ func initGenesis(ctx *cli.Context) error {
 		genesis = new(core.Genesis)
 		if err := json.NewDecoder(file).Decode(genesis); err != nil {
 			utils.Fatalf("invalid genesis file: %v", err)
-		}
-	} else {
-		genesis = utils.MakeGenesis(ctx)
-		if genesis == nil {
-			utils.Fatalf("No default genesis available.")
 		}
 	}
 	// Open an initialise both full and light databases

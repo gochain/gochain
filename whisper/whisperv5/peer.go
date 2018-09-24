@@ -27,7 +27,7 @@ import (
 	"github.com/gochain-io/gochain/rlp"
 )
 
-// peer represents a whisper protocol peer connection.
+// Peer represents a whisper protocol peer connection.
 type Peer struct {
 	host    *Whisper
 	peer    *p2p.Peer

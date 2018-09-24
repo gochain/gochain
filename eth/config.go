@@ -30,16 +30,17 @@ import (
 
 // DefaultConfig contains default settings for use on the GoChain main net.
 var DefaultConfig = Config{
-	SyncMode:      downloader.FastSync,
-	NetworkId:     params.MainnetChainID,
-	LightPeers:    100,
-	DatabaseCache: 768,
-	TrieCache:     256,
-	TrieTimeout:   60 * time.Minute,
-	MinerGasFloor: params.TargetGasLimit,
-	MinerGasCeil:  params.TargetGasLimit,
-	MinerGasPrice: gasprice.Default,
-	MinerRecommit: 1 * time.Second,
+	SyncMode:       downloader.FastSync,
+	NetworkId:      params.MainnetChainID,
+	LightPeers:     100,
+	DatabaseCache:  512,
+	TrieCleanCache: 256,
+	TrieDirtyCache: 256,
+	TrieTimeout:    60 * time.Minute,
+	MinerGasFloor:  params.TargetGasLimit,
+	MinerGasCeil:   params.TargetGasLimit,
+	MinerGasPrice:  gasprice.Default,
+	MinerRecommit:  1 * time.Second,
 
 	TxPool: core.DefaultTxPoolConfig,
 	GPO: gasprice.Config{
@@ -68,7 +69,8 @@ type Config struct {
 	SkipBcVersionCheck bool `toml:"-"`
 	DatabaseHandles    int  `toml:"-"`
 	DatabaseCache      int
-	TrieCache          int
+	TrieCleanCache     int
+	TrieDirtyCache     int
 	TrieTimeout        time.Duration
 
 	// Mining-related options
@@ -92,6 +94,11 @@ type Config struct {
 
 	// Miscellaneous options
 	DocRoot string `toml:"-"`
+
+	// Type of the EWASM interpreter ("" for default)
+	EWASMInterpreter string
+	// Type of the EVM interpreter ("" for default)
+	EVMInterpreter string
 }
 
 type configMarshaling struct {

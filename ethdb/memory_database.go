@@ -36,10 +36,10 @@ func NewMemDatabase() *MemDatabase {
 	}
 }
 
-func NewMemDatabaseWithCap(size int) (*MemDatabase, error) {
+func NewMemDatabaseWithCap(size int) *MemDatabase {
 	return &MemDatabase{
 		db: make(map[string][]byte, size),
-	}, nil
+	}
 }
 
 func (db *MemDatabase) GlobalTable() common.Table  { return db }

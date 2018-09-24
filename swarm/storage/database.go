@@ -20,19 +20,17 @@ package storage
 // no need for queueing/caching
 
 import (
-	"fmt"
-
-	"github.com/gochain-io/gochain/compression/rle"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"
+
+	"github.com/gochain-io/gochain/metrics"
 )
 
 const openFileLimit = 128
 
 type LDBDatabase struct {
-	db   *leveldb.DB
-	comp bool
+	db *leveldb.DB
 }
 
 func NewLDBDatabase(file string) (*LDBDatabase, error) {
@@ -42,41 +40,33 @@ func NewLDBDatabase(file string) (*LDBDatabase, error) {
 		return nil, err
 	}
 
-	database := &LDBDatabase{db: db, comp: false}
+	database := &LDBDatabase{db: db}
 
 	return database, nil
 }
 
-func (ldb *LDBDatabase) Put(key []byte, value []byte) {
-	if ldb.comp {
-		value = rle.Compress(value)
-	}
+func (db *LDBDatabase) Put(key []byte, value []byte) error {
+	metrics.GetOrRegisterCounter("ldbdatabase.put", nil).Inc(1)
 
-	err := ldb.db.Put(key, value, nil)
-	if err != nil {
-		fmt.Println("Error put", err)
-	}
+	return db.db.Put(key, value, nil)
 }
 
-func (ldb *LDBDatabase) Get(key []byte) ([]byte, error) {
-	dat, err := ldb.db.Get(key, nil)
+func (db *LDBDatabase) Get(key []byte) ([]byte, error) {
+	metrics.GetOrRegisterCounter("ldbdatabase.get", nil).Inc(1)
+
+	dat, err := db.db.Get(key, nil)
 	if err != nil {
 		return nil, err
 	}
-
-	if ldb.comp {
-		return rle.Decompress(dat)
-	}
-
 	return dat, nil
 }
 
-func (ldb *LDBDatabase) Delete(key []byte) error {
-	return ldb.db.Delete(key, nil)
+func (db *LDBDatabase) Delete(key []byte) error {
+	return db.db.Delete(key, nil)
 }
 
-func (ldb *LDBDatabase) LastKnownTD() []byte {
-	data, _ := ldb.Get([]byte("LTD"))
+func (db *LDBDatabase) LastKnownTD() []byte {
+	data, _ := db.Get([]byte("LTD"))
 
 	if len(data) == 0 {
 		data = []byte{0x0}
@@ -85,15 +75,19 @@ func (ldb *LDBDatabase) LastKnownTD() []byte {
 	return data
 }
 
-func (ldb *LDBDatabase) NewIterator() iterator.Iterator {
-	return ldb.db.NewIterator(nil, nil)
+func (db *LDBDatabase) NewIterator() iterator.Iterator {
+	metrics.GetOrRegisterCounter("ldbdatabase.newiterator", nil).Inc(1)
+
+	return db.db.NewIterator(nil, nil)
 }
 
-func (ldb *LDBDatabase) Write(batch *leveldb.Batch) error {
-	return ldb.db.Write(batch, nil)
+func (db *LDBDatabase) Write(batch *leveldb.Batch) error {
+	metrics.GetOrRegisterCounter("ldbdatabase.write", nil).Inc(1)
+
+	return db.db.Write(batch, nil)
 }
 
-func (ldb *LDBDatabase) Close() {
+func (db *LDBDatabase) Close() {
 	// Close the leveldb database
-	ldb.db.Close()
+	db.db.Close()
 }

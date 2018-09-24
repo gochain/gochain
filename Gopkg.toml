@@ -85,6 +85,10 @@
   name = "golang.org/x/sys"
   branch = "master"
 
+[[constraint]]
+  name = "github.com/allegro/bigcache"
+  branch = "master"
+
 [prune]
   go-tests = true
   unused-packages = true

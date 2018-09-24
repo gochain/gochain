@@ -55,8 +55,9 @@ var (
 
 type testOdr struct {
 	OdrBackend
-	sdb, ldb common.Database
-	disable  bool
+	indexerConfig *IndexerConfig
+	sdb, ldb      common.Database
+	disable       bool
 }
 
 func (odr *testOdr) Database() common.Database {
@@ -90,6 +91,10 @@ func (odr *testOdr) Retrieve(ctx context.Context, req OdrRequest) error {
 	}
 	req.StoreResult(odr.ldb)
 	return nil
+}
+
+func (odr *testOdr) IndexerConfig() *IndexerConfig {
+	return odr.indexerConfig
 }
 
 type odrTestFn func(ctx context.Context, db common.Database, bc *core.BlockChain, lc *LightChain, bhash common.Hash) ([]byte, error)
@@ -252,7 +257,7 @@ func testChainOdr(t *testing.T, protocol int, fn odrTestFn) {
 	)
 	gspec.MustCommit(ldb)
 	// Assemble the test environment
-	blockchain, _ := core.NewBlockChain(ctx, sdb, nil, params.TestChainConfig, clique.NewFullFaker(), vm.Config{})
+	blockchain, _ := core.NewBlockChain(sdb, nil, params.TestChainConfig, clique.NewFullFaker(), vm.Config{})
 	gchain, _ := core.GenerateChain(ctx, params.TestChainConfig, genesis, clique.NewFaker(), sdb, 4, testChainGen)
 	if _, err := blockchain.InsertChain(ctx, gchain); err != nil {
 		t.Fatal(err)

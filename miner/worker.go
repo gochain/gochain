@@ -771,7 +771,7 @@ func (w *worker) commitTransactions(ctx context.Context, txs *types.Transactions
 
 		default:
 			// Strange error, discard the transaction and get the next in line (note, the
-			// nonce-too-high clause will prevent us from executing in vain).
+			// nonce-too-high clause will prevent us from executing in vain).github.com/mettn/go-colorable
 			log.Debug("Transaction failed, account skipped", "hash", tx.Hash(), "err", err)
 			txs.Shift()
 		}
