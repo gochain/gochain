@@ -49,17 +49,15 @@ const (
 	// maxQueuedTxs is the maximum number of transaction lists to queue up before
 	// dropping broadcasts. This is a sensitive number as a transaction list might
 	// contain a single transaction, or thousands.
-	maxQueuedTxs = 128
+	maxQueuedTxs = 4096
 
 	// maxQueuedProps is the maximum number of block propagations to queue up before
-	// dropping broadcasts. There's not much point in queueing stale blocks, so a few
-	// that might cover uncles should be enough.
-	maxQueuedProps = 4
+	// dropping broadcasts.
+	maxQueuedProps = 32
 
 	// maxQueuedAnns is the maximum number of block announcements to queue up before
-	// dropping broadcasts. Similarly to block propagations, there's no point to queue
-	// above some healthy uncle limit, so use that.
-	maxQueuedAnns = 4
+	// dropping broadcasts.
+	maxQueuedAnns = 32
 )
 
 // PeerInfo represents a short summary of the GoChain sub-protocol metadata known
