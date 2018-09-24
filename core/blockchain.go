@@ -1255,7 +1255,7 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 		switch status {
 		case CanonStatTy:
 			log.Info("Inserted new block", "number", block.Number(), "hash", block.Hash(), "diff", block.Difficulty(),
-				"txs", len(block.Transactions()), "gas", block.GasUsed(), "elapsed", common.PrettyDuration(time.Since(bstart)))
+				"txs", len(block.Transactions()), "parent", block.ParentHash(), "gas", block.GasUsed(), "elapsed", common.PrettyDuration(time.Since(bstart)))
 
 			coalescedLogs = append(coalescedLogs, logs...)
 			blockInsertTimer.UpdateSince(bstart)
@@ -1267,7 +1267,7 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 
 		case SideStatTy:
 			log.Info("Inserted forked block", "number", block.Number(), "hash", block.Hash(), "diff", block.Difficulty(),
-				"txs", len(block.Transactions()), "gas", block.GasUsed(), "elapsed", common.PrettyDuration(time.Since(bstart)))
+				"txs", len(block.Transactions()), "parent", block.ParentHash(), "gas", block.GasUsed(), "elapsed", common.PrettyDuration(time.Since(bstart)))
 
 			blockInsertTimer.UpdateSince(bstart)
 			events = append(events, ChainSideEvent{block})
