@@ -311,7 +311,7 @@ func (p *peer) SendTransactionsAsync(txs types.Transactions) {
 	select {
 	case p.queuedTxs <- txs:
 	default:
-		p.Log().Debug("Dropping transaction propagation", "count", len(txs))
+		p.Log().Info("Dropping transaction propagation: queue full", "count", len(txs))
 	}
 }
 
@@ -320,7 +320,7 @@ func (p *peer) SendNewBlockAsync(block *types.Block, td *big.Int) {
 	select {
 	case p.queuedProps <- &propEvent{block: block, td: td}:
 	default:
-		p.Log().Debug("Dropping block propagation", "number", block.NumberU64(), "hash", block.Hash())
+		p.Log().Info("Dropping block propagation; queue full", "number", block.NumberU64(), "hash", block.Hash(), "diff", block.Difficulty(), "parent", block.ParentHash())
 	}
 }
 
@@ -329,7 +329,7 @@ func (p *peer) SendNewBlockHashAsync(block *types.Block) {
 	select {
 	case p.queuedAnns <- block:
 	default:
-		p.Log().Debug("Dropping block announcement", "number", block.NumberU64(), "hash", block.Hash())
+		p.Log().Info("Dropping block announcement; queue full", "number", block.NumberU64(), "hash", block.Hash(), "diff", block.Difficulty(), "parent", block.ParentHash())
 	}
 }
 
