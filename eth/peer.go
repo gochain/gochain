@@ -49,7 +49,7 @@ const (
 	// maxQueuedTxs is the maximum number of transaction lists to queue up before
 	// dropping broadcasts. This is a sensitive number as a transaction list might
 	// contain a single transaction, or thousands.
-	maxQueuedTxs = 4096
+	maxQueuedTxs = 16384
 
 	// maxQueuedProps is the maximum number of block propagations to queue up before
 	// dropping broadcasts.
@@ -192,6 +192,17 @@ func (p *peer) broadcast() {
 		select {
 		case txs := <-p.queuedTxs:
 			ctx, span := trace.StartSpan(context.Background(), "peer.broadcast-queuedTxs")
+
+			const batchSize = 1000
+		batchLoop:
+			for len(txs) < batchSize {
+				select {
+				case more := <-p.queuedTxs:
+					txs = append(txs, more...)
+				default:
+					break batchLoop
+				}
+			}
 			span.AddAttributes(trace.Int64Attribute("txs", int64(len(txs))))
 			if err := p.SendTransactions(ctx, txs); err != nil {
 				if err != p2p.ErrShuttingDown {
@@ -204,6 +215,7 @@ func (p *peer) broadcast() {
 			} else {
 				p.Log().Trace("Broadcast txs", "len", len(txs))
 			}
+
 			span.End()
 
 		case prop := <-p.queuedProps:
@@ -309,7 +321,7 @@ func (p *peer) SendTransactionsAsync(txs types.Transactions) {
 	select {
 	case p.queuedTxs <- txs:
 	default:
-		p.Log().Info("Dropping transaction propagation: queue full", "count", len(txs))
+		p.Log().Trace("Dropping transaction propagation: queue full", "count", len(txs))
 	}
 }
 
