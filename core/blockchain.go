@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	mrand "math/rand"
+	"math/rand"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -990,8 +990,16 @@ func (bc *BlockChain) WriteBlockWithState(ctx context.Context, block *types.Bloc
 	// Please refer to http://www.cs.cornell.edu/~ie53/publications/btcProcFC.pdf
 	reorg := externTd.Cmp(localTd) > 0
 	if !reorg && externTd.Cmp(localTd) == 0 {
-		// Split same-difficulty blocks by number, then at random
-		reorg = block.NumberU64() < bc.currentBlock.NumberU64() || (block.NumberU64() == bc.currentBlock.NumberU64() && mrand.Float64() < 0.5)
+		// Split same-difficulty blocks by number, then most gas used, then randomly.
+		if block.NumberU64() < bc.currentBlock.NumberU64() {
+			reorg = true
+		} else if block.NumberU64() == bc.currentBlock.NumberU64() {
+			if block.GasUsed() > bc.currentBlock.GasUsed() {
+				reorg = true
+			} else if block.GasUsed() == bc.currentBlock.GasUsed() && rand.Float64() < 0.5 {
+				reorg = true
+			}
+		}
 	}
 	if reorg {
 		// Reorganise the chain if the parent is not the head block
