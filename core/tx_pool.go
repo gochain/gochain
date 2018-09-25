@@ -1514,7 +1514,7 @@ func (pool *TxPool) demoteUnexecutables(ctx context.Context) {
 		// If there's a gap in front, warn (should never happen) and postpone all transactions
 		if pending.Len() > 0 && pending.txs.Get(nonce) == nil {
 			for _, tx := range pending.txs.items {
-				log.Error("Demoting invalidated transaction", "hash", tx.Hash())
+				log.Trace("Demoting invalidated transaction", "hash", tx.Hash())
 				queue.add(tx)
 			}
 			delete(pool.pending, addr)
