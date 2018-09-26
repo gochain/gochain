@@ -275,14 +275,6 @@ func TestFeed_Send_Timeout(t *testing.T) {
 	} else if d := time.Since(t0); d < feedTimeout {
 		t.Fatalf("unexpected delay: %s", d)
 	}
-
-	// Ensure feed no longer exists in subscription.
-	t1 := time.Now()
-	if nsent := feed.Send(100); nsent != 0 {
-		t.Fatal("expected no messages sent")
-	} else if d := time.Since(t1); d > 100*time.Millisecond {
-		t.Fatalf("expected no delay, waited: %s", d)
-	}
 }
 
 func BenchmarkFeedSend1000(b *testing.B) {
