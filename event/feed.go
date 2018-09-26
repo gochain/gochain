@@ -31,7 +31,7 @@ import (
 
 var errBadChannel = errors.New("event: Subscribe argument does not have sendable channel type")
 
-const feedTimeout = 1 * time.Second
+const feedTimeout = 100 * time.Millisecond
 
 // Feed implements one-to-many subscriptions where the carrier of events is a channel.
 // Values sent to a Feed are delivered to all subscribed channels simultaneously.
@@ -205,13 +205,7 @@ func (f *Feed) SendCtx(ctx context.Context, value interface{}) (nsent int) {
 				cases = f.sendCases[:len(cases)-1]
 			}
 		} else if cases[chosen].Chan == timerSelectCase.Chan {
-			// Remove all pending channels from the feed in the event of a timeout.
-			for i := 1; i < len(cases); i++ {
-				if idx := f.sendCases.find(cases[i].Chan.Interface()); idx != -1 {
-					f.sendCases = f.sendCases.delete(idx)
-					log.Warn("feed channel send timeout, subscription dropped", "data", fmt.Sprintf("%T", value))
-				}
-			}
+			log.Trace("Feed channel send timeout, value dropped", "data", fmt.Sprintf("%T", value))
 			break
 		} else {
 			cases = cases.deactivate(chosen)
