@@ -30,7 +30,6 @@ import (
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/event"
-	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/rpc"
 )
 
@@ -62,11 +61,11 @@ const (
 	// The number is referenced from the size of tx pool.
 	txChanSize = 4096
 	// rmLogsChanSize is the size of channel listening to RemovedLogsEvent.
-	rmLogsChanSize = 10
+	rmLogsChanSize = 32
 	// logsChanSize is the size of channel listening to LogsEvent.
-	logsChanSize = 10
+	logsChanSize = 32
 	// chainEvChanSize is the size of channel listening to ChainEvent.
-	chainEvChanSize = 10
+	chainEvChanSize = 32
 )
 
 var (
@@ -94,10 +93,6 @@ type EventSystem struct {
 	lastHead  *types.Header
 
 	// Subscriptions
-	txsSub        event.Subscription         // Subscription for new transaction event
-	logsSub       event.Subscription         // Subscription for new log event
-	rmLogsSub     event.Subscription         // Subscription for removed log event
-	chainSub      event.Subscription         // Subscription for new chain event
 	pendingLogSub *event.TypeMuxSubscription // Subscription for pending log event
 
 	// Channels
@@ -129,18 +124,12 @@ func NewEventSystem(mux *event.TypeMux, backend Backend, lightMode bool) *EventS
 	}
 
 	// Subscribe events
-	m.txsSub = m.backend.SubscribeNewTxsEvent(m.txsCh)
-	m.logsSub = m.backend.SubscribeLogsEvent(m.logsCh)
-	m.rmLogsSub = m.backend.SubscribeRemovedLogsEvent(m.rmLogsCh)
-	m.chainSub = m.backend.SubscribeChainEvent(m.chainCh)
+	m.backend.SubscribeNewTxsEvent(m.txsCh)
+	m.backend.SubscribeLogsEvent(m.logsCh)
+	m.backend.SubscribeRemovedLogsEvent(m.rmLogsCh)
+	m.backend.SubscribeChainEvent(m.chainCh)
 	// TODO(rjl493456442): use feed to subscribe pending log event
 	m.pendingLogSub = m.mux.Subscribe(core.PendingLogsEvent{})
-
-	// Make sure none of the subscriptions are empty
-	if m.txsSub == nil || m.logsSub == nil || m.rmLogsSub == nil || m.chainSub == nil ||
-		m.pendingLogSub.Closed() {
-		log.Crit("Subscribe for event system failed")
-	}
 
 	go m.eventLoop()
 	return m
@@ -441,10 +430,10 @@ func (es *EventSystem) eventLoop() {
 	// Ensure all subscriptions get cleaned up
 	defer func() {
 		es.pendingLogSub.Unsubscribe()
-		es.txsSub.Unsubscribe()
-		es.logsSub.Unsubscribe()
-		es.rmLogsSub.Unsubscribe()
-		es.chainSub.Unsubscribe()
+		es.backend.UnsubscribeNewTxsEvent(es.txsCh)
+		es.backend.UnsubscribeLogsEvent(es.logsCh)
+		es.backend.UnsubscribeRemovedLogsEvent(es.rmLogsCh)
+		es.backend.UnsubscribeChainEvent(es.chainCh)
 	}()
 
 	index := make(filterIndex)
@@ -455,13 +444,25 @@ func (es *EventSystem) eventLoop() {
 	for {
 		select {
 		// Handle subscribed events
-		case ev := <-es.txsCh:
+		case ev, ok := <-es.txsCh:
+			if !ok {
+				return
+			}
 			es.broadcastNewTxs(index, ev)
-		case ev := <-es.logsCh:
+		case ev, ok := <-es.logsCh:
+			if !ok {
+				return
+			}
 			es.broadcastLogs(index, ev)
-		case ev := <-es.rmLogsCh:
+		case ev, ok := <-es.rmLogsCh:
+			if !ok {
+				return
+			}
 			es.broadcastRemovedLogs(index, ev)
-		case ev := <-es.chainCh:
+		case ev, ok := <-es.chainCh:
+			if !ok {
+				return
+			}
 			es.broadcastChain(index, ev)
 		case ev, active := <-es.pendingLogSub.Chan():
 			if !active { // system stopped
@@ -489,15 +490,6 @@ func (es *EventSystem) eventLoop() {
 			}
 			close(f.err)
 
-		// System stopped
-		case <-es.txsSub.Err():
-			return
-		case <-es.logsSub.Err():
-			return
-		case <-es.rmLogsSub.Err():
-			return
-		case <-es.chainSub.Err():
-			return
 		}
 	}
 }

@@ -33,7 +33,6 @@ import (
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/eth/gasprice"
-	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/metrics"
 	"github.com/gochain-io/gochain/params"
@@ -41,7 +40,7 @@ import (
 
 const (
 	// chainHeadChanSize is the size of channel listening to ChainHeadEvent.
-	chainHeadChanSize = 10
+	chainHeadChanSize = 32
 )
 
 var (
@@ -134,7 +133,8 @@ type blockChain interface {
 	GetBlock(hash common.Hash, number uint64) *types.Block
 	StateAt(root common.Hash) (*state.StateDB, error)
 
-	SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) event.Subscription
+	SubscribeChainHeadEvent(ch chan<- ChainHeadEvent)
+	UnsubscribeChainHeadEvent(ch chan<- ChainHeadEvent)
 }
 
 // TxPoolConfig are the configuration parameters of the transaction pool.
@@ -221,15 +221,17 @@ type TxPool struct {
 	config      TxPoolConfig
 	chainconfig *params.ChainConfig
 
-	chain        blockChain
-	gasPrice     *big.Int
-	txFeed       event.Feed
-	txFeedBuf    chan *types.Transaction
-	scope        event.SubscriptionScope
-	chainHeadCh  chan ChainHeadEvent
-	chainHeadSub event.Subscription
-	signer       types.Signer
-	mu           sync.RWMutex
+	chain    blockChain
+	gasPrice *big.Int
+
+	txFeedBuf chan *types.Transaction
+
+	txFeed NewTxsFeed
+
+	chainHeadCh chan ChainHeadEvent
+
+	signer types.Signer
+	mu     sync.RWMutex
 
 	currentState  *state.StateDB      // Current state in the blockchain head
 	pendingState  *state.ManagedState // Pending state tracking virtual nonces
@@ -246,6 +248,8 @@ type TxPool struct {
 	wg sync.WaitGroup // for shutdown sync
 
 	homestead bool
+
+	stop chan struct{}
 }
 
 // NewTxPool creates a new transaction pool to gather, sort and filter inbound
@@ -291,9 +295,10 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 	}
 
 	// Subscribe events from blockchain.
-	pool.chainHeadSub = pool.chain.SubscribeChainHeadEvent(pool.chainHeadCh)
+	pool.chain.SubscribeChainHeadEvent(pool.chainHeadCh)
 	// Spawn worker routines to run until chainHeadSub unsub.
 	pool.wg.Add(3)
+	pool.stop = make(chan struct{})
 	go pool.loop()
 	go pool.feedLoop()
 
@@ -342,13 +347,16 @@ func (pool *TxPool) loop() {
 	// Handle ChainHeadEvents separately
 	go func() {
 		defer pool.wg.Done()
+		defer pool.chain.UnsubscribeChainHeadEvent(pool.chainHeadCh)
 
 		for {
 			select {
-			case <-pool.chainHeadSub.Err():
+			case <-pool.stop:
 				return
-
-			case ev := <-pool.chainHeadCh:
+			case ev, ok := <-pool.chainHeadCh:
+				if !ok {
+					return
+				}
 				if ev.Block == nil {
 					continue
 				}
@@ -378,7 +386,7 @@ func (pool *TxPool) loop() {
 	// Handle tickers.
 	for {
 		select {
-		case <-pool.chainHeadSub.Err():
+		case <-pool.stop:
 			return
 
 		// Periodically reset to latest chain head.
@@ -452,6 +460,24 @@ func (pool *TxPool) loop() {
 	}
 }
 
+// queueFeedSend queues tx to eventually be sent on the txFeed.
+func (pool *TxPool) queueFeedSend(tx *types.Transaction) {
+	select {
+	case <-pool.stop:
+		return
+	case pool.txFeedBuf <- tx:
+		return
+	default:
+		go func() {
+			select {
+			case <-pool.stop:
+				return
+			case pool.txFeedBuf <- tx:
+			}
+		}()
+	}
+}
+
 // feedLoop continuously sends batches of txs from the txFeedBuf to the txFeed.
 func (pool *TxPool) feedLoop() {
 	defer pool.wg.Done()
@@ -459,11 +485,9 @@ func (pool *TxPool) feedLoop() {
 	const batchSize = 1000
 	for {
 		select {
-		case <-pool.chainHeadSub.Err():
+		case <-pool.stop:
 			return
 		case tx := <-pool.txFeedBuf:
-			ctx, span := trace.StartSpan(context.Background(), "TxPool.feedLoop-txFeedBuf")
-
 			var event NewTxsEvent
 			event.Txs = append(event.Txs, tx)
 		batchLoop:
@@ -475,22 +499,8 @@ func (pool *TxPool) feedLoop() {
 					break batchLoop
 				}
 			}
-			span.AddAttributes(trace.Int64Attribute("txs", int64(len(event.Txs))))
-
-			pool.txFeed.SendCtx(ctx, event)
-
-			span.End()
+			pool.txFeed.Send(event)
 		}
-	}
-}
-
-// feedSend queues tx to eventually be sent on the txFeed.
-func (pool *TxPool) feedSend(tx *types.Transaction) {
-	select {
-	case pool.txFeedBuf <- tx:
-		return
-	default:
-		go func() { pool.txFeedBuf <- tx }()
 	}
 }
 
@@ -616,11 +626,9 @@ func (pool *TxPool) reset(ctx context.Context, oldBlock, newBlock *types.Block) 
 
 // Stop terminates the transaction pool.
 func (pool *TxPool) Stop() {
-	// Unsubscribe all subscriptions registered from txpool
-	pool.scope.Close()
-
-	// Unsubscribe subscriptions registered from blockchain
-	pool.chainHeadSub.Unsubscribe()
+	close(pool.stop)
+	// Unsubscribe all subscriptions.
+	pool.txFeed.Close()
 	pool.wg.Wait()
 
 	if pool.journal != nil {
@@ -633,8 +641,12 @@ func (pool *TxPool) Stop() {
 
 // SubscribeNewTxsEvent registers a subscription of NewTxsEvent and
 // starts sending event to the given channel.
-func (pool *TxPool) SubscribeNewTxsEvent(ch chan<- NewTxsEvent) event.Subscription {
-	return pool.scope.Track(pool.txFeed.Subscribe(ch))
+func (pool *TxPool) SubscribeNewTxsEvent(ch chan<- NewTxsEvent) {
+	pool.txFeed.Subscribe(ch)
+}
+
+func (pool *TxPool) UnsubscribeNewTxsEvent(ch chan<- NewTxsEvent) {
+	pool.txFeed.Unsubscribe(ch)
 }
 
 // SetGasPrice updates the minimum price required by the transaction pool for a
@@ -897,7 +909,7 @@ func (pool *TxPool) add(ctx context.Context, tx *types.Transaction, local bool) 
 		poolAddTimer.UpdateSince(t)
 
 		// We've directly injected a replacement transaction, notify subsystems
-		pool.feedSend(tx)
+		pool.queueFeedSend(tx)
 
 		return old != nil, nil
 	}
@@ -1301,7 +1313,7 @@ func (pool *TxPool) promoteExecutable(ctx context.Context, addr common.Address, 
 	// Gather all executable transactions and promote them
 	promote := func(tx *types.Transaction) {
 		if pool.promoteTx(ctx, addr, tx.Hash(), tx) {
-			pool.feedSend(tx)
+			pool.queueFeedSend(tx)
 		}
 	}
 	if tracing {
@@ -1309,7 +1321,7 @@ func (pool *TxPool) promoteExecutable(ctx context.Context, addr common.Address, 
 			hash := tx.Hash()
 			if pool.promoteTx(ctx, addr, hash, tx) {
 				log.Trace("Promoting queued transaction", "hash", hash)
-				pool.feedSend(tx)
+				pool.queueFeedSend(tx)
 			} else {
 				log.Trace("Removed old queued transaction", "hash", hash)
 			}

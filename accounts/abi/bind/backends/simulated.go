@@ -79,7 +79,7 @@ func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
 		database:   database,
 		blockchain: blockchain,
 		config:     genesis.Config,
-		events:     filters.NewEventSystem(new(event.TypeMux), &filterBackend{database, blockchain}, false),
+		events:     filters.NewEventSystem(new(event.TypeMux), newFilterBackend(database, blockchain), false),
 	}
 	backend.rollback()
 	return backend
@@ -338,7 +338,7 @@ func (b *SimulatedBackend) FilterLogs(ctx context.Context, query gochain.FilterQ
 		to = query.ToBlock.Int64()
 	}
 	// Construct and execute the filter
-	filter := filters.New(&filterBackend{b.database, b.blockchain}, from, to, query.Addresses, query.Topics)
+	filter := filters.New(newFilterBackend(b.database, b.blockchain), from, to, query.Addresses, query.Topics)
 
 	logs, err := filter.Logs(ctx)
 	if err != nil {
@@ -404,6 +404,13 @@ func (m callmsg) Data() []byte         { return m.CallMsg.Data }
 type filterBackend struct {
 	db ethdb.Database
 	bc *core.BlockChain
+
+	txSubsMu sync.Mutex
+	txSubs   map[chan<- core.NewTxsEvent]event.Subscription
+}
+
+func newFilterBackend(db ethdb.Database, bc *core.BlockChain) *filterBackend {
+	return &filterBackend{db: db, bc: bc, txSubs: make(map[chan<- core.NewTxsEvent]event.Subscription)}
 }
 
 func (fb *filterBackend) ChainDb() ethdb.Database  { return fb.db }
@@ -419,20 +426,50 @@ func (fb *filterBackend) GetReceipts(ctx context.Context, hash common.Hash) (typ
 	return core.GetBlockReceipts(fb.db, hash, core.GetBlockNumber(fb.db, hash)), nil
 }
 
-func (fb *filterBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
-	return event.NewSubscription(func(quit <-chan struct{}) error {
+func (fb *filterBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
+	sub := event.NewSubscription(func(quit <-chan struct{}) error {
 		<-quit
 		return nil
 	})
+	fb.txSubsMu.Lock()
+	fb.txSubs[ch] = sub
+	fb.txSubsMu.Unlock()
 }
-func (fb *filterBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription {
-	return fb.bc.SubscribeChainEvent(ch)
+
+func (fb *filterBackend) UnsubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
+	fb.txSubsMu.Lock()
+	sub, ok := fb.txSubs[ch]
+	if ok {
+		delete(fb.txSubs, ch)
+	}
+	fb.txSubsMu.Unlock()
+	if ok {
+		sub.Unsubscribe()
+	}
 }
-func (fb *filterBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription {
-	return fb.bc.SubscribeRemovedLogsEvent(ch)
+
+func (fb *filterBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) {
+	fb.bc.SubscribeChainEvent(ch)
 }
-func (fb *filterBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
-	return fb.bc.SubscribeLogsEvent(ch)
+
+func (fb *filterBackend) UnsubscribeChainEvent(ch chan<- core.ChainEvent) {
+	fb.bc.UnsubscribeChainEvent(ch)
+}
+
+func (fb *filterBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) {
+	fb.bc.SubscribeRemovedLogsEvent(ch)
+}
+
+func (fb *filterBackend) UnsubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) {
+	fb.bc.UnsubscribeRemovedLogsEvent(ch)
+}
+
+func (fb *filterBackend) SubscribeLogsEvent(ch chan<- []*types.Log) {
+	fb.bc.SubscribeLogsEvent(ch)
+}
+
+func (fb *filterBackend) UnsubscribeLogsEvent(ch chan<- []*types.Log) {
+	fb.bc.UnsubscribeLogsEvent(ch)
 }
 
 func (fb *filterBackend) BloomStatus() (uint64, uint64) { return 4096, 0 }

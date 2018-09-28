@@ -83,7 +83,6 @@ type ProtocolManager struct {
 
 	eventMux      *event.TypeMux
 	txsCh         chan core.NewTxsEvent
-	txsSub        event.Subscription
 	minedBlockSub *event.TypeMuxSubscription
 
 	// channels for fetcher, syncer, txsyncLoop
@@ -213,7 +212,7 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 
 	// broadcast transactions
 	pm.txsCh = make(chan core.NewTxsEvent, txChanSize)
-	pm.txsSub = pm.txpool.SubscribeNewTxsEvent(pm.txsCh)
+	pm.txpool.SubscribeNewTxsEvent(pm.txsCh)
 	go pm.txBroadcastLoop()
 
 	// broadcast mined blocks
@@ -229,8 +228,8 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 func (pm *ProtocolManager) Stop() {
 	log.Info("Stopping GoChain protocol")
 
-	pm.txsSub.Unsubscribe()        // quits txBroadcastLoop
-	pm.minedBlockSub.Unsubscribe() // quits blockBroadcastLoop
+	pm.txpool.UnsubscribeNewTxsEvent(pm.txsCh) // quits txBroadcastLoop
+	pm.minedBlockSub.Unsubscribe()             // quits blockBroadcastLoop
 
 	// Quit the sync loop.
 	// After this send has completed, no new peers will be accepted.
@@ -748,17 +747,10 @@ func (pm *ProtocolManager) minedBroadcastLoop() {
 }
 
 func (pm *ProtocolManager) txBroadcastLoop() {
-	for {
-		select {
-		case event := <-pm.txsCh:
-			ctx, span := trace.StartSpan(context.Background(), "ProtocolManager.txBroadcastLoop-txsCh")
-			pm.BroadcastTxs(ctx, event.Txs)
-			span.End()
-
-		// Err() channel will be closed when unsubscribing.
-		case <-pm.txsSub.Err():
-			return
-		}
+	for event := range pm.txsCh {
+		ctx, span := trace.StartSpan(context.Background(), "ProtocolManager.txBroadcastLoop-txsCh")
+		pm.BroadcastTxs(ctx, event.Txs)
+		span.End()
 	}
 }
 

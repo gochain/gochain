@@ -145,29 +145,45 @@ func (b *LesApiBackend) TxPoolContent(ctx context.Context) (map[common.Address]t
 	return b.eth.txPool.Content(ctx)
 }
 
-func (b *LesApiBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
-	return b.eth.txPool.SubscribeNewTxsEvent(ch)
+func (b *LesApiBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
+	b.eth.txPool.SubscribeNewTxsEvent(ch)
 }
 
-func (b *LesApiBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription {
-	return b.eth.blockchain.SubscribeChainEvent(ch)
+func (b *LesApiBackend) UnsubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
+	b.eth.txPool.UnsubscribeNewTxsEvent(ch)
 }
 
-func (b *LesApiBackend) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
-	return b.eth.blockchain.SubscribeChainHeadEvent(ch)
+func (b *LesApiBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) {
+	b.eth.blockchain.SubscribeChainEvent(ch)
 }
 
-func (b *LesApiBackend) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription {
-	return b.eth.blockchain.SubscribeChainSideEvent(ch)
+func (b *LesApiBackend) UnsubscribeChainEvent(ch chan<- core.ChainEvent) {
+	b.eth.blockchain.UnsubscribeChainEvent(ch)
 }
 
-func (b *LesApiBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
-	return b.eth.blockchain.SubscribeLogsEvent(ch)
+func (b *LesApiBackend) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) {
+	b.eth.blockchain.SubscribeChainHeadEvent(ch)
 }
 
-func (b *LesApiBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription {
-	return b.eth.blockchain.SubscribeRemovedLogsEvent(ch)
+func (b *LesApiBackend) UnsubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) {
+	b.eth.blockchain.UnsubscribeChainHeadEvent(ch)
 }
+
+func (b *LesApiBackend) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) {
+	b.eth.blockchain.SubscribeChainSideEvent(ch)
+}
+
+func (b *LesApiBackend) UnsubscribeChainSideEvent(ch chan<- core.ChainSideEvent) {
+	b.eth.blockchain.UnsubscribeChainSideEvent(ch)
+}
+
+func (b *LesApiBackend) SubscribeLogsEvent(ch chan<- []*types.Log) {}
+
+func (b *LesApiBackend) UnsubscribeLogsEvent(ch chan<- []*types.Log) {}
+
+func (b *LesApiBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) {}
+
+func (b *LesApiBackend) UnsubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) {}
 
 func (b *LesApiBackend) Downloader() *downloader.Downloader {
 	return b.eth.Downloader()

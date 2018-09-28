@@ -31,7 +31,6 @@ import (
 	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/consensus"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
@@ -87,7 +86,8 @@ type BlockChain interface {
 	GetHeaderByNumber(number uint64) *types.Header
 	GetAncestor(hash common.Hash, number, ancestor uint64, maxNonCanonical *uint64) (common.Hash, uint64)
 	Genesis() *types.Block
-	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
+	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent)
+	UnsubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent)
 }
 
 type txPool interface {
@@ -131,7 +131,7 @@ type ProtocolManager struct {
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
 // with the ethereum network.
-func NewProtocolManager(ctx context.Context, chainConfig *params.ChainConfig, lightSync bool, protocolVersions []uint, networkId uint64, mux *event.TypeMux, engine consensus.Engine, peers *peerSet, blockchain BlockChain, txpool txPool, chainDb ethdb.Database, odr *LesOdr, txrelay *LesTxRelay, quitSync chan struct{}, wg *sync.WaitGroup) (*ProtocolManager, error) {
+func NewProtocolManager(ctx context.Context, chainConfig *params.ChainConfig, lightSync bool, protocolVersions []uint, networkId uint64, mux *event.TypeMux, peers *peerSet, blockchain BlockChain, txpool txPool, chainDb ethdb.Database, odr *LesOdr, txrelay *LesTxRelay, quitSync chan struct{}, wg *sync.WaitGroup) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		lightSync:   lightSync,

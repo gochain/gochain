@@ -27,7 +27,6 @@ import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/rlp"
 )
 
@@ -111,7 +110,8 @@ type txPool interface {
 
 	// SubscribeNewTxsEvent should return an event subscription of
 	// NewTxsEvent and send events to the given channel.
-	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
+	SubscribeNewTxsEvent(chan<- core.NewTxsEvent)
+	UnsubscribeNewTxsEvent(chan<- core.NewTxsEvent)
 }
 
 // statusData is the network packet for the status message.

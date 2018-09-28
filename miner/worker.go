@@ -45,7 +45,7 @@ const (
 	// The number is referenced from the size of tx pool.
 	txChanSize = 4096
 	// chainHeadChanSize is the size of channel listening to ChainHeadEvent.
-	chainHeadChanSize = 100
+	chainHeadChanSize = 32
 )
 
 // Agent can register themself with the worker
@@ -89,12 +89,10 @@ type worker struct {
 	mu sync.Mutex
 
 	// update loop
-	mux          *event.TypeMux
-	txsCh        chan core.NewTxsEvent
-	txsSub       event.Subscription
-	chainHeadCh  chan core.ChainHeadEvent
-	chainHeadSub event.Subscription
-	wg           sync.WaitGroup
+	mux         *event.TypeMux
+	txsCh       chan core.NewTxsEvent
+	chainHeadCh chan core.ChainHeadEvent
+	wg          sync.WaitGroup
 
 	agents map[Agent]struct{}
 	recv   chan *Result
@@ -137,10 +135,8 @@ func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase com
 		agents:      make(map[Agent]struct{}),
 		unconfirmed: newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth),
 	}
-	// Subscribe NewTxsEvent for tx pool
-	worker.txsSub = eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)
-	// Subscribe events for blockchain
-	worker.chainHeadSub = eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
+	eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)
+	eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
 	go worker.update()
 
 	go worker.wait()
@@ -249,20 +245,26 @@ func (w *worker) unregister(agent Agent) {
 }
 
 func (w *worker) update() {
-	defer w.txsSub.Unsubscribe()
-	defer w.chainHeadSub.Unsubscribe()
+	defer w.eth.TxPool().UnsubscribeNewTxsEvent(w.txsCh)
+	defer w.eth.BlockChain().UnsubscribeChainHeadEvent(w.chainHeadCh)
 
 	for {
 		// A real event arrived, process interesting content
 		select {
 		// Handle ChainHeadEvent
-		case <-w.chainHeadCh:
+		case _, ok := <-w.chainHeadCh:
+			if !ok {
+				return
+			}
 			ctx, span := trace.StartSpan(context.Background(), "worker.update-chainheadCh")
 			w.commitNewWork(ctx)
 			span.End()
 
 		// Handle NewTxsEvent
-		case ev := <-w.txsCh:
+		case ev, ok := <-w.txsCh:
+			if !ok {
+				return
+			}
 			ctx, span := trace.StartSpan(context.Background(), "worker.update-txsCh")
 			// Apply transaction to the pending state if we're not mining
 			//
@@ -291,12 +293,6 @@ func (w *worker) update() {
 				}
 			}
 			span.End()
-
-		// System stopped
-		case <-w.txsSub.Err():
-			return
-		case <-w.chainHeadSub.Err():
-			return
 		}
 	}
 }

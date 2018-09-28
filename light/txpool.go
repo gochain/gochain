@@ -27,7 +27,6 @@ import (
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 	"github.com/gochain-io/gochain/rlp"
@@ -48,23 +47,24 @@ var txPermanent = uint64(500)
 // always receive all locally signed transactions in the same order as they are
 // created.
 type TxPool struct {
-	config       *params.ChainConfig
-	signer       types.Signer
-	quit         chan bool
-	txFeed       event.Feed
-	scope        event.SubscriptionScope
-	chainHeadCh  chan core.ChainHeadEvent
-	chainHeadSub event.Subscription
-	mu           sync.RWMutex
-	chain        *LightChain
-	odr          OdrBackend
-	chainDb      ethdb.Database
-	relay        TxRelayBackend
-	head         common.Hash
-	nonce        map[common.Address]uint64            // "pending" nonce
-	pending      map[common.Hash]*types.Transaction   // pending transactions by tx hash
-	mined        map[common.Hash][]*types.Transaction // mined transactions by block hash
-	clearIdx     uint64                               // earliest block nr that can contain mined tx info
+	config *params.ChainConfig
+	signer types.Signer
+	quit   chan bool
+
+	txFeed core.NewTxsFeed
+
+	chainHeadCh chan core.ChainHeadEvent
+
+	mu       sync.RWMutex
+	chain    *LightChain
+	odr      OdrBackend
+	chainDb  ethdb.Database
+	relay    TxRelayBackend
+	head     common.Hash
+	nonce    map[common.Address]uint64            // "pending" nonce
+	pending  map[common.Hash]*types.Transaction   // pending transactions by tx hash
+	mined    map[common.Hash][]*types.Transaction // mined transactions by block hash
+	clearIdx uint64                               // earliest block nr that can contain mined tx info
 
 	homestead bool
 }
@@ -101,8 +101,7 @@ func NewTxPool(config *params.ChainConfig, chain *LightChain, relay TxRelayBacke
 		head:        chain.CurrentHeader().Hash(),
 		clearIdx:    chain.CurrentHeader().Number.Uint64(),
 	}
-	// Subscribe events from blockchain
-	pool.chainHeadSub = pool.chain.SubscribeChainHeadEvent(pool.chainHeadCh)
+	pool.chain.SubscribeChainHeadEvent(pool.chainHeadCh)
 	go pool.eventLoop()
 
 	return pool
@@ -282,18 +281,11 @@ const blockCheckTimeout = time.Second * 3
 // eventLoop processes chain head events and also notifies the tx relay backend
 // about the new head hash and tx state changes
 func (pool *TxPool) eventLoop() {
-	for {
-		select {
-		case ev := <-pool.chainHeadCh:
-			pool.setNewHead(ev.Block.Header())
-			// hack in order to avoid hogging the lock; this part will
-			// be replaced by a subsequent PR.
-			time.Sleep(time.Millisecond)
-
-		// System stopped
-		case <-pool.chainHeadSub.Err():
-			return
-		}
+	for ev := range pool.chainHeadCh {
+		pool.setNewHead(ev.Block.Header())
+		// hack in order to avoid hogging the lock; this part will
+		// be replaced by a subsequent PR.
+		time.Sleep(time.Millisecond)
 	}
 }
 
@@ -313,18 +305,23 @@ func (pool *TxPool) setNewHead(head *types.Header) {
 
 // Stop stops the light transaction pool
 func (pool *TxPool) Stop() {
-	// Unsubscribe all subscriptions registered from txpool
-	pool.scope.Close()
+	// Unsubscribe all subscriptions.
+	pool.txFeed.Close()
+
 	// Unsubscribe subscriptions registered from blockchain
-	pool.chainHeadSub.Unsubscribe()
+	pool.chain.UnsubscribeChainHeadEvent(pool.chainHeadCh)
 	close(pool.quit)
 	log.Info("Transaction pool stopped")
 }
 
 // SubscribeNewTxsEvent registers a subscription of core.NewTxsEvent and
 // starts sending event to the given channel.
-func (pool *TxPool) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
-	return pool.scope.Track(pool.txFeed.Subscribe(ch))
+func (pool *TxPool) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
+	pool.txFeed.Subscribe(ch)
+}
+
+func (pool *TxPool) UnsubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
+	pool.txFeed.Unsubscribe(ch)
 }
 
 // Stats returns the number of currently pending (locally created) transactions
@@ -388,35 +385,32 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction) error
 
 // add validates a new transaction and sets its state pending if processable.
 // It also updates the locally stored nonce if necessary.
-func (self *TxPool) add(ctx context.Context, tx *types.Transaction) error {
+func (pool *TxPool) add(ctx context.Context, tx *types.Transaction) error {
 	hash := tx.Hash()
 
-	if self.pending[hash] != nil {
+	if pool.pending[hash] != nil {
 		return fmt.Errorf("Known transaction (%x)", hash[:4])
 	}
-	err := self.validateTx(ctx, tx)
+	err := pool.validateTx(ctx, tx)
 	if err != nil {
 		return err
 	}
 
-	if _, ok := self.pending[hash]; !ok {
-		self.pending[hash] = tx
+	if _, ok := pool.pending[hash]; !ok {
+		pool.pending[hash] = tx
 
 		nonce := tx.Nonce() + 1
 
-		addr, _ := types.Sender(ctx, self.signer, tx)
-		if nonce > self.nonce[addr] {
-			self.nonce[addr] = nonce
+		addr, _ := types.Sender(ctx, pool.signer, tx)
+		if nonce > pool.nonce[addr] {
+			pool.nonce[addr] = nonce
 		}
 
-		// Notify the subscribers. This event is posted in a goroutine
-		// because it's possible that somewhere during the post "Remove transaction"
-		// gets called which will then wait for the global tx pool lock and deadlock.
-		go self.txFeed.Send(core.NewTxsEvent{Txs: types.Transactions{tx}})
+		pool.txFeed.Send(core.NewTxsEvent{Txs: types.Transactions{tx}})
 	}
 
 	// Print a log message if low enough level is set
-	log.Debug("Pooled new transaction", "hash", hash, "from", log.Lazy{Fn: func() common.Address { from, _ := types.Sender(ctx, self.signer, tx); return from }}, "to", tx.To())
+	log.Debug("Pooled new transaction", "hash", hash, "from", log.Lazy{Fn: func() common.Address { from, _ := types.Sender(ctx, pool.signer, tx); return from }}, "to", tx.To())
 	return nil
 }
 

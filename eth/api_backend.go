@@ -166,24 +166,44 @@ func (b *EthApiBackend) GetEVM(ctx context.Context, msg core.Message, state *sta
 	return vm.NewEVM(context, state, b.eth.chainConfig, vmCfg), nil
 }
 
-func (b *EthApiBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription {
-	return b.eth.BlockChain().SubscribeRemovedLogsEvent(ch)
+func (b *EthApiBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) {
+	b.eth.BlockChain().SubscribeRemovedLogsEvent(ch)
 }
 
-func (b *EthApiBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription {
-	return b.eth.BlockChain().SubscribeChainEvent(ch)
+func (b *EthApiBackend) UnsubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) {
+	b.eth.BlockChain().UnsubscribeRemovedLogsEvent(ch)
 }
 
-func (b *EthApiBackend) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
-	return b.eth.BlockChain().SubscribeChainHeadEvent(ch)
+func (b *EthApiBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) {
+	b.eth.BlockChain().SubscribeChainEvent(ch)
 }
 
-func (b *EthApiBackend) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription {
-	return b.eth.BlockChain().SubscribeChainSideEvent(ch)
+func (b *EthApiBackend) UnsubscribeChainEvent(ch chan<- core.ChainEvent) {
+	b.eth.BlockChain().UnsubscribeChainEvent(ch)
 }
 
-func (b *EthApiBackend) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
-	return b.eth.BlockChain().SubscribeLogsEvent(ch)
+func (b *EthApiBackend) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) {
+	b.eth.BlockChain().SubscribeChainHeadEvent(ch)
+}
+
+func (b *EthApiBackend) UnsubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) {
+	b.eth.BlockChain().UnsubscribeChainHeadEvent(ch)
+}
+
+func (b *EthApiBackend) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) {
+	b.eth.BlockChain().SubscribeChainSideEvent(ch)
+}
+
+func (b *EthApiBackend) UnsubscribeChainSideEvent(ch chan<- core.ChainSideEvent) {
+	b.eth.BlockChain().UnsubscribeChainSideEvent(ch)
+}
+
+func (b *EthApiBackend) SubscribeLogsEvent(ch chan<- []*types.Log) {
+	b.eth.BlockChain().SubscribeLogsEvent(ch)
+}
+
+func (b *EthApiBackend) UnsubscribeLogsEvent(ch chan<- []*types.Log) {
+	b.eth.BlockChain().UnsubscribeLogsEvent(ch)
 }
 
 func (b *EthApiBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
@@ -215,8 +235,12 @@ func (b *EthApiBackend) TxPoolContent(ctx context.Context) (map[common.Address]t
 	return b.eth.TxPool().Content(ctx)
 }
 
-func (b *EthApiBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
-	return b.eth.TxPool().SubscribeNewTxsEvent(ch)
+func (b *EthApiBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
+	b.eth.TxPool().SubscribeNewTxsEvent(ch)
+}
+
+func (b *EthApiBackend) UnsubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
+	b.eth.TxPool().UnsubscribeNewTxsEvent(ch)
 }
 
 func (b *EthApiBackend) Downloader() *downloader.Downloader {

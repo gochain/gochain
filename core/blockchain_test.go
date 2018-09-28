@@ -40,7 +40,7 @@ import (
 
 // newTestBlockChain creates a blockchain without validation.
 // genesis can be nil to use default
-func newTestBlockChainWithGenesis(ctx context.Context, fakeBool, disk bool, genesis *Genesis) (*BlockChain, error) {
+func newTestBlockChainWithGenesis(fakeBool, disk bool, genesis *Genesis) (*BlockChain, error) {
 	var err error
 	var db ethdb.Database
 	if disk {
@@ -957,7 +957,7 @@ func TestLogReorgs(t *testing.T) {
 	blockchain, _ := NewBlockChain(db, nil, gspec.Config, engine, vm.Config{})
 	defer blockchain.Stop()
 
-	rmLogsCh := make(chan RemovedLogsEvent)
+	rmLogsCh := make(chan RemovedLogsEvent, 1)
 	blockchain.SubscribeRemovedLogsEvent(rmLogsCh)
 	chain, _ := GenerateChain(ctx, params.TestChainConfig, genesis, engine, db, 2, func(ctx context.Context, i int, gen *BlockGen) {
 		if i == 1 {

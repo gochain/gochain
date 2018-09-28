@@ -38,7 +38,6 @@ import (
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/eth"
-	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/les"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/p2p"
@@ -50,22 +49,16 @@ const (
 	// historyUpdateRange is the number of blocks a node should report upon login or
 	// history request.
 	historyUpdateRange = 50
-
-	// txChanSize is the size of channel listening to NewTxsEvent.
-	// The number is referenced from the size of tx pool.
-	txChanSize = 4096
-	// chainHeadChanSize is the size of channel listening to ChainHeadEvent.
-	chainHeadChanSize = 100
 )
 
 type txPool interface {
-	// SubscribeNewTxsEvent should return an event subscription of
-	// NewTxsEvent and send events to the given channel.
-	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
+	SubscribeNewTxsEvent(chan<- core.NewTxsEvent)
+	UnsubscribeNewTxsEvent(chan<- core.NewTxsEvent)
 }
 
 type blockChain interface {
-	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
+	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent)
+	UnsubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent)
 }
 
 // Service implements an GoChain netstats reporting daemon that pushes local
@@ -164,33 +157,37 @@ func (s *Service) loop() {
 
 	// Start a goroutine that exhausts the subscriptions to avoid events piling up
 	var (
-		chainHeadCh = make(chan core.ChainHeadEvent, chainHeadChanSize)
-		txEventCh   = make(chan core.NewTxsEvent, txChanSize)
-
-		headSub = blockchain.SubscribeChainHeadEvent(chainHeadCh)
-		txSub   = txpool.SubscribeNewTxsEvent(txEventCh)
-
-		quitCh = make(chan struct{})
-		headCh = make(chan *types.Block, 1)
-		txCh   = make(chan struct{}, 1)
+		chainHeadCh = make(chan core.ChainHeadEvent, 1)
+		txEventCh   = make(chan core.NewTxsEvent, 1)
+		quitCh      = make(chan struct{})
+		headCh      = make(chan *types.Block, 1)
+		txCh        = make(chan struct{}, 1)
 	)
+	blockchain.SubscribeChainHeadEvent(chainHeadCh)
+	txpool.SubscribeNewTxsEvent(txEventCh)
 	go func() {
 		defer close(quitCh)
-		defer txSub.Unsubscribe()
-		defer headSub.Unsubscribe()
+		defer blockchain.UnsubscribeChainHeadEvent(chainHeadCh)
+		defer txpool.UnsubscribeNewTxsEvent(txEventCh)
 
 		var lastTx mclock.AbsTime
 		for {
 			select {
-			// Notify of chain head events, but drop if too frequent
-			case head := <-chainHeadCh:
+			// Notify of chain head events.
+			case head, ok := <-chainHeadCh:
+				if !ok {
+					return
+				}
 				select {
 				case headCh <- head.Block:
 				default:
 				}
 
 			// Notify of new transaction events, but drop if too frequent
-			case <-txEventCh:
+			case _, ok := <-txEventCh:
+				if !ok {
+					return
+				}
 				if time.Duration(mclock.Now()-lastTx) < time.Second {
 					continue
 				}
@@ -200,12 +197,6 @@ func (s *Service) loop() {
 				case txCh <- struct{}{}:
 				default:
 				}
-
-			// node stopped
-			case <-txSub.Err():
-				return
-			case <-headSub.Err():
-				return
 			}
 		}
 	}()
