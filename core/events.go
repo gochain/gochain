@@ -91,7 +91,7 @@ func (f *NewTxsFeed) Send(ev NewTxsEvent) {
 		select {
 		case sub <- ev:
 		default:
-			log.Trace("NewTxsFeed send dropped: channel full", "txs", len(ev.Txs))
+			log.Trace("NewTxsFeed send dropped: channel full", "cap", cap(sub), "txs", len(ev.Txs))
 		}
 	}
 	f.RUnlock()
@@ -135,7 +135,7 @@ func (f *ChainFeed) Send(ev ChainEvent) {
 		select {
 		case sub <- ev:
 		default:
-			log.Info("ChainFeed send dropped: channel full", "block", ev.Block.NumberU64(), "hash", ev.Hash)
+			log.Info("ChainFeed send dropped: channel full", "cap", cap(sub), "block", ev.Block.NumberU64(), "hash", ev.Hash)
 		}
 	}
 	f.RUnlock()
@@ -179,7 +179,7 @@ func (f *ChainHeadFeed) Send(ev ChainHeadEvent) {
 		select {
 		case sub <- ev:
 		default:
-			log.Info("ChainHeadFeed send dropped: channel full", "block", ev.Block.NumberU64(), "hash", ev.Block.Hash())
+			log.Info("ChainHeadFeed send dropped: channel full", "cap", cap(sub), "block", ev.Block.NumberU64(), "hash", ev.Block.Hash())
 		}
 	}
 	f.RUnlock()
@@ -223,7 +223,7 @@ func (f *ChainSideFeed) Send(ev ChainSideEvent) {
 		select {
 		case sub <- ev:
 		default:
-			log.Info("ChainSideFeed send dropped: channel full", "block", ev.Block.NumberU64(), "hash", ev.Block.Hash())
+			log.Info("ChainSideFeed send dropped: channel full", "cap", cap(sub), "block", ev.Block.NumberU64(), "hash", ev.Block.Hash())
 		}
 	}
 	f.RUnlock()
@@ -267,7 +267,7 @@ func (f *PendingLogsFeed) Send(ev PendingLogsEvent) {
 		select {
 		case sub <- ev:
 		default:
-			log.Info("PendingLogsFeed send dropped: channel full", "len", len(ev.Logs))
+			log.Info("PendingLogsFeed send dropped: channel full", "cap", cap(sub), "len", len(ev.Logs))
 		}
 	}
 	f.RUnlock()
@@ -311,7 +311,7 @@ func (f *RemovedLogsFeed) Send(ev RemovedLogsEvent) {
 		select {
 		case sub <- ev:
 		default:
-			log.Info("RemovedLogsFeed send dropped: channel full", "len", len(ev.Logs))
+			log.Info("RemovedLogsFeed send dropped: channel full", "cap", cap(sub), "len", len(ev.Logs))
 		}
 	}
 	f.RUnlock()
@@ -362,7 +362,7 @@ func (f *LogsFeed) Send(logs []*types.Log) {
 		select {
 		case sub <- logs:
 		default:
-			log.Info("LogsFeed send dropped: channel full", "len", len(logs))
+			log.Info("LogsFeed send dropped: channel full", "cap", cap(sub), "len", len(logs))
 		}
 	}
 	f.RUnlock()
