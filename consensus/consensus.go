@@ -19,6 +19,7 @@ package consensus
 
 import (
 	"context"
+	"time"
 
 	"github.com/gochain-io/gochain/accounts"
 	"github.com/gochain-io/gochain/common"
@@ -70,7 +71,8 @@ type Engine interface {
 
 	// Prepare initializes the consensus fields of a block header according to the
 	// rules of a particular engine. The changes are executed inline.
-	Prepare(ctx context.Context, chain ChainReader, header *types.Header) error
+	// Returns a deadline for block finalization, if applicable.
+	Prepare(ctx context.Context, chain ChainReader, header *types.Header) (*time.Time, error)
 
 	// Finalize runs any post-transaction state modifications (e.g. block rewards)
 	// and assembles the final block (if block is true).

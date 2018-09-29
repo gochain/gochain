@@ -541,7 +541,7 @@ func (c *Clique) verifySeal(ctx context.Context, chain consensus.ChainReader, he
 
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
-func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, header *types.Header) error {
+func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, header *types.Header) (*time.Time, error) {
 	ctx, span := trace.StartSpan(ctx, "Clique.Prepare")
 	defer span.End()
 
@@ -552,18 +552,18 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 	// Assemble the voting snapshot to check which votes make sense
 	snap, err := c.snapshot(ctx, chain, number-1, header.ParentHash, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if c.signer != (common.Address{}) {
 		// Check that we can sign.
 		if _, ok := snap.Signers[c.signer]; !ok {
-			return fmt.Errorf("not authorized to sign: %s", c.signer.Hex())
+			return nil, fmt.Errorf("not authorized to sign: %s", c.signer.Hex())
 		}
 	}
 	// Calculate and validate the difficulty.
 	diff := CalcDifficulty(snap.Signers, c.signer)
 	if c.signer != (common.Address{}) && diff == 0 {
-		return fmt.Errorf("signed too recently: %s", c.signer.Hex())
+		return nil, fmt.Errorf("signed too recently: %s", c.signer.Hex())
 	}
 	header.Difficulty = new(big.Int).SetUint64(diff)
 
@@ -605,13 +605,18 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 	// Ensure the timestamp has the correct delay
 	parent := chain.GetHeader(header.ParentHash, number-1)
 	if parent == nil {
-		return consensus.ErrUnknownAncestor
+		return nil, consensus.ErrUnknownAncestor
 	}
 	header.Time = new(big.Int).Add(parent.Time, new(big.Int).SetUint64(c.config.Period))
 	if header.Time.Int64() < time.Now().Unix() {
 		header.Time = big.NewInt(time.Now().Unix())
 	}
-	return nil
+	var deadline *time.Time
+	if c.config.Period != 0 {
+		t := time.Unix(header.Time.Int64(), 0)
+		deadline = &t
+	}
+	return deadline, nil
 }
 
 func (c *Clique) Authorize(signer common.Address, signFn consensus.SignerFn) {

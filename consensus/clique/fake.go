@@ -111,7 +111,7 @@ func (e *fakeEngine) delayOrFail(_ context.Context, _ consensus.ChainReader, hea
 	return nil
 }
 
-func (e *fakeEngine) Prepare(ctx context.Context, chain consensus.ChainReader, header *types.Header) error {
+func (e *fakeEngine) Prepare(ctx context.Context, chain consensus.ChainReader, header *types.Header) (*time.Time, error) {
 	header.Extra = ExtraEnsureVanity(header.Extra)
 	if header.Difficulty == nil {
 		header.Difficulty = header.Coinbase.Big()
@@ -119,7 +119,7 @@ func (e *fakeEngine) Prepare(ctx context.Context, chain consensus.ChainReader, h
 			header.Difficulty.SetUint64(1)
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 func (e *fakeEngine) Finalize(ctx context.Context, chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
