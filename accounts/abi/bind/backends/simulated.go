@@ -432,20 +432,25 @@ func (fb *filterBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
 		return nil
 	})
 	fb.txSubsMu.Lock()
+	defer fb.txSubsMu.Unlock()
 	fb.txSubs[ch] = sub
-	fb.txSubsMu.Unlock()
 }
 
 func (fb *filterBackend) UnsubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
-	fb.txSubsMu.Lock()
-	sub, ok := fb.txSubs[ch]
-	if ok {
-		delete(fb.txSubs, ch)
-	}
-	fb.txSubsMu.Unlock()
-	if ok {
+	if sub := fb.removeSub(ch); sub != nil {
 		sub.Unsubscribe()
 	}
+}
+
+func (fb *filterBackend) removeSub(ch chan<- core.NewTxsEvent) event.Subscription {
+	fb.txSubsMu.Lock()
+	defer fb.txSubsMu.Unlock()
+	sub, ok := fb.txSubs[ch]
+	if !ok {
+		return nil
+	}
+	delete(fb.txSubs, ch)
+	return sub
 }
 
 func (fb *filterBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) {
