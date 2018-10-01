@@ -39,7 +39,7 @@ func benchmarkStateProcessor_Process(cnt int) func(b *testing.B) {
 		tx, _ = types.SignTx(tx, signer, key)
 		txs[i] = tx
 	}
-	bc, err := newTestBlockChainWithGenesis(ctx, false, true, genesis)
+	bc, err := newTestBlockChainWithGenesis(false, true, genesis)
 	block := types.NewBlock(&types.Header{
 		GasLimit: bc.GasLimit(),
 	}, txs, nil, nil)
@@ -69,7 +69,6 @@ func benchmarkStateProcessor_Process(cnt int) func(b *testing.B) {
 }
 
 func TestStateProcessor(t *testing.T) {
-
 	numTxs := 10000
 
 	ctx := context.Background()
@@ -85,7 +84,7 @@ func TestStateProcessor(t *testing.T) {
 	}
 	signer := types.NewEIP155Signer(genesis.Config.ChainId)
 
-	bc, err := newTestBlockChainWithGenesis(ctx, false, true, genesis)
+	bc, err := newTestBlockChainWithGenesis(false, true, genesis)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -41,7 +41,6 @@ import (
 	"github.com/gochain-io/gochain/core/vm"
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/metrics"
 	"github.com/gochain-io/gochain/params"
@@ -97,14 +96,15 @@ type BlockChain struct {
 	triegc *prque.Prque   // Priority queue mapping block numbers to tries to gc
 	gcproc time.Duration  // Accumulates canonical block processing for trie dumping
 
-	hc            *HeaderChain
-	rmLogsFeed    event.Feed
-	chainFeed     event.Feed
-	chainSideFeed event.Feed
-	chainHeadFeed event.Feed
-	logsFeed      event.Feed
-	scope         event.SubscriptionScope
-	genesisBlock  *types.Block
+	hc *HeaderChain
+
+	rmLogsFeed    RemovedLogsFeed
+	chainFeed     ChainFeed
+	chainSideFeed ChainSideFeed
+	chainHeadFeed ChainHeadFeed
+	logsFeed      LogsFeed
+
+	genesisBlock *types.Block
 
 	mu      sync.RWMutex // global mutex for locking chain operations
 	chainmu sync.RWMutex // blockchain insertion lock
@@ -655,7 +655,11 @@ func (bc *BlockChain) Stop() {
 		return
 	}
 	// Unsubscribe all subscriptions registered from blockchain
-	bc.scope.Close()
+	bc.rmLogsFeed.Close()
+	bc.chainFeed.Close()
+	bc.chainSideFeed.Close()
+	bc.chainHeadFeed.Close()
+	bc.logsFeed.Close()
 	close(bc.quit)
 	atomic.StoreInt32(&bc.procInterrupt, 1)
 
@@ -1450,14 +1454,12 @@ func (bc *BlockChain) reorg(ctx context.Context, oldBlock, newBlock *types.Block
 		DeleteTxLookupEntry(bc.db, tx.Hash())
 	}
 	if len(deletedLogs) > 0 {
-		go bc.rmLogsFeed.Send(RemovedLogsEvent{deletedLogs})
+		bc.rmLogsFeed.Send(RemovedLogsEvent{deletedLogs})
 	}
 	if len(oldChain) > 0 {
-		go func() {
-			for _, block := range oldChain {
-				bc.chainSideFeed.Send(ChainSideEvent{Block: block})
-			}
-		}()
+		for _, block := range oldChain {
+			bc.chainSideFeed.Send(ChainSideEvent{Block: block})
+		}
 	}
 
 	return nil
@@ -1472,18 +1474,18 @@ func (bc *BlockChain) PostChainEvents(ctx context.Context, events []interface{},
 
 	// post event logs for further processing
 	if logs != nil {
-		bc.logsFeed.SendCtx(ctx, logs)
+		bc.logsFeed.Send(logs)
 	}
 	for _, event := range events {
 		switch ev := event.(type) {
 		case ChainEvent:
-			bc.chainFeed.SendCtx(ctx, ev)
+			bc.chainFeed.Send(ev)
 
 		case ChainHeadEvent:
-			bc.chainHeadFeed.SendCtx(ctx, ev)
+			bc.chainHeadFeed.Send(ev)
 
 		case ChainSideEvent:
-			bc.chainSideFeed.SendCtx(ctx, ev)
+			bc.chainSideFeed.Send(ev)
 		}
 	}
 }
@@ -1664,26 +1666,48 @@ func (bc *BlockChain) Config() *params.ChainConfig { return bc.chainConfig }
 func (bc *BlockChain) Engine() consensus.Engine { return bc.engine }
 
 // SubscribeRemovedLogsEvent registers a subscription of RemovedLogsEvent.
-func (bc *BlockChain) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) event.Subscription {
-	return bc.scope.Track(bc.rmLogsFeed.Subscribe(ch))
+func (bc *BlockChain) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) {
+	bc.rmLogsFeed.Subscribe(ch)
+}
+
+func (bc *BlockChain) UnsubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) {
+	bc.rmLogsFeed.Unsubscribe(ch)
 }
 
 // SubscribeChainEvent registers a subscription of ChainEvent.
-func (bc *BlockChain) SubscribeChainEvent(ch chan<- ChainEvent) event.Subscription {
-	return bc.scope.Track(bc.chainFeed.Subscribe(ch))
+func (bc *BlockChain) SubscribeChainEvent(ch chan<- ChainEvent) {
+	bc.chainFeed.Subscribe(ch)
+}
+
+// SubscribeChainEvent registers a subscription of ChainEvent.
+func (bc *BlockChain) UnsubscribeChainEvent(ch chan<- ChainEvent) {
+	bc.chainFeed.Unsubscribe(ch)
 }
 
 // SubscribeChainHeadEvent registers a subscription of ChainHeadEvent.
-func (bc *BlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) event.Subscription {
-	return bc.scope.Track(bc.chainHeadFeed.Subscribe(ch))
+func (bc *BlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) {
+	bc.chainHeadFeed.Subscribe(ch)
+}
+
+// SubscribeChainHeadEvent registers a subscription of ChainHeadEvent.
+func (bc *BlockChain) UnsubscribeChainHeadEvent(ch chan<- ChainHeadEvent) {
+	bc.chainHeadFeed.Unsubscribe(ch)
 }
 
 // SubscribeChainSideEvent registers a subscription of ChainSideEvent.
-func (bc *BlockChain) SubscribeChainSideEvent(ch chan<- ChainSideEvent) event.Subscription {
-	return bc.scope.Track(bc.chainSideFeed.Subscribe(ch))
+func (bc *BlockChain) SubscribeChainSideEvent(ch chan<- ChainSideEvent) {
+	bc.chainSideFeed.Subscribe(ch)
+}
+
+func (bc *BlockChain) UnsubscribeChainSideEvent(ch chan<- ChainSideEvent) {
+	bc.chainSideFeed.Unsubscribe(ch)
 }
 
 // SubscribeLogsEvent registers a subscription of []*types.Log.
-func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
-	return bc.scope.Track(bc.logsFeed.Subscribe(ch))
+func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) {
+	bc.logsFeed.Subscribe(ch)
+}
+
+func (bc *BlockChain) UnsubscribeLogsEvent(ch chan<- []*types.Log) {
+	bc.logsFeed.Unsubscribe(ch)
 }

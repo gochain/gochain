@@ -26,7 +26,6 @@ import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/log"
 )
 
@@ -52,7 +51,8 @@ type ChainIndexerChain interface {
 	CurrentHeader() *types.Header
 
 	// SubscribeChainEvent subscribes to new head header notifications.
-	SubscribeChainEvent(ch chan<- ChainEvent) event.Subscription
+	SubscribeChainEvent(ch chan<- ChainEvent)
+	UnsubscribeChainEvent(ch chan<- ChainEvent)
 }
 
 // ChainIndexer does a post-processing job for equally sized sections of the
@@ -126,10 +126,11 @@ func (c *ChainIndexer) AddKnownSectionHead(section uint64, shead common.Hash) {
 // cascading background processing. Children do not need to be started, they
 // are notified about new events by their parents.
 func (c *ChainIndexer) Start(chain ChainIndexerChain) {
-	events := make(chan ChainEvent, 10)
-	sub := chain.SubscribeChainEvent(events)
-
-	go c.eventLoop(chain.CurrentHeader(), events, sub)
+	events := make(chan ChainEvent, 32)
+	chain.SubscribeChainEvent(events)
+	// Mark the chain indexer as active, requiring an additional teardown
+	atomic.StoreUint32(&c.active, 1)
+	go c.eventLoop(chain, events)
 }
 
 // Close tears down all goroutines belonging to the indexer and returns any error
@@ -172,11 +173,10 @@ func (c *ChainIndexer) Close() error {
 // eventLoop is a secondary - optional - event loop of the indexer which is only
 // started for the outermost indexer to push chain head events into a processing
 // queue.
-func (c *ChainIndexer) eventLoop(currentHeader *types.Header, events chan ChainEvent, sub event.Subscription) {
-	// Mark the chain indexer as active, requiring an additional teardown
-	atomic.StoreUint32(&c.active, 1)
+func (c *ChainIndexer) eventLoop(chain ChainIndexerChain, events chan ChainEvent) {
+	defer chain.UnsubscribeChainEvent(events)
 
-	defer sub.Unsubscribe()
+	currentHeader := chain.CurrentHeader()
 
 	// Fire the initial new head event to start any outstanding processing
 	c.newHead(currentHeader.Number.Uint64(), false)

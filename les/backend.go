@@ -141,7 +141,7 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *eth.Config) (*L
 	}
 
 	leth.txPool = light.NewTxPool(leth.chainConfig, leth.blockchain, leth.relay)
-	if leth.protocolManager, err = NewProtocolManager(ctx, leth.chainConfig, true, ClientProtocolVersions, config.NetworkId, leth.eventMux, leth.engine, leth.peers, leth.blockchain, nil, chainDb, leth.odr, leth.relay, quitSync, &leth.wg); err != nil {
+	if leth.protocolManager, err = NewProtocolManager(ctx, leth.chainConfig, true, ClientProtocolVersions, config.NetworkId, leth.eventMux, leth.peers, leth.blockchain, nil, chainDb, leth.odr, leth.relay, quitSync, &leth.wg); err != nil {
 		return nil, err
 	}
 	leth.ApiBackend = &LesApiBackend{

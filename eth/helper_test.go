@@ -91,7 +91,7 @@ func newTestProtocolManagerMust(ctx context.Context, t *testing.T, mode download
 
 // testTxPool is a fake, helper transaction pool for testing purposes
 type testTxPool struct {
-	txFeed event.Feed
+	txFeed core.NewTxsFeed
 	pool   []*types.Transaction        // Collection of all transactions
 	added  chan<- []*types.Transaction // Notification channel for new transactions
 
@@ -135,8 +135,12 @@ func (p *testTxPool) PendingList(ctx context.Context) types.Transactions {
 	return pending
 }
 
-func (p *testTxPool) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subscription {
-	return p.txFeed.Subscribe(ch)
+func (p *testTxPool) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
+	p.txFeed.Subscribe(ch)
+}
+
+func (p *testTxPool) UnsubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
+	p.txFeed.Unsubscribe(ch)
 }
 
 // newTestTransaction create a new dummy transaction.

@@ -52,7 +52,7 @@ type LesServer struct {
 
 func NewLesServer(ctx context.Context, eth *eth.GoChain, config *eth.Config) (*LesServer, error) {
 	quitSync := make(chan struct{})
-	pm, err := NewProtocolManager(ctx, eth.BlockChain().Config(), false, ServerProtocolVersions, config.NetworkId, eth.EventMux(), eth.Engine(), newPeerSet(), eth.BlockChain(), eth.TxPool(), eth.ChainDb(), nil, nil, quitSync, new(sync.WaitGroup))
+	pm, err := NewProtocolManager(ctx, eth.BlockChain().Config(), false, ServerProtocolVersions, config.NetworkId, eth.EventMux(), newPeerSet(), eth.BlockChain(), eth.TxPool(), eth.ChainDb(), nil, nil, quitSync, new(sync.WaitGroup))
 	if err != nil {
 		return nil, err
 	}
@@ -322,7 +322,7 @@ func (s *requestCostStats) update(msgCode, reqCnt, cost uint64) {
 func (pm *ProtocolManager) blockLoop() {
 	pm.wg.Add(1)
 	headCh := make(chan core.ChainHeadEvent, 100)
-	headSub := pm.blockchain.SubscribeChainHeadEvent(headCh)
+	pm.blockchain.SubscribeChainHeadEvent(headCh)
 	go func() {
 		var lastHead *types.Header
 		lastBroadcastTd := common.Big0
@@ -378,7 +378,7 @@ func (pm *ProtocolManager) blockLoop() {
 					}
 				}
 			case <-pm.quitSync:
-				headSub.Unsubscribe()
+				pm.blockchain.UnsubscribeChainHeadEvent(headCh)
 				pm.wg.Done()
 				return
 			}

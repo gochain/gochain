@@ -181,7 +181,7 @@ func newTestProtocolManager(ctx context.Context, lightSync bool, blocks int, gen
 	} else {
 		protocolVersions = ServerProtocolVersions
 	}
-	pm, err := NewProtocolManager(ctx, gspec.Config, lightSync, protocolVersions, NetworkId, evmux, engine, peers, chain, nil, db, odr, nil, make(chan struct{}), new(sync.WaitGroup))
+	pm, err := NewProtocolManager(ctx, gspec.Config, lightSync, protocolVersions, NetworkId, evmux, peers, chain, nil, db, odr, nil, make(chan struct{}), new(sync.WaitGroup))
 	if err != nil {
 		return nil, err
 	}

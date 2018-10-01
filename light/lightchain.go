@@ -30,7 +30,6 @@ import (
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 	"github.com/gochain-io/gochain/rlp"
@@ -46,14 +45,15 @@ var (
 // headers, downloading block bodies and receipts on demand through an ODR
 // interface. It only does header validation during chain insertion.
 type LightChain struct {
-	hc            *core.HeaderChain
-	chainDb       ethdb.Database
-	odr           OdrBackend
-	chainFeed     event.Feed
-	chainSideFeed event.Feed
-	chainHeadFeed event.Feed
-	scope         event.SubscriptionScope
-	genesisBlock  *types.Block
+	hc      *core.HeaderChain
+	chainDb ethdb.Database
+	odr     OdrBackend
+
+	chainFeed     core.ChainFeed
+	chainHeadFeed core.ChainHeadFeed
+	chainSideFeed core.ChainSideFeed
+
+	genesisBlock *types.Block
 
 	mu      sync.RWMutex
 	chainmu sync.RWMutex
@@ -494,28 +494,28 @@ func (self *LightChain) UnlockChain() {
 }
 
 // SubscribeChainEvent registers a subscription of ChainEvent.
-func (self *LightChain) SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription {
-	return self.scope.Track(self.chainFeed.Subscribe(ch))
+func (lc *LightChain) SubscribeChainEvent(ch chan<- core.ChainEvent) {
+	lc.chainFeed.Subscribe(ch)
+}
+
+func (lc *LightChain) UnsubscribeChainEvent(ch chan<- core.ChainEvent) {
+	lc.chainFeed.Unsubscribe(ch)
 }
 
 // SubscribeChainHeadEvent registers a subscription of ChainHeadEvent.
-func (self *LightChain) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
-	return self.scope.Track(self.chainHeadFeed.Subscribe(ch))
+func (lc *LightChain) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) {
+	lc.chainHeadFeed.Subscribe(ch)
+}
+
+func (lc *LightChain) UnsubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) {
+	lc.chainHeadFeed.Unsubscribe(ch)
 }
 
 // SubscribeChainSideEvent registers a subscription of ChainSideEvent.
-func (self *LightChain) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) event.Subscription {
-	return self.scope.Track(self.chainSideFeed.Subscribe(ch))
+func (lc *LightChain) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) {
+	lc.chainSideFeed.Subscribe(ch)
 }
 
-// SubscribeLogsEvent implements the interface of filters.Backend
-// LightChain does not send logs events, so return an empty subscription.
-func (self *LightChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
-	return self.scope.Track(new(event.Feed).Subscribe(ch))
-}
-
-// SubscribeRemovedLogsEvent implements the interface of filters.Backend
-// LightChain does not send core.RemovedLogsEvent, so return an empty subscription.
-func (self *LightChain) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription {
-	return self.scope.Track(new(event.Feed).Subscribe(ch))
+func (lc *LightChain) UnsubscribeChainSideEvent(ch chan<- core.ChainSideEvent) {
+	lc.chainSideFeed.Unsubscribe(ch)
 }
