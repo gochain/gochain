@@ -434,6 +434,10 @@ func (w *worker) commitNewWork(ctx context.Context) {
 		log.Error("Failed to prepare header for mining", "err", err)
 		return
 	}
+	// We only care about the deadline if we're actually mining.
+	if atomic.LoadInt32(&w.mining) == 0 {
+		deadline = nil
+	}
 
 	// Could potentially happen if starting to mine in an odd state.
 	if err := w.makeCurrent(parent, header); err != nil {
