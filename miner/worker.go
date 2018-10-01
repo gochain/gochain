@@ -18,7 +18,6 @@ package miner
 
 import (
 	"context"
-	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -279,7 +278,7 @@ func (w *worker) update() {
 					txs[acc] = append(txs[acc], tx)
 				}
 				txset := types.NewTransactionsByPriceAndNonce(ctx, w.current.signer, txs)
-				w.current.commitTransactions(ctx, w.mux, txset, w.chain, w.coinbase)
+				w.current.commitTransactions(ctx, nil, w.mux, txset, w.chain, w.coinbase)
 				w.updateSnapshot(ctx)
 
 				w.current.stateMu.Unlock()
@@ -415,13 +414,9 @@ func (w *worker) commitNewWork(ctx context.Context) {
 	tstart := time.Now()
 	parent := w.chain.CurrentBlockCtx(ctx)
 
-	tstamp := tstart.Unix()
-	if parent.Time().Cmp(new(big.Int).SetInt64(tstamp)) >= 0 {
-		tstamp = parent.Time().Int64() + 1
-	}
-	// this will ensure we're not going off too far in the future
-	if now := time.Now().Unix(); tstamp > now+1 {
-		wait := time.Duration(tstamp-now) * time.Second
+	// Ensure we're not going off too far in the future.
+	pTime := time.Unix(parent.Time().Int64(), 0)
+	if wait := time.Until(pTime); wait > 0 {
 		log.Info("Mining too far in the future", "wait", common.PrettyDuration(wait))
 		time.Sleep(wait)
 	}
@@ -432,19 +427,20 @@ func (w *worker) commitNewWork(ctx context.Context) {
 		Number:     num.Add(num, common.Big1),
 		GasLimit:   core.CalcGasLimit(parent),
 		Extra:      w.extra,
-		Time:       big.NewInt(tstamp),
 	}
 	// Only set the coinbase if we are mining (avoid spurious block rewards)
 	if atomic.LoadInt32(&w.mining) == 1 {
 		header.Coinbase = w.coinbase
 	}
-	if err := w.engine.Prepare(ctx, w.chain, header); err != nil {
+
+	deadline, err := w.engine.Prepare(ctx, w.chain, header)
+	if err != nil {
 		log.Error("Failed to prepare header for mining", "err", err)
 		return
 	}
+
 	// Could potentially happen if starting to mine in an odd state.
-	err := w.makeCurrent(parent, header)
-	if err != nil {
+	if err := w.makeCurrent(parent, header); err != nil {
 		log.Error("Failed to create mining context", "err", err)
 		return
 	}
@@ -457,7 +453,7 @@ func (w *worker) commitNewWork(ctx context.Context) {
 	work := w.current
 	pending := w.eth.TxPool().Pending(ctx)
 	txs := types.NewTransactionsByPriceAndNonce(ctx, w.current.signer, pending)
-	work.commitTransactions(ctx, w.mux, txs, w.chain, w.coinbase)
+	work.commitTransactions(ctx, deadline, w.mux, txs, w.chain, w.coinbase)
 
 	// Create the new block to seal with the consensus engine
 	work.Block = w.engine.Finalize(ctx, w.chain, header, work.state, work.txs, work.receipts, true)
@@ -486,7 +482,7 @@ func (w *worker) updateSnapshot(ctx context.Context) {
 	w.snapshotState = w.current.state.Copy(ctx)
 }
 
-func (env *Work) commitTransactions(ctx context.Context, mux *event.TypeMux, txs *types.TransactionsByPriceAndNonce, bc *core.BlockChain, coinbase common.Address) {
+func (env *Work) commitTransactions(ctx context.Context, deadline *time.Time, mux *event.TypeMux, txs *types.TransactionsByPriceAndNonce, bc *core.BlockChain, coinbase common.Address) {
 	ctx, span := trace.StartSpan(ctx, "Work.commitTransactions")
 	defer span.End()
 
@@ -500,6 +496,10 @@ func (env *Work) commitTransactions(ctx context.Context, mux *event.TypeMux, txs
 	vmenv := vm.NewEVM(evmContext, env.state, env.config, vm.Config{})
 	var coalescedLogs []*types.Log
 	for {
+		if deadline != nil && time.Now().After(*deadline) {
+			log.Info("Block assembly deadline reached", "block", env.header.Number, "parent", env.header.ParentHash)
+			break
+		}
 		// If we don't have enough gas for any further transactions then we're done
 		if env.gasPool.Gas() < params.TxGas {
 			log.Trace("Not enough gas for further transactions", "have", env.gasPool, "want", params.TxGas)

@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -694,7 +693,7 @@ func (pm *ProtocolManager) BroadcastBlock(ctx context.Context, block *types.Bloc
 	hash := block.Hash()
 	peers := pm.peers.PeersWithoutBlock(ctx, hash)
 
-	// If propagation is requested, send to a subset of the peers.
+	// If propagation is requested, send to all peers.
 	if propagate {
 		// Calculate the TD of the block (it's not imported yet, so block.Td is not valid)
 		var td *big.Int
@@ -704,20 +703,12 @@ func (pm *ProtocolManager) BroadcastBlock(ctx context.Context, block *types.Bloc
 			log.Error("Propagating dangling block", "number", block.Number(), "hash", hash)
 			return
 		}
-		// Send the block to a subset of our peers (at most, square root of total peers).
-		max := int(math.Sqrt(float64(cap(peers))))
-		if max < minBroadcastPeers {
-			max = minBroadcastPeers
-		}
-		if max > len(peers) {
-			max = len(peers)
-		}
-		for _, p := range peers[:max] {
+		for _, p := range peers {
 			p.SendNewBlockAsync(block, td)
 		}
 		return
 	}
-	// Otherwise if the block is indeed in out own chain, announce it
+	// Otherwise if the block is indeed in our own chain, announce it
 	if pm.blockchain.HasBlock(hash, block.NumberU64()) {
 		for _, p := range peers {
 			p.SendNewBlockHashAsync(block)

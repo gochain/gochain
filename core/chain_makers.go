@@ -173,7 +173,7 @@ func GenerateChain(ctx context.Context, config *params.ChainConfig, first *types
 		}
 
 		if b.engine != nil {
-			if err := b.engine.Prepare(ctx, b.chainReader, b.header); err != nil {
+			if _, err := b.engine.Prepare(ctx, b.chainReader, b.header); err != nil {
 				panic(fmt.Sprintf("failed to prepare %d: %v", b.header.Number.Uint64(), err))
 			}
 			block := b.engine.Finalize(ctx, b.chainReader, b.header, statedb, b.txs, b.receipts, true)
