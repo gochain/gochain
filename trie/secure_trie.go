@@ -35,6 +35,7 @@ import (
 // SecureTrie is not safe for concurrent use.
 type SecureTrie struct {
 	trie             Trie
+	hashKeyCache     map[string][common.HashLength]byte
 	hashKeyBuf       [common.HashLength]byte
 	secKeyCache      map[string][]byte
 	secKeyCacheOwner *SecureTrie // Pointer to self, replace the key cache on mismatch
@@ -60,7 +61,10 @@ func NewSecure(root common.Hash, db *Database, cachelimit uint16) (*SecureTrie, 
 		return nil, err
 	}
 	trie.SetCacheLimit(cachelimit)
-	return &SecureTrie{trie: *trie}, nil
+	return &SecureTrie{
+		trie:         *trie,
+		hashKeyCache: make(map[string][common.HashLength]byte, 1024),
+	}, nil
 }
 
 // Get returns the value for key stored in the trie.
@@ -178,11 +182,20 @@ func (t *SecureTrie) NodeIterator(start []byte) NodeIterator {
 // The caller must not hold onto the return value because it will become
 // invalid on the next call to hashKey or secKey.
 func (t *SecureTrie) hashKey(key []byte) []byte {
+	// Use cache version, if available.
+	if buf, ok := t.hashKeyCache[string(key)]; ok {
+		return buf[:]
+	}
+
 	h := newHasher(0, 0, nil)
 	h.sha.Reset()
 	h.sha.Write(key)
 	buf := h.sha.Sum(t.hashKeyBuf[:0])
 	returnHasherToPool(h)
+
+	// Copy result to the cache.
+	t.hashKeyCache[string(key)] = t.hashKeyBuf
+
 	return buf
 }
 
@@ -195,4 +208,14 @@ func (t *SecureTrie) getSecKeyCache() map[string][]byte {
 		t.secKeyCache = make(map[string][]byte)
 	}
 	return t.secKeyCache
+}
+
+// Clone returns a copy of the trie.
+func (t *SecureTrie) Clone() *SecureTrie {
+	other := *t
+	other.hashKeyCache = make(map[string][common.HashLength]byte, len(t.hashKeyCache))
+	for k, v := range t.hashKeyCache {
+		other.hashKeyCache[k] = v
+	}
+	return &other
 }
