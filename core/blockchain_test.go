@@ -70,7 +70,7 @@ func newTestBlockChainWithGenesis(fakeBool, disk bool, genesis *Genesis) (*Block
 	} else {
 		engine = clique.New(genesis.Config.Clique, db)
 	}
-	blockchain, err := NewBlockChain(ctx, db, nil, genesis.Config, engine, vm.Config{})
+	blockchain, err := NewBlockChain(context.Background(), db, nil, genesis.Config, engine, vm.Config{})
 	if err != nil {
 		panic(err)
 	}

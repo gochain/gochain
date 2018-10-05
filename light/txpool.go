@@ -47,23 +47,24 @@ var txPermanent = uint64(500)
 // always receive all locally signed transactions in the same order as they are
 // created.
 type TxPool struct {
-	config       *params.ChainConfig
-	signer       types.Signer
-	quit         chan bool
-	txFeed       event.Feed
-	scope        event.SubscriptionScope
-	chainHeadCh  chan core.ChainHeadEvent
-	chainHeadSub event.Subscription
-	mu           sync.RWMutex
-	chain        *LightChain
-	odr          OdrBackend
-	chainDb      common.Database
-	relay        TxRelayBackend
-	head         common.Hash
-	nonce        map[common.Address]uint64            // "pending" nonce
-	pending      map[common.Hash]*types.Transaction   // pending transactions by tx hash
-	mined        map[common.Hash][]*types.Transaction // mined transactions by block hash
-	clearIdx     uint64                               // earliest block nr that can contain mined tx info
+	config *params.ChainConfig
+	signer types.Signer
+	quit   chan bool
+
+	txFeed core.NewTxsFeed
+
+	chainHeadCh chan core.ChainHeadEvent
+
+	mu       sync.RWMutex
+	chain    *LightChain
+	odr      OdrBackend
+	chainDb  common.Database
+	relay    TxRelayBackend
+	head     common.Hash
+	nonce    map[common.Address]uint64            // "pending" nonce
+	pending  map[common.Hash]*types.Transaction   // pending transactions by tx hash
+	mined    map[common.Hash][]*types.Transaction // mined transactions by block hash
+	clearIdx uint64                               // earliest block nr that can contain mined tx info
 
 	homestead bool
 }
