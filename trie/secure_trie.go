@@ -168,8 +168,12 @@ func (t *SecureTrie) Root() []byte {
 }
 
 func (t *SecureTrie) Copy() *SecureTrie {
-	cpy := *t
-	return &cpy
+	other := *t
+	other.hashKeyCache = make(map[string][common.HashLength]byte, len(t.hashKeyCache))
+	for k, v := range t.hashKeyCache {
+		other.hashKeyCache[k] = v
+	}
+	return &other
 }
 
 // NodeIterator returns an iterator that returns nodes of the underlying trie. Iteration
@@ -208,14 +212,4 @@ func (t *SecureTrie) getSecKeyCache() map[string][]byte {
 		t.secKeyCache = make(map[string][]byte)
 	}
 	return t.secKeyCache
-}
-
-// Clone returns a copy of the trie.
-func (t *SecureTrie) Clone() *SecureTrie {
-	other := *t
-	other.hashKeyCache = make(map[string][common.HashLength]byte, len(t.hashKeyCache))
-	for k, v := range t.hashKeyCache {
-		other.hashKeyCache[k] = v
-	}
-	return &other
 }
