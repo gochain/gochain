@@ -71,10 +71,6 @@
 
 [[constraint]]
   branch = "v2"
-  name = "gopkg.in/karalabe/cookiejar.v2"
-
-[[constraint]]
-  branch = "v2"
   name = "gopkg.in/natefinch/npipe.v2"
 
 [[constraint]]
