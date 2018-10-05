@@ -50,15 +50,15 @@ type ChainIndexerChain interface {
 	// CurrentHeader retrieves the latest locally known header.
 	CurrentHeader() *types.Header
 
-	// SubscribeChainEvent subscribes to new head header notifications.
-	SubscribeChainEvent(ch chan<- ChainEvent)
-	UnsubscribeChainEvent(ch chan<- ChainEvent)
+	// SubscribeChainHeadEvent subscribes to new head header notifications.
+	SubscribeChainHeadEvent(ch chan<- ChainHeadEvent)
+	UnsubscribeChainHeadEvent(ch chan<- ChainHeadEvent)
 }
 
 // ChainIndexer does a post-processing job for equally sized sections of the
 // canonical chain (like BlooomBits and CHT structures). A ChainIndexer is
 // connected to the blockchain through the event system by starting a
-// ChainEventLoop in a goroutine.
+// ChainHeadEventLoop in a goroutine.
 //
 // Further child ChainIndexers can be added which use the output of the parent
 // section indexer. These child indexers receive new head notifications only
@@ -126,8 +126,8 @@ func (c *ChainIndexer) AddKnownSectionHead(section uint64, shead common.Hash) {
 // cascading background processing. Children do not need to be started, they
 // are notified about new events by their parents.
 func (c *ChainIndexer) Start(chain ChainIndexerChain) {
-	events := make(chan ChainEvent, 32)
-	chain.SubscribeChainEvent(events)
+	events := make(chan ChainHeadEvent, 32)
+	chain.SubscribeChainHeadEvent(events)
 	// Mark the chain indexer as active, requiring an additional teardown
 	atomic.StoreUint32(&c.active, 1)
 	go c.eventLoop(chain, events)
@@ -173,8 +173,8 @@ func (c *ChainIndexer) Close() error {
 // eventLoop is a secondary - optional - event loop of the indexer which is only
 // started for the outermost indexer to push chain head events into a processing
 // queue.
-func (c *ChainIndexer) eventLoop(chain ChainIndexerChain, events chan ChainEvent) {
-	defer chain.UnsubscribeChainEvent(events)
+func (c *ChainIndexer) eventLoop(chain ChainIndexerChain, events chan ChainHeadEvent) {
+	defer chain.UnsubscribeChainHeadEvent(events)
 
 	currentHeader := chain.CurrentHeader()
 
