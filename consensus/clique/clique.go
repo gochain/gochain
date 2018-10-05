@@ -614,6 +614,7 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 	var deadline *time.Time
 	if c.config.Period != 0 {
 		t := time.Unix(header.Time.Int64(), 0)
+		t = t.Add(-time.Duration(c.config.Period) * time.Second / 2)
 		deadline = &t
 	}
 	return deadline, nil
