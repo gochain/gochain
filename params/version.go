@@ -1,7 +1,7 @@
 package params
 
 const (
-	Version = "2.1.76"
+	Version = "2.1.77"
 )
 
 func VersionWithCommit(gitCommit string) string {
