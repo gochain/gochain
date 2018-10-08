@@ -627,12 +627,6 @@
 
 [[projects]]
   branch = "v2"
-  name = "gopkg.in/karalabe/cookiejar.v2"
-  packages = ["collections/prque"]
-  revision = "8dcd6a7f4951f6ff3ee9cbb919a06d8925822e57"
-
-[[projects]]
-  branch = "v2"
   name = "gopkg.in/natefinch/npipe.v2"
   packages = ["."]
   revision = "c1b8fa8bdccecb0b8db834ee0b92fdbcfa606dd6"
@@ -661,6 +655,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "8115e1cbee28a23c1b6686666d1701e94fa31215a52e141e44c21abbcb106839"
+  inputs-digest = "604d4c8ed396a26b3cf4c7e60a05b738a6fcbb679e956403192fd8f66979a96a"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -27,9 +27,9 @@ import (
 	"time"
 
 	"go.opencensus.io/trace"
-	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 
 	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/common/prque"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/eth/gasprice"
@@ -1364,11 +1364,11 @@ func (pool *TxPool) finishPromotion(ctx context.Context) {
 	if pending > pool.config.GlobalSlots {
 		pendingBeforeCap := pending
 		// Assemble a spam order to penalize large transactors first
-		spammers := prque.New()
+		spammers := prque.New(nil)
 		for addr, list := range pool.pending {
 			// Only evict transactions from high rollers
 			if !pool.locals.contains(addr) && uint64(list.Len()) > pool.config.AccountSlots {
-				spammers.Push(addr, float32(list.Len()))
+				spammers.Push(addr, int64(list.Len()))
 			}
 		}
 		tracing := log.Tracing()
