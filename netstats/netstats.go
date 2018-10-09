@@ -341,7 +341,7 @@ func (s *Service) reportLoop(conn *websocket.Conn, quitCh, txCh <-chan struct{},
 		return
 	}
 
-	fullReport := time.NewTicker(15 * time.Second)
+	fullReport := time.NewTicker(5 * time.Second)
 	defer fullReport.Stop()
 
 	var err error
