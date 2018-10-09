@@ -150,10 +150,9 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 	if err := WriteHeader(hc.chainDb, header); err != nil {
 		log.Crit("Failed to write header content", "err", err)
 	}
-	// If the total difficulty is higher than our known, add it to the canonical chain
-	// Second clause in the if statement reduces the vulnerability to selfish mining.
-	// Please refer to http://www.cs.cornell.edu/~ie53/publications/btcProcFC.pdf
-	if externTd.Cmp(localTd) > 0 || (externTd.Cmp(localTd) == 0 && mrand.Float64() < 0.5) {
+	local := chainHead{localTd, hc.currentHeader.Number.Uint64(), hc.currentHeader.GasUsed}
+	external := chainHead{externTd, header.Number.Uint64(), header.GasUsed}
+	if reorg(local, external) {
 		// Delete any canonical number assignments above the new head
 		for i := number + 1; ; i++ {
 			hash := GetCanonicalHash(hc.chainDb, i)
