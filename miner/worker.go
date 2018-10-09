@@ -408,7 +408,7 @@ func (w *worker) commitNewWork(ctx context.Context) {
 	defer w.currentMu.Unlock()
 
 	tstart := time.Now()
-	parent := w.chain.CurrentBlockCtx(ctx)
+	parent := w.chain.CurrentBlock()
 
 	// Ensure we're not going off too far in the future.
 	pTime := time.Unix(parent.Time().Int64(), 0)
