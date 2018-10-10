@@ -80,7 +80,7 @@ type stateObject struct {
 	trie Trie // storage trie, which becomes non-nil on first access
 	code Code // contract bytecode, which gets set when code is loaded
 
-	cachedStorage Storage // Storage entry cache to avoid duplicate reads
+	originStorage Storage // Storage cache of original entries to dedup rewrites
 	dirtyStorage  Storage // Storage entries that need to be flushed to disk
 
 	// Cache flags.
@@ -88,9 +88,7 @@ type stateObject struct {
 	// during the "update" phase of the state transition.
 	dirtyCode bool // true if the code was updated
 	suicided  bool
-	touched   bool
 	deleted   bool
-	onDirty   func(addr common.Address) // Callback method to mark a state object newly dirty
 }
 
 // empty returns whether the account is considered empty.
@@ -146,7 +144,7 @@ func (a *Account) MarshalRLP() (_ []byte, err error) {
 }
 
 // newObject creates a state object.
-func newObject(db *StateDB, address common.Address, data Account, onDirty func(addr common.Address)) *stateObject {
+func newObject(db *StateDB, address common.Address, data Account) *stateObject {
 	if data.Balance == nil {
 		data.Balance = new(big.Int)
 	}
@@ -158,9 +156,8 @@ func newObject(db *StateDB, address common.Address, data Account, onDirty func(a
 		address:       address,
 		addrHash:      crypto.Keccak256Hash(address[:]),
 		data:          data,
-		cachedStorage: make(Storage),
+		originStorage: make(Storage),
 		dirtyStorage:  make(Storage),
-		onDirty:       onDirty,
 	}
 }
 
@@ -189,23 +186,17 @@ func (so *stateObject) setError(err error) {
 
 func (so *stateObject) markSuicided() {
 	so.suicided = true
-	if so.onDirty != nil {
-		so.onDirty(so.Address())
-		so.onDirty = nil
-	}
 }
 
 func (so *stateObject) touch() {
-	so.db.journal = append(so.db.journal, touchChange{
-		account:   &so.address,
-		prev:      so.touched,
-		prevDirty: so.onDirty == nil,
+	so.db.journal.append(touchChange{
+		account: &so.address,
 	})
-	if so.onDirty != nil {
-		so.onDirty(so.Address())
-		so.onDirty = nil
+	if so.address == ripemd {
+		// Explicitly put it in the dirty-cache, which is otherwise generated from
+		// flattened journals.
+		so.db.journal.dirty(so.address)
 	}
-	so.touched = true
 }
 
 func (so *stateObject) getTrie(db Database) Trie {
@@ -220,13 +211,25 @@ func (so *stateObject) getTrie(db Database) Trie {
 	return so.trie
 }
 
-// GetState returns a value in account storage.
+// GetState retrieves a value from the account storage trie.
 func (so *stateObject) GetState(db Database, key common.Hash) common.Hash {
-	value, exists := so.cachedStorage[key]
-	if exists {
+	// If we have a dirty value for this state entry, return it
+	value, dirty := so.dirtyStorage[key]
+	if dirty {
 		return value
 	}
-	// Load from DB in case it is missing.
+	// Otherwise return the entry's original value
+	return so.GetCommittedState(db, key)
+}
+
+// GetCommittedState retrieves a value from the committed account storage trie.
+func (so *stateObject) GetCommittedState(db Database, key common.Hash) common.Hash {
+	// If we have the original value cached, return that
+	value, cached := so.originStorage[key]
+	if cached {
+		return value
+	}
+	// Otherwise load the value from the database
 	enc, err := so.getTrie(db).TryGet(key[:])
 	if err != nil {
 		so.setError(err)
@@ -239,28 +242,28 @@ func (so *stateObject) GetState(db Database, key common.Hash) common.Hash {
 		}
 		value.SetBytes(content)
 	}
-	so.cachedStorage[key] = value
+	so.originStorage[key] = value
 	return value
 }
 
 // SetState updates a value in account storage.
 func (so *stateObject) SetState(db Database, key, value common.Hash) {
-	so.db.journal = append(so.db.journal, storageChange{
+	// If the new value is the same as old, don't set
+	prev := so.GetState(db, key)
+	if prev == value {
+		return
+	}
+	// New value is different, update and journal the change
+	so.db.journal.append(storageChange{
 		account:  &so.address,
 		key:      key,
-		prevalue: so.GetState(db, key),
+		prevalue: prev,
 	})
 	so.setState(key, value)
 }
 
 func (so *stateObject) setState(key, value common.Hash) {
-	so.cachedStorage[key] = value
 	so.dirtyStorage[key] = value
-
-	if so.onDirty != nil {
-		so.onDirty(so.Address())
-		so.onDirty = nil
-	}
 }
 
 // updateTrie writes cached storage modifications into the object's storage trie.
@@ -268,6 +271,13 @@ func (so *stateObject) updateTrie(db Database) Trie {
 	tr := so.getTrie(db)
 	for key, value := range so.dirtyStorage {
 		delete(so.dirtyStorage, key)
+
+		// Skip noop changes, persist actual changes
+		if value == so.originStorage[key] {
+			continue
+		}
+		so.originStorage[key] = value
+
 		if (value == common.Hash{}) {
 			so.setError(tr.TryDelete(key[:]))
 			continue
@@ -285,7 +295,7 @@ func (so *stateObject) updateRoot(db Database) {
 	so.data.Root = so.trie.Hash()
 }
 
-// CommitTrie the storage trie of the object to dwb.
+// CommitTrie the storage trie of the object to db.
 // This updates the trie root.
 func (so *stateObject) CommitTrie(db Database) error {
 	so.updateTrie(db)
@@ -324,7 +334,7 @@ func (so *stateObject) SubBalance(amount *big.Int) {
 }
 
 func (so *stateObject) SetBalance(amount *big.Int) {
-	so.db.journal = append(so.db.journal, balanceChange{
+	so.db.journal.append(balanceChange{
 		account: &so.address,
 		prev:    so.data.Balance,
 	})
@@ -333,23 +343,19 @@ func (so *stateObject) SetBalance(amount *big.Int) {
 
 func (so *stateObject) setBalance(amount *big.Int) {
 	so.data.Balance = amount
-	if so.onDirty != nil {
-		so.onDirty(so.Address())
-		so.onDirty = nil
-	}
 }
 
 // Return the gas back to the origin. Used by the Virtual machine or Closures
 func (so *stateObject) ReturnGas(gas *big.Int) {}
 
-func (so *stateObject) deepCopy(db *StateDB, onDirty func(addr common.Address)) *stateObject {
-	stateObject := newObject(db, so.address, so.data, onDirty)
+func (so *stateObject) deepCopy(db *StateDB) *stateObject {
+	stateObject := newObject(db, so.address, so.data)
 	if so.trie != nil {
 		stateObject.trie = db.db.CopyTrie(so.trie)
 	}
 	stateObject.code = so.code
 	stateObject.dirtyStorage = so.dirtyStorage.Copy()
-	stateObject.cachedStorage = so.dirtyStorage.Copy()
+	stateObject.originStorage = so.originStorage.Copy()
 	stateObject.suicided = so.suicided
 	stateObject.dirtyCode = so.dirtyCode
 	stateObject.deleted = so.deleted
@@ -383,7 +389,7 @@ func (so *stateObject) Code(db Database) []byte {
 
 func (so *stateObject) SetCode(codeHash common.Hash, code []byte) {
 	prevcode := so.Code(so.db.db)
-	so.db.journal = append(so.db.journal, codeChange{
+	so.db.journal.append(codeChange{
 		account:  &so.address,
 		prevhash: so.data.CodeHash,
 		prevcode: prevcode,
@@ -395,14 +401,10 @@ func (so *stateObject) setCode(codeHash common.Hash, code []byte) {
 	so.code = code
 	so.data.CodeHash = codeHash
 	so.dirtyCode = true
-	if so.onDirty != nil {
-		so.onDirty(so.Address())
-		so.onDirty = nil
-	}
 }
 
 func (so *stateObject) SetNonce(nonce uint64) {
-	so.db.journal = append(so.db.journal, nonceChange{
+	so.db.journal.append(nonceChange{
 		account: &so.address,
 		prev:    so.data.Nonce,
 	})
@@ -411,10 +413,6 @@ func (so *stateObject) SetNonce(nonce uint64) {
 
 func (so *stateObject) setNonce(nonce uint64) {
 	so.data.Nonce = nonce
-	if so.onDirty != nil {
-		so.onDirty(so.Address())
-		so.onDirty = nil
-	}
 }
 
 func (so *stateObject) Balance() *big.Int {

@@ -55,6 +55,15 @@
   version = "1.0.0"
 
 [[projects]]
+  name = "github.com/allegro/bigcache"
+  packages = [
+    ".",
+    "queue"
+  ]
+  revision = "f31987a23e44c5121ef8c8b2f2ea2e8ffa37b068"
+  version = "v1.1.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/aristanetworks/goarista"
   packages = ["monotime"]
@@ -671,6 +680,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "620e8b0690ad8060e21adec6d1179e5729a457402c434599391303552c57e002"
+  inputs-digest = "99a45f3739d013582282353ff3fbaf19fc20c35f6a712ef88ceb701374100c2c"
   solver-name = "gps-cdcl"
   solver-version = 1

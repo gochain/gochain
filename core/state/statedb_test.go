@@ -386,19 +386,15 @@ func (test *snapshotTest) checkEqual(state, checkstate *StateDB) error {
 		if obj, err := state.getStateObject(addr); err != nil {
 			return fmt.Errorf("failed to get state: %s", err)
 		} else if obj != nil {
-			var err error
-			state.ForEachStorage(addr, func(key, val common.Hash) bool {
-				return checkeq("GetState("+key.Hex()+")", val, checkstate.GetState(addr, key))
+			state.ForEachStorage(addr, func(key, value common.Hash) bool {
+				return checkeq("GetState("+key.Hex()+")", value, checkstate.GetState(addr, key))
 			})
-			if err != nil {
-				return fmt.Errorf("failed to get state: %s", err)
-			}
-			checkstate.ForEachStorage(addr, func(key, checkval common.Hash) bool {
-				return checkeq("GetState("+key.Hex()+")", state.GetState(addr, key), checkval)
+			checkstate.ForEachStorage(addr, func(key, value common.Hash) bool {
+				return checkeq("GetState("+key.Hex()+")", state.GetState(addr, key), value)
 			})
-			if err != nil {
-				return fmt.Errorf("failed to get state: %s", err)
-			}
+		}
+		if err != nil {
+			return err
 		}
 	}
 
@@ -420,11 +416,27 @@ func (s *StateSuite) TestTouchDelete(c *check.C) {
 
 	snapshot := s.state.Snapshot()
 	s.state.AddBalance(common.Address{}, new(big.Int))
-	if len(s.state.stateObjectsDirty) != 1 {
+
+	if len(s.state.journal.dirties) != 1 {
 		c.Fatal("expected one dirty state object")
 	}
 	s.state.RevertToSnapshot(snapshot)
-	if len(s.state.stateObjectsDirty) != 0 {
+	if len(s.state.journal.dirties) != 0 {
 		c.Fatal("expected no dirty state object")
+	}
+}
+
+// TestCopyOfCopy tests that modified objects are carried over to the copy, and the copy of the copy.
+// See https://github.com/ethereum/go-ethereum/pull/15225#issuecomment-380191512
+func TestCopyOfCopy(t *testing.T) {
+	sdb, _ := New(common.Hash{}, NewDatabase(ethdb.NewMemDatabase()))
+	addr := common.HexToAddress("aaaa")
+	sdb.SetBalance(addr, big.NewInt(42))
+	ctx := context.Background()
+	if got := sdb.Copy(ctx).GetBalance(addr).Uint64(); got != 42 {
+		t.Fatalf("1st copy fail, expected 42, got %v", got)
+	}
+	if got := sdb.Copy(ctx).Copy(ctx).GetBalance(addr).Uint64(); got != 42 {
+		t.Fatalf("2nd copy fail, expected 42, got %v", got)
 	}
 }
