@@ -327,9 +327,7 @@ func (pool *TxPool) loop() {
 	defer journal.Stop()
 
 	// Track the current and latest blocks for transaction reorgs.
-	pool.mu.Lock()
 	b := pool.chain.CurrentBlock()
-	pool.mu.Unlock()
 	blocks := struct {
 		sync.RWMutex
 		current, latest *types.Block

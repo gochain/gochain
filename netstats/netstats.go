@@ -578,7 +578,7 @@ func (s *Service) assembleBlockStats(ctx context.Context, block *types.Block) *b
 	if s.eth != nil {
 		// Full nodes have all needed information available
 		if block == nil {
-			block = s.eth.BlockChain().CurrentBlockCtx(ctx)
+			block = s.eth.BlockChain().CurrentBlock()
 		}
 		header = block.Header()
 		td = s.eth.BlockChain().GetTd(header.Hash(), header.Number.Uint64())

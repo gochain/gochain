@@ -100,7 +100,7 @@ func (b *SimulatedBackend) Commit(ctx context.Context) {
 // rollback aborts all pending transactions, reverting to the last committed state.
 func (b *SimulatedBackend) rollback() {
 	ctx := context.TODO()
-	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlockCtx(ctx), clique.NewFaker(), b.database, 1, nil)
+	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlock(), clique.NewFaker(), b.database, 1, nil)
 	statedb, err := b.blockchain.State()
 	if err != nil {
 		panic(err)
@@ -118,7 +118,7 @@ func (b *SimulatedBackend) CodeAt(ctx context.Context, contract common.Address, 
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlockCtx(ctx).Number()) != 0 {
+	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlock().Number()) != 0 {
 		return nil, errBlockNumberUnsupported
 	}
 	statedb, _ := b.blockchain.State()
@@ -130,7 +130,7 @@ func (b *SimulatedBackend) BalanceAt(ctx context.Context, contract common.Addres
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlockCtx(ctx).Number()) != 0 {
+	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlock().Number()) != 0 {
 		return nil, errBlockNumberUnsupported
 	}
 	statedb, _ := b.blockchain.State()
@@ -142,7 +142,7 @@ func (b *SimulatedBackend) NonceAt(ctx context.Context, contract common.Address,
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlockCtx(ctx).Number()) != 0 {
+	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlock().Number()) != 0 {
 		return 0, errBlockNumberUnsupported
 	}
 	statedb, _ := b.blockchain.State()
@@ -154,7 +154,7 @@ func (b *SimulatedBackend) StorageAt(ctx context.Context, contract common.Addres
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlockCtx(ctx).Number()) != 0 {
+	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlock().Number()) != 0 {
 		return nil, errBlockNumberUnsupported
 	}
 	statedb, _ := b.blockchain.State()
@@ -181,14 +181,14 @@ func (b *SimulatedBackend) CallContract(ctx context.Context, call gochain.CallMs
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlockCtx(ctx).Number()) != 0 {
+	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlock().Number()) != 0 {
 		return nil, errBlockNumberUnsupported
 	}
 	state, err := b.blockchain.State()
 	if err != nil {
 		return nil, err
 	}
-	rval, _, _, err := b.callContract(ctx, call, b.blockchain.CurrentBlockCtx(ctx), state)
+	rval, _, _, err := b.callContract(ctx, call, b.blockchain.CurrentBlock(), state)
 	return rval, err
 }
 
@@ -310,7 +310,7 @@ func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx *types.Transa
 		panic(fmt.Errorf("invalid transaction nonce: got %d, want %d", tx.Nonce(), nonce))
 	}
 
-	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlockCtx(ctx), clique.NewFaker(), b.database, 1, func(ctx context.Context, number int, block *core.BlockGen) {
+	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlock(), clique.NewFaker(), b.database, 1, func(ctx context.Context, number int, block *core.BlockGen) {
 		for _, tx := range b.pendingBlock.Transactions() {
 			block.AddTx(ctx, tx)
 		}

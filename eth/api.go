@@ -295,7 +295,7 @@ func (api *PublicDebugAPI) DumpBlock(ctx context.Context, blockNr rpc.BlockNumbe
 	}
 	var block *types.Block
 	if blockNr == rpc.LatestBlockNumber {
-		block = api.eth.blockchain.CurrentBlockCtx(ctx)
+		block = api.eth.blockchain.CurrentBlock()
 	} else {
 		block = api.eth.blockchain.GetBlockByNumber(uint64(blockNr))
 	}
