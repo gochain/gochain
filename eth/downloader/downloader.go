@@ -26,7 +26,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/rcrowley/go-metrics"
 	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain"
@@ -35,6 +34,7 @@ import (
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/metrics"
 	"github.com/gochain-io/gochain/params"
 )
 

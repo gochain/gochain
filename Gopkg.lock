@@ -190,6 +190,16 @@
   revision = "1395d1447324cbea88d249fbfcfd70ea878fdfca"
 
 [[projects]]
+  name = "github.com/influxdata/influxdb"
+  packages = [
+    "client",
+    "models",
+    "pkg/escape"
+  ]
+  revision = "389de31c961831de0a9f4172173337d4a6193909"
+  version = "v1.6.3"
+
+[[projects]]
   name = "github.com/jackpal/go-nat-pmp"
   packages = ["."]
   revision = "c9cfead9f2a36ddf3daa40ba269aa7f4bbba6b62"
@@ -318,15 +328,6 @@
   packages = ["util/flock"]
   revision = "85f23d82a045d103ea7f3c89a91fba4a93e6367a"
   version = "v2.1.0"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/rcrowley/go-metrics"
-  packages = [
-    ".",
-    "exp"
-  ]
-  revision = "e2704e165165ec55d062f5919b4b29494e9fa790"
 
 [[projects]]
   branch = "master"
@@ -655,6 +656,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "604d4c8ed396a26b3cf4c7e60a05b738a6fcbb679e956403192fd8f66979a96a"
+  inputs-digest = "45cebedcb7d35a0eb93e143894bf7b18d5f77d4e5de418fbff1fa971a4eca21b"
   solver-name = "gps-cdcl"
   solver-version = 1

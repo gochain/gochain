@@ -24,7 +24,7 @@ import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/log"
-	"github.com/rcrowley/go-metrics"
+	"github.com/gochain-io/gochain/metrics"
 )
 
 var (

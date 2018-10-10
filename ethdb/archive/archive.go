@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/minio/minio-go"
-	gometrics "github.com/rcrowley/go-metrics"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 
@@ -41,10 +40,10 @@ type Archive struct {
 	period time.Duration
 
 	// Meters for measuring archive request counts and latencies.
-	getTimer gometrics.Timer
-	putTimer gometrics.Timer
-	hasTimer gometrics.Timer
-	delTimer gometrics.Timer
+	getTimer metrics.Timer
+	putTimer metrics.Timer
+	hasTimer metrics.Timer
+	delTimer metrics.Timer
 }
 
 // NewArchive returns a new Archive backed by an S3 compatible bucket.
@@ -117,10 +116,10 @@ func (a *Archive) Meter(prefix string) {
 	if !metrics.Enabled {
 		return
 	}
-	a.getTimer = metrics.NewTimer(prefix + "get")
-	a.putTimer = metrics.NewTimer(prefix + "put")
-	a.hasTimer = metrics.NewTimer(prefix + "has")
-	a.delTimer = metrics.NewTimer(prefix + "del")
+	a.getTimer = metrics.NewRegisteredTimer(prefix+"get", nil)
+	a.putTimer = metrics.NewRegisteredTimer(prefix+"put", nil)
+	a.hasTimer = metrics.NewRegisteredTimer(prefix+"has", nil)
+	a.delTimer = metrics.NewRegisteredTimer(prefix+"del", nil)
 }
 
 func prefixDir(prefix byte) string {

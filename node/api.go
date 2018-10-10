@@ -25,10 +25,10 @@ import (
 	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/metrics"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/p2p/discover"
 	"github.com/gochain-io/gochain/rpc"
-	"github.com/rcrowley/go-metrics"
 )
 
 // PrivateAdminAPI is the collection of administrative API methods exposed only
