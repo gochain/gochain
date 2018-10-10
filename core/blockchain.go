@@ -280,8 +280,8 @@ func (bc *BlockChain) SetHead(head uint64) error {
 	defer bc.mu.Unlock()
 
 	// Rewind the header chain, deleting all block bodies until then
-	delFn := func(hash common.Hash, num uint64) {
-		DeleteBody(bc.db, hash, num)
+	delFn := func(del DatabaseDeleter, hash common.Hash, num uint64) {
+		DeleteBody(del, hash, num)
 	}
 	bc.hc.SetHead(head, delFn)
 	currentHeader := bc.hc.CurrentHeader()
@@ -943,9 +943,7 @@ func (bc *BlockChain) WriteBlockWithState(ctx context.Context, block *types.Bloc
 	if err := bc.hc.WriteTd(block.Hash(), block.NumberU64(), externTd); err != nil {
 		return NonStatTy, err
 	}
-	// Write other block data using a batch.
-	batch := bc.db.NewBatch()
-	if err := WriteBlock(batch, block); err != nil {
+	if err := WriteBlock(bc.db, block); err != nil {
 		return NonStatTy, err
 	}
 	root, err := state.Commit(bc.chainConfig.IsEIP158(block.Number()))
@@ -1002,6 +1000,8 @@ func (bc *BlockChain) WriteBlockWithState(ctx context.Context, block *types.Bloc
 			}
 		}
 	}
+	// Write other block data using a batch.
+	batch := bc.db.NewBatch()
 	if err := WriteBlockReceipts(batch, block.Hash(), block.NumberU64(), receipts); err != nil {
 		return NonStatTy, err
 	}
@@ -1486,8 +1486,12 @@ func (bc *BlockChain) reorg(ctx context.Context, oldBlock, newBlock *types.Block
 	}
 	// When transactions get deleted from the database that means the
 	// receipts that were created in the fork must also be deleted
+	batch := bc.db.NewBatch()
 	for _, tx := range diff {
-		DeleteTxLookupEntry(bc.db, tx.Hash())
+		DeleteTxLookupEntry(batch, tx.Hash())
+	}
+	if err := batch.Write(); err != nil {
+		return err
 	}
 	if len(deletedLogs) > 0 {
 		bc.rmLogsFeed.Send(RemovedLogsEvent{deletedLogs})
