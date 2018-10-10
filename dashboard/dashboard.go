@@ -36,10 +36,10 @@ import (
 
 	"github.com/elastic/gosigar"
 	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/metrics"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/params"
 	"github.com/gochain-io/gochain/rpc"
-	"github.com/rcrowley/go-metrics"
 	"golang.org/x/net/websocket"
 )
 

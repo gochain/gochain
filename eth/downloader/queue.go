@@ -25,12 +25,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rcrowley/go-metrics"
-
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/prque"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/metrics"
 )
 
 var (

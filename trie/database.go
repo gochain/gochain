@@ -27,17 +27,17 @@ import (
 )
 
 var (
-	memcacheFlushTimeTimer  = metrics.NewTimer("trie/memcache/flush/time")
-	memcacheFlushNodesMeter = metrics.NewMeter("trie/memcache/flush/nodes")
-	memcacheFlushSizeMeter  = metrics.NewMeter("trie/memcache/flush/size")
+	memcacheFlushTimeTimer  = metrics.NewRegisteredTimer("trie/memcache/flush/time", nil)
+	memcacheFlushNodesMeter = metrics.NewRegisteredMeter("trie/memcache/flush/nodes", nil)
+	memcacheFlushSizeMeter  = metrics.NewRegisteredMeter("trie/memcache/flush/size", nil)
 
-	memcacheGCTimeTimer  = metrics.NewTimer("trie/memcache/gc/time")
-	memcacheGCNodesMeter = metrics.NewMeter("trie/memcache/gc/nodes")
-	memcacheGCSizeMeter  = metrics.NewMeter("trie/memcache/gc/size")
+	memcacheGCTimeTimer  = metrics.NewRegisteredTimer("trie/memcache/gc/time", nil)
+	memcacheGCNodesMeter = metrics.NewRegisteredMeter("trie/memcache/gc/nodes", nil)
+	memcacheGCSizeMeter  = metrics.NewRegisteredMeter("trie/memcache/gc/size", nil)
 
-	memcacheCommitTimeTimer  = metrics.NewTimer("trie/memcache/commit/time")
-	memcacheCommitNodesMeter = metrics.NewMeter("trie/memcache/commit/nodes")
-	memcacheCommitSizeMeter  = metrics.NewMeter("trie/memcache/commit/size")
+	memcacheCommitTimeTimer  = metrics.NewRegisteredTimer("trie/memcache/commit/time", nil)
+	memcacheCommitNodesMeter = metrics.NewRegisteredMeter("trie/memcache/commit/nodes", nil)
+	memcacheCommitSizeMeter  = metrics.NewRegisteredMeter("trie/memcache/commit/size", nil)
 )
 
 // secureKeyPrefix is the database key prefix used to store trie node preimages.
