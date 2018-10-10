@@ -989,23 +989,9 @@ func (bc *BlockChain) WriteBlockWithState(ctx context.Context, block *types.Bloc
 	if err := WriteBlockReceipts(batch, block.Hash(), block.NumberU64(), receipts); err != nil {
 		return NonStatTy, err
 	}
-	// If the total difficulty is higher than our known, add it to the canonical chain
-	// Second clause in the if statement reduces the vulnerability to selfish mining.
-	// Please refer to http://www.cs.cornell.edu/~ie53/publications/btcProcFC.pdf
-	reorg := externTd.Cmp(localTd) > 0
-	if !reorg && externTd.Cmp(localTd) == 0 {
-		// Split same-difficulty blocks by number, then most gas used, then randomly.
-		if block.NumberU64() < bc.currentBlock.NumberU64() {
-			reorg = true
-		} else if block.NumberU64() == bc.currentBlock.NumberU64() {
-			if block.GasUsed() > bc.currentBlock.GasUsed() {
-				reorg = true
-			} else if block.GasUsed() == bc.currentBlock.GasUsed() && rand.Float64() < 0.5 {
-				reorg = true
-			}
-		}
-	}
-	if reorg {
+	local := chainHead{localTd, bc.currentBlock.NumberU64(), bc.currentBlock.GasUsed()}
+	external := chainHead{externTd, block.NumberU64(), block.GasUsed()}
+	if reorg(local, external) {
 		// Reorganise the chain if the parent is not the head block
 		if block.ParentHash() != bc.currentBlock.Hash() {
 			if err := bc.reorg(ctx, bc.currentBlock, block); err != nil {
@@ -1034,6 +1020,39 @@ func (bc *BlockChain) WriteBlockWithState(ctx context.Context, block *types.Bloc
 	}
 	bc.futureBlocks.Remove(block.Hash())
 	return status, nil
+}
+
+type chainHead struct {
+	totalDifficulty *big.Int
+	number          uint64
+	gasUsed         uint64
+}
+
+// reorg returns true if the external chainHead should be used instead of local.
+// Cases include:
+//  - higher total difficulty
+//  - same total difficulty and lesser number
+//  - same total difficulty and number, more gas used
+//  - same total difficulty, number, and gas used, random 50/50 chance
+// Please refer to http://www.cs.cornell.edu/~ie53/publications/btcProcFC.pdf
+func reorg(local, external chainHead) bool {
+	cmp := external.totalDifficulty.Cmp(local.totalDifficulty)
+	if cmp != 0 {
+		return cmp > 0
+	}
+	// Split same-difficulty blocks by number, then most gas used, then randomly.
+	if external.number < local.number {
+		return true
+	}
+	if external.number == local.number {
+		if external.gasUsed > local.gasUsed {
+			return true
+		}
+		if external.gasUsed == local.gasUsed && rand.Float64() < 0.5 {
+			return true
+		}
+	}
+	return false
 }
 
 // InsertChain attempts to insert the given batch of blocks in to the canonical
