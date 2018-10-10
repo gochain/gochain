@@ -298,6 +298,9 @@ func (o *FileSegmentOpener) ListSegmentNames(path, table string) ([]string, erro
 
 	var keys []string
 	for _, fi := range fis {
+		if filepath.Ext(fi.Name()) != "" {
+			continue
+		}
 		keys = append(keys, fi.Name())
 	}
 	return keys, nil

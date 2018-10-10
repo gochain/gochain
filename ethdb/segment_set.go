@@ -122,7 +122,6 @@ func (ss *SegmentSet) onEvicted(key, value interface{}) {
 		log.Info("Purge local segment", "path", s.Path())
 		s.Purge()
 	default:
-		log.Info("Close local segment", "path", s.Path())
 		s.Close()
 	}
 }

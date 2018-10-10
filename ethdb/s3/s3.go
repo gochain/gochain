@@ -18,8 +18,8 @@ import (
 )
 
 var (
-	uploadBytesMeter   = metrics.NewMeter("ethdb/s3/upload/bytes")
-	downloadBytesMeter = metrics.NewMeter("ethdb/s3/download/bytes")
+	uploadBytesMeter   = metrics.NewRegisteredMeter("ethdb/s3/upload/bytes", nil)
+	downloadBytesMeter = metrics.NewRegisteredMeter("ethdb/s3/download/bytes", nil)
 )
 
 const (
@@ -354,16 +354,18 @@ func (o *SegmentOpener) OpenSegment(table, name, path string) (ethdb.Segment, er
 	s := NewSegment(o.Client, table, name, path)
 
 	// Remove local segment if it is a regular file.
-	fi, err := os.Stat(s.Path())
-	if os.IsNotExist(err) {
-		// nop
-	} else if err != nil {
-		return nil, err
-	} else if !fi.IsDir() {
-		if err := os.Remove(s.Path()); err != nil {
+	/*
+		fi, err := os.Stat(s.Path())
+		if os.IsNotExist(err) {
+			// nop
+		} else if err != nil {
 			return nil, err
+		} else if !fi.IsDir() {
+			if err := os.Remove(s.Path()); err != nil {
+				return nil, err
+			}
 		}
-	}
+	*/
 
 	return s, nil
 }

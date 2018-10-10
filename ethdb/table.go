@@ -345,7 +345,7 @@ func (t *Table) compact(ctx context.Context) error {
 		if fi, err := os.Stat(ldbSegment.Path()); err != nil {
 			return err
 		} else if time.Since(fi.ModTime()) < t.MinCompactionAge {
-			log.Info("LDB segment too young, skipping compaction", "table", t.Name, "name", ldbSegment.Name(), "elapsed", time.Since(startTime))
+			log.Debug("LDB segment too young, skipping compaction", "table", t.Name, "name", ldbSegment.Name(), "elapsed", time.Since(startTime))
 			continue
 		}
 
@@ -413,6 +413,32 @@ func (b *tableBatch) Put(key, value []byte) error {
 		return err
 	}
 	b.size += len(value)
+	return nil
+}
+
+func (b *tableBatch) Delete(key []byte) error {
+	// Ignore if value doesn't exist.
+	if _, err := b.table.Get(key); err == ErrKeyNotFound {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	name := b.table.Partitioner.Partition(key)
+	ldbSegment, err := b.table.CreateSegmentIfNotExists(name)
+	if err != nil {
+		log.Error("tableBatch.Delete: error", "table", b.table.Name, "segment", name, "key", fmt.Sprintf("%x", key))
+		return err
+	}
+
+	sb := b.batches[name]
+	if sb == nil {
+		sb = ldbSegment.newBatch()
+		b.batches[name] = sb
+	}
+	if err := sb.Delete(key); err != nil {
+		return err
+	}
 	return nil
 }
 

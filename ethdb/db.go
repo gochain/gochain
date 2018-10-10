@@ -1,14 +1,19 @@
 package ethdb
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/log"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 // Database errors.
@@ -76,6 +81,12 @@ func NewDB(path string) *DB {
 
 // Open initializes and opens the database.
 func (db *DB) Open() error {
+	// Migrate database first, if necessary.
+	if err := db.migrate(); err != nil {
+		return err
+	}
+
+	// Ensure directory exists.
 	if err := os.MkdirAll(db.Path, 0777); err != nil {
 		return err
 	}
@@ -130,4 +141,143 @@ func (db *DB) ReceiptTable() common.Table { return db.receipt }
 // Tables returns a sorted list of all tables.
 func (db *DB) Tables() []*Table {
 	return []*Table{db.global, db.body, db.header, db.receipt}
+}
+
+// migrate converts a source LevelDB database to the new ethdb formatted database.
+func (db *DB) migrate() error {
+	const suffix = ".migrating"
+
+	if strings.HasSuffix(db.Path, suffix) {
+		return nil
+	}
+
+	// Ignore if there is no directory.
+	if _, err := os.Stat(db.Path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("ethdb.DB.migrate: %s", err)
+	}
+
+	// Ignore if path has already been migrated.
+	if ok, err := IsDBDir(db.Path); err != nil {
+		return fmt.Errorf("ethdb.DB.migrate: cannot check ethdb directory: %s", err)
+	} else if ok {
+		return nil // already migrated
+	}
+
+	// Skip if not an LevelDB directory. Probably empty.
+	if ok, err := IsLevelDBDir(db.Path); err != nil {
+		return fmt.Errorf("ethdb.DB.migrate: cannot check leveldb directory: %s", err)
+	} else if !ok {
+		return nil
+	}
+
+	log.Info("begin ethdb migration", "path", db.Path)
+
+	// Remove partial migration, if exists.
+	tmpPath := db.Path + suffix
+	if err := os.RemoveAll(tmpPath); err != nil {
+		return fmt.Errorf("ethdb.DB.migrate: cannot remove partial migration: %s", err)
+	}
+
+	// Open source database.
+	src, err := leveldb.OpenFile(db.Path, nil)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	// Clone to temporary destination database.
+	dst := *db
+	dst.Path = tmpPath
+	dst.MinCompactionAge = 0
+	if err := dst.Open(); err != nil {
+		return fmt.Errorf("cannot open dst database: %s", err)
+	}
+	defer dst.Close()
+
+	// Iterate over every key in the source database.
+	itr := src.NewIterator(nil, nil)
+	defer itr.Release()
+
+	// Write all key/values to new database.
+	for itr.Next() {
+		var tbl *Table
+
+		switch {
+		case isBodyKey(itr.Key()):
+			tbl = dst.BodyTable().(*Table)
+		case isHeaderKey(itr.Key()):
+			tbl = dst.HeaderTable().(*Table)
+		case isReceiptKey(itr.Key()):
+			tbl = dst.ReceiptTable().(*Table)
+		default:
+			tbl = dst.GlobalTable().(*Table)
+		}
+
+		if err := tbl.Put(itr.Key(), itr.Value()); err != nil {
+			return fmt.Errorf("cannot insert item: tbl=%s key=%x err=%q", tbl.Name, itr.Key(), err)
+		}
+	}
+	if err := itr.Error(); err != nil {
+		return err
+	}
+
+	// Close both databases.
+	if err := src.Close(); err != nil {
+		return err
+	} else if err := dst.Close(); err != nil {
+		return err
+	}
+
+	// Rename databases.
+	if err := os.Rename(db.Path, db.Path+".old"); err != nil {
+		return err
+	} else if err := os.Rename(tmpPath, db.Path); err != nil {
+		return err
+	}
+
+	log.Info("ethdb migration complete", "path", db.Path)
+
+	return nil
+}
+
+func isBodyKey(key []byte) bool {
+	return bytes.HasPrefix(key, []byte("b")) && len(key) == 41
+}
+
+func isHeaderKey(key []byte) bool {
+	return bytes.HasPrefix(key, []byte("h")) && (len(key) == 41 || (len(key) == 10 && key[9] == 'n'))
+}
+
+func isReceiptKey(key []byte) bool {
+	return bytes.HasPrefix(key, []byte("r")) && len(key) == 41
+}
+
+// IsDBDir returns true if path contains an ethdb.DB.
+// Checks if the "global" table exists.
+func IsDBDir(path string) (bool, error) {
+	fi, err := os.Stat(filepath.Join(path, "global"))
+	if os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return fi.IsDir(), nil
+}
+
+// IsLevelDBDir returns true if path contains a goleveldb database.
+// Verifies that path contains a CURRENT file that starts with MANIFEST.
+func IsLevelDBDir(path string) (bool, error) {
+	f, err := os.Open(filepath.Join(path, "CURRENT"))
+	if os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	buf := make([]byte, 8)
+	if _, err := io.ReadFull(f, buf); err != nil {
+		return false, fmt.Errorf("ethdb.DB.IsLevelDBDir: cannot read CURRENT: %s", err)
+	}
+	return string(buf) == "MANIFEST", nil
 }
