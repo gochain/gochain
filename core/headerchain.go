@@ -24,6 +24,7 @@ import (
 	"math"
 	"math/big"
 	mrand "math/rand"
+	"sync/atomic"
 	"time"
 
 	"github.com/gochain-io/gochain/common"
@@ -52,8 +53,8 @@ type HeaderChain struct {
 	chainDb       ethdb.Database
 	genesisHeader *types.Header
 
-	currentHeader     *types.Header // Current head of the header chain (may be above the block chain!)
-	currentHeaderHash common.Hash   // Hash of the current head of the header chain (prevent recomputing all the time)
+	currentHeader     atomic.Value // Current head of the header chain (may be above the block chain!)
+	currentHeaderHash common.Hash  // Hash of the current head of the header chain (prevent recomputing all the time)
 
 	headerCache *lru.Cache // Cache for the most recent block headers
 	tdCache     *lru.Cache // Cache for the most recent block total difficulties
@@ -96,13 +97,13 @@ func NewHeaderChain(chainDb ethdb.Database, config *params.ChainConfig, engine c
 		return nil, ErrNoGenesis
 	}
 
-	hc.currentHeader = hc.genesisHeader
+	hc.currentHeader.Store(hc.genesisHeader)
 	if head := GetHeadBlockHash(chainDb); head != (common.Hash{}) {
 		if chead := hc.GetHeaderByHash(head); chead != nil {
-			hc.currentHeader = chead
+			hc.currentHeader.Store(chead)
 		}
 	}
-	hc.currentHeaderHash = hc.currentHeader.Hash()
+	hc.currentHeaderHash = hc.CurrentHeader().Hash()
 
 	return hc, nil
 }
@@ -140,7 +141,8 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 	if ptd == nil {
 		return NonStatTy, consensus.ErrUnknownAncestor
 	}
-	localTd := hc.GetTd(hc.currentHeaderHash, hc.currentHeader.Number.Uint64())
+	currentHeader := hc.CurrentHeader()
+	localTd := hc.GetTd(hc.currentHeaderHash, currentHeader.Number.Uint64())
 	externTd := new(big.Int).Add(header.Difficulty, ptd)
 
 	// Irrelevant of the canonical status, write the td and header to the database
@@ -150,7 +152,7 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 	if err := WriteHeader(hc.chainDb, header); err != nil {
 		log.Crit("Failed to write header content", "err", err)
 	}
-	local := chainHead{localTd, hc.currentHeader.Number.Uint64(), hc.currentHeader.GasUsed}
+	local := chainHead{localTd, currentHeader.Number.Uint64(), currentHeader.GasUsed}
 	external := chainHead{externTd, header.Number.Uint64(), header.GasUsed}
 	if reorg(local, external) {
 		// Delete any canonical number assignments above the new head
@@ -183,7 +185,8 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 		if err := WriteHeadHeaderHash(hc.chainDb, hash); err != nil {
 			log.Crit("Failed to insert head header hash", "err", err)
 		}
-		hc.currentHeaderHash, hc.currentHeader = hash, types.CopyHeader(header)
+		hc.currentHeaderHash = hash
+		hc.currentHeader.Store(types.CopyHeader(header))
 
 		status = CanonStatTy
 	} else {
@@ -207,7 +210,7 @@ func (hc *HeaderChain) ValidateHeaderChain(ctx context.Context, chain []*types.H
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(chain); i++ {
 		if chain[i].Number.Uint64() != chain[i-1].Number.Uint64()+1 || chain[i].ParentHash != chain[i-1].Hash() {
-			// Chain broke ancestry, log a messge (programming error) and skip insertion
+			// Chain broke ancestry, log a message (programming error) and skip insertion
 			log.Error("Non contiguous header insert", "number", chain[i].Number, "hash", chain[i].Hash(),
 				"parent", chain[i].ParentHash, "prevnumber", chain[i-1].Number, "prevhash", chain[i-1].Hash())
 
@@ -422,7 +425,7 @@ func (hc *HeaderChain) GetHeaderByNumber(number uint64) *types.Header {
 // CurrentHeader retrieves the current head header of the canonical chain. The
 // header is retrieved from the HeaderChain's internal cache.
 func (hc *HeaderChain) CurrentHeader() *types.Header {
-	return hc.currentHeader
+	return hc.currentHeader.Load().(*types.Header)
 }
 
 // SetCurrentHeader sets the current head header of the canonical chain.
@@ -430,7 +433,7 @@ func (hc *HeaderChain) SetCurrentHeader(head *types.Header) {
 	if err := WriteHeadHeaderHash(hc.chainDb, head.Hash()); err != nil {
 		log.Crit("Failed to insert head header hash", "err", err)
 	}
-	hc.currentHeader = head
+	hc.currentHeader.Store(head)
 	hc.currentHeaderHash = head.Hash()
 }
 
@@ -442,19 +445,23 @@ type DeleteCallback func(common.Hash, uint64)
 // will be deleted and the new one set.
 func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) {
 	height := uint64(0)
-	if hc.currentHeader != nil {
-		height = hc.currentHeader.Number.Uint64()
+
+	hdr := hc.CurrentHeader()
+	if hdr != nil {
+		height = hdr.Number.Uint64()
 	}
 
-	for hc.currentHeader != nil && hc.currentHeader.Number.Uint64() > head {
-		hash := hc.currentHeader.Hash()
-		num := hc.currentHeader.Number.Uint64()
+	for hdr != nil && hdr.Number.Uint64() > head {
+		hash := hdr.Hash()
+		num := hdr.Number.Uint64()
 		if delFn != nil {
 			delFn(hash, num)
 		}
 		DeleteHeader(hc.chainDb, hash, num)
 		DeleteTd(hc.chainDb, hash, num)
-		hc.currentHeader = hc.GetHeader(hc.currentHeader.ParentHash, hc.currentHeader.Number.Uint64()-1)
+
+		hdr = hc.GetHeader(hdr.ParentHash, hdr.Number.Uint64()-1)
+		hc.currentHeader.Store(hdr)
 	}
 	// Roll back the canonical chain numbering
 	for i := height; i > head; i-- {
@@ -465,10 +472,11 @@ func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) {
 	hc.tdCache.Purge()
 	hc.numberCache.Purge()
 
-	if hc.currentHeader == nil {
-		hc.currentHeader = hc.genesisHeader
+	if hdr == nil {
+		hdr = hc.genesisHeader
+		hc.currentHeader.Store(hdr)
 	}
-	hc.currentHeaderHash = hc.currentHeader.Hash()
+	hc.currentHeaderHash = hdr.Hash()
 
 	if err := WriteHeadHeaderHash(hc.chainDb, hc.currentHeaderHash); err != nil {
 		log.Crit("Failed to reset head header hash", "err", err)
