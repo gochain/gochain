@@ -156,13 +156,16 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 	external := chainHead{externTd, header.Number.Uint64(), header.GasUsed}
 	if reorg(local, external) {
 		// Delete any canonical number assignments above the new head
+		batch := hc.chainDb.NewBatch()
 		for i := number + 1; ; i++ {
 			hash := GetCanonicalHash(hc.chainDb, i)
 			if hash == (common.Hash{}) {
 				break
 			}
-			DeleteCanonicalHash(hc.chainDb, i)
+			DeleteCanonicalHash(batch, i)
 		}
+		batch.Write()
+
 		// Overwrite any stale canonical number assignments
 		var (
 			headHash   = header.ParentHash
@@ -439,7 +442,7 @@ func (hc *HeaderChain) SetCurrentHeader(head *types.Header) {
 
 // DeleteCallback is a callback function that is called by SetHead before
 // each header is deleted.
-type DeleteCallback func(common.Hash, uint64)
+type DeleteCallback func(DatabaseDeleter, common.Hash, uint64)
 
 // SetHead rewinds the local chain to a new head. Everything above the new head
 // will be deleted and the new one set.
@@ -450,23 +453,24 @@ func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) {
 	if hdr != nil {
 		height = hdr.Number.Uint64()
 	}
-
+	batch := hc.chainDb.NewBatch()
 	for hdr != nil && hdr.Number.Uint64() > head {
 		hash := hdr.Hash()
 		num := hdr.Number.Uint64()
 		if delFn != nil {
-			delFn(hash, num)
+			delFn(batch, hash, num)
 		}
-		DeleteHeader(hc.chainDb, hash, num)
-		DeleteTd(hc.chainDb, hash, num)
+		DeleteHeader(batch, hash, num)
+		DeleteTd(batch, hash, num)
 
 		hdr = hc.GetHeader(hdr.ParentHash, hdr.Number.Uint64()-1)
 		hc.currentHeader.Store(hdr)
 	}
 	// Roll back the canonical chain numbering
 	for i := height; i > head; i-- {
-		DeleteCanonicalHash(hc.chainDb, i)
+		DeleteCanonicalHash(batch, i)
 	}
+	batch.Write()
 	// Clear out any stale content from the caches
 	hc.headerCache.Purge()
 	hc.tdCache.Purge()
