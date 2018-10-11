@@ -351,23 +351,7 @@ func (o *SegmentOpener) ListSegmentNames(path, table string) ([]string, error) {
 
 // OpenSegment returns creates and opens a reference to a remote immutable segment.
 func (o *SegmentOpener) OpenSegment(table, name, path string) (ethdb.Segment, error) {
-	s := NewSegment(o.Client, table, name, path)
-
-	// Remove local segment if it is a regular file.
-	/*
-		fi, err := os.Stat(s.Path())
-		if os.IsNotExist(err) {
-			// nop
-		} else if err != nil {
-			return nil, err
-		} else if !fi.IsDir() {
-			if err := os.Remove(s.Path()); err != nil {
-				return nil, err
-			}
-		}
-	*/
-
-	return s, nil
+	return NewSegment(o.Client, table, name, path), nil
 }
 
 // Ensure implementation fulfills interface.

@@ -159,19 +159,6 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 	if err != nil {
 		return nil, err
 	}
-	/*
-		if arDB, ok := eth.chainDb.(*archive.DB); ok {
-			arDB.Start(func(prefix byte) uint64 {
-				switch prefix {
-				case 'h':
-					return eth.blockchain.CurrentHeader().Number.Uint64()
-				case 'b', 'r':
-					return eth.blockchain.CurrentBlock().Number().Uint64()
-				}
-				return 0
-			})
-		}
-	*/
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)

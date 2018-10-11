@@ -1497,11 +1497,12 @@ func (bc *BlockChain) reorg(ctx context.Context, oldBlock, newBlock *types.Block
 	}
 	// Insert the new chain, taking care of the proper incremental order
 	addedTxs := make(map[common.Hash]struct{})
+	batch := bc.db.GlobalTable().NewBatch()
 	for i := len(newChain) - 1; i >= 0; i-- {
 		// insert the block in the canonical way, re-writing history
 		bc.insert(newChain[i])
 		// write lookup entries for hash based transaction/receipt searches
-		if err := WriteTxLookupEntries(bc.db.GlobalTable(), newChain[i]); err != nil {
+		if err := WriteTxLookupEntries(batch, newChain[i]); err != nil {
 			return err
 		}
 		for _, tx := range newChain[i].Transactions() {
@@ -1518,7 +1519,10 @@ func (bc *BlockChain) reorg(ctx context.Context, oldBlock, newBlock *types.Block
 	// When transactions get deleted from the database that means the
 	// receipts that were created in the fork must also be deleted
 	for _, tx := range diff {
-		DeleteTxLookupEntry(bc.db.GlobalTable(), tx.Hash())
+		DeleteTxLookupEntry(batch, tx.Hash())
+	}
+	if err := batch.Write(); err != nil {
+		return err
 	}
 	if len(deletedLogs) > 0 {
 		bc.rmLogsFeed.Send(RemovedLogsEvent{deletedLogs})
