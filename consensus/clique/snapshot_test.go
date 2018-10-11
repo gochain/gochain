@@ -73,7 +73,7 @@ func (ap *testerAccountPool) address(account string) common.Address {
 // testerChainReader implements consensus.ChainReader to access the genesis
 // block. All other methods and requests will panic.
 type testerChainReader struct {
-	db ethdb.Database
+	db common.Database
 }
 
 func (r *testerChainReader) Config() *params.ChainConfig                 { return params.AllCliqueProtocolChanges }
@@ -83,7 +83,7 @@ func (r *testerChainReader) GetBlock(common.Hash, uint64) *types.Block   { panic
 func (r *testerChainReader) GetHeaderByHash(common.Hash) *types.Header   { panic("not supported") }
 func (r *testerChainReader) GetHeaderByNumber(number uint64) *types.Header {
 	if number == 0 {
-		return core.GetHeader(r.db, core.GetCanonicalHash(r.db, 0), 0)
+		return core.GetHeader(r.db.HeaderTable(), core.GetCanonicalHash(r.db, 0), 0)
 	}
 	panic("not supported")
 }

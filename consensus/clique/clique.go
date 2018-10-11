@@ -37,7 +37,6 @@ import (
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/crypto/sha3"
-	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 	"github.com/gochain-io/gochain/rlp"
@@ -203,7 +202,7 @@ type propose struct {
 // Ethereum testnet following the Ropsten attacks.
 type Clique struct {
 	config *params.CliqueConfig // Consensus engine configuration parameters
-	db     ethdb.Database       // Database to store and retrieve snapshot checkpoints
+	db     common.Database      // Database to store and retrieve snapshot checkpoints
 
 	recents    *lru.ARCCache // Snapshots for recent block to speed up reorgs
 	signatures *lru.ARCCache // Signatures of recent blocks to speed up mining
@@ -217,7 +216,7 @@ type Clique struct {
 
 // New creates a Clique proof-of-authority consensus engine with the initial
 // signers set to the ones provided by the user.
-func New(config *params.CliqueConfig, db ethdb.Database) *Clique {
+func New(config *params.CliqueConfig, db common.Database) *Clique {
 	// Set any missing consensus parameters to their defaults
 	conf := *config
 	if conf.Epoch == 0 {

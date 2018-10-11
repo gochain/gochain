@@ -339,3 +339,141 @@ func TestEncodeToReaderReturnToPool(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestBool(t *testing.T) {
+	for i, tt := range []struct {
+		val bool
+		out []byte
+	}{
+		{val: true, out: unhex("01")},
+		{val: false, out: unhex("80")},
+	} {
+		var buf bytes.Buffer
+		if n, err := WriteBoolTo(&buf, tt.val); err != nil {
+			t.Fatal(err)
+		} else if b := buf.Bytes(); !bytes.Equal(b, tt.out) {
+			t.Fatalf("%d. unexpected output: %x", i, b)
+		} else if n != int64(len(tt.out)) {
+			t.Fatalf("%d. unexpected n: %d", i, n)
+		}
+
+		if b := AppendBool(make([]byte, 0, len(tt.out)), tt.val); !bytes.Equal(b, tt.out) {
+			t.Fatalf("%d. unexpected output: %x", i, b)
+		}
+	}
+}
+
+func TestUint64(t *testing.T) {
+	for i, tt := range []struct {
+		val uint64
+		out []byte
+	}{
+		{val: 0, out: unhex("80")},
+		{val: 127, out: unhex("7F")},
+		{val: 128, out: unhex("8180")},
+		{val: 256, out: unhex("820100")},
+		{val: 1024, out: unhex("820400")},
+		{val: 0xFFFFFF, out: unhex("83FFFFFF")},
+		{val: 0xFFFFFFFF, out: unhex("84FFFFFFFF")},
+		{val: 0xFFFFFFFF, out: unhex("84FFFFFFFF")},
+		{val: 0xFFFFFFFFFF, out: unhex("85FFFFFFFFFF")},
+		{val: 0xFFFFFFFFFFFF, out: unhex("86FFFFFFFFFFFF")},
+		{val: 0xFFFFFFFFFFFFFF, out: unhex("87FFFFFFFFFFFFFF")},
+		{val: 0xFFFFFFFFFFFFFFFF, out: unhex("88FFFFFFFFFFFFFFFF")},
+	} {
+		var buf bytes.Buffer
+		if n, err := WriteUint64To(&buf, tt.val); err != nil {
+			t.Fatal(err)
+		} else if b := buf.Bytes(); !bytes.Equal(b, tt.out) {
+			t.Fatalf("%d. unexpected output: %x", i, b)
+		} else if n != int64(len(tt.out)) {
+			t.Fatalf("%d. unexpected n: %d", i, n)
+		}
+
+		if b := AppendUint64(make([]byte, 0, len(tt.out)), tt.val); !bytes.Equal(b, tt.out) {
+			t.Fatalf("%d. unexpected output: %x", i, b)
+		}
+	}
+}
+
+func TestBigInt(t *testing.T) {
+	for i, tt := range []struct {
+		val *big.Int
+		out []byte
+	}{
+		{val: nil, out: unhex("80")},
+		{val: big.NewInt(0), out: unhex("80")},
+		{val: big.NewInt(1), out: unhex("01")},
+		{val: big.NewInt(127), out: unhex("7F")},
+		{val: big.NewInt(128), out: unhex("8180")},
+		{val: big.NewInt(256), out: unhex("820100")},
+		{val: big.NewInt(1024), out: unhex("820400")},
+		{val: big.NewInt(0xFFFFFF), out: unhex("83FFFFFF")},
+		{val: big.NewInt(0xFFFFFFFF), out: unhex("84FFFFFFFF")},
+		{val: big.NewInt(0xFFFFFFFFFF), out: unhex("85FFFFFFFFFF")},
+		{val: big.NewInt(0xFFFFFFFFFFFF), out: unhex("86FFFFFFFFFFFF")},
+		{val: big.NewInt(0xFFFFFFFFFFFFFF), out: unhex("87FFFFFFFFFFFFFF")},
+		{
+			val: big.NewInt(0).SetBytes(unhex("102030405060708090A0B0C0D0E0F2")),
+			out: unhex("8F102030405060708090A0B0C0D0E0F2"),
+		},
+		{
+			val: big.NewInt(0).SetBytes(unhex("0100020003000400050006000700080009000A000B000C000D000E01")),
+			out: unhex("9C0100020003000400050006000700080009000A000B000C000D000E01"),
+		},
+		{
+			val: big.NewInt(0).SetBytes(unhex("010000000000000000000000000000000000000000000000000000000000000000")),
+			out: unhex("A1010000000000000000000000000000000000000000000000000000000000000000"),
+		},
+	} {
+		var buf bytes.Buffer
+		if n, err := WriteBigIntTo(&buf, tt.val); err != nil {
+			t.Fatal(err)
+		} else if b := buf.Bytes(); !bytes.Equal(b, tt.out) {
+			t.Fatalf("%d. unexpected output: %x", i, b)
+		} else if n != int64(len(tt.out)) {
+			t.Fatalf("%d. unexpected n: %d", i, n)
+		}
+
+		if b, err := AppendBigInt(make([]byte, 0, len(tt.out)), tt.val); err != nil {
+			t.Fatal(err)
+		} else if !bytes.Equal(b, tt.out) {
+			t.Fatalf("%d. unexpected output: %x", i, b)
+		}
+	}
+
+	t.Run("ErrNegative", func(t *testing.T) {
+		if _, err := WriteBigIntTo(nil, big.NewInt(-1)); err == nil || err.Error() != `rlp: cannot write negative *big.Int` {
+			t.Fatal(err)
+		}
+		if _, err := AppendBigInt(nil, big.NewInt(-1)); err == nil || err.Error() != `rlp: cannot append negative *big.Int` {
+			t.Fatal(err)
+		}
+	})
+}
+
+func TestBytes(t *testing.T) {
+	for i, tt := range []struct {
+		val []byte
+		out []byte
+	}{
+		{val: []byte{}, out: unhex("80")},
+		{val: []byte{0x7E}, out: unhex("7E")},
+		{val: []byte{0x7F}, out: unhex("7F")},
+		{val: []byte{0x80}, out: unhex("8180")},
+		{val: []byte{1, 2, 3}, out: unhex("83010203")},
+	} {
+		var buf bytes.Buffer
+		if n, err := WriteBytesTo(&buf, tt.val); err != nil {
+			t.Fatal(err)
+		} else if b := buf.Bytes(); !bytes.Equal(b, tt.out) {
+			t.Fatalf("%d. unexpected output: %x", i, b)
+		} else if n != int64(len(tt.out)) {
+			t.Fatalf("%d. unexpected n: %d", i, n)
+		}
+
+		if b := AppendBytes(make([]byte, 0, len(tt.out)), tt.val); !bytes.Equal(b, tt.out) {
+			t.Fatalf("%d. unexpected output: %x", i, b)
+		}
+	}
+}

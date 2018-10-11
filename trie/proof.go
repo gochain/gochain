@@ -22,7 +22,6 @@ import (
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/rlp"
 )
@@ -34,7 +33,7 @@ import (
 // If the trie does not contain a value for key, the returned proof contains all
 // nodes of the longest existing prefix of the key (at least the root node), ending
 // with the node that proves the absence of the key.
-func (t *Trie) Prove(key []byte, fromLevel uint, proofDb ethdb.Putter) error {
+func (t *Trie) Prove(key []byte, fromLevel uint, proofDb common.Putter) error {
 	// Collect all nodes on the path to key.
 	key = keybytesToHex(key)
 	nodes := []node{}
@@ -97,7 +96,7 @@ func (t *Trie) Prove(key []byte, fromLevel uint, proofDb ethdb.Putter) error {
 // If the trie does not contain a value for key, the returned proof contains all
 // nodes of the longest existing prefix of the key (at least the root node), ending
 // with the node that proves the absence of the key.
-func (t *SecureTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.Putter) error {
+func (t *SecureTrie) Prove(key []byte, fromLevel uint, proofDb common.Putter) error {
 	return t.trie.Prove(key, fromLevel, proofDb)
 }
 

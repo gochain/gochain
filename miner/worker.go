@@ -30,7 +30,6 @@ import (
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
-	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
@@ -99,7 +98,7 @@ type worker struct {
 	eth     Backend
 	chain   *core.BlockChain
 	proc    core.Validator
-	chainDb ethdb.Database
+	chainDb common.Database
 
 	coinbase common.Address
 	extra    []byte

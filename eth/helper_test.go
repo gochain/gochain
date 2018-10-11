@@ -62,14 +62,14 @@ func newTestProtocolManager(ctx context.Context, mode downloader.SyncMode, block
 			Signer: hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
 		}
 		genesis       = gspec.MustCommit(db)
-		blockchain, _ = core.NewBlockChain(db, nil, gspec.Config, engine, vm.Config{})
+		blockchain, _ = core.NewBlockChain(ctx, db, nil, gspec.Config, engine, vm.Config{})
 	)
 	chain, _ := core.GenerateChain(ctx, gspec.Config, genesis, engine, db, blocks, generator)
 	if _, err := blockchain.InsertChain(ctx, chain); err != nil {
 		panic(err)
 	}
 
-	pm, err := NewProtocolManager(gspec.Config, mode, DefaultConfig.NetworkId, evmux, &testTxPool{added: newtx}, engine, blockchain, db)
+	pm, err := NewProtocolManager(ctx, gspec.Config, mode, DefaultConfig.NetworkId, evmux, &testTxPool{added: newtx}, engine, blockchain, db)
 	if err != nil {
 		return nil, nil, err
 	}

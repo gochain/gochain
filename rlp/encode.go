@@ -34,6 +34,18 @@ var (
 	EmptyList   = []byte{0xC0}
 )
 
+const (
+	// MaxHeadSize is the maximum size for a header, in bytes.
+	MaxHeadSize = 9
+
+	// MaxBigIntSize is the maximum size for a BigInt, in bytes.
+	// This is used so we don't have to fully compute big.Int.Bytes().
+	//
+	// We determine this value by using total currency in circulation plus
+	// additional padding. This can hold 10^77.
+	MaxBigIntSize = 32
+)
+
 // Encoder is implemented by types that require custom
 // encoding rules or want to encode private fields.
 type Encoder interface {
@@ -428,6 +440,15 @@ func writeRawValue(val reflect.Value, w *encbuf) error {
 	return nil
 }
 
+func WriteRawValueTo(w io.Writer, v RawValue) (n int64, err error) {
+	nn, err := w.Write(v)
+	return int64(nn), err
+}
+
+func RawValueSize(v RawValue) int {
+	return len(v)
+}
+
 func writeUint(val reflect.Value, w *encbuf) error {
 	i := val.Uint()
 	if i == 0 {
@@ -444,6 +465,45 @@ func writeUint(val reflect.Value, w *encbuf) error {
 	return nil
 }
 
+func WriteUint64To(w io.Writer, v uint64) (n int64, err error) {
+	if v == 0 {
+		nn, err := w.Write([]byte{0x80})
+		return int64(nn), err
+	} else if v < 128 {
+		// fits single byte
+		nn, err := w.Write([]byte{byte(v)})
+		return int64(nn), err
+	}
+
+	// Encode value to bytes.
+	buf := make([]byte, 9)
+	sz := putint(buf[1:], v)
+	buf[0] = 0x80 + byte(sz)
+
+	nn, err := w.Write(buf[:sz+1])
+	return int64(nn), err
+}
+
+func AppendUint64(b []byte, v uint64) []byte {
+	if v == 0 {
+		buf := b[len(b):][:1]
+		buf[0] = 0x80
+		return b[:len(b)+1]
+	} else if v < 128 {
+		buf := b[len(b):][:1]
+		buf[0] = byte(v)
+		return b[:len(b)+1]
+	}
+	return AppendHead(b, 0x80, v)
+}
+
+func Uint64Size(v uint64) int {
+	if v < 128 {
+		return 1
+	}
+	return intsize(v) + 1
+}
+
 func writeBool(val reflect.Value, w *encbuf) error {
 	if val.Bool() {
 		w.str = append(w.str, 0x01)
@@ -451,6 +511,29 @@ func writeBool(val reflect.Value, w *encbuf) error {
 		w.str = append(w.str, 0x80)
 	}
 	return nil
+}
+
+func WriteBoolTo(w io.Writer, v bool) (n int64, err error) {
+	if v {
+		nn, err := w.Write([]byte{0x01})
+		return int64(nn), err
+	}
+	nn, err := w.Write([]byte{0x80})
+	return int64(nn), err
+}
+
+func AppendBool(b []byte, v bool) []byte {
+	buf := b[len(b):][:1]
+	if v {
+		buf[0] = 0x01
+	} else {
+		buf[0] = 0x80
+	}
+	return b[:len(b)+1]
+}
+
+func BoolSize(v uint64) int {
+	return 1
 }
 
 func writeBigIntPtr(val reflect.Value, w *encbuf) error {
@@ -476,6 +559,45 @@ func writeBigInt(i *big.Int, w *encbuf) error {
 		w.encodeString(i.Bytes())
 	}
 	return nil
+}
+
+func WriteBigIntTo(w io.Writer, v *big.Int) (n int64, err error) {
+	if v == nil {
+		nn, err := w.Write([]byte{0x80})
+		return int64(nn), err
+	} else if cmp := v.Cmp(big0); cmp == 0 {
+		nn, err := w.Write([]byte{0x80})
+		return int64(nn), err
+	} else if cmp == -1 {
+		return 0, fmt.Errorf("rlp: cannot write negative *big.Int")
+	}
+	return WriteBytesTo(w, v.Bytes())
+}
+
+func AppendBigInt(b []byte, v *big.Int) ([]byte, error) {
+	if v == nil {
+		buf := b[len(b):][:1]
+		buf[0] = 0x80
+		return b[:len(b)+1], nil
+	} else if cmp := v.Cmp(big0); cmp == 0 {
+		buf := b[len(b):][:1]
+		buf[0] = 0x80
+		return b[:len(b)+1], nil
+	} else if cmp == -1 {
+		return nil, fmt.Errorf("rlp: cannot append negative *big.Int")
+	}
+	return AppendBytes(b, v.Bytes()), nil
+}
+
+func BigIntSize(v *big.Int) int {
+	if v == nil {
+		return 1
+	} else if cmp := v.Cmp(big0); cmp == 0 {
+		return 1
+	} else if cmp == -1 {
+		return 0
+	}
+	return BytesSize(v.Bytes())
 }
 
 func writeBytes(val reflect.Value, w *encbuf) error {
@@ -507,6 +629,99 @@ func writeString(val reflect.Value, w *encbuf) error {
 		w.str = append(w.str, s...)
 	}
 	return nil
+}
+
+func WriteBytesTo(w io.Writer, v []byte) (n int64, err error) {
+	// Fits single byte, no string header
+	if len(v) == 1 && v[0] <= 0x7F {
+		nn, err := w.Write(v)
+		return int64(nn), err
+	}
+
+	// Write header.
+	if len(v) < 56 {
+		nn, err := w.Write([]byte{0x80 + byte(len(v))})
+		if n += int64(nn); err != nil {
+			return n, err
+		}
+	} else {
+		buf := make([]byte, 9)
+		sz := putint(buf[1:], uint64(len(v)))
+		buf[0] = 0xB7 + byte(sz)
+		nn, err := w.Write(buf[:sz+1])
+		if n += int64(nn); err != nil {
+			return n, err
+		}
+	}
+
+	nn, err := w.Write(v)
+	n += int64(nn)
+	return n, err
+}
+
+func AppendBytes(b, v []byte) []byte {
+	// Fits single byte, no string header
+	if len(v) == 1 && v[0] <= 0x7F {
+		buf := b[len(b):][:1]
+		buf[0] = v[0]
+		return b[:len(b)+1]
+	}
+
+	// Write small header, if possible.
+	if len(v) < 56 {
+		buf := b[len(b):][:1+len(v)]
+		buf[0] = 0x80 + byte(len(v))
+		copy(buf[1:], v)
+		return b[:len(b)+1+len(v)]
+	}
+
+	b = AppendHead(b, 0xB7, uint64(len(v)))
+	b = b[:len(b)+len(v)]
+	copy(b[len(b)-len(v):], v)
+	return b
+}
+
+func BytesSize(v []byte) int {
+	if len(v) == 1 && v[0] <= 0x7F {
+		return 1
+	} else if len(v) < 56 {
+		return 1 + len(v)
+	}
+	return intsize(uint64(len(v))) + 1 + len(v)
+}
+
+func WriteListHeaderTo(w io.Writer, v int) (n int64, err error) {
+	if v < 56 {
+		nn, err := w.Write([]byte{0xC0 + byte(v)})
+		return int64(nn), err
+	}
+
+	buf := make([]byte, 9)
+	sz := putint(buf[1:], uint64(v))
+	buf[0] = 0xF7 + byte(sz)
+	nn, err := w.Write(buf[:sz+1])
+	return int64(nn), err
+}
+
+// PrependListHeader writes the list header to the beginning of b.
+// This function assumes that MaxHeadSize has been allocated at the beginning already.
+// Returns the byte slice starting from the beginning of the header.
+func PrependListHeader(b []byte) []byte {
+	_ = b[8] // bounds check
+
+	sz := len(b) - MaxHeadSize
+	if sz < 56 {
+		b[8] = 0xC0 + byte(sz)
+		return b[8:]
+	}
+
+	b = b[MaxHeadSize-(intsize(uint64(sz))+1):]
+	AppendHead(b[:0], 0xF7, uint64(sz))
+	return b
+}
+
+func ListHeaderSize(sz int) int {
+	return headsize(uint64(sz))
 }
 
 func writeEncoder(val reflect.Value, w *encbuf) error {
@@ -694,6 +909,79 @@ func putint(b []byte, i uint64) (size int) {
 		b[6] = byte(i >> 8)
 		b[7] = byte(i)
 		return 8
+	}
+}
+
+func AppendHead(b []byte, prefix byte, v uint64) []byte {
+	switch {
+	case v < (1 << 8):
+		buf := b[len(b):][:2]
+		buf[0] = prefix + 1
+		buf[1] = byte(v)
+		return b[:len(b)+2]
+	case v < (1 << 16):
+		buf := b[len(b):][:3]
+		buf[0] = prefix + 2
+		buf[1] = byte(v >> 8)
+		buf[2] = byte(v)
+		return b[:len(b)+3]
+	case v < (1 << 24):
+		buf := b[len(b):][:4]
+		buf[0] = prefix + 3
+		buf[1] = byte(v >> 16)
+		buf[2] = byte(v >> 8)
+		buf[3] = byte(v)
+		return b[:len(b)+4]
+	case v < (1 << 32):
+		buf := b[len(b):][:5]
+		buf[0] = prefix + 4
+		buf[1] = byte(v >> 24)
+		buf[2] = byte(v >> 16)
+		buf[3] = byte(v >> 8)
+		buf[4] = byte(v)
+		return b[:len(b)+5]
+	case v < (1 << 40):
+		buf := b[len(b):][:6]
+		buf[0] = prefix + 5
+		buf[1] = byte(v >> 32)
+		buf[2] = byte(v >> 24)
+		buf[3] = byte(v >> 16)
+		buf[4] = byte(v >> 8)
+		buf[5] = byte(v)
+		return b[:len(b)+6]
+	case v < (1 << 48):
+		buf := b[len(b):][:7]
+		buf[0] = prefix + 6
+		buf[1] = byte(v >> 40)
+		buf[2] = byte(v >> 32)
+		buf[3] = byte(v >> 24)
+		buf[4] = byte(v >> 16)
+		buf[5] = byte(v >> 8)
+		buf[6] = byte(v)
+		return b[:len(b)+7]
+	case v < (1 << 56):
+		buf := b[len(b):][:8]
+		buf[0] = prefix + 7
+		buf[1] = byte(v >> 48)
+		buf[2] = byte(v >> 40)
+		buf[3] = byte(v >> 32)
+		buf[4] = byte(v >> 24)
+		buf[5] = byte(v >> 16)
+		buf[6] = byte(v >> 8)
+		buf[7] = byte(v)
+		return b[:len(b)+8]
+	default:
+		buf := b[len(b):][:9]
+		buf[0] = prefix + 8
+		buf[1] = byte(v >> 56)
+		buf[2] = byte(v >> 48)
+		buf[3] = byte(v >> 40)
+		buf[4] = byte(v >> 32)
+		buf[5] = byte(v >> 24)
+		buf[6] = byte(v >> 16)
+		buf[7] = byte(v >> 8)
+		buf[8] = byte(v)
+		return b[:len(b)+9]
 	}
 }
 

@@ -25,7 +25,6 @@ import (
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/trie"
 )
 
@@ -70,7 +69,7 @@ func (db *odrDatabase) ContractCode(addrHash, codeHash common.Hash) ([]byte, err
 	if codeHash == sha3_nil {
 		return nil, nil
 	}
-	if code, err := db.backend.Database().Get(codeHash[:]); err == nil {
+	if code, err := db.backend.Database().GlobalTable().Get(codeHash[:]); err == nil {
 		return code, nil
 	}
 	id := *db.id
@@ -141,7 +140,7 @@ func (t *odrTrie) GetKey(sha []byte) []byte {
 	return nil
 }
 
-func (t *odrTrie) Prove(key []byte, fromLevel uint, proofDb ethdb.Putter) error {
+func (t *odrTrie) Prove(key []byte, fromLevel uint, proofDb common.Putter) error {
 	return errors.New("not implemented, needs client/server interface split")
 }
 
@@ -151,7 +150,7 @@ func (t *odrTrie) do(key []byte, fn func() error) error {
 	for {
 		var err error
 		if t.trie == nil {
-			t.trie, err = trie.New(t.id.Root, trie.NewDatabase(t.db.backend.Database()))
+			t.trie, err = trie.New(t.id.Root, trie.NewDatabase(t.db.backend.Database().GlobalTable()))
 		}
 		if err == nil {
 			err = fn()
@@ -177,7 +176,7 @@ func newNodeIterator(t *odrTrie, startkey []byte) trie.NodeIterator {
 	// Open the actual non-ODR trie if that hasn't happened yet.
 	if t.trie == nil {
 		it.do(func() error {
-			t, err := trie.New(t.id.Root, trie.NewDatabase(t.db.backend.Database()))
+			t, err := trie.New(t.id.Root, trie.NewDatabase(t.db.backend.Database().GlobalTable()))
 			if err == nil {
 				it.t.trie = t
 			}

@@ -17,6 +17,7 @@
 // Package eth implements the GoChain protocol.
 package eth
 
+/*
 import (
 	"bytes"
 	"time"
@@ -34,7 +35,7 @@ var deduplicateData = []byte("dbUpgrade_20170714deduplicateData")
 // starts a background process to make upgrades if necessary.
 // Returns a stop function that blocks until the process has
 // been safely stopped.
-func upgradeDeduplicateData(db ethdb.Database) func() error {
+func upgradeDeduplicateData(db common.Database) func() error {
 	// If the database is already converted or empty, bail out
 	data, _ := db.Get(deduplicateData)
 	if len(data) > 0 && data[0] == 42 {
@@ -137,3 +138,4 @@ func upgradeDeduplicateData(db ethdb.Database) func() error {
 		return <-errc
 	}
 }
+*/

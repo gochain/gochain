@@ -26,7 +26,6 @@ import (
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/params"
 	"github.com/gochain-io/gochain/rlp"
@@ -58,7 +57,7 @@ type TxPool struct {
 	mu       sync.RWMutex
 	chain    *LightChain
 	odr      OdrBackend
-	chainDb  ethdb.Database
+	chainDb  common.Database
 	relay    TxRelayBackend
 	head     common.Hash
 	nonce    map[common.Address]uint64            // "pending" nonce
@@ -182,7 +181,7 @@ func (pool *TxPool) checkMinedTxs(ctx context.Context, hash common.Hash, number 
 		if _, err := GetBlockReceipts(ctx, pool.odr, hash, number); err != nil { // ODR caches, ignore results
 			return err
 		}
-		if err := core.WriteTxLookupEntries(pool.chainDb, block); err != nil {
+		if err := core.WriteTxLookupEntries(pool.chainDb.GlobalTable(), block); err != nil {
 			return err
 		}
 		// Update the transaction pool's state
@@ -198,17 +197,17 @@ func (pool *TxPool) checkMinedTxs(ctx context.Context, hash common.Hash, number 
 // rollbackTxs marks the transactions contained in recently rolled back blocks
 // as rolled back. It also removes any positional lookup entries.
 func (pool *TxPool) rollbackTxs(hash common.Hash, txc txStateChanges) {
-	batch := pool.chainDb.NewBatch()
+	gbatch := pool.chainDb.GlobalTable().NewBatch()
 	if list, ok := pool.mined[hash]; ok {
 		for _, tx := range list {
 			txHash := tx.Hash()
-			core.DeleteTxLookupEntry(batch, txHash)
+			core.DeleteTxLookupEntry(gbatch, txHash)
 			pool.pending[txHash] = tx
 			txc.setState(txHash, false)
 		}
 		delete(pool.mined, hash)
 	}
-	batch.Write()
+	gbatch.Write()
 }
 
 // reorgOnNewHead sets a new head header, processing (and rolling back if necessary)
@@ -433,7 +432,7 @@ func (self *TxPool) Add(ctx context.Context, tx *types.Transaction) error {
 	//fmt.Println("Send", tx.Hash())
 	self.relay.Send(types.Transactions{tx})
 
-	if err := self.chainDb.Put(tx.Hash().Bytes(), data); err != nil {
+	if err := self.chainDb.GlobalTable().Put(tx.Hash().Bytes(), data); err != nil {
 		log.Error("Cannot add to tx pool chain db", err)
 	}
 	return nil
@@ -503,7 +502,7 @@ func (self *TxPool) RemoveTransactions(txs types.Transactions) {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 	var hashes []common.Hash
-	batch := self.chainDb.NewBatch()
+	batch := self.chainDb.GlobalTable().NewBatch()
 	for _, tx := range txs {
 		//self.RemoveTx(tx.Hash())
 		hash := tx.Hash()
@@ -521,7 +520,7 @@ func (pool *TxPool) RemoveTx(hash common.Hash) {
 	defer pool.mu.Unlock()
 	// delete from pending pool
 	delete(pool.pending, hash)
-	if err := pool.chainDb.Delete(hash[:]); err != nil {
+	if err := pool.chainDb.GlobalTable().Delete(hash[:]); err != nil {
 		log.Error("Cannot remove tx from tx pool chain db", err)
 	}
 	pool.relay.Discard([]common.Hash{hash})

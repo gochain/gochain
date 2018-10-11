@@ -107,6 +107,44 @@ type Account struct {
 	CodeHash common.Hash
 }
 
+func (a *Account) RLPSize() int {
+	return rlp.Uint64Size(a.Nonce) +
+		rlp.BigIntSize(a.Balance) +
+		rlp.BytesSize([]byte(a.Root[:])) +
+		rlp.BytesSize([]byte(a.CodeHash[:]))
+}
+
+// EncodeRLP implements rlp.Encoder.
+func (a *Account) EncodeRLP(w io.Writer) error {
+	if _, err := rlp.WriteListHeaderTo(w, a.RLPSize()); err != nil {
+		return err
+	}
+
+	if _, err := rlp.WriteUint64To(w, a.Nonce); err != nil {
+		return err
+	} else if _, err := rlp.WriteBigIntTo(w, a.Balance); err != nil {
+		return err
+	} else if _, err := rlp.WriteBytesTo(w, []byte(a.Root[:])); err != nil {
+		return err
+	} else if _, err := rlp.WriteBytesTo(w, []byte(a.CodeHash[:])); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalRLP returns an RLP encoded byte slice.
+func (a *Account) MarshalRLP() (_ []byte, err error) {
+	buf := make([]byte, rlp.MaxHeadSize, rlp.MaxHeadSize+rlp.Uint64Size(a.Nonce)+rlp.MaxBigIntSize+rlp.BytesSize([]byte(a.Root[:]))+rlp.BytesSize([]byte(a.CodeHash[:])))
+	buf = rlp.AppendUint64(buf, a.Nonce)
+	if buf, err = rlp.AppendBigInt(buf, a.Balance); err != nil {
+		return nil, err
+	}
+	buf = rlp.AppendBytes(buf, []byte(a.Root[:]))
+	buf = rlp.AppendBytes(buf, []byte(a.CodeHash[:]))
+	buf = rlp.PrependListHeader(buf)
+	return buf, nil
+}
+
 // newObject creates a state object.
 func newObject(db *StateDB, address common.Address, data Account, onDirty func(addr common.Address)) *stateObject {
 	if data.Balance == nil {
@@ -126,9 +164,20 @@ func newObject(db *StateDB, address common.Address, data Account, onDirty func(a
 	}
 }
 
+// RLPSize returns the size of the encoded RLP object.
+func (so *stateObject) RLPSize() int {
+	return so.data.RLPSize()
+}
+
 // EncodeRLP implements rlp.Encoder.
 func (so *stateObject) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, so.data)
+	return so.data.EncodeRLP(w)
+	// return rlp.Encode(w, so.data)
+}
+
+// MarshalRLP returns an RLP encoded byte slice.
+func (so *stateObject) MarshalRLP() ([]byte, error) {
+	return so.data.MarshalRLP()
 }
 
 // setError remembers the first non-nil error it is called with.

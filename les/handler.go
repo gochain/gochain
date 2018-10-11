@@ -35,7 +35,6 @@ import (
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/eth/downloader"
-	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/event"
 	"github.com/gochain-io/gochain/light"
 	"github.com/gochain-io/gochain/log"
@@ -102,7 +101,7 @@ type ProtocolManager struct {
 	networkId   uint64
 	chainConfig *params.ChainConfig
 	blockchain  BlockChain
-	chainDb     ethdb.Database
+	chainDb     common.Database
 	odr         *LesOdr
 	server      *LesServer
 	serverPool  *serverPool
@@ -131,7 +130,7 @@ type ProtocolManager struct {
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
 // with the ethereum network.
-func NewProtocolManager(ctx context.Context, chainConfig *params.ChainConfig, lightSync bool, protocolVersions []uint, networkId uint64, mux *event.TypeMux, peers *peerSet, blockchain BlockChain, txpool txPool, chainDb ethdb.Database, odr *LesOdr, txrelay *LesTxRelay, quitSync chan struct{}, wg *sync.WaitGroup) (*ProtocolManager, error) {
+func NewProtocolManager(ctx context.Context, chainConfig *params.ChainConfig, lightSync bool, protocolVersions []uint, networkId uint64, mux *event.TypeMux, peers *peerSet, blockchain BlockChain, txpool txPool, chainDb common.Database, odr *LesOdr, txrelay *LesTxRelay, quitSync chan struct{}, wg *sync.WaitGroup) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		lightSync:   lightSync,
@@ -560,7 +559,7 @@ func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 				break
 			}
 			// Retrieve the requested block body, stopping if enough was found
-			if data := core.GetBodyRLP(pm.chainDb, hash, core.GetBlockNumber(pm.chainDb, hash)); len(data) != 0 {
+			if data := core.GetBodyRLP(pm.chainDb.BodyTable(), hash, core.GetBlockNumber(pm.chainDb.GlobalTable(), hash)); len(data) != 0 {
 				bodies = append(bodies, data)
 				bytes += len(data)
 			}
@@ -611,7 +610,7 @@ func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 		}
 		for _, req := range req.Reqs {
 			// Retrieve the requested state entry, stopping if enough was found
-			if header := core.GetHeader(pm.chainDb, req.BHash, core.GetBlockNumber(pm.chainDb, req.BHash)); header != nil {
+			if header := core.GetHeader(pm.chainDb.HeaderTable(), req.BHash, core.GetBlockNumber(pm.chainDb.GlobalTable(), req.BHash)); header != nil {
 				statedb, err := pm.blockchain.State()
 				if err != nil {
 					continue
@@ -677,7 +676,7 @@ func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 				break
 			}
 			// Retrieve the requested block's receipts, skipping if unknown to us
-			results := core.GetBlockReceipts(pm.chainDb, hash, core.GetBlockNumber(pm.chainDb, hash))
+			results := core.GetBlockReceipts(pm.chainDb.ReceiptTable(), hash, core.GetBlockNumber(pm.chainDb.GlobalTable(), hash))
 			if results == nil {
 				if header := pm.blockchain.GetHeaderByHash(hash); header == nil || header.ReceiptHash != types.EmptyRootHash {
 					continue
@@ -737,7 +736,7 @@ func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 		}
 		for _, req := range req.Reqs {
 			// Retrieve the requested state entry, stopping if enough was found
-			if header := core.GetHeader(pm.chainDb, req.BHash, core.GetBlockNumber(pm.chainDb, req.BHash)); header != nil {
+			if header := core.GetHeader(pm.chainDb.HeaderTable(), req.BHash, core.GetBlockNumber(pm.chainDb.GlobalTable(), req.BHash)); header != nil {
 				statedb, err := pm.blockchain.State()
 				if err != nil {
 					continue
@@ -797,7 +796,7 @@ func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 			if statedb == nil || req.BHash != lastBHash {
 				statedb, root, lastBHash = nil, common.Hash{}, req.BHash
 
-				if header := core.GetHeader(pm.chainDb, req.BHash, core.GetBlockNumber(pm.chainDb, req.BHash)); header != nil {
+				if header := core.GetHeader(pm.chainDb.HeaderTable(), req.BHash, core.GetBlockNumber(pm.chainDb.GlobalTable(), req.BHash)); header != nil {
 					statedb, _ = pm.blockchain.State()
 					root = header.Root
 				}
@@ -892,7 +891,7 @@ func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 		if reject(uint64(reqCnt), MaxHelperTrieProofsFetch) {
 			return errResp(ErrRequestRejected, "")
 		}
-		trieDb := trie.NewDatabase(ethdb.NewTable(pm.chainDb, light.ChtTablePrefix))
+		trieDb := trie.NewDatabase(common.NewTablePrefixer(pm.chainDb.GlobalTable(), light.ChtTablePrefix))
 		for _, req := range req.Reqs {
 			if header := pm.blockchain.GetHeaderByNumber(req.BlockNum); header != nil {
 				sectionHead := core.GetCanonicalHash(pm.chainDb, req.ChtNum*light.CHTFrequencyServer-1)
@@ -953,7 +952,7 @@ func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 
 				var prefix string
 				if root, prefix = pm.getHelperTrie(req.Type, req.TrieIdx); root != (common.Hash{}) {
-					auxTrie, _ = trie.New(root, trie.NewDatabase(ethdb.NewTable(pm.chainDb, prefix)))
+					auxTrie, _ = trie.New(root, trie.NewDatabase(common.NewTablePrefixer(pm.chainDb.GlobalTable(), prefix)))
 				}
 			}
 			if req.AuxReq == auxRoot {
@@ -1169,7 +1168,7 @@ func (pm *ProtocolManager) getHelperTrieAuxData(req HelperTrieReq) []byte {
 	case req.Type == htCanonical && req.AuxReq == auxHeader && len(req.Key) == 8:
 		blockNum := binary.BigEndian.Uint64(req.Key)
 		hash := core.GetCanonicalHash(pm.chainDb, blockNum)
-		return core.GetHeaderRLP(pm.chainDb, hash, blockNum)
+		return core.GetHeaderRLP(pm.chainDb.HeaderTable(), hash, blockNum)
 	}
 	return nil
 }
@@ -1182,7 +1181,7 @@ func (pm *ProtocolManager) txStatus(ctx context.Context, hashes []common.Hash) [
 
 		// If the transaction is unknown to the pool, try looking it up locally
 		if stat == core.TxStatusUnknown {
-			if block, number, index := core.GetTxLookupEntry(pm.chainDb, hashes[i]); block != (common.Hash{}) {
+			if block, number, index := core.GetTxLookupEntry(pm.chainDb.GlobalTable(), hashes[i]); block != (common.Hash{}) {
 				stats[i].Status = core.TxStatusIncluded
 				stats[i].Lookup = &core.TxLookupEntry{BlockHash: block, BlockIndex: number, Index: index}
 			}

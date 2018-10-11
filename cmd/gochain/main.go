@@ -119,12 +119,11 @@ var (
 		utils.GpoBlocksFlag,
 		utils.GpoPercentileFlag,
 		utils.ExtraDataFlag,
-		utils.ArchiveEndpointFlag,
-		utils.ArchiveBucketFlag,
-		utils.ArchiveIDFlag,
-		utils.ArchiveSecretFlag,
-		utils.ArchiveAgeFlag,
-		utils.ArchivePeriodFlag,
+		utils.EthdbEndpointFlag,
+		utils.EthdbBucketFlag,
+		utils.EthdbAccessKeyIDFlag,
+		utils.EthdbSecretAccessKeyFlag,
+		utils.EthdbMaxOpenSegmentCountFlag,
 		configFileFlag,
 	}
 

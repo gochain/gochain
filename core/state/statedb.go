@@ -397,11 +397,11 @@ func (db *StateDB) Suicide(addr common.Address) bool {
 // updateStateObject writes the given object to the trie.
 func (db *StateDB) updateStateObject(stateObject *stateObject) error {
 	addr := stateObject.Address()
-	data, err := rlp.EncodeToBytes(stateObject)
+	buf, err := stateObject.MarshalRLP()
 	if err != nil {
 		panic(fmt.Errorf("can't encode object at %x: %v", addr[:], err))
 	}
-	return db.trie.TryUpdate(addr[:], data)
+	return db.trie.TryUpdate(addr[:], buf)
 }
 
 // deleteStateObject removes the given object from the state trie.

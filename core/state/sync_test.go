@@ -69,7 +69,7 @@ func makeTestState() (Database, common.Hash, []*testAccount) {
 
 // checkStateAccounts cross references a reconstructed state with an expected
 // account array.
-func checkStateAccounts(t *testing.T, db ethdb.Database, root common.Hash, accounts []*testAccount) {
+func checkStateAccounts(t *testing.T, db common.Database, root common.Hash, accounts []*testAccount) {
 	// Check root availability and state contents
 	state, err := New(root, NewDatabase(db))
 	if err != nil {
@@ -92,11 +92,11 @@ func checkStateAccounts(t *testing.T, db ethdb.Database, root common.Hash, accou
 }
 
 // checkTrieConsistency checks that all nodes in a (sub-)trie are indeed present.
-func checkTrieConsistency(db ethdb.Database, root common.Hash) error {
-	if v, _ := db.Get(root[:]); v == nil {
+func checkTrieConsistency(db common.Database, root common.Hash) error {
+	if v, _ := db.GlobalTable().Get(root[:]); v == nil {
 		return nil // Consider a non existent state consistent.
 	}
-	trie, err := trie.New(root, trie.NewDatabase(db))
+	trie, err := trie.New(root, trie.NewDatabase(db.GlobalTable()))
 	if err != nil {
 		return err
 	}
@@ -107,9 +107,9 @@ func checkTrieConsistency(db ethdb.Database, root common.Hash) error {
 }
 
 // checkStateConsistency checks that all data of a state root is present.
-func checkStateConsistency(db ethdb.Database, root common.Hash) error {
+func checkStateConsistency(db common.Database, root common.Hash) error {
 	// Create and iterate a state trie rooted in a sub-node
-	if _, err := db.Get(root.Bytes()); err != nil {
+	if _, err := db.GlobalTable().Get(root.Bytes()); err != nil {
 		return nil // Consider a non existent state consistent.
 	}
 	state, err := New(root, NewDatabase(db))
@@ -294,7 +294,7 @@ func TestIncompleteStateSync(t *testing.T) {
 	// Create a random state to copy
 	srcDb, srcRoot, srcAccounts := makeTestState()
 
-	checkTrieConsistency(srcDb.TrieDB().DiskDB().(ethdb.Database), srcRoot)
+	checkTrieConsistency(srcDb.TrieDB().DiskDB().(common.Database), srcRoot)
 
 	// Create a destination state and sync with the scheduler
 	dstDb := ethdb.NewMemDatabase()

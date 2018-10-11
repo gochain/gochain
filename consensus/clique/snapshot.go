@@ -24,7 +24,6 @@ import (
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/params"
 	"github.com/hashicorp/golang-lru"
 )
@@ -81,8 +80,8 @@ func newGenesisSnapshot(config *params.CliqueConfig, sigcache *lru.ARCCache, num
 }
 
 // loadSnapshot loads an existing snapshot from the database.
-func loadSnapshot(config *params.CliqueConfig, sigcache *lru.ARCCache, db ethdb.Database, hash common.Hash) (*Snapshot, error) {
-	blob, err := db.Get(append([]byte("clique-"), hash[:]...))
+func loadSnapshot(config *params.CliqueConfig, sigcache *lru.ARCCache, db common.Database, hash common.Hash) (*Snapshot, error) {
+	blob, err := db.GlobalTable().Get(append([]byte("clique-"), hash[:]...))
 	if err != nil {
 		return nil, err
 	}
@@ -97,12 +96,12 @@ func loadSnapshot(config *params.CliqueConfig, sigcache *lru.ARCCache, db ethdb.
 }
 
 // store inserts the snapshot into the database.
-func (s *Snapshot) store(db ethdb.Database) error {
+func (s *Snapshot) store(db common.Database) error {
 	blob, err := json.Marshal(s)
 	if err != nil {
 		return err
 	}
-	return db.Put(append([]byte("clique-"), s.Hash[:]...), blob)
+	return db.GlobalTable().Put(append([]byte("clique-"), s.Hash[:]...), blob)
 }
 
 // copy creates a deep copy of the snapshot, though not the individual votes.

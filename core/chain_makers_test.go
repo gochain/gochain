@@ -80,7 +80,7 @@ func ExampleGenerateChain() {
 	})
 
 	// Import the chain. This runs all block validation rules.
-	blockchain, _ := NewBlockChain(db, nil, gspec.Config, engine, vm.Config{})
+	blockchain, _ := NewBlockChain(ctx, db, nil, gspec.Config, engine, vm.Config{})
 	defer blockchain.Stop()
 
 	if i, err := blockchain.InsertChain(ctx, chain); err != nil {

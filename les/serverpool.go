@@ -27,8 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/mclock"
-	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/p2p/discover"
@@ -95,7 +95,7 @@ const (
 // known light server nodes. It received discovered nodes, stores statistics about
 // known nodes and takes care of always having enough good quality servers connected.
 type serverPool struct {
-	db     ethdb.Database
+	db     common.Database
 	dbKey  []byte
 	server *p2p.Server
 	quit   chan struct{}
@@ -120,7 +120,7 @@ type serverPool struct {
 }
 
 // newServerPool creates a new serverPool instance
-func newServerPool(db ethdb.Database, quit chan struct{}, wg *sync.WaitGroup) *serverPool {
+func newServerPool(db common.Database, quit chan struct{}, wg *sync.WaitGroup) *serverPool {
 	pool := &serverPool{
 		db:           db,
 		quit:         quit,
@@ -382,7 +382,7 @@ func (pool *serverPool) findOrNewNode(id discover.NodeID, ip net.IP, port uint16
 
 // loadNodes loads known nodes and their statistics from the database
 func (pool *serverPool) loadNodes() {
-	enc, err := pool.db.Get(pool.dbKey)
+	enc, err := pool.db.GlobalTable().Get(pool.dbKey)
 	if err != nil {
 		return
 	}
@@ -416,7 +416,7 @@ func (pool *serverPool) saveNodes() {
 		log.Error("Cannot encode server pool known queue", "err", err)
 		return
 	}
-	if err := pool.db.Put(pool.dbKey, enc); err != nil {
+	if err := pool.db.GlobalTable().Put(pool.dbKey, enc); err != nil {
 		log.Error("Cannot put server pool known queue", "err", err)
 	}
 }

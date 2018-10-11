@@ -50,7 +50,7 @@ var errGasEstimationFailed = errors.New("gas required exceeds allowance or alway
 // SimulatedBackend implements bind.ContractBackend, simulating a blockchain in
 // the background. Its main purpose is to allow easily testing contract bindings.
 type SimulatedBackend struct {
-	database   ethdb.Database   // In memory database to store our testing data
+	database   common.Database  // In memory database to store our testing data
 	blockchain *core.BlockChain // Ethereum blockchain to handle the consensus
 
 	mu           sync.Mutex
@@ -70,7 +70,7 @@ func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
 		Signer: hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
 	}
 	genesis.MustCommit(database)
-	blockchain, err := core.NewBlockChain(database, nil, genesis.Config, clique.NewFaker(), vm.Config{})
+	blockchain, err := core.NewBlockChain(context.Background(), database, nil, genesis.Config, clique.NewFaker(), vm.Config{})
 	if err != nil {
 		panic(err)
 	}
@@ -164,7 +164,7 @@ func (b *SimulatedBackend) StorageAt(ctx context.Context, contract common.Addres
 
 // TransactionReceipt returns the receipt of a transaction.
 func (b *SimulatedBackend) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
-	receipt, _, _, _ := core.GetReceipt(b.database, txHash)
+	receipt, _, _, _ := core.GetReceipt(ctx, b.database, txHash)
 	return receipt, nil
 }
 
@@ -402,18 +402,18 @@ func (m callmsg) Data() []byte         { return m.CallMsg.Data }
 // filterBackend implements filters.Backend to support filtering for logs without
 // taking bloom-bits acceleration structures into account.
 type filterBackend struct {
-	db ethdb.Database
+	db common.Database
 	bc *core.BlockChain
 
 	txSubsMu sync.Mutex
 	txSubs   map[chan<- core.NewTxsEvent]event.Subscription
 }
 
-func newFilterBackend(db ethdb.Database, bc *core.BlockChain) *filterBackend {
+func newFilterBackend(db common.Database, bc *core.BlockChain) *filterBackend {
 	return &filterBackend{db: db, bc: bc, txSubs: make(map[chan<- core.NewTxsEvent]event.Subscription)}
 }
 
-func (fb *filterBackend) ChainDb() ethdb.Database  { return fb.db }
+func (fb *filterBackend) ChainDb() common.Database { return fb.db }
 func (fb *filterBackend) EventMux() *event.TypeMux { panic("not supported") }
 
 func (fb *filterBackend) HeaderByNumber(ctx context.Context, block rpc.BlockNumber) (*types.Header, error) {
@@ -423,7 +423,7 @@ func (fb *filterBackend) HeaderByNumber(ctx context.Context, block rpc.BlockNumb
 	return fb.bc.GetHeaderByNumber(uint64(block.Int64())), nil
 }
 func (fb *filterBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
-	return core.GetBlockReceipts(fb.db, hash, core.GetBlockNumber(fb.db, hash)), nil
+	return core.GetBlockReceipts(fb.db.ReceiptTable(), hash, core.GetBlockNumber(fb.db.GlobalTable(), hash)), nil
 }
 
 func (fb *filterBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {

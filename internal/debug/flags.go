@@ -73,6 +73,10 @@ var (
 		Name:  "blockprofilerate",
 		Usage: "Turn on block profiling with the given rate",
 	}
+	mutexProfileFractionFlag = cli.IntFlag{
+		Name:  "mutexprofilefraction",
+		Usage: "Turn on mutex profiling with the given fraction",
+	}
 	cpuprofileFlag = cli.StringFlag{
 		Name:  "cpuprofile",
 		Usage: "Write CPU profile to the given file",
@@ -87,7 +91,8 @@ var (
 var Flags = []cli.Flag{
 	verbosityFlag, vmoduleFlag, backtraceAtFlag, debugFlag,
 	pprofFlag, pprofAddrFlag, pprofPortFlag,
-	memprofilerateFlag, blockprofilerateFlag, cpuprofileFlag, traceFlag,
+	memprofilerateFlag, cpuprofileFlag, traceFlag,
+	blockprofilerateFlag, mutexProfileFractionFlag,
 }
 
 var glogger *log.GlogHandler
@@ -127,6 +132,9 @@ func Setup(ctx *cli.Context) error {
 
 	// pprof server
 	if ctx.GlobalBool(pprofFlag.Name) {
+		runtime.SetBlockProfileRate(ctx.GlobalInt(blockprofilerateFlag.Name))
+		runtime.SetMutexProfileFraction(ctx.GlobalInt(mutexProfileFractionFlag.Name))
+
 		address := fmt.Sprintf("%s:%d", ctx.GlobalString(pprofAddrFlag.Name), ctx.GlobalInt(pprofPortFlag.Name))
 		go func() {
 			log.Info("Starting pprof server", "addr", fmt.Sprintf("http://%s/debug/pprof", address))

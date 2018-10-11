@@ -38,7 +38,7 @@ func TestHeaderStorage(t *testing.T) {
 		t.Fatalf("Non existent header returned: %v", entry)
 	}
 	// Write and verify the header in the database
-	if err := WriteHeader(db, header); err != nil {
+	if err := WriteHeader(db.GlobalTable(), db.HeaderTable(), header); err != nil {
 		t.Fatalf("Failed to write header into database: %v", err)
 	}
 	if entry := GetHeader(db, header.Hash(), header.Number.Uint64()); entry == nil {
@@ -124,7 +124,7 @@ func TestBlockStorage(t *testing.T) {
 		t.Fatalf("Non existent body returned: %v", entry)
 	}
 	// Write and verify the block in the database
-	if err := WriteBlock(db, block); err != nil {
+	if err := WriteBlock(db.GlobalTable(), db.BodyTable(), db.HeaderTable(), block); err != nil {
 		t.Fatalf("Failed to write block into database: %v", err)
 	}
 	if entry := GetBlock(db, block.Hash(), block.NumberU64()); entry == nil {
@@ -165,7 +165,7 @@ func TestPartialBlockStorage(t *testing.T) {
 		ReceiptHash: types.EmptyRootHash,
 	})
 	// Store a header and check that it's not recognized as a block
-	if err := WriteHeader(db, block.Header()); err != nil {
+	if err := WriteHeader(db.GlobalTable(), db.HeaderTable(), block.Header()); err != nil {
 		t.Fatalf("Failed to write header into database: %v", err)
 	}
 	if entry := GetBlock(db, block.Hash(), block.NumberU64()); entry != nil {
@@ -183,7 +183,7 @@ func TestPartialBlockStorage(t *testing.T) {
 	DeleteBody(db, block.Hash(), block.NumberU64())
 
 	// Store a header and a body separately and check reassembly
-	if err := WriteHeader(db, block.Header()); err != nil {
+	if err := WriteHeader(db.GlobalTable(), db.HeaderTable(), block.Header()); err != nil {
 		t.Fatalf("Failed to write header into database: %v", err)
 	}
 	if err := WriteBody(db, block.Hash(), block.NumberU64(), block.Body()); err != nil {
@@ -304,7 +304,7 @@ func TestLookupStorage(t *testing.T) {
 		}
 	}
 	// Insert all the transactions into the database, and verify contents
-	if err := WriteBlock(db, block); err != nil {
+	if err := WriteBlock(db.GlobalTable(), db.BodyTable(), db.HeaderTable(), block); err != nil {
 		t.Fatalf("failed to write block contents: %v", err)
 	}
 	if err := WriteTxLookupEntries(db, block); err != nil {

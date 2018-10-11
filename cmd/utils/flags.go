@@ -44,7 +44,6 @@ import (
 	"github.com/gochain-io/gochain/eth/downloader"
 	"github.com/gochain-io/gochain/eth/gasprice"
 	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/ethdb/archive"
 	"github.com/gochain-io/gochain/les"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/metrics"
@@ -507,32 +506,26 @@ var (
 		Value: whisper.DefaultMinimumPoW,
 	}
 
-	// Archive settings
-	ArchiveEndpointFlag = cli.StringFlag{
-		Name:  "archive",
+	// S3 archival settings
+	EthdbEndpointFlag = cli.StringFlag{
+		Name:  "ethdb.endpoint",
 		Usage: "S3 compatible archive endpoint.",
 	}
-	ArchiveBucketFlag = cli.StringFlag{
-		Name:  "archivebucket",
-		Usage: "Name of archive bucket. Must already exist.",
+	EthdbBucketFlag = cli.StringFlag{
+		Name:  "ethdb.bucket",
+		Usage: "Name of ethdb archive bucket. Must already exist.",
 	}
-	ArchiveIDFlag = cli.StringFlag{
-		Name:  "archiveid",
-		Usage: "Archive access key ID.",
+	EthdbAccessKeyIDFlag = cli.StringFlag{
+		Name:  "ethdb.accesskeyid",
+		Usage: "Ethdb archive access key ID.",
 	}
-	ArchiveSecretFlag = cli.StringFlag{
-		Name:  "archivesecret",
-		Usage: "Archive access key secret.",
+	EthdbSecretAccessKeyFlag = cli.StringFlag{
+		Name:  "ethdb.secretaccesskey",
+		Usage: "Ethdb archive secret access key.",
 	}
-	ArchiveAgeFlag = cli.Uint64Flag{
-		Name:  "archiveage",
-		Usage: "Archive age. The number of blocks from head before archiving.",
-		Value: archive.DefaultArchiveAge,
-	}
-	ArchivePeriodFlag = cli.DurationFlag{
-		Name:  "archiveperiod",
-		Usage: "How often the archive process runs.",
-		Value: archive.DefaultArchivePeriod,
+	EthdbMaxOpenSegmentCountFlag = cli.IntFlag{
+		Name:  "ethdb.maxopensegmentcount",
+		Usage: "Ethdb per-table open segment count.",
 	}
 )
 
@@ -836,6 +829,7 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	setHTTP(ctx, cfg)
 	setWS(ctx, cfg)
 	setNodeUserIdent(ctx, cfg)
+	setEthdb(ctx, &cfg.Ethdb)
 
 	switch {
 	case ctx.GlobalIsSet(DataDirFlag.Name):
@@ -899,24 +893,21 @@ func setTxPool(ctx *cli.Context, cfg *core.TxPoolConfig) {
 	}
 }
 
-func setArchive(ctx *cli.Context, cfg *archive.Config) {
-	if ctx.GlobalIsSet(ArchiveEndpointFlag.Name) {
-		cfg.Endpoint = ctx.GlobalString(ArchiveEndpointFlag.Name)
+func setEthdb(ctx *cli.Context, cfg *ethdb.Config) {
+	if ctx.GlobalIsSet(EthdbEndpointFlag.Name) {
+		cfg.Endpoint = ctx.GlobalString(EthdbEndpointFlag.Name)
 	}
-	if ctx.GlobalIsSet(ArchiveBucketFlag.Name) {
-		cfg.Bucket = ctx.GlobalString(ArchiveBucketFlag.Name)
+	if ctx.GlobalIsSet(EthdbBucketFlag.Name) {
+		cfg.Bucket = ctx.GlobalString(EthdbBucketFlag.Name)
 	}
-	if ctx.GlobalIsSet(ArchiveIDFlag.Name) {
-		cfg.ID = ctx.GlobalString(ArchiveIDFlag.Name)
+	if ctx.GlobalIsSet(EthdbAccessKeyIDFlag.Name) {
+		cfg.AccessKeyID = ctx.GlobalString(EthdbAccessKeyIDFlag.Name)
 	}
-	if ctx.GlobalIsSet(ArchiveSecretFlag.Name) {
-		cfg.Secret = ctx.GlobalString(ArchiveSecretFlag.Name)
+	if ctx.GlobalIsSet(EthdbSecretAccessKeyFlag.Name) {
+		cfg.SecretAccessKey = ctx.GlobalString(EthdbSecretAccessKeyFlag.Name)
 	}
-	if ctx.GlobalIsSet(ArchiveAgeFlag.Name) {
-		cfg.Age = ctx.GlobalUint64(ArchiveAgeFlag.Name)
-	}
-	if ctx.GlobalIsSet(ArchivePeriodFlag.Name) {
-		cfg.Period = ctx.GlobalDuration(ArchivePeriodFlag.Name)
+	if ctx.GlobalIsSet(EthdbMaxOpenSegmentCountFlag.Name) {
+		cfg.MaxOpenSegmentCount = ctx.GlobalInt(EthdbMaxOpenSegmentCountFlag.Name)
 	}
 }
 
@@ -980,7 +971,6 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 	setEtherbase(ctx, ks, cfg)
 	setGPO(ctx, &cfg.GPO)
 	setTxPool(ctx, &cfg.TxPool)
-	setArchive(ctx, &cfg.Archive)
 
 	switch {
 	case ctx.GlobalIsSet(SyncModeFlag.Name):
@@ -1139,7 +1129,7 @@ func SetupNetwork(ctx *cli.Context) {
 }
 
 // MakeChainDatabase open an LevelDB using the flags passed to the client and will hard crash if it fails.
-func MakeChainDatabase(ctx *cli.Context, stack *node.Node) ethdb.Database {
+func MakeChainDatabase(ctx *cli.Context, stack *node.Node) common.Database {
 	var (
 		cache   = ctx.GlobalInt(CacheFlag.Name) * ctx.GlobalInt(CacheDatabaseFlag.Name) / 100
 		handles = makeDatabaseHandles()
@@ -1169,7 +1159,7 @@ func MakeGenesis(ctx *cli.Context) *core.Genesis {
 }
 
 // MakeChain creates a chain manager from set command line flags.
-func MakeChain(ctx *cli.Context, stack *node.Node) (chain *core.BlockChain, chainDb ethdb.Database) {
+func MakeChain(ctx *cli.Context, stack *node.Node) (chain *core.BlockChain, chainDb common.Database) {
 	var err error
 	chainDb = MakeChainDatabase(ctx, stack)
 
@@ -1195,7 +1185,7 @@ func MakeChain(ctx *cli.Context, stack *node.Node) (chain *core.BlockChain, chai
 		cache.TrieNodeLimit = ctx.GlobalInt(CacheFlag.Name) * ctx.GlobalInt(CacheGCFlag.Name) / 100
 	}
 	vmcfg := vm.Config{EnablePreimageRecording: ctx.GlobalBool(VMEnableDebugFlag.Name)}
-	chain, err = core.NewBlockChain(chainDb, cache, config, engine, vmcfg)
+	chain, err = core.NewBlockChain(context.Background(), chainDb, cache, config, engine, vmcfg)
 	if err != nil {
 		Fatalf("Can't create BlockChain: %v", err)
 	}

@@ -30,6 +30,7 @@ import (
 	"github.com/gochain-io/gochain/accounts/usbwallet"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/crypto"
+	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/p2p/discover"
@@ -150,6 +151,9 @@ type Config struct {
 
 	// Logger is a custom logger to use with the p2p.Server.
 	Logger log.Logger `toml:",omitempty"`
+
+	// Ethdb provides db-specific settings.
+	Ethdb ethdb.Config `toml:,omitempty`
 }
 
 // IPCEndpoint resolves an IPC endpoint based on a configured value, taking into

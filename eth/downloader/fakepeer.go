@@ -23,7 +23,6 @@ import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/ethdb"
 )
 
 // FakePeer is a mock downloader peer that operates on a local database instance
@@ -31,13 +30,13 @@ import (
 // sync commands from an xisting local database.
 type FakePeer struct {
 	id string
-	db ethdb.Database
+	db common.Database
 	hc *core.HeaderChain
 	dl *Downloader
 }
 
 // NewFakePeer creates a new mock downloader peer with the given data sources.
-func NewFakePeer(id string, db ethdb.Database, hc *core.HeaderChain, dl *Downloader) *FakePeer {
+func NewFakePeer(id string, db common.Database, hc *core.HeaderChain, dl *Downloader) *FakePeer {
 	return &FakePeer{id: id, db: db, hc: hc, dl: dl}
 }
 
@@ -136,7 +135,7 @@ func (p *FakePeer) RequestBodies(ctx context.Context, hashes []common.Hash) erro
 func (p *FakePeer) RequestReceipts(ctx context.Context, hashes []common.Hash) error {
 	var receipts [][]*types.Receipt
 	for _, hash := range hashes {
-		receipts = append(receipts, core.GetBlockReceipts(p.db, hash, p.hc.GetBlockNumber(hash)))
+		receipts = append(receipts, core.GetBlockReceipts(p.db.ReceiptTable(), hash, p.hc.GetBlockNumber(hash)))
 	}
 	p.dl.DeliverReceipts(p.id, receipts)
 	return nil
@@ -147,7 +146,7 @@ func (p *FakePeer) RequestReceipts(ctx context.Context, hashes []common.Hash) er
 func (p *FakePeer) RequestNodeData(ctx context.Context, hashes []common.Hash) error {
 	var data [][]byte
 	for _, hash := range hashes {
-		if entry, err := p.db.Get(hash.Bytes()); err == nil {
+		if entry, err := p.db.GlobalTable().Get(hash.Bytes()); err == nil {
 			data = append(data, entry)
 		}
 	}

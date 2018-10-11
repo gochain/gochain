@@ -1,5 +1,5 @@
 # Build GoChain in a stock Go builder container
-FROM golang:1.10-alpine as builder
+FROM golang:1.11-alpine as builder
 
 RUN apk --no-cache add build-base git bzr mercurial gcc linux-headers
 ENV D=/go/src/github.com/gochain-io/gochain
@@ -14,5 +14,5 @@ FROM alpine:latest
 
 RUN apk add --no-cache ca-certificates
 COPY --from=builder /tmp/gochain/* /usr/local/bin/
-EXPOSE 8545 8546 30303 30303/udp 30304/udp
+EXPOSE 6060 8545 8546 30303 30303/udp 30304/udp
 CMD [ "gochain" ]
