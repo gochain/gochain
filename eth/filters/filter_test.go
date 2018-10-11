@@ -26,6 +26,7 @@ import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
+	"github.com/gochain-io/gochain/core/rawdb"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/ethdb"
@@ -84,16 +85,10 @@ func BenchmarkFilters(b *testing.B) {
 		}
 	})
 	for i, block := range chain {
-		core.WriteBlock(db.GlobalTable(), db.BodyTable(), db.HeaderTable(), block)
-		if err := core.WriteCanonicalHash(db, block.Hash(), block.NumberU64()); err != nil {
-			b.Fatalf("failed to insert block number: %v", err)
-		}
-		if err := core.WriteHeadBlockHash(db.GlobalTable(), block.Hash()); err != nil {
-			b.Fatalf("failed to insert block number: %v", err)
-		}
-		if err := core.WriteBlockReceipts(db.ReceiptTable(), block.Hash(), block.NumberU64(), receipts[i]); err != nil {
-			b.Fatal("error writing block receipts:", err)
-		}
+		rawdb.WriteBlock(db, block)
+		rawdb.WriteCanonicalHash(db, block.Hash(), block.NumberU64())
+		rawdb.WriteHeadBlockHash(db.GlobalTable(), block.Hash())
+		rawdb.WriteReceipts(db.ReceiptTable(), block.Hash(), block.NumberU64(), receipts[i])
 	}
 	b.ResetTimer()
 
@@ -174,16 +169,10 @@ func TestFilters(t *testing.T) {
 		}
 	})
 	for i, block := range chain {
-		core.WriteBlock(db.GlobalTable(), db.BodyTable(), db.HeaderTable(), block)
-		if err := core.WriteCanonicalHash(db, block.Hash(), block.NumberU64()); err != nil {
-			t.Fatalf("failed to insert block number: %v", err)
-		}
-		if err := core.WriteHeadBlockHash(db.GlobalTable(), block.Hash()); err != nil {
-			t.Fatalf("failed to insert block number: %v", err)
-		}
-		if err := core.WriteBlockReceipts(db.ReceiptTable(), block.Hash(), block.NumberU64(), receipts[i]); err != nil {
-			t.Fatal("error writing block receipts:", err)
-		}
+		rawdb.WriteBlock(db, block)
+		rawdb.WriteCanonicalHash(db, block.Hash(), block.NumberU64())
+		rawdb.WriteHeadBlockHash(db.GlobalTable(), block.Hash())
+		rawdb.WriteReceipts(db.ReceiptTable(), block.Hash(), block.NumberU64(), receipts[i])
 	}
 
 	filter := New(backend, 0, -1, []common.Address{addr}, [][]common.Hash{{hash1, hash2, hash3, hash4}})

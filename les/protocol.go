@@ -28,6 +28,7 @@ import (
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core"
+	"github.com/gochain-io/gochain/core/rawdb"
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/crypto/secp256k1"
 	"github.com/gochain-io/gochain/rlp"
@@ -224,6 +225,6 @@ type proofsData [][]rlp.RawValue
 
 type txStatus struct {
 	Status core.TxStatus
-	Lookup *core.TxLookupEntry `rlp:"nil"`
+	Lookup *rawdb.TxLookupEntry `rlp:"nil"`
 	Error  string
 }

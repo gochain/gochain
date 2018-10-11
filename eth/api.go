@@ -28,6 +28,7 @@ import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/core"
+	"github.com/gochain-io/gochain/core/rawdb"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/log"
@@ -324,7 +325,7 @@ func NewPrivateDebugAPI(config *params.ChainConfig, eth *GoChain) *PrivateDebugA
 
 // Preimage is a debug API function that returns the preimage for a sha3 hash, if known.
 func (api *PrivateDebugAPI) Preimage(ctx context.Context, hash common.Hash) (hexutil.Bytes, error) {
-	db := core.PreimageTablePrefixer(api.eth.ChainDb().GlobalTable())
+	db := rawdb.PreimageTablePrefixer(api.eth.ChainDb().GlobalTable())
 	return db.Get(hash.Bytes())
 }
 

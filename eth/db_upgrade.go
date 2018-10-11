@@ -84,7 +84,7 @@ func upgradeDeduplicateData(db common.Database) func() error {
 
 			if hash[0] == byte('l') {
 				// Potential clash, the "old" `hash` must point to a live transaction.
-				if tx, _, _, _ := core.GetTransaction(db, common.BytesToHash(hash)); tx == nil || !bytes.Equal(tx.Hash().Bytes(), hash) {
+				if tx, _, _, _ := rawdb.ReadTransaction(db, common.BytesToHash(hash)); tx == nil || !bytes.Equal(tx.Hash().Bytes(), hash) {
 					continue
 				}
 			}

@@ -25,8 +25,8 @@ import (
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/bitutil"
-	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/bloombits"
+	"github.com/gochain-io/gochain/core/rawdb"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/event"
@@ -71,20 +71,20 @@ func benchmarkBloomBits(b *testing.B, sectionSize uint64) {
 	if err := db.Open(); err != nil {
 		b.Fatalf("error opening database at %v: %v", benchDataDir, err)
 	}
-	head := core.GetHeadBlockHash(db.GlobalTable())
+	head := rawdb.ReadHeadBlockHash(db.GlobalTable())
 	if head == (common.Hash{}) {
 		b.Fatalf("chain data not found at %v", benchDataDir)
 	}
 
 	clearBloomBits(db)
 	fmt.Println("Generating bloombits data...")
-	headNum := core.GetBlockNumber(db.GlobalTable(), head)
-	if headNum < sectionSize+512 {
+	headNum := rawdb.ReadHeaderNumber(db.GlobalTable(), head)
+	if headNum == nil || *headNum < sectionSize+512 {
 		b.Fatalf("not enough blocks for running a benchmark")
 	}
 
 	start := time.Now()
-	cnt := (headNum - 512) / sectionSize
+	cnt := (*headNum - 512) / sectionSize
 	var dataSize, compSize uint64
 	for sectionIdx := uint64(0); sectionIdx < cnt; sectionIdx++ {
 		bc, err := bloombits.NewGenerator(uint(sectionSize))
@@ -93,14 +93,14 @@ func benchmarkBloomBits(b *testing.B, sectionSize uint64) {
 		}
 		var header *types.Header
 		for i := sectionIdx * sectionSize; i < (sectionIdx+1)*sectionSize; i++ {
-			hash := core.GetCanonicalHash(db, i)
-			header = core.GetHeader(db.GlobalTable(), hash, i)
+			hash := rawdb.ReadCanonicalHash(db, i)
+			header = rawdb.ReadHeader(db.GlobalTable(), hash, i)
 			if header == nil {
 				b.Fatalf("Error creating bloomBits data")
 			}
 			bc.AddBloom(uint(i-sectionIdx*sectionSize), header.Bloom)
 		}
-		sectionHead := core.GetCanonicalHash(db, (sectionIdx+1)*sectionSize-1)
+		sectionHead := rawdb.ReadCanonicalHash(db, (sectionIdx+1)*sectionSize-1)
 		for i := 0; i < types.BloomBitLength; i++ {
 			data, err := bc.Bitset(uint(i))
 			if err != nil {
@@ -109,7 +109,7 @@ func benchmarkBloomBits(b *testing.B, sectionSize uint64) {
 			comp := bitutil.CompressBytes(data)
 			dataSize += uint64(len(data))
 			compSize += uint64(len(comp))
-			core.WriteBloomBits(db.GlobalTable(), uint(i), sectionIdx, sectionHead, comp)
+			rawdb.WriteBloomBits(db.GlobalTable(), uint(i), sectionIdx, sectionHead, comp)
 		}
 		//if sectionIdx%50 == 0 {
 		//	fmt.Println(" section", sectionIdx, "/", cnt)
@@ -184,11 +184,11 @@ func BenchmarkNoBloomBits(b *testing.B) {
 	if err := db.Open(); err != nil {
 		b.Fatalf("error opening database at %v: %v", benchDataDir, err)
 	}
-	head := core.GetHeadBlockHash(db.GlobalTable())
+	head := rawdb.ReadHeadBlockHash(db.GlobalTable())
 	if head == (common.Hash{}) {
 		b.Fatalf("chain data not found at %v", benchDataDir)
 	}
-	headNum := core.GetBlockNumber(db.GlobalTable(), head)
+	headNum := rawdb.ReadHeaderNumber(db.GlobalTable(), head)
 
 	clearBloomBits(db)
 
@@ -196,10 +196,10 @@ func BenchmarkNoBloomBits(b *testing.B) {
 	start := time.Now()
 	mux := new(event.TypeMux)
 	backend := &testBackend{mux: mux, db: db}
-	filter := New(backend, 0, int64(headNum), []common.Address{{}}, nil)
+	filter := New(backend, 0, int64(*headNum), []common.Address{{}}, nil)
 	filter.Logs(context.Background())
 	d := time.Since(start)
 	fmt.Println("Finished running filter benchmarks")
-	fmt.Println(" ", d, "total  ", d*time.Duration(1000000)/time.Duration(headNum+1), "per million blocks")
+	fmt.Println(" ", d, "total  ", d*time.Duration(1000000)/time.Duration(*headNum+1), "per million blocks")
 	db.Close()
 }

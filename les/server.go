@@ -26,6 +26,7 @@ import (
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core"
+	"github.com/gochain-io/gochain/core/rawdb"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/eth"
 	"github.com/gochain-io/gochain/les/flowcontrol"
@@ -333,11 +334,11 @@ func (pm *ProtocolManager) blockLoop() {
 					header := ev.Block.Header()
 					hash := header.Hash()
 					number := header.Number.Uint64()
-					td := core.GetTd(pm.chainDb.GlobalTable(), hash, number)
+					td := rawdb.ReadTd(pm.chainDb.GlobalTable(), hash, number)
 					if td != nil && td.Cmp(lastBroadcastTd) > 0 {
 						var reorg uint64
 						if lastHead != nil {
-							reorg = lastHead.Number.Uint64() - core.FindCommonAncestor(pm.chainDb.HeaderTable(), header, lastHead).Number.Uint64()
+							reorg = lastHead.Number.Uint64() - rawdb.FindCommonAncestor(pm.chainDb.HeaderTable(), header, lastHead).Number.Uint64()
 						}
 						lastHead = header
 						lastBroadcastTd = td

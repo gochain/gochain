@@ -28,6 +28,7 @@ import (
 	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/common/math"
 	"github.com/gochain-io/gochain/consensus/clique"
+	"github.com/gochain-io/gochain/core/rawdb"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
 	"github.com/gochain-io/gochain/crypto"
@@ -232,13 +233,13 @@ func makeChainForBench(db common.Database, full bool, count uint64) {
 			ReceiptHash: types.EmptyRootHash,
 		}
 		hash = header.Hash()
-		WriteHeader(db.GlobalTable(), db.HeaderTable(), header)
-		WriteCanonicalHash(db, hash, n)
-		WriteTd(db.GlobalTable(), hash, n, big.NewInt(int64(n+1)))
+		rawdb.WriteHeader(db.GlobalTable(), db.HeaderTable(), header)
+		rawdb.WriteCanonicalHash(db, hash, n)
+		rawdb.WriteTd(db.GlobalTable(), hash, n, big.NewInt(int64(n+1)))
 		if full || n == 0 {
 			block := types.NewBlockWithHeader(header)
-			WriteBody(db.BodyTable(), hash, n, block.Body())
-			WriteBlockReceipts(db.ReceiptTable(), hash, n, nil)
+			rawdb.WriteBody(db.BodyTable(), hash, n, block.Body())
+			rawdb.WriteReceipts(db.ReceiptTable(), hash, n, nil)
 		}
 	}
 }
@@ -290,8 +291,8 @@ func benchReadChain(b *testing.B, full bool, count uint64) {
 			header := chain.GetHeaderByNumber(n)
 			if full {
 				hash := header.Hash()
-				GetBody(db.BodyTable(), hash, n)
-				GetBlockReceipts(db.ReceiptTable(), hash, n)
+				rawdb.ReadBody(db.BodyTable(), hash, n)
+				rawdb.ReadReceipts(db.ReceiptTable(), hash, n)
 			}
 		}
 

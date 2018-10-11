@@ -32,6 +32,7 @@ import (
 	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/bloombits"
+	"github.com/gochain-io/gochain/core/rawdb"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
 	"github.com/gochain-io/gochain/eth/downloader"
@@ -145,11 +146,11 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 	log.Info("Initialising GoChain protocol", "versions", ProtocolVersions, "network", config.NetworkId)
 
 	if !config.SkipBcVersionCheck {
-		bcVersion := core.GetBlockChainVersion(chainDb.GlobalTable())
+		bcVersion := rawdb.ReadDatabaseVersion(chainDb.GlobalTable())
 		if bcVersion != core.BlockChainVersion && bcVersion != 0 {
 			return nil, fmt.Errorf("Blockchain DB version mismatch (%d / %d). Run geth upgradedb.\n", bcVersion, core.BlockChainVersion)
 		}
-		core.WriteBlockChainVersion(chainDb.GlobalTable(), core.BlockChainVersion)
+		rawdb.WriteDatabaseVersion(chainDb.GlobalTable(), core.BlockChainVersion)
 	}
 	var (
 		vmConfig    = vm.Config{EnablePreimageRecording: config.EnablePreimageRecording}
@@ -165,9 +166,7 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 		if err := eth.blockchain.SetHead(compat.RewindTo); err != nil {
 			log.Error("Cannot set head during chain rewind", "rewind_to", compat.RewindTo, "err", err)
 		}
-		if err := core.WriteChainConfig(chainDb.GlobalTable(), genesisHash, chainConfig); err != nil {
-			log.Error("Cannot write chain config during rewind", "hash", genesisHash, "err", err)
-		}
+		rawdb.WriteChainConfig(chainDb.GlobalTable(), genesisHash, chainConfig)
 	}
 	eth.bloomIndexer.Start(eth.blockchain)
 
