@@ -637,7 +637,7 @@ func (db *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error)
 		case isDirty:
 			// Write any contract code associated with the state object
 			if stateObject.code != nil && stateObject.dirtyCode {
-				db.db.TrieDB().Insert(stateObject.data.CodeHash, stateObject.code)
+				db.db.TrieDB().InsertBlob(stateObject.data.CodeHash, stateObject.code)
 				stateObject.dirtyCode = false
 			}
 			// Write any storage changes in the state object to its storage trie.

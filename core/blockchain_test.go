@@ -567,8 +567,8 @@ func testReorgBadHashes(t *testing.T, full bool) {
 		if _, err = blockchain.InsertHeaderChain(ctx, headers, 1); err != nil {
 			t.Errorf("failed to import headers: %v", err)
 		}
-		if blockchain.CurrentHeader().Hash() != headers[3].Hash() {
-			t.Errorf("last header hash mismatch: have: %x, want %x", blockchain.CurrentHeader().Hash(), headers[3].Hash())
+		if hash := blockchain.CurrentHeader().Hash(); hash != headers[3].Hash() {
+			t.Errorf("last header hash mismatch: have: %x, want %x", hash, headers[3].Hash())
 		}
 		BadHashes[headers[3].Hash()] = true
 		defer func() { delete(BadHashes, headers[3].Hash()) }()
@@ -1387,8 +1387,8 @@ func TestTrieForkGC(t *testing.T) {
 	}
 	// Dereference all the recent tries and ensure no past trie is left in
 	for i := 0; i < triesInMemory; i++ {
-		chain.stateCache.TrieDB().Dereference(blocks[len(blocks)-1-i].Root(), common.Hash{})
-		chain.stateCache.TrieDB().Dereference(forks[len(blocks)-1-i].Root(), common.Hash{})
+		chain.stateCache.TrieDB().Dereference(blocks[len(blocks)-1-i].Root())
+		chain.stateCache.TrieDB().Dereference(forks[len(blocks)-1-i].Root())
 	}
 	if len(chain.stateCache.TrieDB().Nodes()) > 0 {
 		t.Fatalf("stale tries still alive after garbase collection")
