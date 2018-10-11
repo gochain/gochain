@@ -17,8 +17,11 @@
 package rpc
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -31,6 +34,23 @@ import (
 	"golang.org/x/net/websocket"
 )
 
+// websocketJSONCodec is a custom JSON codec with payload size enforcement and
+// special number parsing.
+var websocketJSONCodec = websocket.Codec{
+	// Marshal is the stock JSON marshaller used by the websocket library too.
+	Marshal: func(v interface{}) ([]byte, byte, error) {
+		msg, err := json.Marshal(v)
+		return msg, websocket.TextFrame, err
+	},
+	// Unmarshal is a specialized unmarshaller to properly convert numbers.
+	Unmarshal: func(msg []byte, payloadType byte, v interface{}) error {
+		dec := json.NewDecoder(bytes.NewReader(msg))
+		dec.UseNumber()
+
+		return dec.Decode(v)
+	},
+}
+
 // WebsocketHandler returns a handler that serves JSON-RPC to WebSocket connections.
 //
 // allowedOrigins should be a comma-separated list of allowed origin URLs.
@@ -39,7 +59,16 @@ func (srv *Server) WebsocketHandler(allowedOrigins []string) http.Handler {
 	return websocket.Server{
 		Handshake: wsHandshakeValidator(allowedOrigins),
 		Handler: func(conn *websocket.Conn) {
-			srv.ServeCodec(NewJSONCodec(conn), OptionMethodInvocation|OptionSubscriptions)
+			// Create a custom encode/decode pair to enforce payload size and number encoding
+			conn.MaxPayloadBytes = maxRequestContentLength
+
+			encoder := func(v interface{}) error {
+				return websocketJSONCodec.Send(conn, v)
+			}
+			decoder := func(v interface{}) error {
+				return websocketJSONCodec.Receive(conn, v)
+			}
+			srv.ServeCodec(NewCodec(conn, encoder, decoder), OptionMethodInvocation|OptionSubscriptions)
 		},
 	}
 }
@@ -91,12 +120,7 @@ func wsHandshakeValidator(allowedOrigins []string) func(*websocket.Config, *http
 	return f
 }
 
-// DialWebsocket creates a new RPC client that communicates with a JSON-RPC server
-// that is listening on the given endpoint.
-//
-// The context is used for the initial connection establishment. It does not
-// affect subsequent interactions with the client.
-func DialWebsocket(ctx context.Context, endpoint, origin string) (*Client, error) {
+func wsGetConfig(endpoint, origin string) (*websocket.Config, error) {
 	if origin == "" {
 		var err error
 		if origin, err = os.Hostname(); err != nil {
@@ -109,6 +133,25 @@ func DialWebsocket(ctx context.Context, endpoint, origin string) (*Client, error
 		}
 	}
 	config, err := websocket.NewConfig(endpoint, origin)
+	if err != nil {
+		return nil, err
+	}
+
+	if config.Location.User != nil {
+		b64auth := base64.StdEncoding.EncodeToString([]byte(config.Location.User.String()))
+		config.Header.Add("Authorization", "Basic "+b64auth)
+		config.Location.User = nil
+	}
+	return config, nil
+}
+
+// DialWebsocket creates a new RPC client that communicates with a JSON-RPC server
+// that is listening on the given endpoint.
+//
+// The context is used for the initial connection establishment. It does not
+// affect subsequent interactions with the client.
+func DialWebsocket(ctx context.Context, endpoint, origin string) (*Client, error) {
+	config, err := wsGetConfig(endpoint, origin)
 	if err != nil {
 		return nil, err
 	}
