@@ -30,6 +30,7 @@ import (
 	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/bloombits"
+	"github.com/gochain-io/gochain/core/rawdb"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/event"
@@ -59,18 +60,32 @@ func (b *testBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumbe
 	var hash common.Hash
 	var num uint64
 	if blockNr == rpc.LatestBlockNumber {
-		hash = core.GetHeadBlockHash(b.db.GlobalTable())
-		num = core.GetBlockNumber(b.db.GlobalTable(), hash)
+		hash = rawdb.ReadHeadBlockHash(b.db.GlobalTable())
+		number := rawdb.ReadHeaderNumber(b.db.GlobalTable(), hash)
+		if number == nil {
+			return nil, nil
+		}
+		num = *number
 	} else {
 		num = uint64(blockNr)
-		hash = core.GetCanonicalHash(b.db, num)
+		hash = rawdb.ReadCanonicalHash(b.db, num)
 	}
-	return core.GetHeader(b.db.HeaderTable(), hash, num), nil
+	return rawdb.ReadHeader(b.db.HeaderTable(), hash, num), nil
 }
 
-func (b *testBackend) GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error) {
-	num := core.GetBlockNumber(b.db.GlobalTable(), blockHash)
-	return core.GetBlockReceipts(b.db.ReceiptTable(), blockHash, num), nil
+func (b *testBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
+	number := rawdb.ReadHeaderNumber(b.db.GlobalTable(), hash)
+	if number == nil {
+		return nil, nil
+	}
+	return rawdb.ReadHeader(b.db.HeaderTable(), hash, *number), nil
+}
+
+func (b *testBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
+	if number := rawdb.ReadHeaderNumber(b.db.GlobalTable(), hash); number != nil {
+		return rawdb.ReadReceipts(b.db.ReceiptTable(), hash, *number), nil
+	}
+	return nil, nil
 }
 
 func (b *testBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
@@ -126,8 +141,8 @@ func (b *testBackend) ServiceFilter(ctx context.Context, session *bloombits.Matc
 				task.Bitsets = make([][]byte, len(task.Sections))
 				for i, section := range task.Sections {
 					if rand.Int()%4 != 0 { // Handle occasional missing deliveries
-						head := core.GetCanonicalHash(b.db, (section+1)*params.BloomBitsBlocks-1)
-						task.Bitsets[i], _ = core.GetBloomBits(b.db.GlobalTable(), task.Bit, section, head)
+						head := rawdb.ReadCanonicalHash(b.db, (section+1)*params.BloomBitsBlocks-1)
+						task.Bitsets[i], _ = rawdb.ReadBloomBits(b.db.GlobalTable(), task.Bit, section, head)
 					}
 				}
 				request <- task

@@ -25,7 +25,7 @@ import (
 	"fmt"
 
 	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/core"
+	"github.com/gochain-io/gochain/core/rawdb"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/light"
@@ -110,7 +110,7 @@ func (r *BlockRequest) Validate(db common.Database, msg *Msg) error {
 	body := bodies[0]
 
 	// Retrieve our stored header and validate block content against it
-	header := core.GetHeader(db.HeaderTable(), r.Hash, r.Number)
+	header := rawdb.ReadHeader(db.HeaderTable(), r.Hash, r.Number)
 	if header == nil {
 		return errHeaderUnavailable
 	}
@@ -166,7 +166,7 @@ func (r *ReceiptsRequest) Validate(db common.Database, msg *Msg) error {
 	receipt := receipts[0]
 
 	// Retrieve our stored header and validate receipt content against it
-	header := core.GetHeader(db.HeaderTable(), r.Hash, r.Number)
+	header := rawdb.ReadHeader(db.HeaderTable(), r.Hash, r.Number)
 	if header == nil {
 		return errHeaderUnavailable
 	}

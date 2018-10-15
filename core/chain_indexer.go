@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/core/rawdb"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/log"
 )
@@ -205,7 +206,7 @@ func (c *ChainIndexer) eventLoop(chain ChainIndexerChain, events chan ChainHeadE
 
 				// TODO(karalabe): This operation is expensive and might block, causing the event system to
 				// potentially also lock up. We need to do with on a different thread somehow.
-				if h := FindCommonAncestor(c.chainDb.HeaderTable(), prevHeader, header); h != nil {
+				if h := rawdb.FindCommonAncestor(c.chainDb.HeaderTable(), prevHeader, header); h != nil {
 					c.newHead(h.Number.Uint64(), true)
 				}
 			}
@@ -348,11 +349,11 @@ func (c *ChainIndexer) processSection(section uint64, lastHead common.Hash) (com
 	}
 
 	for number := section * c.sectionSize; number < (section+1)*c.sectionSize; number++ {
-		hash := GetCanonicalHash(c.chainDb, number)
+		hash := rawdb.ReadCanonicalHash(c.chainDb, number)
 		if hash == (common.Hash{}) {
 			return common.Hash{}, fmt.Errorf("canonical block #%d unknown", number)
 		}
-		header := GetHeader(c.chainDb.HeaderTable(), hash, number)
+		header := rawdb.ReadHeader(c.chainDb.HeaderTable(), hash, number)
 		if header == nil {
 			return common.Hash{}, fmt.Errorf("block #%d [%x…] not found", number, hash[:4])
 		} else if header.ParentHash != lastHead {

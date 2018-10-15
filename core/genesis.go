@@ -28,6 +28,7 @@ import (
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/hexutil"
 	"github.com/gochain-io/gochain/common/math"
+	"github.com/gochain-io/gochain/core/rawdb"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/ethdb"
@@ -169,7 +170,7 @@ func SetupGenesisBlock(db common.Database, genesis *Genesis) (*params.ChainConfi
 	}
 
 	// Just commit the new block if there is no stored genesis block.
-	stored := GetCanonicalHash(db, 0)
+	stored := rawdb.ReadCanonicalHash(db, 0)
 	if (stored == common.Hash{}) {
 		if genesis == nil {
 			log.Info("Writing default main-net genesis block")
@@ -191,14 +192,12 @@ func SetupGenesisBlock(db common.Database, genesis *Genesis) (*params.ChainConfi
 
 	// Get the existing chain configuration.
 	newcfg := genesis.configOrDefault(stored)
-	storedcfg, err := GetChainConfig(db.GlobalTable(), stored)
-	if err != nil {
-		if err == ErrChainConfigNotFound {
-			// This case happens if a genesis write was interrupted.
-			log.Warn("Found genesis block without chain config")
-			err = WriteChainConfig(db.GlobalTable(), stored, newcfg)
-		}
-		return newcfg, stored, err
+	storedcfg := rawdb.ReadChainConfig(db.GlobalTable(), stored)
+	if storedcfg == nil {
+		// This case happens if a genesis write was interrupted.
+		log.Warn("Found genesis block without chain config")
+		rawdb.WriteChainConfig(db.GlobalTable(), stored, newcfg)
+		return newcfg, stored, nil
 	}
 	// Special case: don't change the existing config of a non-mainnet chain if no new
 	// config is supplied. These chains would get AllProtocolChanges (and a compat error)
@@ -209,15 +208,16 @@ func SetupGenesisBlock(db common.Database, genesis *Genesis) (*params.ChainConfi
 
 	// Check config compatibility and write the config. Compatibility errors
 	// are returned to the caller unless we're already at block zero.
-	height := GetBlockNumber(db.GlobalTable(), GetHeadHeaderHash(db.GlobalTable()))
-	if height == missingNumber {
+	height := rawdb.ReadHeaderNumber(db.GlobalTable(), rawdb.ReadHeadHeaderHash(db.GlobalTable()))
+	if height == nil {
 		return newcfg, stored, fmt.Errorf("missing block number for head header hash")
 	}
-	compatErr := storedcfg.CheckCompatible(newcfg, height)
-	if compatErr != nil && height != 0 && compatErr.RewindTo != 0 {
+	compatErr := storedcfg.CheckCompatible(newcfg, *height)
+	if compatErr != nil && *height != 0 && compatErr.RewindTo != 0 {
 		return newcfg, stored, compatErr
 	}
-	return newcfg, stored, WriteChainConfig(db.GlobalTable(), stored, newcfg)
+	rawdb.WriteChainConfig(db.GlobalTable(), stored, newcfg)
+	return newcfg, stored, nil
 }
 
 func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
@@ -288,29 +288,18 @@ func (g *Genesis) Commit(db common.Database) (*types.Block, error) {
 	if block.Number().Sign() != 0 {
 		return nil, fmt.Errorf("can't commit genesis block with number > 0")
 	}
-	if err := WriteTd(db.GlobalTable(), block.Hash(), block.NumberU64(), g.Difficulty); err != nil {
-		return nil, err
-	}
-	if err := WriteBlock(db.GlobalTable(), db.BodyTable(), db.HeaderTable(), block); err != nil {
-		return nil, err
-	}
-	if err := WriteBlockReceipts(db.ReceiptTable(), block.Hash(), block.NumberU64(), nil); err != nil {
-		return nil, err
-	}
-	if err := WriteCanonicalHash(db, block.Hash(), block.NumberU64()); err != nil {
-		return nil, err
-	}
-	if err := WriteHeadBlockHash(db.GlobalTable(), block.Hash()); err != nil {
-		return nil, err
-	}
-	if err := WriteHeadHeaderHash(db.GlobalTable(), block.Hash()); err != nil {
-		return nil, err
-	}
+	rawdb.WriteTd(db.GlobalTable(), block.Hash(), block.NumberU64(), g.Difficulty)
+	rawdb.WriteBlock(db, block)
+	rawdb.WriteReceipts(db.ReceiptTable(), block.Hash(), block.NumberU64(), nil)
+	rawdb.WriteCanonicalHash(db, block.Hash(), block.NumberU64())
+	rawdb.WriteHeadBlockHash(db.GlobalTable(), block.Hash())
+	rawdb.WriteHeadHeaderHash(db.GlobalTable(), block.Hash())
 	config := g.Config
 	if config == nil {
 		config = params.AllCliqueProtocolChanges
 	}
-	return block, WriteChainConfig(db.GlobalTable(), block.Hash(), config)
+	rawdb.WriteChainConfig(db.GlobalTable(), block.Hash(), config)
+	return block, nil
 }
 
 // MustCommit writes the genesis block and state to db, panicking on error.

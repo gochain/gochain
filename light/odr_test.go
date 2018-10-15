@@ -28,6 +28,7 @@ import (
 	"github.com/gochain-io/gochain/common/math"
 	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
+	"github.com/gochain-io/gochain/core/rawdb"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
@@ -70,9 +71,15 @@ func (odr *testOdr) Retrieve(ctx context.Context, req OdrRequest) error {
 	}
 	switch req := req.(type) {
 	case *BlockRequest:
-		req.Rlp = core.GetBodyRLP(odr.sdb.BodyTable(), req.Hash, core.GetBlockNumber(odr.sdb.GlobalTable(), req.Hash))
+		number := rawdb.ReadHeaderNumber(odr.sdb.GlobalTable(), req.Hash)
+		if number != nil {
+			req.Rlp = rawdb.ReadBodyRLP(odr.sdb.BodyTable(), req.Hash, *number)
+		}
 	case *ReceiptsRequest:
-		req.Receipts = core.GetBlockReceipts(odr.sdb.ReceiptTable(), req.Hash, core.GetBlockNumber(odr.sdb.GlobalTable(), req.Hash))
+		number := rawdb.ReadHeaderNumber(odr.sdb.GlobalTable(), req.Hash)
+		if number != nil {
+			req.Receipts = rawdb.ReadReceipts(odr.sdb.ReceiptTable(), req.Hash, *number)
+		}
 	case *TrieRequest:
 		t, _ := trie.New(req.Id.Root, trie.NewDatabase(odr.sdb.GlobalTable()))
 		nodes := NewNodeSet()
@@ -108,9 +115,15 @@ func TestOdrGetReceiptsLes1(t *testing.T) { testChainOdr(t, 1, odrGetReceipts) }
 func odrGetReceipts(ctx context.Context, db common.Database, bc *core.BlockChain, lc *LightChain, bhash common.Hash) ([]byte, error) {
 	var receipts types.Receipts
 	if bc != nil {
-		receipts = core.GetBlockReceipts(db.ReceiptTable(), bhash, core.GetBlockNumber(db.GlobalTable(), bhash))
+		number := rawdb.ReadHeaderNumber(db.GlobalTable(), bhash)
+		if number != nil {
+			receipts = rawdb.ReadReceipts(db.ReceiptTable(), bhash, *number)
+		}
 	} else {
-		receipts, _ = GetBlockReceipts(ctx, lc.Odr(), bhash, core.GetBlockNumber(db.GlobalTable(), bhash))
+		number := rawdb.ReadHeaderNumber(db.GlobalTable(), bhash)
+		if number != nil {
+			receipts, _ = GetBlockReceipts(ctx, lc.Odr(), bhash, *number)
+		}
 	}
 	if receipts == nil {
 		return nil, nil
@@ -260,7 +273,7 @@ func testChainOdr(t *testing.T, protocol int, fn odrTestFn) {
 
 	test := func(expFail int) {
 		for i := uint64(0); i <= blockchain.CurrentHeader().Number.Uint64(); i++ {
-			bhash := core.GetCanonicalHash(sdb, i)
+			bhash := rawdb.ReadCanonicalHash(sdb, i)
 			b1, err := fn(NoOdr, sdb, blockchain, nil, bhash)
 			if err != nil {
 				t.Fatalf("error in full-node test for block %d: %v", i, err)

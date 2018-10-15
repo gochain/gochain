@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/gochain-io/gochain/core"
+	"github.com/gochain-io/gochain/core/rawdb"
 	"github.com/gochain-io/gochain/eth/downloader"
 	"github.com/gochain-io/gochain/light"
 	"github.com/gochain-io/gochain/log"
@@ -62,7 +62,7 @@ func (pm *ProtocolManager) syncer() {
 
 func (pm *ProtocolManager) needToSync(peerHead blockInfo) bool {
 	head := pm.blockchain.CurrentHeader()
-	currentTd := core.GetTd(pm.chainDb.GlobalTable(), head.Hash(), head.Number.Uint64())
+	currentTd := rawdb.ReadTd(pm.chainDb.GlobalTable(), head.Hash(), head.Number.Uint64())
 	return currentTd != nil && peerHead.Td.Cmp(currentTd) > 0
 }
 

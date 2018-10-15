@@ -25,6 +25,7 @@ import (
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core"
+	"github.com/gochain-io/gochain/core/rawdb"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/crypto"
 	"github.com/gochain-io/gochain/ethdb"
@@ -83,7 +84,7 @@ func (r *testerChainReader) GetBlock(common.Hash, uint64) *types.Block   { panic
 func (r *testerChainReader) GetHeaderByHash(common.Hash) *types.Header   { panic("not supported") }
 func (r *testerChainReader) GetHeaderByNumber(number uint64) *types.Header {
 	if number == 0 {
-		return core.GetHeader(r.db.HeaderTable(), core.GetCanonicalHash(r.db, 0), 0)
+		return rawdb.ReadHeader(r.db.HeaderTable(), rawdb.ReadCanonicalHash(r.db, 0), 0)
 	}
 	panic("not supported")
 }
