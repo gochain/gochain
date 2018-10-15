@@ -291,23 +291,27 @@ func (bc *BlockChain) SetHead(head uint64) error {
 	bc.blockCache.Purge()
 	bc.futureBlocks.Purge()
 
+	currentBlock := bc.CurrentBlock()
+	currentFastBlock := bc.CurrentFastBlock()
+
 	// Rewind the block chain, ensuring we don't end up with a stateless head block
-	if currentBlock := bc.CurrentBlock(); currentBlock != nil && currentHeader.Number.Uint64() < currentBlock.NumberU64() {
-		bc.currentBlock.Store(bc.GetBlock(currentHeader.Hash(), currentHeader.Number.Uint64()))
+	if currentBlock != nil && currentHeader.Number.Uint64() < currentBlock.NumberU64() {
+		currentBlock = bc.GetBlock(currentHeader.Hash(), currentHeader.Number.Uint64())
+		bc.currentBlock.Store(currentBlock)
 	}
-	if currentBlock := bc.CurrentBlock(); currentBlock != nil {
+	if currentBlock != nil {
 		if _, err := state.New(currentBlock.Root(), bc.stateCache); err != nil {
 			// Rewound state missing, rolled back to before pivot, reset to genesis
-			bc.currentBlock.Store(bc.genesisBlock)
+			currentBlock = bc.genesisBlock
+			bc.currentBlock.Store(currentBlock)
 		}
 	}
 	// Rewind the fast block in a simpleton way to the target head
 	if currentFastBlock := bc.CurrentFastBlock(); currentFastBlock != nil && currentHeader.Number.Uint64() < currentFastBlock.NumberU64() {
-		bc.currentFastBlock.Store(bc.GetBlock(currentHeader.Hash(), currentHeader.Number.Uint64()))
+		currentFastBlock = bc.GetBlock(currentHeader.Hash(), currentHeader.Number.Uint64())
+		bc.currentFastBlock.Store(currentFastBlock)
 	}
 	// If either blocks reached nil, reset to the genesis state
-	currentBlock := bc.CurrentBlock()
-	currentFastBlock := bc.CurrentFastBlock()
 	if currentBlock == nil {
 		currentBlock = bc.genesisBlock
 		bc.currentBlock.Store(currentBlock)
@@ -695,7 +699,7 @@ func (bc *BlockChain) Stop() {
 			}
 		}
 		for !bc.triegc.Empty() {
-			triedb.Dereference(bc.triegc.PopItem().(common.Hash), common.Hash{})
+			triedb.Dereference(bc.triegc.PopItem().(common.Hash))
 		}
 		if size, _ := triedb.Size(); size != 0 {
 			log.Error("Dangling trie nodes after full cleanup")
@@ -1007,7 +1011,7 @@ func (bc *BlockChain) WriteBlockWithState(ctx context.Context, block *types.Bloc
 					bc.triegc.Push(root, number)
 					break
 				}
-				triedb.Dereference(root.(common.Hash), common.Hash{})
+				triedb.Dereference(root.(common.Hash))
 			}
 		}
 	}

@@ -33,7 +33,7 @@ import (
 	"github.com/gochain-io/gochain/trie"
 )
 
-// stateReq represents a batch of state fetch requests groupped together into
+// stateReq represents a batch of state fetch requests grouped together into
 // a single data retrieval network packet.
 type stateReq struct {
 	items    []common.Hash              // Hashes of the state items to download
@@ -141,7 +141,7 @@ func (d *Downloader) runStateSync(s *stateSync) *stateSync {
 
 		// Handle incoming state packs:
 		case pack := <-d.stateCh:
-			// Discard any data not requested (or previsouly timed out)
+			// Discard any data not requested (or previously timed out)
 			req := active[pack.PeerId()]
 			if req == nil {
 				log.Debug("Unrequested node data", "peer", pack.PeerId(), "len", pack.Items())
@@ -184,7 +184,7 @@ func (d *Downloader) runStateSync(s *stateSync) *stateSync {
 		case req := <-d.trackStateReq:
 			// If an active request already exists for this peer, we have a problem. In
 			// theory the trie node schedule must never assign two requests to the same
-			// peer. In practive however, a peer might receive a request, disconnect and
+			// peer. In practice however, a peer might receive a request, disconnect and
 			// immediately reconnect before the previous times out. In this case the first
 			// request is never honored, alas we must not silently overwrite it, as that
 			// causes valid requests to go missing and sync to get stuck.
@@ -216,7 +216,7 @@ func (d *Downloader) runStateSync(s *stateSync) *stateSync {
 type stateSync struct {
 	d *Downloader // Downloader instance to access and manage current peerset
 
-	sched  *trie.TrieSync             // State trie sync scheduler defining the tasks
+	sched  *trie.Sync                 // State trie sync scheduler defining the tasks
 	keccak hash.Hash                  // Keccak256 hasher to verify deliveries with
 	tasks  map[common.Hash]*stateTask // Set of tasks currently queued for retrieval
 
@@ -230,7 +230,7 @@ type stateSync struct {
 	err        error          // Any error hit during sync (set before completion)
 }
 
-// stateTask represents a single trie node download taks, containing a set of
+// stateTask represents a single trie node download task, containing a set of
 // peers already attempted retrieval from to detect stalled syncs and abort.
 type stateTask struct {
 	attempts map[string]struct{}
@@ -343,7 +343,7 @@ func (s *stateSync) commit(force bool) error {
 	return nil
 }
 
-// assignTasks attempts to assing new tasks to all idle peers, either from the
+// assignTasks attempts to assign new tasks to all idle peers, either from the
 // batch currently being retried, or fetching new data from the trie sync itself.
 func (s *stateSync) assignTasks() {
 	ctx, span := trace.StartSpan(context.Background(), "stateSync.assignTasks")
