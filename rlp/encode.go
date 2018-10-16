@@ -23,8 +23,6 @@ import (
 	"math/big"
 	"reflect"
 	"sync"
-
-	"go.opencensus.io/trace"
 )
 
 var (
@@ -103,8 +101,6 @@ func Encode(w io.Writer, val interface{}) error {
 }
 
 func EncodeCtx(ctx context.Context, w io.Writer, val interface{}) error {
-	ctx, span := trace.StartSpan(ctx, "Encode")
-	defer span.End()
 	if outer, ok := w.(*encbuf); ok {
 		// Encode was called by some type's EncodeRLP.
 		// Avoid copying by writing to the outer encbuf directly.
@@ -126,8 +122,6 @@ func EncodeToBytes(val interface{}) ([]byte, error) {
 }
 
 func EncodeToBytesCtx(ctx context.Context, val interface{}) ([]byte, error) {
-	ctx, span := trace.StartSpan(ctx, "EncodeToBytes")
-	defer span.End()
 	eb := encbufPool.Get().(*encbuf)
 	defer encbufPool.Put(eb)
 	eb.reset()
@@ -147,8 +141,6 @@ func EncodeToReader(val interface{}) (size int, r io.Reader, err error) {
 }
 
 func EncodeToReaderCtx(ctx context.Context, val interface{}) (size int, r io.Reader, err error) {
-	ctx, span := trace.StartSpan(ctx, "EncodeToReader")
-	defer span.End()
 	eb := encbufPool.Get().(*encbuf)
 	eb.reset()
 	if err := eb.encode(ctx, val); err != nil {
@@ -219,11 +211,8 @@ func (w *encbuf) Write(b []byte) (int, error) {
 }
 
 func (w *encbuf) encode(ctx context.Context, val interface{}) error {
-	ctx, span := trace.StartSpan(ctx, "encBuf.encode")
-	defer span.End()
 	rval := reflect.ValueOf(val)
 	t := rval.Type()
-	span.AddAttributes(trace.StringAttribute("type", t.String()))
 	ti, err := cachedTypeInfo(t, tags{})
 	if err != nil {
 		return err
@@ -272,8 +261,6 @@ func (w *encbuf) size() int {
 }
 
 func (w *encbuf) toBytes(ctx context.Context) []byte {
-	ctx, span := trace.StartSpan(ctx, "encbuf.toBytes")
-	defer span.End()
 	out := make([]byte, w.size())
 	strpos := 0
 	pos := 0
@@ -292,9 +279,6 @@ func (w *encbuf) toBytes(ctx context.Context) []byte {
 }
 
 func (w *encbuf) toWriter(ctx context.Context, out io.Writer) (err error) {
-	ctx, span := trace.StartSpan(ctx, "encBuf.toWriter")
-	defer span.End()
-
 	strpos := 0
 	for _, head := range w.lheads {
 		// write string data before header
