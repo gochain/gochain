@@ -28,8 +28,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-
-	"go.opencensus.io/trace"
 )
 
 var (
@@ -124,8 +122,6 @@ func Decode(r io.Reader, val interface{}) error {
 }
 
 func DecodeCtx(ctx context.Context, r io.Reader, val interface{}) error {
-	ctx, span := trace.StartSpan(ctx, "Decode")
-	defer span.End()
 	s := NewStream(r, 0)
 	err := s.DecodeCtx(ctx, val)
 	Discard(s)
@@ -140,8 +136,6 @@ func DecodeBytes(b []byte, val interface{}) error {
 }
 
 func DecodeBytesCtx(ctx context.Context, b []byte, val interface{}) error {
-	ctx, span := trace.StartSpan(ctx, "DecodeBytes")
-	defer span.End()
 	r := bytes.NewReader(b)
 	s := NewStream(r, uint64(len(b)))
 	defer Discard(s)
@@ -883,15 +877,11 @@ func (s *Stream) Decode(val interface{}) error {
 	return s.DecodeCtx(context.Background(), val)
 }
 func (s *Stream) DecodeCtx(ctx context.Context, val interface{}) error {
-	ctx, span := trace.StartSpan(ctx, "Stream.Decode")
-	defer span.End()
-
 	if val == nil {
 		return errDecodeIntoNil
 	}
 	rval := reflect.ValueOf(val)
 	rtyp := rval.Type()
-	span.AddAttributes(trace.StringAttribute("type", rtyp.String()))
 	if rtyp.Kind() != reflect.Ptr {
 		return errNoPointer
 	}
