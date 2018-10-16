@@ -97,7 +97,12 @@ func (db *DB) Open() error {
 	db.receipt = NewTable("receipt", db.TablePath("receipt"), NewBlockNumberPartitioner(db.PartitionSize))
 
 	for _, tbl := range db.Tables() {
+		// Allow 100x header files since they are small.
 		tbl.MaxOpenSegmentCount = db.MaxOpenSegmentCount
+		if tbl.Name == "header" {
+			tbl.MaxOpenSegmentCount *= 100
+		}
+
 		tbl.MinCompactionAge = db.MinCompactionAge
 		tbl.SegmentOpener = db.SegmentOpener
 		tbl.SegmentCompactor = db.SegmentCompactor
