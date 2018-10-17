@@ -86,7 +86,7 @@ type BlockChain interface {
 	GetHeaderByNumber(number uint64) *types.Header
 	GetAncestor(hash common.Hash, number, ancestor uint64, maxNonCanonical *uint64) (common.Hash, uint64)
 	Genesis() *types.Block
-	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent)
+	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent, name string)
 	UnsubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent)
 }
 

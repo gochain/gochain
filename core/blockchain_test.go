@@ -960,7 +960,7 @@ func TestLogReorgs(t *testing.T) {
 	defer blockchain.Stop()
 
 	rmLogsCh := make(chan RemovedLogsEvent, 1)
-	blockchain.SubscribeRemovedLogsEvent(rmLogsCh)
+	blockchain.SubscribeRemovedLogsEvent(rmLogsCh, "test")
 	chain, _ := GenerateChain(ctx, params.TestChainConfig, genesis, engine, db, 2, func(ctx context.Context, i int, gen *BlockGen) {
 		if i == 1 {
 			tx, err := types.SignTx(types.NewContractCreation(gen.TxNonce(addr1), new(big.Int), 1000000, new(big.Int), code), signer, key1)
@@ -1024,7 +1024,7 @@ func TestReorgSideEvent(t *testing.T) {
 		gen.AddTx(ctx, tx)
 	})
 	chainSideCh := make(chan ChainSideEvent, 64)
-	blockchain.SubscribeChainSideEvent(chainSideCh)
+	blockchain.SubscribeChainSideEvent(chainSideCh, "test")
 	if _, err := blockchain.InsertChain(ctx, replacementBlocks); err != nil {
 		t.Fatalf("failed to insert chain: %v", err)
 	}

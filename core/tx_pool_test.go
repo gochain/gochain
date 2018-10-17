@@ -90,8 +90,8 @@ func (bc *testBlockChain) StateAt(common.Hash) (*state.StateDB, error) {
 	return bc.statedb, nil
 }
 
-func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) {
-	bc.chainHeadFeed.Subscribe(ch)
+func (bc *testBlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent, name string) {
+	bc.chainHeadFeed.Subscribe(ch, name)
 }
 
 func (bc *testBlockChain) UnsubscribeChainHeadEvent(ch chan<- ChainHeadEvent) {
@@ -811,7 +811,7 @@ func TestTransactionGapFilling(t *testing.T) {
 
 	// Keep track of transaction events to ensure all executables get announced
 	events := make(chan NewTxsEvent, testTxPoolConfig.AccountQueue+5)
-	pool.SubscribeNewTxsEvent(events)
+	pool.SubscribeNewTxsEvent(events, "test")
 	pool.mu.Unlock()
 	defer pool.UnsubscribeNewTxsEvent(events)
 
@@ -1095,7 +1095,7 @@ func TestTransactionPendingLimiting(t *testing.T) {
 
 	// Keep track of transaction events to ensure all executables get announced
 	events := make(chan NewTxsEvent, testTxPoolConfig.AccountQueue+5)
-	pool.SubscribeNewTxsEvent(events)
+	pool.SubscribeNewTxsEvent(events, "test")
 	pool.mu.Unlock()
 	defer pool.UnsubscribeNewTxsEvent(events)
 
@@ -1349,7 +1349,7 @@ func TestTransactionPoolRepricing(t *testing.T) {
 	// Keep track of transaction events to ensure all executables get announced
 	events := make(chan NewTxsEvent, 32)
 	pool.mu.Lock()
-	pool.SubscribeNewTxsEvent(events)
+	pool.SubscribeNewTxsEvent(events, "test")
 	pool.mu.Unlock()
 	defer pool.UnsubscribeNewTxsEvent(events)
 
@@ -1519,7 +1519,7 @@ func TestTransactionPoolUnderpricing(t *testing.T) {
 	// Keep track of transaction events to ensure all executables get announced
 	events := make(chan NewTxsEvent, 32)
 	pool.mu.Lock()
-	pool.SubscribeNewTxsEvent(events)
+	pool.SubscribeNewTxsEvent(events, "test")
 	pool.mu.Unlock()
 	defer pool.UnsubscribeNewTxsEvent(events)
 
@@ -1601,7 +1601,7 @@ func TestTransactionPoolStableUnderpricing(t *testing.T) {
 
 	// Keep track of transaction events to ensure all executables get announced
 	events := make(chan NewTxsEvent, 1024)
-	pool.SubscribeNewTxsEvent(events)
+	pool.SubscribeNewTxsEvent(events, "test")
 	defer pool.UnsubscribeNewTxsEvent(events)
 
 	// Create a number of test accounts and fund them
@@ -1671,7 +1671,7 @@ func TestTransactionReplacement(t *testing.T) {
 	// Keep track of transaction events to ensure all executables get announced
 	events := make(chan NewTxsEvent, 32)
 	pool.mu.Lock()
-	pool.SubscribeNewTxsEvent(events)
+	pool.SubscribeNewTxsEvent(events, "test")
 	defer pool.UnsubscribeNewTxsEvent(events)
 
 	// Create a test account to add transactions with

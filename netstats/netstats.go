@@ -52,13 +52,13 @@ const (
 )
 
 type txPool interface {
-	SubscribeNewTxsEvent(chan<- core.NewTxsEvent)
+	SubscribeNewTxsEvent(chan<- core.NewTxsEvent, string)
 	UnsubscribeNewTxsEvent(chan<- core.NewTxsEvent)
 }
 
 type blockChain interface {
-	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent)
-	UnsubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent)
+	SubscribeChainHeadEvent(chan<- core.ChainHeadEvent, string)
+	UnsubscribeChainHeadEvent(chan<- core.ChainHeadEvent)
 }
 
 // Service implements an GoChain netstats reporting daemon that pushes local
@@ -163,8 +163,8 @@ func (s *Service) loop() {
 		headCh      = make(chan *types.Block, 1)
 		txCh        = make(chan struct{}, 1)
 	)
-	blockchain.SubscribeChainHeadEvent(chainHeadCh)
-	txpool.SubscribeNewTxsEvent(txEventCh)
+	blockchain.SubscribeChainHeadEvent(chainHeadCh, "netstats.Service")
+	txpool.SubscribeNewTxsEvent(txEventCh, "netstats.Service")
 	go func() {
 		defer close(quitCh)
 		defer blockchain.UnsubscribeChainHeadEvent(chainHeadCh)

@@ -88,32 +88,32 @@ func (b *testBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.
 	return nil, nil
 }
 
-func (b *testBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
-	b.txFeed.Subscribe(ch)
+func (b *testBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent, name string) {
+	b.txFeed.Subscribe(ch, name)
 }
 
 func (b *testBackend) UnsubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
 	b.txFeed.Unsubscribe(ch)
 }
 
-func (b *testBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) {
-	b.rmLogsFeed.Subscribe(ch)
+func (b *testBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent, name string) {
+	b.rmLogsFeed.Subscribe(ch, name)
 }
 
 func (b *testBackend) UnsubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) {
 	b.rmLogsFeed.Unsubscribe(ch)
 }
 
-func (b *testBackend) SubscribeLogsEvent(ch chan<- []*types.Log) {
-	b.logsFeed.Subscribe(ch)
+func (b *testBackend) SubscribeLogsEvent(ch chan<- []*types.Log, name string) {
+	b.logsFeed.Subscribe(ch, name)
 }
 
 func (b *testBackend) UnsubscribeLogsEvent(ch chan<- []*types.Log) {
 	b.logsFeed.Unsubscribe(ch)
 }
 
-func (b *testBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) {
-	b.chainFeed.Subscribe(ch)
+func (b *testBackend) SubscribeChainEvent(ch chan<- core.ChainEvent, name string) {
+	b.chainFeed.Subscribe(ch, name)
 }
 
 func (b *testBackend) UnsubscribeChainEvent(ch chan<- core.ChainEvent) {

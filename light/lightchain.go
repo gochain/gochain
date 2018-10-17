@@ -496,8 +496,8 @@ func (self *LightChain) UnlockChain() {
 }
 
 // SubscribeChainEvent registers a subscription of ChainEvent.
-func (lc *LightChain) SubscribeChainEvent(ch chan<- core.ChainEvent) {
-	lc.chainFeed.Subscribe(ch)
+func (lc *LightChain) SubscribeChainEvent(ch chan<- core.ChainEvent, name string) {
+	lc.chainFeed.Subscribe(ch, name)
 }
 
 func (lc *LightChain) UnsubscribeChainEvent(ch chan<- core.ChainEvent) {
@@ -505,8 +505,8 @@ func (lc *LightChain) UnsubscribeChainEvent(ch chan<- core.ChainEvent) {
 }
 
 // SubscribeChainHeadEvent registers a subscription of ChainHeadEvent.
-func (lc *LightChain) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) {
-	lc.chainHeadFeed.Subscribe(ch)
+func (lc *LightChain) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent, name string) {
+	lc.chainHeadFeed.Subscribe(ch, name)
 }
 
 func (lc *LightChain) UnsubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) {
@@ -514,8 +514,8 @@ func (lc *LightChain) UnsubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) {
 }
 
 // SubscribeChainSideEvent registers a subscription of ChainSideEvent.
-func (lc *LightChain) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent) {
-	lc.chainSideFeed.Subscribe(ch)
+func (lc *LightChain) SubscribeChainSideEvent(ch chan<- core.ChainSideEvent, name string) {
+	lc.chainSideFeed.Subscribe(ch, name)
 }
 
 func (lc *LightChain) UnsubscribeChainSideEvent(ch chan<- core.ChainSideEvent) {

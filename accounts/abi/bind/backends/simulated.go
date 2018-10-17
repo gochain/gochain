@@ -452,7 +452,7 @@ func (fb *filterBackend) GetLogs(ctx context.Context, hash common.Hash) ([][]*ty
 	return logs, nil
 }
 
-func (fb *filterBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
+func (fb *filterBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent, _ string) {
 	sub := event.NewSubscription(func(quit <-chan struct{}) error {
 		<-quit
 		return nil
@@ -479,24 +479,24 @@ func (fb *filterBackend) removeSub(ch chan<- core.NewTxsEvent) event.Subscriptio
 	return sub
 }
 
-func (fb *filterBackend) SubscribeChainEvent(ch chan<- core.ChainEvent) {
-	fb.bc.SubscribeChainEvent(ch)
+func (fb *filterBackend) SubscribeChainEvent(ch chan<- core.ChainEvent, name string) {
+	fb.bc.SubscribeChainEvent(ch, name)
 }
 
 func (fb *filterBackend) UnsubscribeChainEvent(ch chan<- core.ChainEvent) {
 	fb.bc.UnsubscribeChainEvent(ch)
 }
 
-func (fb *filterBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) {
-	fb.bc.SubscribeRemovedLogsEvent(ch)
+func (fb *filterBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent, name string) {
+	fb.bc.SubscribeRemovedLogsEvent(ch, name)
 }
 
 func (fb *filterBackend) UnsubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) {
 	fb.bc.UnsubscribeRemovedLogsEvent(ch)
 }
 
-func (fb *filterBackend) SubscribeLogsEvent(ch chan<- []*types.Log) {
-	fb.bc.SubscribeLogsEvent(ch)
+func (fb *filterBackend) SubscribeLogsEvent(ch chan<- []*types.Log, name string) {
+	fb.bc.SubscribeLogsEvent(ch, name)
 }
 
 func (fb *filterBackend) UnsubscribeLogsEvent(ch chan<- []*types.Log) {

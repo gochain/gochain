@@ -133,7 +133,7 @@ type blockChain interface {
 	GetBlock(hash common.Hash, number uint64) *types.Block
 	StateAt(root common.Hash) (*state.StateDB, error)
 
-	SubscribeChainHeadEvent(ch chan<- ChainHeadEvent)
+	SubscribeChainHeadEvent(ch chan<- ChainHeadEvent, name string)
 	UnsubscribeChainHeadEvent(ch chan<- ChainHeadEvent)
 }
 
@@ -295,7 +295,7 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 	}
 
 	// Subscribe events from blockchain.
-	pool.chain.SubscribeChainHeadEvent(pool.chainHeadCh)
+	pool.chain.SubscribeChainHeadEvent(pool.chainHeadCh, "core.TxPool")
 	// Spawn worker routines to run until chainHeadSub unsub.
 	pool.wg.Add(3)
 	pool.stop = make(chan struct{})
@@ -639,8 +639,8 @@ func (pool *TxPool) Stop() {
 
 // SubscribeNewTxsEvent registers a subscription of NewTxsEvent and
 // starts sending event to the given channel.
-func (pool *TxPool) SubscribeNewTxsEvent(ch chan<- NewTxsEvent) {
-	pool.txFeed.Subscribe(ch)
+func (pool *TxPool) SubscribeNewTxsEvent(ch chan<- NewTxsEvent, name string) {
+	pool.txFeed.Subscribe(ch, name)
 }
 
 func (pool *TxPool) UnsubscribeNewTxsEvent(ch chan<- NewTxsEvent) {

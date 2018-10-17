@@ -322,7 +322,7 @@ func (s *requestCostStats) update(msgCode, reqCnt, cost uint64) {
 func (pm *ProtocolManager) blockLoop() {
 	pm.wg.Add(1)
 	headCh := make(chan core.ChainHeadEvent, 100)
-	pm.blockchain.SubscribeChainHeadEvent(headCh)
+	pm.blockchain.SubscribeChainHeadEvent(headCh, "les.ProtocolManger-blockLoop")
 	go func() {
 		var lastHead *types.Header
 		lastBroadcastTd := common.Big0
