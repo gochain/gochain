@@ -48,7 +48,7 @@ const (
 	inmemorySnapshots  = 128  // Number of recent vote snapshots to keep in memory
 	inmemorySignatures = 4096 // Number of recent block signatures to keep in memory
 
-	wiggleTime = 200 * time.Millisecond // Delay step for out-of-turn signers.
+	wiggleTime = 100 * time.Millisecond // Delay step for out-of-turn signers.
 )
 
 // Clique proof-of-authority protocol constants.
@@ -667,40 +667,44 @@ func (c *Clique) Seal(ctx context.Context, chain consensus.ChainReader, block *t
 		}
 	}
 
-	// The in-turn signer, with difficulty n, will not delay.
-	var delay time.Duration
-	n := uint64(len(header.Signers))
-	if diff := header.Difficulty.Uint64(); diff < n {
-		// Out-of-turn to sign, delay it a bit.
-		// Since diff is in the range [n/2+1,n], delay is [wiggleTime,n/2*wiggleTime].
-		delay = time.Duration(n-diff) * wiggleTime
-	}
-	if until := time.Unix(header.Time.Int64(), delay.Nanoseconds()); time.Now().Before(until) {
-		// Need to wait.
-		if delay == 0 {
-			log.Trace("Waiting for slot to sign and propagate", "number", number, "until", header.Time.Int64())
-		} else {
-			log.Trace("Out-of-turn signing requested - waiting for slot to sign and propagate after delay",
-				"number", number, "until", header.Time.Int64(), "delay", common.PrettyDuration(delay))
-		}
-
-		if wait := until.Sub(time.Now()); wait > 0 {
-			select {
-			case <-stop:
-				return nil, nil
-			case <-time.After(wait):
-			}
-		}
-	}
-
 	// Sign all the things!
 	sighash, err := signFn(accounts.Account{Address: signer}, sigHash(ctx, header).Bytes())
 	if err != nil {
 		return nil, err
 	}
 	header.Signer = sighash
+	wSeal := block.WithSeal(header)
 
-	return block.WithSeal(header), nil
+	// Maybe delay.
+	var (
+		n    = uint64(len(snap.Signers))
+		diff = header.Difficulty.Uint64()
+	)
+	if diff == n {
+		// In-turn, seal immediately.
+		return wSeal, nil
+	} else if diff > n {
+		// Should never happen.
+		return nil, fmt.Errorf("failed to seal: illegal difficulty %d/%d", diff, n)
+	}
+	// Out-of-turn (diff < n), wait until header.Time plus a delay based on difficulty.
+	// Since diff is in the range [n/2+1,n], delay is [wiggleTime,n/2*wiggleTime].
+	var (
+		delay = time.Duration(n-diff) * wiggleTime
+		until = time.Unix(header.Time.Int64(), delay.Nanoseconds())
+	)
+	if wait := time.Until(until); wait > 0 {
+		log.Trace("Out-of-turn signing requested - waiting for slot to sign and propagate after delay",
+			"number", number, "until", header.Time.Int64(), "delay", common.PrettyDuration(delay))
+
+		select {
+		case <-stop:
+			return nil, nil
+		case <-time.After(wait):
+		}
+	}
+
+	return wSeal, nil
 }
 
 // CalcDifficulty returns the difficulty for signer, given all signers and their most recently signed block numbers,
