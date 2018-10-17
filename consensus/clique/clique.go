@@ -677,7 +677,7 @@ func (c *Clique) Seal(ctx context.Context, chain consensus.ChainReader, block *t
 
 	// Maybe delay.
 	var (
-		n    = uint64(len(header.Signers))
+		n    = uint64(len(snap.Signers))
 		diff = header.Difficulty.Uint64()
 	)
 	if diff == n {
