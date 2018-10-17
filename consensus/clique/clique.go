@@ -610,13 +610,17 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 	if header.Time.Int64() < time.Now().Unix() {
 		header.Time = big.NewInt(time.Now().Unix())
 	}
-	var deadline *time.Time
-	if c.config.Period != 0 {
-		t := time.Unix(header.Time.Int64(), 0)
-		t = t.Add(-time.Duration(c.config.Period) * time.Second * 2 / 3)
-		deadline = &t
+	if c.config.Period == 0 {
+		return nil, nil
 	}
-	return deadline, nil
+	return prepareDeadline(header.Time.Int64(), c.config.Period), nil
+}
+
+// prepareDeadline returns a deadline for block preparation which is 2/3 of the period before unix.
+func prepareDeadline(unix int64, period uint64) *time.Time {
+	t := time.Unix(unix, 0)
+	t = t.Add(-time.Duration(period) * time.Second * 2 / 3)
+	return &t
 }
 
 func (c *Clique) Authorize(signer common.Address, signFn consensus.SignerFn) {
@@ -691,7 +695,7 @@ func (c *Clique) Seal(ctx context.Context, chain consensus.ChainReader, block *t
 	// Since diff is in the range [n/2+1,n], delay is [wiggleTime,n/2*wiggleTime].
 	var (
 		delay = time.Duration(n-diff) * wiggleTime
-		until = time.Unix(header.Time.Int64(), delay.Nanoseconds())
+		until = prepareDeadline(header.Time.Int64(), c.config.Period).Add(delay)
 	)
 	if wait := time.Until(until); wait > 0 {
 		log.Trace("Out-of-turn signing requested - waiting for slot to sign and propagate after delay",
