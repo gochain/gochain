@@ -97,11 +97,12 @@ func (s *Server) RegisterName(name string, rcvr interface{}) error {
 
 	methods, subscriptions := suitableCallbacks(rcvrVal, svc.typ)
 
-	// already a previous service register under given sname, merge methods/subscriptions
+	if len(methods) == 0 && len(subscriptions) == 0 {
+		return fmt.Errorf("Service %T doesn't have any suitable methods/subscriptions to expose", rcvr)
+	}
+
+	// already a previous service register under given name, merge methods/subscriptions
 	if regsvc, present := s.services[name]; present {
-		if len(methods) == 0 && len(subscriptions) == 0 {
-			return fmt.Errorf("Service %T doesn't have any suitable methods/subscriptions to expose", rcvr)
-		}
 		for _, m := range methods {
 			regsvc.callbacks[formatName(m.method.Name)] = m
 		}
@@ -113,10 +114,6 @@ func (s *Server) RegisterName(name string, rcvr interface{}) error {
 
 	svc.name = name
 	svc.callbacks, svc.subscriptions = methods, subscriptions
-
-	if len(svc.callbacks) == 0 && len(svc.subscriptions) == 0 {
-		return fmt.Errorf("Service %T doesn't have any suitable methods/subscriptions to expose", rcvr)
-	}
 
 	s.services[svc.name] = svc
 	return nil
@@ -147,7 +144,7 @@ func (s *Server) serveRequest(ctx context.Context, codec ServerCodec, singleShot
 	defer cancel()
 
 	// if the codec supports notification include a notifier that callbacks can use
-	// to send notification to clients. It is thight to the codec/connection. If the
+	// to send notification to clients. It is tied to the codec/connection. If the
 	// connection is closed the notifier will stop and cancels all active subscriptions.
 	if options&OptionSubscriptions == OptionSubscriptions {
 		ctx = context.WithValue(ctx, notifierKey{}, newNotifier(codec))
@@ -439,7 +436,7 @@ func (s *Server) readRequest(codec ServerCodec) ([]*serverRequest, bool, Error) 
 					}
 				}
 			} else {
-				requests[i] = &serverRequest{id: r.id, err: &methodNotFoundError{r.method, r.method}}
+				requests[i] = &serverRequest{id: r.id, err: &methodNotFoundError{r.service, r.method}}
 			}
 			continue
 		}

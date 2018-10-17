@@ -34,6 +34,7 @@ import (
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/p2p/discover"
+	"github.com/gochain-io/gochain/rpc"
 )
 
 const (
@@ -119,6 +120,10 @@ type Config struct {
 	// If the module list is empty, all RPC API endpoints designated public will be
 	// exposed.
 	HTTPModules []string `toml:",omitempty"`
+
+	// HTTPTimeouts allows for customization of the timeout values used by the HTTP RPC
+	// interface.
+	HTTPTimeouts rpc.HTTPTimeouts
 
 	// HTTPTracing enables openconsensus tracing.
 	HTTPTracing bool
