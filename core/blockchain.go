@@ -1707,8 +1707,8 @@ func (bc *BlockChain) Config() *params.ChainConfig { return bc.chainConfig }
 func (bc *BlockChain) Engine() consensus.Engine { return bc.engine }
 
 // SubscribeRemovedLogsEvent registers a subscription of RemovedLogsEvent.
-func (bc *BlockChain) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) {
-	bc.rmLogsFeed.Subscribe(ch)
+func (bc *BlockChain) SubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent, name string) {
+	bc.rmLogsFeed.Subscribe(ch, name)
 }
 
 func (bc *BlockChain) UnsubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) {
@@ -1716,8 +1716,8 @@ func (bc *BlockChain) UnsubscribeRemovedLogsEvent(ch chan<- RemovedLogsEvent) {
 }
 
 // SubscribeChainEvent registers a subscription of ChainEvent.
-func (bc *BlockChain) SubscribeChainEvent(ch chan<- ChainEvent) {
-	bc.chainFeed.Subscribe(ch)
+func (bc *BlockChain) SubscribeChainEvent(ch chan<- ChainEvent, name string) {
+	bc.chainFeed.Subscribe(ch, name)
 }
 
 // SubscribeChainEvent registers a subscription of ChainEvent.
@@ -1726,8 +1726,8 @@ func (bc *BlockChain) UnsubscribeChainEvent(ch chan<- ChainEvent) {
 }
 
 // SubscribeChainHeadEvent registers a subscription of ChainHeadEvent.
-func (bc *BlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) {
-	bc.chainHeadFeed.Subscribe(ch)
+func (bc *BlockChain) SubscribeChainHeadEvent(ch chan<- ChainHeadEvent, name string) {
+	bc.chainHeadFeed.Subscribe(ch, name)
 }
 
 // SubscribeChainHeadEvent registers a subscription of ChainHeadEvent.
@@ -1736,8 +1736,8 @@ func (bc *BlockChain) UnsubscribeChainHeadEvent(ch chan<- ChainHeadEvent) {
 }
 
 // SubscribeChainSideEvent registers a subscription of ChainSideEvent.
-func (bc *BlockChain) SubscribeChainSideEvent(ch chan<- ChainSideEvent) {
-	bc.chainSideFeed.Subscribe(ch)
+func (bc *BlockChain) SubscribeChainSideEvent(ch chan<- ChainSideEvent, name string) {
+	bc.chainSideFeed.Subscribe(ch, name)
 }
 
 func (bc *BlockChain) UnsubscribeChainSideEvent(ch chan<- ChainSideEvent) {
@@ -1745,8 +1745,8 @@ func (bc *BlockChain) UnsubscribeChainSideEvent(ch chan<- ChainSideEvent) {
 }
 
 // SubscribeLogsEvent registers a subscription of []*types.Log.
-func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) {
-	bc.logsFeed.Subscribe(ch)
+func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log, name string) {
+	bc.logsFeed.Subscribe(ch, name)
 }
 
 func (bc *BlockChain) UnsubscribeLogsEvent(ch chan<- []*types.Log) {

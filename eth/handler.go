@@ -210,7 +210,7 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 
 	// broadcast transactions
 	pm.txsCh = make(chan core.NewTxsEvent, txChanSize)
-	pm.txpool.SubscribeNewTxsEvent(pm.txsCh)
+	pm.txpool.SubscribeNewTxsEvent(pm.txsCh, "eth.ProtocolManager")
 	go pm.txBroadcastLoop()
 
 	// broadcast mined blocks

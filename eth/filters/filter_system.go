@@ -125,10 +125,11 @@ func NewEventSystem(mux *event.TypeMux, backend Backend, lightMode bool) *EventS
 	}
 
 	// Subscribe events
-	m.backend.SubscribeNewTxsEvent(m.txsCh)
-	m.backend.SubscribeLogsEvent(m.logsCh)
-	m.backend.SubscribeRemovedLogsEvent(m.rmLogsCh)
-	m.backend.SubscribeChainEvent(m.chainCh)
+	const name = "eth/filters.EventSystem"
+	m.backend.SubscribeNewTxsEvent(m.txsCh, name)
+	m.backend.SubscribeLogsEvent(m.logsCh, name)
+	m.backend.SubscribeRemovedLogsEvent(m.rmLogsCh, name)
+	m.backend.SubscribeChainEvent(m.chainCh, name)
 	// TODO(rjl493456442): use feed to subscribe pending log event
 	m.pendingLogSub = m.mux.Subscribe(core.PendingLogsEvent{})
 

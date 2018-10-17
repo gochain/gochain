@@ -133,8 +133,8 @@ func newWorker(config *params.ChainConfig, engine consensus.Engine, coinbase com
 		agents:      make(map[Agent]struct{}),
 		unconfirmed: newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth),
 	}
-	eth.TxPool().SubscribeNewTxsEvent(worker.txsCh)
-	eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
+	eth.TxPool().SubscribeNewTxsEvent(worker.txsCh, "miner.worker")
+	eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh, "miner.worker")
 	go worker.update()
 
 	go worker.wait()

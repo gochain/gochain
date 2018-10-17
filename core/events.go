@@ -17,12 +17,16 @@
 package core
 
 import (
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/log"
 )
+
+const timeout = 500 * time.Millisecond
 
 // NewTxsEvent is posted when a batch of transactions enter the transaction pool.
 type NewTxsEvent struct{ Txs []*types.Transaction }
@@ -55,257 +59,322 @@ type ChainHeadEvent struct{ Block *types.Block }
 
 type NewTxsFeed struct {
 	mu   sync.RWMutex
-	subs []chan<- NewTxsEvent
+	subs map[chan<- NewTxsEvent]string
 }
 
 func (f *NewTxsFeed) Close() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for _, sub := range f.subs {
+	for sub := range f.subs {
 		close(sub)
 	}
 	f.subs = nil
 }
 
-func (f *NewTxsFeed) Subscribe(ch chan<- NewTxsEvent) {
+func (f *NewTxsFeed) Subscribe(ch chan<- NewTxsEvent, name string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.subs = append(f.subs, ch)
+	if f.subs == nil {
+		f.subs = make(map[chan<- NewTxsEvent]string)
+	}
+	f.subs[ch] = name
 }
 
 func (f *NewTxsFeed) Unsubscribe(ch chan<- NewTxsEvent) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for i, s := range f.subs {
-		if s == ch {
-			f.subs = append(f.subs[:i], f.subs[i+1:]...)
-			close(ch)
-			return
-		}
+	if _, ok := f.subs[ch]; ok {
+		delete(f.subs, ch)
+		close(ch)
 	}
 }
 
 func (f *NewTxsFeed) Send(ev NewTxsEvent) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	for _, sub := range f.subs {
+	for sub, name := range f.subs {
 		select {
 		case sub <- ev:
 		default:
-			log.Trace("NewTxsFeed send dropped: channel full", "cap", cap(sub), "txs", len(ev.Txs))
+			log.Trace("NewTxsFeed send dropped: channel full", "name", name, "cap", cap(sub), "txs", len(ev.Txs))
 		}
 	}
 }
 
 type ChainFeed struct {
 	mu   sync.RWMutex
-	subs []chan<- ChainEvent
+	subs map[chan<- ChainEvent]string
 }
 
 func (f *ChainFeed) Close() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for _, sub := range f.subs {
+	for sub := range f.subs {
 		close(sub)
 	}
 	f.subs = nil
 }
 
-func (f *ChainFeed) Subscribe(ch chan<- ChainEvent) {
+func (f *ChainFeed) Subscribe(ch chan<- ChainEvent, name string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.subs = append(f.subs, ch)
+	if f.subs == nil {
+		f.subs = make(map[chan<- ChainEvent]string)
+	}
+	f.subs[ch] = name
 }
 
 func (f *ChainFeed) Unsubscribe(ch chan<- ChainEvent) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for i, s := range f.subs {
-		if s == ch {
-			f.subs = append(f.subs[:i], f.subs[i+1:]...)
-			close(ch)
-			return
-		}
+	if _, ok := f.subs[ch]; ok {
+		delete(f.subs, ch)
+		close(ch)
 	}
 }
 
 func (f *ChainFeed) Send(ev ChainEvent) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	for _, sub := range f.subs {
-		sub <- ev
+	for sub, name := range f.subs {
+		select {
+		case sub <- ev:
+		default:
+			start := time.Now()
+			var action string
+			select {
+			case sub <- ev:
+				action = "delayed"
+			case <-time.After(timeout):
+				action = "dropped"
+			}
+			dur := time.Since(start)
+			log.Warn(fmt.Sprintf("ChainFeed send %s: channel full", action), "name", name, "cap", cap(sub), "time", dur, "block", ev.Block.NumberU64(), "hash", ev.Hash)
+		}
 	}
 }
 
 type ChainHeadFeed struct {
 	mu   sync.RWMutex
-	subs []chan<- ChainHeadEvent
+	subs map[chan<- ChainHeadEvent]string
 }
 
 func (f *ChainHeadFeed) Close() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for _, sub := range f.subs {
+	for sub := range f.subs {
 		close(sub)
 	}
 	f.subs = nil
 }
 
-func (f *ChainHeadFeed) Subscribe(ch chan<- ChainHeadEvent) {
+func (f *ChainHeadFeed) Subscribe(ch chan<- ChainHeadEvent, name string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.subs = append(f.subs, ch)
+	if f.subs == nil {
+		f.subs = make(map[chan<- ChainHeadEvent]string)
+	}
+	f.subs[ch] = name
 }
 
 func (f *ChainHeadFeed) Unsubscribe(ch chan<- ChainHeadEvent) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for i, s := range f.subs {
-		if s == ch {
-			f.subs = append(f.subs[:i], f.subs[i+1:]...)
-			close(ch)
-			return
-		}
+	if _, ok := f.subs[ch]; ok {
+		delete(f.subs, ch)
+		close(ch)
 	}
 }
 
 func (f *ChainHeadFeed) Send(ev ChainHeadEvent) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	for _, sub := range f.subs {
-		sub <- ev
+	for sub, name := range f.subs {
+		select {
+		case sub <- ev:
+		default:
+			start := time.Now()
+			var action string
+			select {
+			case sub <- ev:
+				action = "delayed"
+			case <-time.After(timeout):
+				action = "dropped"
+			}
+			dur := time.Since(start)
+			log.Warn(fmt.Sprintf("ChainHeadFeed send %s: channel full", action), "name", name, "cap", cap(sub), "time", dur, "block", ev.Block.NumberU64(), "hash", ev.Block.Hash())
+		}
 	}
 }
 
 type ChainSideFeed struct {
 	mu   sync.RWMutex
-	subs []chan<- ChainSideEvent
+	subs map[chan<- ChainSideEvent]string
 }
 
 func (f *ChainSideFeed) Close() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for _, sub := range f.subs {
+	for sub := range f.subs {
 		close(sub)
 	}
 	f.subs = nil
 }
 
-func (f *ChainSideFeed) Subscribe(ch chan<- ChainSideEvent) {
+func (f *ChainSideFeed) Subscribe(ch chan<- ChainSideEvent, name string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.subs = append(f.subs, ch)
+	if f.subs == nil {
+		f.subs = make(map[chan<- ChainSideEvent]string)
+	}
+	f.subs[ch] = name
 }
 
 func (f *ChainSideFeed) Unsubscribe(ch chan<- ChainSideEvent) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for i, s := range f.subs {
-		if s == ch {
-			f.subs = append(f.subs[:i], f.subs[i+1:]...)
-			close(ch)
-			return
-		}
+	if _, ok := f.subs[ch]; ok {
+		delete(f.subs, ch)
+		close(ch)
 	}
 }
 
 func (f *ChainSideFeed) Send(ev ChainSideEvent) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	for _, sub := range f.subs {
-		sub <- ev
+	for sub, name := range f.subs {
+		select {
+		case sub <- ev:
+		default:
+			start := time.Now()
+			var action string
+			select {
+			case sub <- ev:
+				action = "delayed"
+			case <-time.After(timeout):
+				action = "dropped"
+			}
+			dur := time.Since(start)
+			log.Warn(fmt.Sprintf("ChainSideFeed send %s: channel full", action), "name", name, "cap", cap(sub), "time", dur, "block", ev.Block.NumberU64(), "hash", ev.Block.Hash())
+		}
 	}
 }
 
 type PendingLogsFeed struct {
 	mu   sync.RWMutex
-	subs []chan<- PendingLogsEvent
+	subs map[chan<- PendingLogsEvent]string
 }
 
 func (f *PendingLogsFeed) Close() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for _, sub := range f.subs {
+	for sub := range f.subs {
 		close(sub)
 	}
 	f.subs = nil
 }
 
-func (f *PendingLogsFeed) Subscribe(ch chan<- PendingLogsEvent) {
+func (f *PendingLogsFeed) Subscribe(ch chan<- PendingLogsEvent, name string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.subs = append(f.subs, ch)
+	if f.subs == nil {
+		f.subs = make(map[chan<- PendingLogsEvent]string)
+	}
+	f.subs[ch] = name
 }
 
 func (f *PendingLogsFeed) Unsubscribe(ch chan<- PendingLogsEvent) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for i, s := range f.subs {
-		if s == ch {
-			f.subs = append(f.subs[:i], f.subs[i+1:]...)
-			close(ch)
-			return
-		}
+	if _, ok := f.subs[ch]; ok {
+		delete(f.subs, ch)
+		close(ch)
 	}
 }
 
 func (f *PendingLogsFeed) Send(ev PendingLogsEvent) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	for _, sub := range f.subs {
-		sub <- ev
+	for sub, name := range f.subs {
+		select {
+		case sub <- ev:
+		default:
+			start := time.Now()
+			var action string
+			select {
+			case sub <- ev:
+				action = "delayed"
+			case <-time.After(timeout):
+				action = "dropped"
+			}
+			dur := time.Since(start)
+			log.Warn(fmt.Sprintf("PendingLogsFeed send %s: channel full", action), "name", name, "cap", cap(sub), "time", dur, "len", len(ev.Logs))
+		}
 	}
 }
 
 type RemovedLogsFeed struct {
 	mu   sync.RWMutex
-	subs []chan<- RemovedLogsEvent
+	subs map[chan<- RemovedLogsEvent]string
 }
 
 func (f *RemovedLogsFeed) Close() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for _, sub := range f.subs {
+	for sub := range f.subs {
 		close(sub)
 	}
 	f.subs = nil
 }
 
-func (f *RemovedLogsFeed) Subscribe(ch chan<- RemovedLogsEvent) {
+func (f *RemovedLogsFeed) Subscribe(ch chan<- RemovedLogsEvent, name string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.subs = append(f.subs, ch)
+	if f.subs == nil {
+		f.subs = make(map[chan<- RemovedLogsEvent]string)
+	}
+	f.subs[ch] = name
 }
 
 func (f *RemovedLogsFeed) Unsubscribe(ch chan<- RemovedLogsEvent) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for i, s := range f.subs {
-		if s == ch {
-			f.subs = append(f.subs[:i], f.subs[i+1:]...)
-			close(ch)
-			return
-		}
+	if _, ok := f.subs[ch]; ok {
+		delete(f.subs, ch)
+		close(ch)
 	}
 }
 
 func (f *RemovedLogsFeed) Send(ev RemovedLogsEvent) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	for _, sub := range f.subs {
-		sub <- ev
+	for sub, name := range f.subs {
+		select {
+		case sub <- ev:
+		default:
+			start := time.Now()
+			var action string
+			select {
+			case sub <- ev:
+				action = "delayed"
+			case <-time.After(timeout):
+				action = "dropped"
+			}
+			dur := time.Since(start)
+			log.Warn(fmt.Sprintf("RemovedLogsFeed send %s: channel full", action), "name", name, "cap", cap(sub), "time", dur, "len", len(ev.Logs))
+		}
 	}
 }
 
 type LogsFeed struct {
 	mu   sync.RWMutex
-	subs []chan<- []*types.Log
+	subs map[chan<- []*types.Log]string
 }
 
 func (f *LogsFeed) Close() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for _, sub := range f.subs {
+	for sub := range f.subs {
 		close(sub)
 	}
 	f.subs = nil
@@ -317,28 +386,41 @@ func (f *LogsFeed) Len() int {
 	return len(f.subs)
 }
 
-func (f *LogsFeed) Subscribe(ch chan<- []*types.Log) {
+func (f *LogsFeed) Subscribe(ch chan<- []*types.Log, name string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.subs = append(f.subs, ch)
+	if f.subs == nil {
+		f.subs = make(map[chan<- []*types.Log]string)
+	}
+	f.subs[ch] = name
 }
 
 func (f *LogsFeed) Unsubscribe(ch chan<- []*types.Log) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for i, s := range f.subs {
-		if s == ch {
-			f.subs = append(f.subs[:i], f.subs[i+1:]...)
-			close(ch)
-			return
-		}
+	if _, ok := f.subs[ch]; ok {
+		delete(f.subs, ch)
+		close(ch)
 	}
 }
 
 func (f *LogsFeed) Send(logs []*types.Log) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	for _, sub := range f.subs {
-		sub <- logs
+	for sub, name := range f.subs {
+		select {
+		case sub <- logs:
+		default:
+			start := time.Now()
+			var action string
+			select {
+			case sub <- logs:
+				action = "delayed"
+			case <-time.After(timeout):
+				action = "dropped"
+			}
+			dur := time.Since(start)
+			log.Warn(fmt.Sprintf("LogsFeed send %s: channel full", action), "name", name, "cap", cap(sub), "time", dur, "len", len(logs))
+		}
 	}
 }

@@ -135,8 +135,8 @@ func (p *testTxPool) PendingList(ctx context.Context) types.Transactions {
 	return pending
 }
 
-func (p *testTxPool) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
-	p.txFeed.Subscribe(ch)
+func (p *testTxPool) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent, name string) {
+	p.txFeed.Subscribe(ch, name)
 }
 
 func (p *testTxPool) UnsubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {

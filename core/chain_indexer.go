@@ -51,7 +51,7 @@ type ChainIndexerChain interface {
 	CurrentHeader() *types.Header
 
 	// SubscribeChainHeadEvent subscribes to new head header notifications.
-	SubscribeChainHeadEvent(ch chan<- ChainHeadEvent)
+	SubscribeChainHeadEvent(ch chan<- ChainHeadEvent, name string)
 	UnsubscribeChainHeadEvent(ch chan<- ChainHeadEvent)
 }
 
@@ -127,7 +127,7 @@ func (c *ChainIndexer) AddKnownSectionHead(section uint64, shead common.Hash) {
 // are notified about new events by their parents.
 func (c *ChainIndexer) Start(chain ChainIndexerChain) {
 	events := make(chan ChainHeadEvent, 32)
-	chain.SubscribeChainHeadEvent(events)
+	chain.SubscribeChainHeadEvent(events, "core.ChainIndexer")
 	// Mark the chain indexer as active, requiring an additional teardown
 	atomic.StoreUint32(&c.active, 1)
 	go c.eventLoop(chain, events)

@@ -34,13 +34,13 @@ type Backend interface {
 	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error)
 	GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error)
 
-	SubscribeNewTxsEvent(chan<- core.NewTxsEvent)
-	UnsubscribeNewTxsEvent(chan<- core.NewTxsEvent)
-	SubscribeChainEvent(ch chan<- core.ChainEvent)
+	SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent, name string)
+	UnsubscribeNewTxsEvent(ch chan<- core.NewTxsEvent)
+	SubscribeChainEvent(ch chan<- core.ChainEvent, name string)
 	UnsubscribeChainEvent(ch chan<- core.ChainEvent)
-	SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent)
+	SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent, name string)
 	UnsubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent)
-	SubscribeLogsEvent(ch chan<- []*types.Log)
+	SubscribeLogsEvent(ch chan<- []*types.Log, name string)
 	UnsubscribeLogsEvent(ch chan<- []*types.Log)
 
 	BloomStatus() (uint64, uint64)

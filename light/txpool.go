@@ -101,7 +101,7 @@ func NewTxPool(config *params.ChainConfig, chain *LightChain, relay TxRelayBacke
 		head:        chain.CurrentHeader().Hash(),
 		clearIdx:    chain.CurrentHeader().Number.Uint64(),
 	}
-	pool.chain.SubscribeChainHeadEvent(pool.chainHeadCh)
+	pool.chain.SubscribeChainHeadEvent(pool.chainHeadCh, "light.TxPool")
 	go pool.eventLoop()
 
 	return pool
@@ -316,8 +316,8 @@ func (pool *TxPool) Stop() {
 
 // SubscribeNewTxsEvent registers a subscription of core.NewTxsEvent and
 // starts sending event to the given channel.
-func (pool *TxPool) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {
-	pool.txFeed.Subscribe(ch)
+func (pool *TxPool) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent, name string) {
+	pool.txFeed.Subscribe(ch, name)
 }
 
 func (pool *TxPool) UnsubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) {

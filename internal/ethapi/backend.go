@@ -55,11 +55,11 @@ type Backend interface {
 	GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error)
 	GetTd(blockHash common.Hash) *big.Int
 	GetEVM(ctx context.Context, msg core.Message, state *state.StateDB, header *types.Header, vmCfg vm.Config) (*vm.EVM, error)
-	SubscribeChainEvent(ch chan<- core.ChainEvent)
+	SubscribeChainEvent(ch chan<- core.ChainEvent, name string)
 	UnsubscribeChainEvent(ch chan<- core.ChainEvent)
-	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent)
+	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent, name string)
 	UnsubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent)
-	SubscribeChainSideEvent(ch chan<- core.ChainSideEvent)
+	SubscribeChainSideEvent(ch chan<- core.ChainSideEvent, name string)
 	UnsubscribeChainSideEvent(ch chan<- core.ChainSideEvent)
 
 	// TxPool API
@@ -69,7 +69,7 @@ type Backend interface {
 	GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
 	Stats() (pending int, queued int)
 	TxPoolContent(context.Context) (map[common.Address]types.Transactions, map[common.Address]types.Transactions)
-	SubscribeNewTxsEvent(chan<- core.NewTxsEvent)
+	SubscribeNewTxsEvent(chan<- core.NewTxsEvent, string)
 	UnsubscribeNewTxsEvent(chan<- core.NewTxsEvent)
 
 	ChainConfig() *params.ChainConfig
