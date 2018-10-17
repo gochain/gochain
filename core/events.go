@@ -133,11 +133,7 @@ func (f *ChainFeed) Send(ev ChainEvent) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	for _, sub := range f.subs {
-		select {
-		case sub <- ev:
-		default:
-			log.Info("ChainFeed send dropped: channel full", "cap", cap(sub), "block", ev.Block.NumberU64(), "hash", ev.Hash)
-		}
+		sub <- ev
 	}
 }
 
@@ -177,11 +173,7 @@ func (f *ChainHeadFeed) Send(ev ChainHeadEvent) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	for _, sub := range f.subs {
-		select {
-		case sub <- ev:
-		default:
-			log.Info("ChainHeadFeed send dropped: channel full", "cap", cap(sub), "block", ev.Block.NumberU64(), "hash", ev.Block.Hash())
-		}
+		sub <- ev
 	}
 }
 
@@ -221,11 +213,7 @@ func (f *ChainSideFeed) Send(ev ChainSideEvent) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	for _, sub := range f.subs {
-		select {
-		case sub <- ev:
-		default:
-			log.Info("ChainSideFeed send dropped: channel full", "cap", cap(sub), "block", ev.Block.NumberU64(), "hash", ev.Block.Hash())
-		}
+		sub <- ev
 	}
 }
 
@@ -265,11 +253,7 @@ func (f *PendingLogsFeed) Send(ev PendingLogsEvent) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	for _, sub := range f.subs {
-		select {
-		case sub <- ev:
-		default:
-			log.Info("PendingLogsFeed send dropped: channel full", "cap", cap(sub), "len", len(ev.Logs))
-		}
+		sub <- ev
 	}
 }
 
@@ -309,11 +293,7 @@ func (f *RemovedLogsFeed) Send(ev RemovedLogsEvent) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	for _, sub := range f.subs {
-		select {
-		case sub <- ev:
-		default:
-			log.Info("RemovedLogsFeed send dropped: channel full", "cap", cap(sub), "len", len(ev.Logs))
-		}
+		sub <- ev
 	}
 }
 
@@ -359,10 +339,6 @@ func (f *LogsFeed) Send(logs []*types.Log) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	for _, sub := range f.subs {
-		select {
-		case sub <- logs:
-		default:
-			log.Info("LogsFeed send dropped: channel full", "cap", cap(sub), "len", len(logs))
-		}
+		sub <- logs
 	}
 }
