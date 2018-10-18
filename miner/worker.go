@@ -397,9 +397,21 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	return nil
 }
 
+// sleepUntil sleeps until unix.
+func sleepUntil(unix int64) {
+	if wait := time.Until(time.Unix(unix, 0)); wait > 0 {
+		log.Info("Mining too far in the future", "wait", common.PrettyDuration(wait))
+		time.Sleep(wait)
+	}
+}
+
 func (w *worker) commitNewWork(ctx context.Context) {
 	ctx, span := trace.StartSpan(ctx, "worker.commitNewWork")
 	defer span.End()
+
+	// Ensure we're not going off too far in the future by maybe waiting (before locking).
+	parent := w.chain.CurrentBlock()
+	sleepUntil(parent.Time().Int64())
 
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -407,14 +419,11 @@ func (w *worker) commitNewWork(ctx context.Context) {
 	defer w.currentMu.Unlock()
 
 	tstart := time.Now()
-	parent := w.chain.CurrentBlock()
 
-	// Ensure we're not going off too far in the future.
-	pTime := time.Unix(parent.Time().Int64(), 0)
-	if wait := time.Until(pTime); wait > 0 {
-		log.Info("Mining too far in the future", "wait", common.PrettyDuration(wait))
-		time.Sleep(wait)
-	}
+	// Update now that we hold the lock.
+	parent = w.chain.CurrentBlock()
+	// Ensure again that we're not going off too far in the future. This is a no-op unless parent changed.
+	sleepUntil(parent.Time().Int64())
 
 	num := parent.Number()
 	header := &types.Header{
