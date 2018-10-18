@@ -96,7 +96,16 @@ func (f *NewTxsFeed) Send(ev NewTxsEvent) {
 		select {
 		case sub <- ev:
 		default:
-			log.Trace("NewTxsFeed send dropped: channel full", "name", name, "cap", cap(sub), "txs", len(ev.Txs))
+			start := time.Now()
+			var action string
+			select {
+			case sub <- ev:
+				action = "delayed"
+			case <-time.After(timeout):
+				action = "dropped"
+			}
+			dur := time.Since(start)
+			log.Warn(fmt.Sprintf("NewTxsFeed send %s: channel full", action), "name", name, "cap", cap(sub), "time", dur, "txs", len(ev.Txs))
 		}
 	}
 }
