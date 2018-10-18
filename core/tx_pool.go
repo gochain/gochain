@@ -498,6 +498,15 @@ func (pool *TxPool) feedLoop() {
 				}
 			}
 			pool.txFeed.Send(event)
+
+			// Unless another full batch is ready, then wait a bit.
+			if len(pool.txFeedBuf) < batchSize {
+				select {
+				case <-pool.stop:
+					return
+				case <-time.After(50 * time.Millisecond):
+				}
+			}
 		}
 	}
 }
