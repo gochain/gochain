@@ -316,7 +316,7 @@ func (d *Downloader) Synchronise(ctx context.Context, id string, head common.Has
 	switch err {
 	case nil:
 	case errBusy:
-		log.Info("Synchronisation already in progress")
+		log.Debug("Synchronisation already in progress")
 	case errTimeout, errBadPeer, errStallingPeer,
 		errEmptyHeaderSet, errPeersUnavailable, errTooOld,
 		errInvalidAncestor, errInvalidChain:
