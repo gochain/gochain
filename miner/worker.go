@@ -41,7 +41,7 @@ const (
 
 	// txChanSize is the size of channel listening to NewTxsEvent.
 	// The number is referenced from the size of tx pool.
-	txChanSize = 4096
+	txChanSize = 16384
 	// chainHeadChanSize is the size of channel listening to ChainHeadEvent.
 	chainHeadChanSize = 32
 )
@@ -259,10 +259,25 @@ func (w *worker) update() {
 			span.End()
 
 		// Handle NewTxsEvent
-		case ev, ok := <-w.txsCh:
+		case first, ok := <-w.txsCh:
 			if !ok {
 				return
 			}
+			evs := []core.NewTxsEvent{first}
+			// Check for more ready events.
+		batchloop:
+			for len(evs) < 1000 {
+				select {
+				case ev, ok := <-w.txsCh:
+					if !ok {
+						return
+					}
+					evs = append(evs, ev)
+				default:
+					break batchloop
+				}
+			}
+
 			ctx, span := trace.StartSpan(context.Background(), "worker.update-txsCh")
 			// Apply transaction to the pending state if we're not mining
 			//
@@ -274,9 +289,11 @@ func (w *worker) update() {
 				w.current.stateMu.Lock()
 
 				txs := make(map[common.Address]types.Transactions)
-				for _, tx := range ev.Txs {
-					acc, _ := types.Sender(ctx, w.current.signer, tx)
-					txs[acc] = append(txs[acc], tx)
+				for _, ev := range evs {
+					for _, tx := range ev.Txs {
+						acc, _ := types.Sender(ctx, w.current.signer, tx)
+						txs[acc] = append(txs[acc], tx)
+					}
 				}
 				txset := types.NewTransactionsByPriceAndNonce(ctx, w.current.signer, txs)
 				w.current.commitTransactions(ctx, nil, w.mux, txset, w.chain, w.coinbase)
