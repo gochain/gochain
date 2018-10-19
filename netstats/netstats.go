@@ -520,6 +520,7 @@ type blockStats struct {
 	Diff       string         `json:"difficulty"`
 	TotalDiff  string         `json:"totalDifficulty"`
 	Txs        []txStats      `json:"transactions"`
+	TxCount    uint64         `json:"transactionCount"`
 	TxHash     common.Hash    `json:"transactionsRoot"`
 	Root       common.Hash    `json:"stateRoot"`
 	Uncles     uncleStats     `json:"uncles"`
@@ -570,10 +571,11 @@ func (s *Service) assembleBlockStats(ctx context.Context, block *types.Block) *b
 
 	// Gather the block infos from the local blockchain
 	var (
-		header *types.Header
-		td     *big.Int
-		txs    []txStats
-		uncles []*types.Header
+		header  *types.Header
+		td      *big.Int
+		txs     []txStats
+		txCount int
+		uncles  []*types.Header
 	)
 	if s.eth != nil {
 		// Full nodes have all needed information available
@@ -583,7 +585,8 @@ func (s *Service) assembleBlockStats(ctx context.Context, block *types.Block) *b
 		header = block.Header()
 		td = s.eth.BlockChain().GetTd(header.Hash(), header.Number.Uint64())
 
-		txs = make([]txStats, len(block.Transactions()))
+		txCount = len(block.Transactions())
+		txs = make([]txStats, txCount)
 		for i, tx := range block.Transactions() {
 			txs[i].Hash = tx.Hash()
 		}
@@ -611,6 +614,7 @@ func (s *Service) assembleBlockStats(ctx context.Context, block *types.Block) *b
 		GasLimit:   header.GasLimit,
 		Diff:       header.Difficulty.String(),
 		TotalDiff:  td.String(),
+		TxCount:    uint64(txCount),
 		Txs:        txs,
 		TxHash:     header.TxHash,
 		Root:       header.Root,
