@@ -265,6 +265,7 @@ func (w *worker) update() {
 			}
 			evs := []core.NewTxsEvent{first}
 			// Check for more ready events.
+		batchloop:
 			for len(evs) < 1000 {
 				select {
 				case ev, ok := <-w.txsCh:
@@ -273,7 +274,7 @@ func (w *worker) update() {
 					}
 					evs = append(evs, ev)
 				default:
-					break
+					break batchloop
 				}
 			}
 
