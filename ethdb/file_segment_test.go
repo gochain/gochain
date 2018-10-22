@@ -10,6 +10,8 @@ import (
 	"testing"
 	"testing/quick"
 
+	"github.com/gochain-io/gochain/common"
+
 	"github.com/gochain-io/gochain/ethdb"
 )
 
@@ -45,7 +47,7 @@ func TestFileSegment_Get(t *testing.T) {
 		}
 
 		// Fetch unknown key.
-		if v, err := s.Get([]byte("no_such_key")); err != ethdb.ErrKeyNotFound {
+		if v, err := s.Get([]byte("no_such_key")); err != common.ErrNotFound {
 			t.Fatalf("unexpected error: %s", err)
 		} else if v != nil {
 			t.Fatalf("expected nil value, got %q", v)

@@ -416,9 +416,7 @@ func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) error {
 	defer bc.mu.Unlock()
 
 	// Prepare the genesis block and reinitialise the chain
-	if err := bc.hc.WriteTd(genesis.Hash(), genesis.NumberU64(), genesis.Difficulty()); err != nil {
-		log.Crit("Failed to write genesis block TD", "err", err)
-	}
+	bc.hc.WriteTd(genesis.Hash(), genesis.NumberU64(), genesis.Difficulty())
 	rawdb.WriteBlock(bc.db, genesis)
 	bc.genesisBlock = genesis
 	bc.insert(bc.genesisBlock)
@@ -863,13 +861,9 @@ func (bc *BlockChain) InsertReceiptChain(ctx context.Context, blockChain types.B
 		stats.processed++
 
 		if bbatch.ValueSize() >= ethdb.IdealBatchSize || rbatch.ValueSize() >= ethdb.IdealBatchSize {
-			if err := gbatch.Write(); err != nil {
-				return 0, err
-			} else if err := bbatch.Write(); err != nil {
-				return 0, err
-			} else if err := rbatch.Write(); err != nil {
-				return 0, err
-			}
+			rawdb.Must("flush global batch", gbatch.Write)
+			rawdb.Must("flush body batch", bbatch.Write)
+			rawdb.Must("flush receipts batch", rbatch.Write)
 			bytes += gbatch.ValueSize()
 			bytes += bbatch.ValueSize()
 			bytes += rbatch.ValueSize()
@@ -880,21 +874,15 @@ func (bc *BlockChain) InsertReceiptChain(ctx context.Context, blockChain types.B
 	}
 	if gbatch.ValueSize() > 0 {
 		bytes += gbatch.ValueSize()
-		if err := gbatch.Write(); err != nil {
-			return 0, err
-		}
+		rawdb.Must("write global batch", gbatch.Write)
 	}
 	if bbatch.ValueSize() > 0 {
 		bytes += bbatch.ValueSize()
-		if err := bbatch.Write(); err != nil {
-			return 0, err
-		}
+		rawdb.Must("write body batch", bbatch.Write)
 	}
 	if rbatch.ValueSize() > 0 {
 		bytes += rbatch.ValueSize()
-		if err := rbatch.Write(); err != nil {
-			return 0, err
-		}
+		rawdb.Must("write receipts batch", rbatch.Write)
 	}
 
 	// Update the head fast sync block if better
@@ -928,9 +916,7 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
-	if err := bc.hc.WriteTd(block.Hash(), block.NumberU64(), td); err != nil {
-		return err
-	}
+	bc.hc.WriteTd(block.Hash(), block.NumberU64(), td)
 	rawdb.WriteBlock(bc.db, block)
 	return nil
 }
@@ -959,9 +945,7 @@ func (bc *BlockChain) WriteBlockWithState(ctx context.Context, block *types.Bloc
 
 	// Irrelevant of the canonical status, write the block itself to the database
 	hash := block.Hash()
-	if err := bc.hc.WriteTd(hash, block.NumberU64(), externTd); err != nil {
-		return NonStatTy, err
-	}
+	bc.hc.WriteTd(hash, block.NumberU64(), externTd)
 	rawdb.WriteBlock(bc.db, block)
 	root, err := state.Commit(bc.chainConfig.IsEIP158(block.Number()))
 	if err != nil {
@@ -1501,9 +1485,7 @@ func (bc *BlockChain) reorg(ctx context.Context, oldBlock, newBlock *types.Block
 	for _, tx := range diff {
 		rawdb.DeleteTxLookupEntry(batch, tx.Hash())
 	}
-	if err := batch.Write(); err != nil {
-		return err
-	}
+	rawdb.Must("batch delete tx lookup entries", batch.Write)
 	if len(deletedLogs) > 0 {
 		bc.rmLogsFeed.Send(RemovedLogsEvent{deletedLogs})
 	}

@@ -142,5 +142,6 @@ func (b *BloomIndexer) Commit() error {
 		}
 		rawdb.WriteBloomBits(batch, uint(i), b.section, b.head, bitutil.CompressBytes(bits))
 	}
-	return batch.Write()
+	rawdb.Must("write bloom bits batch", batch.Write)
+	return nil
 }

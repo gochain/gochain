@@ -206,7 +206,7 @@ func (pool *TxPool) rollbackTxs(hash common.Hash, txc txStateChanges) {
 		}
 		delete(pool.mined, hash)
 	}
-	gbatch.Write()
+	rawdb.Must("batch delete tx lookup entries", gbatch.Write)
 }
 
 // reorgOnNewHead sets a new head header, processing (and rolling back if necessary)
@@ -506,10 +506,12 @@ func (self *TxPool) RemoveTransactions(txs types.Transactions) {
 		//self.RemoveTx(tx.Hash())
 		hash := tx.Hash()
 		delete(self.pending, hash)
-		batch.Delete(hash[:])
+		rawdb.Must("add tx delete to batch", func() error {
+			return batch.Delete(hash[:])
+		})
 		hashes = append(hashes, hash)
 	}
-	batch.Write()
+	rawdb.Must("batch delete txs", batch.Write)
 	self.relay.Discard(hashes)
 }
 

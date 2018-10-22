@@ -28,7 +28,14 @@ import (
 // ReadTxLookupEntry retrieves the positional metadata associated with a transaction
 // hash to allow retrieving the transaction or receipt by hash.
 func ReadTxLookupEntry(db DatabaseReader, hash common.Hash) (common.Hash, uint64, uint64) {
-	data, _ := db.Get(hashKey(lookupPrefix, hash))
+	var data []byte
+	Must("get tx lookup entry", func() (err error) {
+		data, err = db.Get(hashKey(lookupPrefix, hash))
+		if err == common.ErrNotFound {
+			err = nil
+		}
+		return
+	})
 	if len(data) == 0 {
 		return common.Hash{}, 0, 0
 	}
@@ -53,15 +60,17 @@ func WriteTxLookupEntries(db DatabaseWriter, block *types.Block) {
 		if err != nil {
 			log.Crit("Failed to encode transaction lookup entry", "err", err)
 		}
-		if err := db.Put(hashKey(lookupPrefix, tx.Hash()), data); err != nil {
-			log.Crit("Failed to store transaction lookup entry", "err", err)
-		}
+		Must("put tx lookup entry", func() (err error) {
+			return db.Put(hashKey(lookupPrefix, tx.Hash()), data)
+		})
 	}
 }
 
 // DeleteTxLookupEntry removes all transaction data associated with a hash.
 func DeleteTxLookupEntry(db DatabaseDeleter, hash common.Hash) {
-	db.Delete(hashKey(lookupPrefix, hash))
+	Must("delete tx lookup entry", func() error {
+		return db.Delete(hashKey(lookupPrefix, hash))
+	})
 }
 
 // ReadTransaction retrieves a specific transaction from the database, along with
@@ -114,7 +123,7 @@ func WriteBloomBits(db DatabaseWriter, bit uint, section uint64, head common.Has
 	binary.BigEndian.PutUint64(key[3:], section)
 	copy(key[11:], head[:])
 
-	if err := db.Put(key[:], bits); err != nil {
-		log.Crit("Failed to store bloom bits", "err", err)
-	}
+	Must("put bloom bits", func() error {
+		return db.Put(key[:], bits)
+	})
 }

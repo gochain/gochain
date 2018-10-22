@@ -20,7 +20,6 @@ import (
 )
 
 var (
-	ErrKeyNotFound                 = errors.New("ethdb: key not found")
 	ErrImmutableSegment            = errors.New("ethdb: immutable segment")
 	ErrSegmentTypeUnknown          = errors.New("ethdb: segment type unknown")
 	ErrFileSegmentChecksumMismatch = errors.New("ethdb: file segment checksum mismatch")
@@ -183,7 +182,7 @@ func (s *FileSegment) Get(key []byte) ([]byte, error) {
 
 	_, voff := s.offset(key)
 	if voff == 0 {
-		return nil, ErrKeyNotFound
+		return nil, common.ErrNotFound
 	}
 
 	// Read value.

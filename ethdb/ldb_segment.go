@@ -1,6 +1,7 @@
 package ethdb
 
 import (
+	"github.com/gochain-io/gochain/common"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
@@ -61,7 +62,7 @@ func (s *LDBSegment) Has(key []byte) (bool, error) {
 func (s *LDBSegment) Get(key []byte) ([]byte, error) {
 	value, err := s.db.Get(key, nil)
 	if err == leveldb.ErrNotFound {
-		return nil, ErrKeyNotFound
+		return nil, common.ErrNotFound
 	}
 	return value, err
 }
