@@ -460,7 +460,7 @@ func (pool *TxPool) feedLoop() {
 	}
 }
 
-const maxReorgDepth = 16
+const maxReorgDepth = 64
 
 // reset retrieves the current state of the blockchain and ensures the content
 // of the transaction pool is valid with regard to the chain state.
@@ -493,7 +493,7 @@ func (pool *TxPool) reset(ctx context.Context, oldBlock, newBlock *types.Block) 
 		}
 		if depth > maxReorgDepth {
 			// Too deep to pull all transactions into memory.
-			log.Debug("Skipping deep transaction reorg", "depth", depth)
+			log.Warn("Skipping deep transaction reorg", "depth", depth)
 		} else {
 			// Set of txs included in the main chain.
 			included := make(map[common.Hash]struct{})
