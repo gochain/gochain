@@ -154,6 +154,8 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 	local := chainHead{localTd, currentHeader.Number.Uint64(), currentHeader.GasUsed}
 	external := chainHead{externTd, header.Number.Uint64(), header.GasUsed}
 	if reorg(local, external) {
+		log.Info("Reorganizing header chain", "oldnum", currentHeader.Number, "newnum", header.Number, "oldtd", localTd, "newtd", externTd, "oldhash", hc.currentHeaderHash, "newhash", hash)
+
 		// Delete any canonical number assignments above the new head
 		for i := number + 1; ; i++ {
 			hash := rawdb.ReadCanonicalHash(hc.chainDb, i)

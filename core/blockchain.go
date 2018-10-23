@@ -953,11 +953,13 @@ func (bc *BlockChain) WriteBlockWithState(ctx context.Context, block *types.Bloc
 	defer bc.mu.Unlock()
 
 	currentBlock := bc.CurrentBlock()
-	localTd := bc.GetTd(currentBlock.Hash(), currentBlock.NumberU64())
+	currentHash := currentBlock.Hash()
+	localTd := bc.GetTd(currentHash, currentBlock.NumberU64())
 	externTd := new(big.Int).Add(block.Difficulty(), ptd)
 
 	// Irrelevant of the canonical status, write the block itself to the database
-	if err := bc.hc.WriteTd(block.Hash(), block.NumberU64(), externTd); err != nil {
+	hash := block.Hash()
+	if err := bc.hc.WriteTd(hash, block.NumberU64(), externTd); err != nil {
 		return NonStatTy, err
 	}
 	rawdb.WriteBlock(bc.db, block)
@@ -1019,6 +1021,7 @@ func (bc *BlockChain) WriteBlockWithState(ctx context.Context, block *types.Bloc
 	local := chainHead{localTd, currentBlock.NumberU64(), currentBlock.GasUsed()}
 	external := chainHead{externTd, block.NumberU64(), block.GasUsed()}
 	if reorg(local, external) {
+		log.Info("Reorganizing block chain", "oldnum", currentBlock.NumberU64(), "newnum", block.NumberU64(), "oldtd", localTd, "newtd", externTd, "oldhash", currentHash, "newhash", hash)
 		// Reorganise the chain if the parent is not the head block
 		if block.ParentHash() != currentBlock.Hash() {
 			if err := bc.reorg(ctx, currentBlock, block); err != nil {
@@ -1058,6 +1061,7 @@ func reorg(local, external chainHead) bool {
 	if cmp != 0 {
 		return cmp > 0
 	}
+	log.Info("Reorg same difficulty", "diff", local.totalDifficulty, "oldnum", local.number, "newnum", external.number)
 	// Split same-difficulty blocks by number, then most gas used, then randomly.
 	if external.number < local.number {
 		return true
