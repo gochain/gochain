@@ -230,10 +230,10 @@ func TestPrepareDeadline(t *testing.T) {
 		period uint64
 		want   time.Time
 	}{
-		{unix: 3, period: 3, want: time.Unix(1, 0)},
-		{unix: 6, period: 6, want: time.Unix(2, 0)},
-		{unix: now.Unix(), period: 6, want: now.Add(-4 * time.Second)},
-		{unix: 123456789, period: 300, want: time.Unix(123456589, 0)},
+		{unix: 2, period: 2, want: time.Unix(1, 0)},
+		{unix: 6, period: 6, want: time.Unix(3, 0)},
+		{unix: now.Unix(), period: 6, want: now.Add(-3 * time.Second)},
+		{unix: 123456789, period: 200, want: time.Unix(123456689, 0)},
 	} {
 		if got := prepareDeadline(test.unix, test.period); *got != test.want {
 			t.Errorf("%q:%d - wanted %q but got %q", time.Unix(test.unix, 0), 6, test.want, got)
