@@ -297,7 +297,7 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 	// Subscribe events from blockchain.
 	pool.chain.SubscribeChainHeadEvent(pool.chainHeadCh, "core.TxPool")
 	// Spawn worker routines to run until chainHeadSub unsub.
-	pool.wg.Add(3)
+	pool.wg.Add(2)
 	pool.stop = make(chan struct{})
 	go pool.loop()
 	go pool.feedLoop()
@@ -320,93 +320,42 @@ func (pool *TxPool) loop() {
 	evict := time.NewTicker(evictionInterval)
 	defer evict.Stop()
 
-	reset := time.NewTicker(resetInterval)
-	defer reset.Stop()
-
 	journal := time.NewTicker(pool.config.Rejournal)
 	defer journal.Stop()
-
-	// Track the current and latest blocks for transaction reorgs.
-	b := pool.chain.CurrentBlock()
-	blocks := struct {
-		sync.RWMutex
-		current, latest *types.Block
-	}{
-		current: b,
-		latest:  b,
-	}
-
-	chainHeadGauge.Update(int64(blocks.current.NumberU64()))
-	chainHeadTxsGauge.Update(int64(len(blocks.current.Transactions())))
 
 	globalSlotsGauge.Update(int64(pool.config.GlobalSlots))
 	globalQueueGauge.Update(int64(pool.config.GlobalQueue))
 
-	// Handle ChainHeadEvents separately
-	go func() {
-		defer pool.wg.Done()
-		defer pool.chain.UnsubscribeChainHeadEvent(pool.chainHeadCh)
+	// Track the previous head block for resets.
+	head := pool.chain.CurrentBlock()
+	chainHeadGauge.Update(int64(head.NumberU64()))
+	chainHeadTxsGauge.Update(int64(len(head.Transactions())))
 
-		for {
-			select {
-			case <-pool.stop:
-				return
-			case ev, ok := <-pool.chainHeadCh:
-				if !ok {
-					return
-				}
-				if ev.Block == nil {
-					continue
-				}
-				blocks.RLock()
-				chain := blocks.latest
-				blocks.RUnlock()
-
-				n := ev.Block.Number()
-				if n.Cmp(chain.Number()) <= 0 {
-					continue
-				}
-				// Update latestBlock for next reset.
-				blocks.Lock()
-				blocks.latest = ev.Block
-				blocks.Unlock()
-
-				if !pool.chainconfig.IsHomestead(n) {
-					continue
-				}
-				pool.mu.Lock()
-				pool.homestead = true
-				pool.mu.Unlock()
-			}
-		}
-	}()
-
-	// Handle tickers.
+	// Keep waiting for and reacting to the various events.
 	for {
 		select {
 		case <-pool.stop:
 			return
 
-		// Periodically reset to latest chain head.
-		case <-reset.C:
-			ctx, span := trace.StartSpan(context.Background(), "TxPool.loop-reset")
-			blocks.RLock()
-			latest, current := blocks.latest, blocks.current
-			blocks.RUnlock()
-
-			if latest.NumberU64() > current.NumberU64() {
+		// Handle ChainHeadEvent
+		case ev, ok := <-pool.chainHeadCh:
+			if !ok {
+				return
+			}
+			if ev.Block != nil {
+				ctx, span := trace.StartSpan(context.Background(), "TxPool.loop-reset")
 				pool.mu.Lock()
-				pool.reset(ctx, current, latest)
+				if pool.chainconfig.IsHomestead(ev.Block.Number()) {
+					pool.homestead = true
+				}
+				pool.reset(ctx, head, ev.Block)
+				head = ev.Block
 				pool.mu.Unlock()
 
-				blocks.Lock()
-				blocks.current = latest
-				blocks.Unlock()
-
-				chainHeadGauge.Update(int64(latest.NumberU64()))
-				chainHeadTxsGauge.Update(int64(len(latest.Transactions())))
+				chainHeadGauge.Update(int64(head.NumberU64()))
+				chainHeadTxsGauge.Update(int64(len(head.Transactions())))
+				span.End()
 			}
-			span.End()
 
 		// Handle stats reporting ticks
 		case <-report.C:
@@ -524,7 +473,7 @@ func (pool *TxPool) reset(ctx context.Context, oldBlock, newBlock *types.Block) 
 			log.Info("Resetting tx pool", "old", nil, "newnum", newBlock.NumberU64(), "newhash", newBlock.Hash())
 		}
 	} else {
-		log.Info("Resetting tx pool", "oldnum", oldBlock.NumberU64(), "newnum", newBlock.NumberU64(), "oldhash", oldBlock.Hash(), "newhash", newBlock.Hash())
+		log.Info("Resetting tx pool", "oldnum", oldBlock.NumberU64(), "newnum", newBlock.NumberU64(), "oldhash", oldBlock.Hash(), "newhash", newBlock.Hash(), "newparent", newBlock.ParentHash())
 	}
 	start := time.Now()
 
@@ -648,6 +597,7 @@ func (pool *TxPool) Stop() {
 	close(pool.stop)
 	// Unsubscribe all subscriptions.
 	pool.txFeed.Close()
+	pool.chain.UnsubscribeChainHeadEvent(pool.chainHeadCh)
 	pool.wg.Wait()
 
 	if pool.journal != nil {
