@@ -476,15 +476,26 @@ func (w *worker) commitNewWork(ctx context.Context) {
 
 	// Create the current work task and check any fork transitions needed
 	work := w.current
+
+	t := time.Now()
 	pending := w.eth.TxPool().Pending(ctx)
+	pendingDur := time.Since(t)
+
+	t = time.Now()
 	txs := types.NewTransactionsByPriceAndNonce(ctx, w.current.signer, pending)
+	sortDur := time.Since(t)
+
+	t = time.Now()
 	work.commitTransactions(ctx, deadline, w.mux, txs, w.chain, w.coinbase)
+	commitDur := time.Since(t)
 
 	// Create the new block to seal with the consensus engine
 	work.Block = w.engine.Finalize(ctx, w.chain, header, work.state, work.txs, work.receipts, true)
 	// We only care about logging if we're actually mining.
 	if atomic.LoadInt32(&w.mining) == 1 {
-		log.Info("Commit new mining work", "number", work.Block.Number(), "diff", work.Block.Difficulty(), "txs", work.tcount, "parent", work.Block.ParentHash(), "elapsed", common.PrettyDuration(time.Since(tstart)))
+		log.Info("Commit new mining work", "number", work.Block.Number(), "diff", work.Block.Difficulty(),
+			"txs", work.tcount, "parent", work.Block.ParentHash(), "elapsed", common.PrettyDuration(time.Since(tstart)),
+			"pending", common.PrettyDuration(pendingDur), "sort", common.PrettyDuration(sortDur), "commit", common.PrettyDuration(commitDur))
 		w.unconfirmed.Shift(work.Block.NumberU64() - 1)
 	}
 	w.push(work)
