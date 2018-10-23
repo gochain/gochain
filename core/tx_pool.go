@@ -519,6 +519,13 @@ func (pool *TxPool) reset(ctx context.Context, oldBlock, newBlock *types.Block) 
 	ctx, span := trace.StartSpan(ctx, "TxPool.reset")
 	defer span.End()
 
+	if oldBlock == nil {
+		if newBlock != nil {
+			log.Info("Resetting tx pool", "old", nil, "newnum", newBlock.NumberU64(), "newhash", newBlock.Hash())
+		}
+	} else {
+		log.Info("Resetting tx pool", "oldnum", oldBlock.NumberU64(), "newnum", newBlock.NumberU64(), "oldhash", oldBlock.Hash(), "newhash", newBlock.Hash())
+	}
 	// If we're reorging an old state, reinject all dropped transactions
 	reinject := make(map[common.Hash]*types.Transaction)
 
