@@ -1021,12 +1021,15 @@ func (bc *BlockChain) WriteBlockWithState(ctx context.Context, block *types.Bloc
 	local := chainHead{localTd, currentBlock.NumberU64(), currentBlock.GasUsed()}
 	external := chainHead{externTd, block.NumberU64(), block.GasUsed()}
 	if reorg(local, external) {
-		log.Info("Reorganizing block chain", "oldnum", currentBlock.NumberU64(), "newnum", block.NumberU64(), "oldtd", localTd, "newtd", externTd, "oldhash", currentHash, "newhash", hash)
 		// Reorganise the chain if the parent is not the head block
 		if block.ParentHash() != currentBlock.Hash() {
+			log.Info("Reorganizing block chain", "oldnum", currentBlock.NumberU64(), "newnum", block.NumberU64(), "oldtd", localTd, "newtd", externTd, "oldhash", currentHash, "newhash", hash)
+			start := time.Now()
 			if err := bc.reorg(ctx, currentBlock, block); err != nil {
 				return NonStatTy, err
 			}
+			dur := time.Since(start)
+			log.Info("Reorganized block chain", "dur", common.PrettyDuration(dur))
 		}
 		rawdb.WriteTxLookupEntries(bc.db.GlobalTable(), block)
 		rawdb.WritePreimages(bc.db.GlobalTable(), block.NumberU64(), state.Preimages())

@@ -526,6 +526,8 @@ func (pool *TxPool) reset(ctx context.Context, oldBlock, newBlock *types.Block) 
 	} else {
 		log.Info("Resetting tx pool", "oldnum", oldBlock.NumberU64(), "newnum", newBlock.NumberU64(), "oldhash", oldBlock.Hash(), "newhash", newBlock.Hash())
 	}
+	start := time.Now()
+
 	// If we're reorging an old state, reinject all dropped transactions
 	reinject := make(map[common.Hash]*types.Transaction)
 
@@ -636,6 +638,9 @@ func (pool *TxPool) reset(ctx context.Context, oldBlock, newBlock *types.Block) 
 	// Check the queue and move transactions over to the pending if possible
 	// or remove those that have become invalid
 	pool.promoteExecutablesAll(ctx)
+
+	dur := time.Since(start)
+	log.Info("Reset tx pool", "dur", common.PrettyDuration(dur))
 }
 
 // Stop terminates the transaction pool.
