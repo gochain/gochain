@@ -48,7 +48,7 @@ const (
 	inmemorySnapshots  = 128  // Number of recent vote snapshots to keep in memory
 	inmemorySignatures = 4096 // Number of recent block signatures to keep in memory
 
-	wiggleTime = 100 * time.Millisecond // Delay step for out-of-turn signers.
+	wiggleTime = 200 * time.Millisecond // Delay step for out-of-turn signers.
 )
 
 // Clique proof-of-authority protocol constants.
@@ -616,10 +616,10 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 	return prepareDeadline(header.Time.Int64(), c.config.Period), nil
 }
 
-// prepareDeadline returns a deadline for block preparation which is 2/3 of the period before unix.
+// prepareDeadline returns a deadline for block preparation which is 1/2 of the period before unix.
 func prepareDeadline(unix int64, period uint64) *time.Time {
 	t := time.Unix(unix, 0)
-	t = t.Add(-time.Duration(period) * time.Second * 2 / 3)
+	t = t.Add(-time.Duration(period) * time.Second / 2)
 	return &t
 }
 

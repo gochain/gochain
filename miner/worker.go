@@ -522,7 +522,7 @@ func (env *Work) commitTransactions(ctx context.Context, deadline *time.Time, mu
 	var coalescedLogs []*types.Log
 	for {
 		if deadline != nil && time.Now().After(*deadline) {
-			log.Info("Block assembly deadline reached", "block", env.header.Number, "parent", env.header.ParentHash)
+			log.Warn("Block assembly deadline reached", "block", env.header.Number, "parent", env.header.ParentHash)
 			break
 		}
 		// If we don't have enough gas for any further transactions then we're done
