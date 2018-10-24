@@ -329,7 +329,7 @@ func (d *Downloader) Synchronise(ctx context.Context, id string, head common.Has
 			d.dropPeer(id)
 		}
 	default:
-		log.Warn("Synchronisation failed, retrying", "err", err)
+		log.Warn("Synchronisation failed, retrying", "peer", id, "err", err)
 	}
 	return err
 }
@@ -418,7 +418,7 @@ func (d *Downloader) syncWithPeer(ctx context.Context, p *peerConnection, hash c
 
 	log.Info("Synchronising with the network", "peer", p.id, "eth", p.version, "head", hash, "td", td, "mode", d.mode)
 	defer func(start time.Time) {
-		log.Info("Synchronisation terminated", "elapsed", time.Since(start))
+		log.Info("Synchronisation terminated", "peer", p.id, "elapsed", time.Since(start), "err", err)
 	}(time.Now())
 
 	// Look up the sync boundaries: the common ancestor and the target block
