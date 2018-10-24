@@ -478,9 +478,7 @@ func (f *Fetcher) loop() {
 				if announce := f.fetching[hash]; announce != nil && announce.origin == task.peer && f.fetched[hash] == nil && f.completing[hash] == nil && f.queued[hash] == nil {
 					// If the delivered header does not match the promised number, drop the announcer
 					if header.Number.Uint64() != announce.number {
-						if tracing {
-							log.Trace("Invalid block number fetched", "peer", announce.origin, "hash", header.Hash(), "announced", announce.number, "provided", header.Number)
-						}
+						log.Error("Invalid block number fetched", "peer", announce.origin, "hash", header.Hash(), "announced", announce.number, "provided", header.Number)
 						f.dropPeer(announce.origin)
 						f.forgetHash(hash)
 						continue
@@ -679,12 +677,12 @@ func (f *Fetcher) insert(peer string, block *types.Block) {
 	defer span.End()
 	span.AddAttributes(trace.Int64Attribute("num", int64(block.NumberU64())))
 
-	log.Debug("Importing propagated block", "peer", peer, "number", block.Number(), "hash", hash)
+	log.Info("Importing propagated block", "peer", peer, "number", block.Number(), "hash", hash)
 
 	// If the parent's unknown, abort insertion
 	parent := f.getBlock(ctx, block.ParentHash())
 	if parent == nil {
-		log.Debug("Unknown parent of propagated block", "peer", peer, "number", block.Number(), "hash", hash, "parent", block.ParentHash())
+		log.Error("Unknown parent of propagated block", "peer", peer, "number", block.Number(), "hash", hash, "parent", block.ParentHash())
 		return
 	}
 	// Quickly validate the header and propagate the block if it passes
@@ -709,13 +707,13 @@ func (f *Fetcher) insert(peer string, block *types.Block) {
 
 	default:
 		// Something went very wrong, drop the peer
-		log.Debug("Propagated block verification failed", "peer", peer, "number", block.Number(), "hash", hash, "err", err)
+		log.Error("Propagated block verification failed", "peer", peer, "number", block.Number(), "hash", hash, "err", err)
 		f.dropPeer(peer)
 		return
 	}
 	// Run the actual import and log any issues
 	if _, err := f.insertChain(ctx, types.Blocks{block}); err != nil {
-		log.Debug("Propagated block import failed", "peer", peer, "number", block.Number(), "hash", hash, "err", err)
+		log.Error("Propagated block import failed", "peer", peer, "number", block.Number(), "hash", hash, "err", err)
 		return
 	}
 	// If import succeeded, broadcast the block
