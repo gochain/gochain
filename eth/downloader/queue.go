@@ -275,7 +275,7 @@ func (q *queue) ScheduleSkeleton(from uint64, skeleton []*types.Header) {
 	if q.headerResults != nil {
 		panic("skeleton assembly already in progress")
 	}
-	// Shedule all the header retrieval tasks for the skeleton assembly
+	// Schedule all the header retrieval tasks for the skeleton assembly
 	q.headerTaskPool = make(map[uint64]*types.Header)
 	q.headerTaskQueue = prque.New(nil)
 	q.headerPeerMiss = make(map[string]map[uint64]struct{}) // Reset availability to correct invalid chains
@@ -662,7 +662,7 @@ func (q *queue) expire(timeout time.Duration, pendPool map[string]*fetchRequest,
 			for _, header := range request.Headers {
 				taskQueue.Push(header, -header.Number.Int64())
 			}
-			// Add the peer to the expiry report along the the number of failed requests
+			// Add the peer to the expiry report along the number of failed requests
 			expiries[id] = len(request.Headers)
 		}
 	}

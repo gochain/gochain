@@ -49,7 +49,7 @@ func (p *FakePeer) Head() (common.Hash, *big.Int) {
 }
 
 // RequestHeadersByHash implements downloader.Peer, returning a batch of headers
-// defined by the origin hash and the associaed query parameters.
+// defined by the origin hash and the associated query parameters.
 func (p *FakePeer) RequestHeadersByHash(ctx context.Context, hash common.Hash, amount int, skip int, reverse bool) error {
 	var (
 		headers []*types.Header
@@ -93,7 +93,7 @@ func (p *FakePeer) RequestHeadersByHash(ctx context.Context, hash common.Hash, a
 }
 
 // RequestHeadersByNumber implements downloader.Peer, returning a batch of headers
-// defined by the origin number and the associaed query parameters.
+// defined by the origin number and the associated query parameters.
 func (p *FakePeer) RequestHeadersByNumber(ctx context.Context, number uint64, amount int, skip int, reverse bool) error {
 	var (
 		headers []*types.Header
