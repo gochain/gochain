@@ -294,7 +294,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	// main loop. handle incoming messages.
 	for {
 		if err := pm.handleMsg(p); err != nil {
-			p.Log().Debug("GoChain message handling failed", "err", err)
+			p.Log().Error("GoChain message handling failed", "err", err)
 			return err
 		}
 	}
