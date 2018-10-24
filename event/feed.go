@@ -205,7 +205,7 @@ func (f *Feed) SendCtx(ctx context.Context, value interface{}) (nsent int) {
 				cases = f.sendCases[:len(cases)-1]
 			}
 		} else if cases[chosen].Chan == timerSelectCase.Chan {
-			log.Trace("Feed channel send timeout, value dropped", "data", fmt.Sprintf("%T", value))
+			log.Warn("Feed channel send timeout, value dropped", "data", fmt.Sprintf("%T", value))
 			break
 		} else {
 			cases = cases.deactivate(chosen)
