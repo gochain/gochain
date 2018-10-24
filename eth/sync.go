@@ -75,10 +75,12 @@ func (pm *ProtocolManager) syncTransactionsAllPeers() {
 	if max > len(peers) {
 		max = len(peers)
 	}
+	log.Info("Resyncing pending txs", "txs", len(txs), "peers", max)
 	for _, p := range peers[:max] {
 		select {
 		case pm.txsyncCh <- &txsync{p, txs}:
 		case <-pm.quitSync:
+			return
 		}
 	}
 }
