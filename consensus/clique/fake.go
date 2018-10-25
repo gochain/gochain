@@ -69,7 +69,7 @@ func (e *fakeEngine) Authorize(signer common.Address, fn consensus.SignerFn) {
 	e.real.Authorize(signer, fn)
 }
 
-func (e *fakeEngine) Author(_ context.Context, header *types.Header) (common.Address, error) {
+func (e *fakeEngine) Author(header *types.Header) (common.Address, error) {
 	return header.Coinbase, nil
 }
 
@@ -111,7 +111,7 @@ func (e *fakeEngine) delayOrFail(_ context.Context, _ consensus.ChainReader, hea
 	return nil
 }
 
-func (e *fakeEngine) Prepare(ctx context.Context, chain consensus.ChainReader, header *types.Header) (*time.Time, error) {
+func (e *fakeEngine) Prepare(ctx context.Context, chain consensus.ChainReader, header *types.Header) error {
 	header.Extra = ExtraEnsureVanity(header.Extra)
 	if header.Difficulty == nil {
 		header.Difficulty = header.Coinbase.Big()
@@ -119,7 +119,7 @@ func (e *fakeEngine) Prepare(ctx context.Context, chain consensus.ChainReader, h
 			header.Difficulty.SetUint64(1)
 		}
 	}
-	return nil, nil
+	return nil
 }
 
 func (e *fakeEngine) Finalize(ctx context.Context, chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
@@ -127,9 +127,13 @@ func (e *fakeEngine) Finalize(ctx context.Context, chain consensus.ChainReader, 
 	return e.real.Finalize(ctx, chain, header, state, txs, receipts, block)
 }
 
-func (e *fakeEngine) Seal(ctx context.Context, chain consensus.ChainReader, block *types.Block, stop <-chan struct{}) (*types.Block, error) {
+func (e *fakeEngine) Seal(ctx context.Context, chain consensus.ChainReader, block *types.Block, stop <-chan struct{}) (*types.Block, *time.Time, error) {
 	header := block.Header()
 	header.Nonce, header.MixDigest = types.BlockNonce{}, common.Hash{}
 	header.Signer = hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
-	return block.WithSeal(header), nil
+	return block.WithSeal(header), nil, nil
+}
+
+func (e *fakeEngine) SealHash(header *types.Header) common.Hash {
+	return e.real.SealHash(header)
 }

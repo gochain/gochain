@@ -25,7 +25,6 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -63,7 +62,7 @@ var (
 {{if .cmd.Description}}{{.cmd.Description}}
 {{end}}{{if .cmd.Subcommands}}
 SUBCOMMANDS:
-	{{range .cmd.Subcommands}}{{.cmd.Name}}{{with .cmd.ShortName}}, {{.cmd}}{{end}}{{ "\t" }}{{.cmd.Usage}}
+	{{range .cmd.Subcommands}}{{.Name}}{{with .ShortName}}, {{.}}{{end}}{{ "\t" }}{{.Usage}}
 	{{end}}{{end}}{{if .categorizedFlags}}
 {{range $idx, $categorized := .categorizedFlags}}{{$categorized.Name}} OPTIONS:
 {{range $categorized.Flags}}{{"\t"}}{{.}}
@@ -211,6 +210,10 @@ var (
 		Value: dashboard.DefaultConfig.Assets,
 	}
 	// Transaction pool settings
+	TxPoolLocalsFlag = cli.StringFlag{
+		Name:  "txpool.locals",
+		Usage: "Comma separated accounts to treat as locals (no flush, priority inclusion)",
+	}
 	TxPoolNoLocalsFlag = cli.BoolFlag{
 		Name:  "txpool.nolocals",
 		Usage: "Disables price exemptions for locally submitted transactions",
@@ -224,6 +227,11 @@ var (
 		Name:  "txpool.rejournal",
 		Usage: "Time interval to regenerate the local transaction journal",
 		Value: core.DefaultTxPoolConfig.Rejournal,
+	}
+	TxPoolPriceLimitFlag = cli.Uint64Flag{
+		Name:  "txpool.pricelimit",
+		Usage: "Minimum gas price limit to enforce for acceptance into the pool",
+		Value: eth.DefaultConfig.TxPool.PriceLimit,
 	}
 	TxPoolPriceBumpFlag = cli.Uint64Flag{
 		Name:  "txpool.pricebump",
@@ -282,27 +290,70 @@ var (
 		Usage: "Enable mining",
 	}
 	MinerThreadsFlag = cli.IntFlag{
-		Name:  "minerthreads",
+		Name:  "miner.threads",
 		Usage: "Number of CPU threads to use for mining",
-		Value: runtime.NumCPU(),
+		Value: 0,
 	}
-	TargetGasLimitFlag = cli.Uint64Flag{
+	MinerLegacyThreadsFlag = cli.IntFlag{
+		Name:  "minerthreads",
+		Usage: "Number of CPU threads to use for mining (deprecated, use --miner.threads)",
+		Value: 0,
+	}
+	MinerNotifyFlag = cli.StringFlag{
+		Name:  "miner.notify",
+		Usage: "Comma separated HTTP URL list to notify of new work packages",
+	}
+	MinerGasTargetFlag = cli.Uint64Flag{
+		Name:  "miner.gastarget",
+		Usage: "Target gas floor for mined blocks",
+		Value: eth.DefaultConfig.MinerGasFloor,
+	}
+	MinerLegacyGasTargetFlag = cli.Uint64Flag{
 		Name:  "targetgaslimit",
-		Usage: "Target gas limit sets the artificial target gas floor for the blocks to mine",
+		Usage: "Target gas floor for mined blocks (deprecated, use --miner.gastarget)",
+		Value: eth.DefaultConfig.MinerGasFloor,
 	}
-	EtherbaseFlag = cli.StringFlag{
-		Name:  "etherbase",
-		Usage: "Public address for block mining rewards (default = first account created)",
+	MinerGasLimitFlag = cli.Uint64Flag{
+		Name:  "miner.gaslimit",
+		Usage: "Target gas ceiling for mined blocks",
+		Value: eth.DefaultConfig.MinerGasCeil,
+	}
+	MinerGasPriceFlag = BigFlag{
+		Name:  "miner.gasprice",
+		Usage: "Minimum gas price for mining a transaction",
+		Value: eth.DefaultConfig.MinerGasPrice,
+	}
+	MinerLegacyGasPriceFlag = BigFlag{
+		Name:  "gasprice",
+		Usage: "Minimum gas price for mining a transaction (deprecated, use --miner.gasprice)",
+		Value: eth.DefaultConfig.MinerGasPrice,
+	}
+	MinerEtherbaseFlag = cli.StringFlag{
+		Name:  "miner.etherbase",
+		Usage: "Public address for block mining rewards (default = first account)",
 		Value: "0",
 	}
-	GasPriceFlag = BigFlag{
-		Name:  "gasprice",
-		Usage: "Minimal gas price to accept in to the pool and for mining.",
-		Value: eth.DefaultConfig.GasPrice,
+	MinerLegacyEtherbaseFlag = cli.StringFlag{
+		Name:  "etherbase",
+		Usage: "Public address for block mining rewards (default = first account, deprecated, use --miner.etherbase)",
+		Value: "0",
 	}
-	ExtraDataFlag = cli.StringFlag{
-		Name:  "extradata",
+	MinerExtraDataFlag = cli.StringFlag{
+		Name:  "miner.extradata",
 		Usage: "Block extra data set by the miner (default = client version)",
+	}
+	MinerLegacyExtraDataFlag = cli.StringFlag{
+		Name:  "extradata",
+		Usage: "Block extra data set by the miner (default = client version, deprecated, use --miner.extradata)",
+	}
+	MinerRecommitIntervalFlag = cli.DurationFlag{
+		Name:  "miner.recommit",
+		Usage: "Time interval to recreate the block being mined",
+		Value: eth.DefaultConfig.MinerRecommit,
+	}
+	MinerNoVerfiyFlag = cli.BoolFlag{
+		Name:  "miner.noverify",
+		Usage: "Disable remote sealing verification",
 	}
 	// Account settings
 	UnlockedAccountFlag = cli.StringFlag{
@@ -732,10 +783,19 @@ func MakeAddress(ks *keystore.KeyStore, account string) (accounts.Account, error
 // setEtherbase retrieves the etherbase either from the directly specified
 // command line flags or from the keystore if CLI indexed.
 func setEtherbase(ctx *cli.Context, ks *keystore.KeyStore, cfg *eth.Config) {
-	if ctx.GlobalIsSet(EtherbaseFlag.Name) {
-		account, err := MakeAddress(ks, ctx.GlobalString(EtherbaseFlag.Name))
+	// Extract the current etherbase, new flag overriding legacy one
+	var etherbase string
+	if ctx.GlobalIsSet(MinerLegacyEtherbaseFlag.Name) {
+		etherbase = ctx.GlobalString(MinerLegacyEtherbaseFlag.Name)
+	}
+	if ctx.GlobalIsSet(MinerEtherbaseFlag.Name) {
+		etherbase = ctx.GlobalString(MinerEtherbaseFlag.Name)
+	}
+	// Convert the etherbase into an address and configure it
+	if etherbase != "" {
+		account, err := MakeAddress(ks, etherbase)
 		if err != nil {
-			Fatalf("Option %q: %v", EtherbaseFlag.Name, err)
+			Fatalf("Invalid miner etherbase: %v", err)
 		}
 		cfg.Etherbase = account.Address
 	}
@@ -861,6 +921,16 @@ func setGPO(ctx *cli.Context, cfg *gasprice.Config) {
 }
 
 func setTxPool(ctx *cli.Context, cfg *core.TxPoolConfig) {
+	if ctx.GlobalIsSet(TxPoolLocalsFlag.Name) {
+		locals := strings.Split(ctx.GlobalString(TxPoolLocalsFlag.Name), ",")
+		for _, account := range locals {
+			if trimmed := strings.TrimSpace(account); !common.IsHexAddress(trimmed) {
+				Fatalf("Invalid account in --txpool.locals: %s", trimmed)
+			} else {
+				cfg.Locals = append(cfg.Locals, common.HexToAddress(account))
+			}
+		}
+	}
 	if ctx.GlobalIsSet(TxPoolNoLocalsFlag.Name) {
 		cfg.NoLocals = ctx.GlobalBool(TxPoolNoLocalsFlag.Name)
 	}
@@ -870,8 +940,8 @@ func setTxPool(ctx *cli.Context, cfg *core.TxPoolConfig) {
 	if ctx.GlobalIsSet(TxPoolRejournalFlag.Name) {
 		cfg.Rejournal = ctx.GlobalDuration(TxPoolRejournalFlag.Name)
 	}
-	if ctx.GlobalIsSet(GasPriceFlag.Name) {
-		cfg.PriceLimit = ctx.GlobalUint64(GasPriceFlag.Name)
+	if ctx.GlobalIsSet(TxPoolPriceLimitFlag.Name) {
+		cfg.PriceLimit = ctx.GlobalUint64(TxPoolPriceLimitFlag.Name)
 	}
 	if ctx.GlobalIsSet(TxPoolPriceBumpFlag.Name) {
 		cfg.PriceBump = ctx.GlobalUint64(TxPoolPriceBumpFlag.Name)
@@ -911,7 +981,7 @@ func setEthdb(ctx *cli.Context, cfg *ethdb.Config) {
 	}
 }
 
-// checkExclusive verifies that only a single isntance of the provided flags was
+// checkExclusive verifies that only a single instance of the provided flags was
 // set by the user. Each flag might optionally be followed by a string type to
 // specialize it further.
 func checkExclusive(ctx *cli.Context, args ...interface{}) {
@@ -928,11 +998,14 @@ func checkExclusive(ctx *cli.Context, args ...interface{}) {
 		if i+1 < len(args) {
 			switch option := args[i+1].(type) {
 			case string:
-				// Extended flag, expand the name and shift the arguments
+				// Extended flag check, make sure value set doesn't conflict with passed in option
 				if ctx.GlobalString(flag.GetName()) == option {
 					name += "=" + option
+					set = append(set, "--"+name)
 				}
+				// shift arguments and continue
 				i++
+				continue
 
 			case cli.Flag:
 			default:
@@ -1003,17 +1076,38 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 	if ctx.GlobalIsSet(CacheFlag.Name) || ctx.GlobalIsSet(CacheGCFlag.Name) {
 		cfg.TrieCache = ctx.GlobalInt(CacheFlag.Name) * ctx.GlobalInt(CacheGCFlag.Name) / 100
 	}
-	if ctx.GlobalIsSet(MinerThreadsFlag.Name) {
-		cfg.MinerThreads = ctx.GlobalInt(MinerThreadsFlag.Name)
+	if ctx.GlobalIsSet(MinerNotifyFlag.Name) {
+		cfg.MinerNotify = strings.Split(ctx.GlobalString(MinerNotifyFlag.Name), ",")
 	}
 	if ctx.GlobalIsSet(DocRootFlag.Name) {
 		cfg.DocRoot = ctx.GlobalString(DocRootFlag.Name)
 	}
-	if ctx.GlobalIsSet(ExtraDataFlag.Name) {
-		cfg.ExtraData = []byte(ctx.GlobalString(ExtraDataFlag.Name))
+	if ctx.GlobalIsSet(MinerLegacyExtraDataFlag.Name) {
+		cfg.MinerExtraData = []byte(ctx.GlobalString(MinerLegacyExtraDataFlag.Name))
 	}
-	if ctx.GlobalIsSet(GasPriceFlag.Name) {
-		cfg.GasPrice = GlobalBig(ctx, GasPriceFlag.Name)
+	if ctx.GlobalIsSet(MinerExtraDataFlag.Name) {
+		cfg.MinerExtraData = []byte(ctx.GlobalString(MinerExtraDataFlag.Name))
+	}
+	if ctx.GlobalIsSet(MinerLegacyGasTargetFlag.Name) {
+		cfg.MinerGasFloor = ctx.GlobalUint64(MinerLegacyGasTargetFlag.Name)
+	}
+	if ctx.GlobalIsSet(MinerGasTargetFlag.Name) {
+		cfg.MinerGasFloor = ctx.GlobalUint64(MinerGasTargetFlag.Name)
+	}
+	if ctx.GlobalIsSet(MinerGasLimitFlag.Name) {
+		cfg.MinerGasCeil = ctx.GlobalUint64(MinerGasLimitFlag.Name)
+	}
+	if ctx.GlobalIsSet(MinerLegacyGasPriceFlag.Name) {
+		cfg.MinerGasPrice = GlobalBig(ctx, MinerLegacyGasPriceFlag.Name)
+	}
+	if ctx.GlobalIsSet(MinerGasPriceFlag.Name) {
+		cfg.MinerGasPrice = GlobalBig(ctx, MinerGasPriceFlag.Name)
+	}
+	if ctx.GlobalIsSet(MinerRecommitIntervalFlag.Name) {
+		cfg.MinerRecommit = ctx.Duration(MinerRecommitIntervalFlag.Name)
+	}
+	if ctx.GlobalIsSet(MinerNoVerfiyFlag.Name) {
+		cfg.MinerNoverify = ctx.Bool(MinerNoVerfiyFlag.Name)
 	}
 	if ctx.GlobalIsSet(VMEnableDebugFlag.Name) {
 		// TODO(fjl): force-enable this in --dev mode
@@ -1047,8 +1141,8 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 		log.Info("Using developer account", "address", developer.Address)
 
 		cfg.Genesis = core.DeveloperGenesisBlock(uint64(ctx.GlobalInt(DeveloperPeriodFlag.Name)), developer.Address)
-		if !ctx.GlobalIsSet(GasPriceFlag.Name) {
-			cfg.GasPrice = big.NewInt(1)
+		if !ctx.GlobalIsSet(MinerGasPriceFlag.Name) && !ctx.GlobalIsSet(MinerLegacyGasPriceFlag.Name) {
+			cfg.MinerGasPrice = big.NewInt(1)
 		}
 	}
 	// TODO(fjl): move trie cache generations into config
@@ -1062,7 +1156,6 @@ func SetDashboardConfig(ctx *cli.Context, cfg *dashboard.Config) {
 	cfg.Host = ctx.GlobalString(DashboardAddrFlag.Name)
 	cfg.Port = ctx.GlobalInt(DashboardPortFlag.Name)
 	cfg.Refresh = ctx.GlobalDuration(DashboardRefreshFlag.Name)
-	cfg.Assets = ctx.GlobalString(DashboardAssetsFlag.Name)
 }
 
 // RegisterEthService adds an GoChain client to the stack.
@@ -1117,14 +1210,6 @@ func RegisterNetStatsService(stack *node.Node, cfg netstats.Config) {
 		return netstats.New(cfg, ethServ, lesServ), nil
 	}); err != nil {
 		Fatalf("Failed to register the GoChain Stats service: %v", err)
-	}
-}
-
-// SetupNetwork configures the system for either the main net or some test network.
-func SetupNetwork(ctx *cli.Context) {
-	// TODO(fjl): move target gas limit into config
-	if ctx.GlobalIsSet(TargetGasLimitFlag.Name) {
-		params.TargetGasLimit = ctx.GlobalUint64(TargetGasLimitFlag.Name)
 	}
 }
 

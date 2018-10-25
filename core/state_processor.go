@@ -76,6 +76,7 @@ func (p *StateProcessor) Process(ctx context.Context, block *types.Block, stated
 	// Create a new emv context and environment.
 	evmContext := NewEVMContextLite(header, p.bc, nil)
 	vmenv := vm.NewEVM(evmContext, statedb, p.config, cfg)
+	signer := types.MakeSigner(p.config, header.Number)
 
 	// Iterate over and process the individual transactions
 	for i, tx := range txs {
@@ -83,7 +84,7 @@ func (p *StateProcessor) Process(ctx context.Context, block *types.Block, stated
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
 		span.End()
 
-		receipt, _, err := ApplyTransaction(ctx, vmenv, p.config, gp, statedb, header, tx, usedGas, types.MakeSigner(p.config, header.Number))
+		receipt, _, err := ApplyTransaction(ctx, vmenv, p.config, gp, statedb, header, tx, usedGas, signer)
 		if err != nil {
 			return nil, nil, 0, err
 		}

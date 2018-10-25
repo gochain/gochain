@@ -105,24 +105,6 @@ func (b *EthApiBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumb
 	return b.eth.blockchain.GetBlockByNumber(uint64(blockNr)), nil
 }
 
-func (b *EthApiBackend) StateQuery(ctx context.Context, blockNr rpc.BlockNumber, fn func(*state.StateDB) error) error {
-	ctx, span := trace.StartSpan(ctx, "EthApiBackend.StateQuery")
-	defer span.End()
-	// Pending state is only known by the miner
-	if blockNr == rpc.PendingBlockNumber {
-		return b.eth.miner.PendingQuery(fn)
-	}
-	header, err := b.HeaderByNumber(ctx, blockNr)
-	if header == nil || err != nil {
-		return err
-	}
-	stateDb, err := b.eth.BlockChain().StateAt(header.Root)
-	if err != nil {
-		return err
-	}
-	return fn(stateDb)
-}
-
 func (b *EthApiBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.StateDB, *types.Header, error) {
 	ctx, span := trace.StartSpan(ctx, "EthApiBackend.StateAndHeaderByNumber")
 	defer span.End()

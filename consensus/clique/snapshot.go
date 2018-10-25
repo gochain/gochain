@@ -206,7 +206,7 @@ func (s *Snapshot) apply(ctx context.Context, headers []*types.Header) (*Snapsho
 			snap.Tally = make(map[common.Address]Tally)
 		}
 		// Resolve the authorization key and check against signers
-		signer, err := ecrecover(ctx, header, s.sigcache)
+		signer, err := ecrecover(header, s.sigcache)
 		if err != nil {
 			return nil, err
 		}

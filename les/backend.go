@@ -151,7 +151,7 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *eth.Config) (*L
 	}
 	gpoParams := config.GPO
 	if gpoParams.Default == nil {
-		gpoParams.Default = config.GasPrice
+		gpoParams.Default = config.MinerGasPrice
 	}
 	leth.ApiBackend.gpo = gasprice.NewOracle(leth.ApiBackend, gpoParams)
 	return leth, nil

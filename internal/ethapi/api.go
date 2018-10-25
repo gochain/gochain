@@ -38,7 +38,6 @@ import (
 	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/rawdb"
-	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/core/vm"
 	"github.com/gochain-io/gochain/crypto"
@@ -537,11 +536,11 @@ func (s *PublicBlockChainAPI) GenesisAlloc(ctx context.Context) (core.GenesisAll
 func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*hexutil.Big, error) {
 	ctx, span := trace.StartSpan(ctx, "PublicBlockChainAPI.GetBalance")
 	defer span.End()
-	var bal *big.Int
-	err := s.b.StateQuery(ctx, blockNr, func(state *state.StateDB) (err error) {
-		bal, err = state.GetBalanceErr(address)
-		return
-	})
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	if state == nil || err != nil {
+		return nil, err
+	}
+	bal, err := state.GetBalanceErr(address)
 	return (*hexutil.Big)(bal), err
 }
 
@@ -628,24 +627,23 @@ func (s *PublicBlockChainAPI) GetUncleCountByBlockHash(ctx context.Context, bloc
 
 // GetCode returns the code stored at the given address in the state for the given block number.
 func (s *PublicBlockChainAPI) GetCode(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
-	var code hexutil.Bytes
-	err := s.b.StateQuery(ctx, blockNr, func(state *state.StateDB) (err error) {
-		code, err = state.GetCodeErr(address)
-		return
-	})
-	return code, err
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	if state == nil || err != nil {
+		return nil, err
+	}
+	return state.GetCodeErr(address)
 }
 
 // GetStorageAt returns the storage from the state at the given address, key and
 // block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta block
 // numbers are also allowed.
 func (s *PublicBlockChainAPI) GetStorageAt(ctx context.Context, address common.Address, key string, blockNr rpc.BlockNumber) (hexutil.Bytes, error) {
-	var st common.Hash
-	err := s.b.StateQuery(ctx, blockNr, func(state *state.StateDB) (err error) {
-		st, err = state.GetStateErr(address, common.HexToHash(key))
-		return
-	})
-	return st[:], err
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	if state == nil || err != nil {
+		return nil, err
+	}
+	res, err := state.GetStateErr(address, common.HexToHash(key))
+	return res[:], err
 }
 
 // CallArgs represents the arguments for a call.
@@ -1048,13 +1046,11 @@ func (s *PublicTransactionPoolAPI) GetRawTransactionByBlockHashAndIndex(ctx cont
 
 // GetTransactionCount returns the number of transactions the given address has sent for the given block number
 func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, address common.Address, blockNr rpc.BlockNumber) (*hexutil.Uint64, error) {
-	ctx, span := trace.StartSpan(ctx, "PublicTransactionPoolAPI.GetTransactionCount")
-	defer span.End()
-	var nonce uint64
-	err := s.b.StateQuery(ctx, blockNr, func(state *state.StateDB) (err error) {
-		nonce, err = state.GetNonceErr(address)
-		return
-	})
+	state, _, err := s.b.StateAndHeaderByNumber(ctx, blockNr)
+	if state == nil || err != nil {
+		return nil, err
+	}
+	nonce, err := state.GetNonceErr(address)
 	return (*hexutil.Uint64)(&nonce), err
 }
 

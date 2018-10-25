@@ -76,10 +76,6 @@ var (
 	// that is not part of the local blockchain.
 	errUnknownBlock = errors.New("unknown block")
 
-	// errInvalidCheckpointBeneficiary is returned if a checkpoint/epoch transition
-	// block has a beneficiary set to non-zeroes.
-	errInvalidCheckpointBeneficiary = errors.New("beneficiary in checkpoint block non-zero")
-
 	// errInvalidVote is returned if a nonce value is something else that the two
 	// allowed constants of 0x00..0 or 0xff..f.
 	errInvalidVote = errors.New("vote nonce not 0x00..0 or 0xff..f")
@@ -141,10 +137,10 @@ var (
 // Note, the method requires the extra data to be at least 65 bytes, otherwise it
 // panics. This is done to avoid accidentally using both forms (signature present
 // or not), which could be abused to produce different hashes for the same header.
-func sigHash(ctx context.Context, header *types.Header) (hash common.Hash) {
+func sigHash(header *types.Header) (hash common.Hash) {
 	hasher := sha3.NewKeccak256SingleSum()
 
-	rlp.EncodeCtx(ctx, hasher, []interface{}{
+	rlp.Encode(hasher, []interface{}{
 		header.ParentHash,
 		header.UncleHash,
 		header.Coinbase,
@@ -168,7 +164,7 @@ func sigHash(ctx context.Context, header *types.Header) (hash common.Hash) {
 }
 
 // ecrecover extracts the Ethereum account address from a signed header.
-func ecrecover(ctx context.Context, header *types.Header, sigcache *lru.ARCCache) (common.Address, error) {
+func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, error) {
 	// If the signature's already cached, return that
 	hash := header.Hash()
 	if address, known := sigcache.Get(hash); known {
@@ -181,7 +177,7 @@ func ecrecover(ctx context.Context, header *types.Header, sigcache *lru.ARCCache
 	signature := header.Signer
 
 	// Recover the public key and the Ethereum address
-	pubkey, err := crypto.Ecrecover(sigHash(ctx, header).Bytes(), signature)
+	pubkey, err := crypto.Ecrecover(sigHash(header).Bytes(), signature)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -237,8 +233,8 @@ func New(config *params.CliqueConfig, db common.Database) *Clique {
 
 // Author implements consensus.Engine, returning the address recovered
 // from the signature in the header's extra-data section.
-func (c *Clique) Author(ctx context.Context, header *types.Header) (common.Address, error) {
-	return ecrecover(ctx, header, c.signatures)
+func (c *Clique) Author(header *types.Header) (common.Address, error) {
+	return ecrecover(header, c.signatures)
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules.
@@ -305,10 +301,9 @@ func (c *Clique) verifyHeader(ctx context.Context, chain consensus.ChainReader, 
 	}
 	number := header.Number.Uint64()
 
-	// Checkpoint blocks need to enforce zero beneficiary
 	checkpoint := (number % c.config.Epoch) == 0
 	if checkpoint && len(header.Extra) > extraVanity {
-		return errInvalidCheckpointBeneficiary
+		return errInvalidVote
 	}
 	// Nonces must be 0x00..0 or 0xff..f, zeroes enforced on checkpoints
 	if !bytes.Equal(header.Nonce[:], nonceAuthVote) && !bytes.Equal(header.Nonce[:], nonceDropVote) {
@@ -448,6 +443,9 @@ func (c *Clique) snapshot(ctx context.Context, chain consensus.ChainReader, numb
 		// If we're at block zero, make a snapshot
 		if number == 0 {
 			genesis := chain.GetHeaderByNumber(0)
+			if genesis == nil {
+				return nil, errors.New("no genesis block found")
+			}
 			if err := c.VerifyHeader(ctx, chain, genesis); err != nil {
 				return nil, err
 			}
@@ -516,7 +514,7 @@ func (c *Clique) verifySeal(ctx context.Context, chain consensus.ChainReader, he
 		return err
 	}
 	// Resolve the authorization key and check against signers
-	signer, err := ecrecover(ctx, header, c.signatures)
+	signer, err := ecrecover(header, c.signatures)
 	if err != nil {
 		return err
 	}
@@ -540,7 +538,7 @@ func (c *Clique) verifySeal(ctx context.Context, chain consensus.ChainReader, he
 
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
-func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, header *types.Header) (*time.Time, error) {
+func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, header *types.Header) error {
 	ctx, span := trace.StartSpan(ctx, "Clique.Prepare")
 	defer span.End()
 
@@ -551,18 +549,18 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 	// Assemble the voting snapshot to check which votes make sense
 	snap, err := c.snapshot(ctx, chain, number-1, header.ParentHash, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if c.signer != (common.Address{}) {
 		// Check that we can sign.
 		if _, ok := snap.Signers[c.signer]; !ok {
-			return nil, fmt.Errorf("not authorized to sign: %s", c.signer.Hex())
+			return fmt.Errorf("not authorized to sign: %s", c.signer.Hex())
 		}
 	}
 	// Calculate and validate the difficulty.
 	diff := CalcDifficulty(snap.Signers, c.signer)
 	if c.signer != (common.Address{}) && diff == 0 {
-		return nil, fmt.Errorf("signed too recently: %s", c.signer.Hex())
+		return fmt.Errorf("signed too recently: %s", c.signer.Hex())
 	}
 	header.Difficulty = new(big.Int).SetUint64(diff)
 
@@ -604,23 +602,16 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 	// Ensure the timestamp has the correct delay
 	parent := chain.GetHeader(header.ParentHash, number-1)
 	if parent == nil {
-		return nil, consensus.ErrUnknownAncestor
+		return consensus.ErrUnknownAncestor
 	}
 	header.Time = new(big.Int).Add(parent.Time, new(big.Int).SetUint64(c.config.Period))
 	if header.Time.Int64() < time.Now().Unix() {
 		header.Time = big.NewInt(time.Now().Unix())
 	}
 	if c.config.Period == 0 {
-		return nil, nil
+		return nil
 	}
-	return prepareDeadline(header.Time.Int64(), c.config.Period), nil
-}
-
-// prepareDeadline returns a deadline for block preparation which is 1/2 of the period before unix.
-func prepareDeadline(unix int64, period uint64) *time.Time {
-	t := time.Unix(unix, 0)
-	t = t.Add(-time.Duration(period) * time.Second / 2)
-	return &t
+	return nil
 }
 
 func (c *Clique) Authorize(signer common.Address, signFn consensus.SignerFn) {
@@ -633,7 +624,7 @@ func (c *Clique) Authorize(signer common.Address, signFn consensus.SignerFn) {
 
 // Seal implements consensus.Engine, attempting to create a sealed block using
 // the local signing credentials.
-func (c *Clique) Seal(ctx context.Context, chain consensus.ChainReader, block *types.Block, stop <-chan struct{}) (*types.Block, error) {
+func (c *Clique) Seal(ctx context.Context, chain consensus.ChainReader, block *types.Block, stop <-chan struct{}) (*types.Block, *time.Time, error) {
 	ctx, span := trace.StartSpan(ctx, "Clique.Seal")
 	defer span.End()
 
@@ -642,11 +633,11 @@ func (c *Clique) Seal(ctx context.Context, chain consensus.ChainReader, block *t
 	// Sealing the genesis block is not supported
 	number := header.Number.Uint64()
 	if number == 0 {
-		return nil, errUnknownBlock
+		return nil, nil, errUnknownBlock
 	}
 	// For 0-period chains, refuse to seal empty blocks (no reward but would spin sealing)
 	if c.config.Period == 0 && len(block.Transactions()) == 0 {
-		return nil, errWaitTransactions
+		return nil, nil, errWaitTransactions
 	}
 	// Don't hold the signer fields for the entire sealing procedure
 	c.lock.RLock()
@@ -656,25 +647,25 @@ func (c *Clique) Seal(ctx context.Context, chain consensus.ChainReader, block *t
 	// Bail out if we're unauthorized to sign a block
 	snap, err := c.snapshot(ctx, chain, number-1, header.ParentHash, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	lastBlockSigned, authorized := snap.Signers[signer]
 	if !authorized {
-		return nil, fmt.Errorf("%s not authorized to sign", signer.Hex())
+		return nil, nil, fmt.Errorf("%s not authorized to sign", signer.Hex())
 	}
 
 	if lastBlockSigned > 0 {
 		if next := snap.nextSignableBlockNumber(lastBlockSigned); number < next {
 			log.Info("Signed recently, must wait for others", "number", number, "signed", lastBlockSigned, "next", next)
 			<-stop
-			return nil, nil
+			return nil, nil, nil
 		}
 	}
 
 	// Sign all the things!
-	sighash, err := signFn(accounts.Account{Address: signer}, sigHash(ctx, header).Bytes())
+	sighash, err := signFn(accounts.Account{Address: signer}, sigHash(header).Bytes())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	header.Signer = sighash
 	wSeal := block.WithSeal(header)
@@ -684,31 +675,16 @@ func (c *Clique) Seal(ctx context.Context, chain consensus.ChainReader, block *t
 		n    = uint64(len(snap.Signers))
 		diff = header.Difficulty.Uint64()
 	)
-	if diff == n {
-		// In-turn, seal immediately.
-		return wSeal, nil
-	} else if diff > n {
-		// Should never happen.
-		return nil, fmt.Errorf("failed to seal: illegal difficulty %d/%d", diff, n)
-	}
-	// Out-of-turn (diff < n), wait until header.Time plus a delay based on difficulty.
+	// Wait until header.Time plus a delay based on difficulty.
 	// Since diff is in the range [n/2+1,n], delay is [wiggleTime,n/2*wiggleTime].
-	var (
-		delay = time.Duration(n-diff) * wiggleTime
-		until = prepareDeadline(header.Time.Int64(), c.config.Period).Add(delay)
-	)
-	if wait := time.Until(until); wait > 0 {
-		log.Trace("Out-of-turn signing requested - waiting for slot to sign and propagate after delay",
-			"number", number, "until", header.Time.Int64(), "delay", common.PrettyDuration(delay))
+	delay := time.Duration(n-diff) * wiggleTime
+	until := time.Unix(header.Time.Int64(), 0).Add(delay)
 
-		select {
-		case <-stop:
-			return nil, nil
-		case <-time.After(wait):
-		}
-	}
+	return wSeal, &until, nil
+}
 
-	return wSeal, nil
+func (c *Clique) SealHash(header *types.Header) common.Hash {
+	return sigHash(header)
 }
 
 // CalcDifficulty returns the difficulty for signer, given all signers and their most recently signed block numbers,

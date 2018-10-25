@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/gochain-io/gochain/common"
 )
@@ -219,24 +218,6 @@ func (test *testCalcDifficulty) run(t *testing.T) {
 		got := CalcDifficulty(test.lastSigned, signer)
 		if got != uint64(exp) {
 			t.Errorf("expected difficulty %d but got %d", exp, got)
-		}
-	}
-}
-
-func TestPrepareDeadline(t *testing.T) {
-	now := time.Now().Round(time.Second)
-	for _, test := range []struct {
-		unix   int64
-		period uint64
-		want   time.Time
-	}{
-		{unix: 2, period: 2, want: time.Unix(1, 0)},
-		{unix: 6, period: 6, want: time.Unix(3, 0)},
-		{unix: now.Unix(), period: 6, want: now.Add(-3 * time.Second)},
-		{unix: 123456789, period: 200, want: time.Unix(123456689, 0)},
-	} {
-		if got := prepareDeadline(test.unix, test.period); *got != test.want {
-			t.Errorf("%q:%d - wanted %q but got %q", time.Unix(test.unix, 0), 6, test.want, got)
 		}
 	}
 }

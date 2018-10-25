@@ -30,9 +30,8 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		TrieCache               int
 		TrieTimeout             time.Duration
 		Etherbase               common.Address `toml:",omitempty"`
-		MinerThreads            int            `toml:",omitempty"`
-		ExtraData               hexutil.Bytes  `toml:",omitempty"`
-		GasPrice                *big.Int
+		MinerExtraData          hexutil.Bytes  `toml:",omitempty"`
+		MinerGasPrice           *big.Int
 		TxPool                  core.TxPoolConfig
 		GPO                     gasprice.Config
 		EnablePreimageRecording bool
@@ -51,9 +50,8 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.TrieCache = c.TrieCache
 	enc.TrieTimeout = c.TrieTimeout
 	enc.Etherbase = c.Etherbase
-	enc.MinerThreads = c.MinerThreads
-	enc.ExtraData = c.ExtraData
-	enc.GasPrice = c.GasPrice
+	enc.MinerExtraData = c.MinerExtraData
+	enc.MinerGasPrice = c.MinerGasPrice
 	enc.TxPool = c.TxPool
 	enc.GPO = c.GPO
 	enc.EnablePreimageRecording = c.EnablePreimageRecording
@@ -77,9 +75,8 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		TrieCache               *int
 		TrieTimeout             *time.Duration
 		Etherbase               *common.Address `toml:",omitempty"`
-		MinerThreads            *int            `toml:",omitempty"`
-		ExtraData               *hexutil.Bytes  `toml:",omitempty"`
-		GasPrice                *big.Int
+		MinerExtraData          *hexutil.Bytes  `toml:",omitempty"`
+		MinerGasPrice           *big.Int
 		TxPool                  *core.TxPoolConfig
 		GPO                     *gasprice.Config
 		EnablePreimageRecording *bool
@@ -126,14 +123,11 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	if dec.Etherbase != nil {
 		c.Etherbase = *dec.Etherbase
 	}
-	if dec.MinerThreads != nil {
-		c.MinerThreads = *dec.MinerThreads
+	if dec.MinerExtraData != nil {
+		c.MinerExtraData = *dec.MinerExtraData
 	}
-	if dec.ExtraData != nil {
-		c.ExtraData = *dec.ExtraData
-	}
-	if dec.GasPrice != nil {
-		c.GasPrice = dec.GasPrice
+	if dec.MinerGasPrice != nil {
+		c.MinerGasPrice = dec.MinerGasPrice
 	}
 	if dec.TxPool != nil {
 		c.TxPool = *dec.TxPool

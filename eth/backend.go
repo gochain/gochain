@@ -137,7 +137,7 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 		shutdownChan:   make(chan bool),
 		stopDbUpgrade:  stopDbUpgrade,
 		networkId:      config.NetworkId,
-		gasPrice:       config.GasPrice,
+		gasPrice:       config.MinerGasPrice,
 		etherbase:      config.Etherbase,
 		bloomRequests:  make(chan chan *bloombits.Retrieval),
 		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks),
@@ -178,20 +178,18 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 	if eth.protocolManager, err = NewProtocolManager(context.Background(), eth.chainConfig, config.SyncMode, config.NetworkId, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb); err != nil {
 		return nil, err
 	}
-	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine)
-	if err := eth.miner.SetExtra(makeExtraData(config.ExtraData)); err != nil {
+	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine, config.MinerRecommit, config.MinerGasFloor, config.MinerGasCeil, eth.isLocalBlock)
+	if err := eth.miner.SetExtra(makeExtraData(config.MinerExtraData)); err != nil {
 		log.Error("Cannot set extra chain data", "err", err)
 	}
 
-	eth.ApiBackend = &EthApiBackend{
-		eth: eth,
-	}
+	eth.ApiBackend = &EthApiBackend{eth: eth}
 	if g := eth.config.Genesis; g != nil {
 		eth.ApiBackend.initialSupply = g.Alloc.Total()
 	}
 	gpoParams := config.GPO
 	if gpoParams.Default == nil {
-		gpoParams.Default = config.GasPrice
+		gpoParams.Default = config.MinerGasPrice
 	}
 	eth.ApiBackend.gpo = gasprice.NewOracle(eth.ApiBackend, gpoParams)
 
@@ -312,7 +310,35 @@ func (gc *GoChain) Etherbase() (eb common.Address, err error) {
 	return common.Address{}, fmt.Errorf("etherbase must be explicitly specified")
 }
 
-// set in js console via admin interface or wrapper from cli flags
+// isLocalBlock checks whether the specified block is mined
+// by local miner accounts.
+//
+// We regard two types of accounts as local miner account: etherbase
+// and accounts specified via `txpool.locals` flag.
+func (gc *GoChain) isLocalBlock(block *types.Block) bool {
+	author, err := gc.engine.Author(block.Header())
+	if err != nil {
+		log.Warn("Failed to retrieve block author", "number", block.NumberU64(), "hash", block.Hash(), "err", err)
+		return false
+	}
+	// Check whether the given address is etherbase.
+	gc.lock.RLock()
+	etherbase := gc.etherbase
+	gc.lock.RUnlock()
+	if author == etherbase {
+		return true
+	}
+	// Check whether the given address is specified by `txpool.local`
+	// CLI flag.
+	for _, account := range gc.config.TxPool.Locals {
+		if account == author {
+			return true
+		}
+	}
+	return false
+}
+
+// SetEtherbase sets the mining reward address.
 func (gc *GoChain) SetEtherbase(etherbase common.Address) {
 	gc.lock.Lock()
 	gc.etherbase = etherbase
@@ -321,32 +347,66 @@ func (gc *GoChain) SetEtherbase(etherbase common.Address) {
 	gc.miner.SetEtherbase(etherbase)
 }
 
-func (gc *GoChain) StartMining(local bool) error {
-	eb, err := gc.Etherbase()
-	if err != nil {
-		log.Error("Cannot start mining without etherbase", "err", err)
-		return fmt.Errorf("etherbase missing: %v", err)
+// StartMining starts the miner with the given number of CPU threads. If mining
+// is already running, this method adjust the number of threads allowed to use
+// and updates the minimum price required by the transaction pool.
+func (gc *GoChain) StartMining(threads int) error {
+	// Update the thread count within the consensus engine
+	type threaded interface {
+		SetThreads(threads int)
 	}
-	if clique, ok := gc.engine.(*clique.Clique); ok {
-		wallet, err := gc.accountManager.Find(accounts.Account{Address: eb})
-		if wallet == nil || err != nil {
-			log.Error("Etherbase account unavailable locally", "err", err)
-			return fmt.Errorf("signer missing: %v", err)
+	if th, ok := gc.engine.(threaded); ok {
+		log.Info("Updated mining threads", "threads", threads)
+		if threads == 0 {
+			threads = -1 // Disable the miner from within
 		}
-		clique.Authorize(eb, wallet.SignHash)
+		th.SetThreads(threads)
 	}
-	if local {
-		// If local (CPU) mining is started, we can disable the transaction rejection
-		// mechanism introduced to speed sync times. CPU mining on mainnet is ludicrous
-		// so noone will ever hit this path, whereas marking sync done on CPU mining
-		// will ensure that private networks work in single miner mode too.
+	// If the miner was not running, initialize it
+	if !gc.IsMining() {
+		// Propagate the initial price point to the transaction pool
+		gc.lock.RLock()
+		price := gc.gasPrice
+		gc.lock.RUnlock()
+		gc.txPool.SetGasPrice(context.Background(), price)
+
+		// Configure the local mining address
+		eb, err := gc.Etherbase()
+		if err != nil {
+			log.Error("Cannot start mining without etherbase", "err", err)
+			return fmt.Errorf("etherbase missing: %v", err)
+		}
+		if clique, ok := gc.engine.(*clique.Clique); ok {
+			wallet, err := gc.accountManager.Find(accounts.Account{Address: eb})
+			if wallet == nil || err != nil {
+				log.Error("Etherbase account unavailable locally", "err", err)
+				return fmt.Errorf("signer missing: %v", err)
+			}
+			clique.Authorize(eb, wallet.SignHash)
+		}
+		// If mining is started, we can disable the transaction rejection mechanism
+		// introduced to speed sync times.
 		atomic.StoreUint32(&gc.protocolManager.acceptTxs, 1)
+
+		go gc.miner.Start(eb)
 	}
-	go gc.miner.Start(eb)
 	return nil
 }
 
-func (gc *GoChain) StopMining()         { gc.miner.Stop() }
+// StopMining terminates the miner, both at the consensus engine level as well as
+// at the block creation level.
+func (gc *GoChain) StopMining() {
+	// Update the thread count within the consensus engine
+	type threaded interface {
+		SetThreads(threads int)
+	}
+	if th, ok := gc.engine.(threaded); ok {
+		th.SetThreads(-1)
+	}
+	// Stop the block creating itself
+	gc.miner.Stop()
+}
+
 func (gc *GoChain) IsMining() bool      { return gc.miner.Mining() }
 func (gc *GoChain) Miner() *miner.Miner { return gc.miner }
 
@@ -398,14 +458,7 @@ func (gc *GoChain) Start(srvr *p2p.Server) error {
 // Stop implements node.Service, terminating all internal goroutines used by the
 // GoChain protocol.
 func (gc *GoChain) Stop() error {
-	if gc.stopDbUpgrade != nil {
-		if err := gc.stopDbUpgrade(); err != nil {
-			log.Error("Cannot stop db upgrade", "err", err)
-		}
-	}
-	if err := gc.bloomIndexer.Close(); err != nil {
-		log.Error("Cannot stop bloom indexer", "err", err)
-	}
+	gc.bloomIndexer.Close()
 	gc.blockchain.Stop()
 	gc.protocolManager.Stop()
 	if gc.lesServer != nil {

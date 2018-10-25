@@ -18,6 +18,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime"
@@ -72,6 +73,7 @@ var (
 		utils.TxPoolNoLocalsFlag,
 		utils.TxPoolJournalFlag,
 		utils.TxPoolRejournalFlag,
+		utils.TxPoolPriceLimitFlag,
 		utils.TxPoolPriceBumpFlag,
 		utils.TxPoolAccountSlotsFlag,
 		utils.TxPoolGlobalSlotsFlag,
@@ -92,11 +94,21 @@ var (
 		utils.ListenPortFlag,
 		utils.MaxPeersFlag,
 		utils.MaxPendingPeersFlag,
-		utils.EtherbaseFlag,
-		utils.GasPriceFlag,
-		utils.MinerThreadsFlag,
 		utils.MiningEnabledFlag,
-		utils.TargetGasLimitFlag,
+		utils.MinerThreadsFlag,
+		utils.MinerLegacyThreadsFlag,
+		utils.MinerNotifyFlag,
+		utils.MinerGasTargetFlag,
+		utils.MinerLegacyGasTargetFlag,
+		utils.MinerGasLimitFlag,
+		utils.MinerGasPriceFlag,
+		utils.MinerLegacyGasPriceFlag,
+		utils.MinerEtherbaseFlag,
+		utils.MinerLegacyEtherbaseFlag,
+		utils.MinerExtraDataFlag,
+		utils.MinerLegacyExtraDataFlag,
+		utils.MinerRecommitIntervalFlag,
+		utils.MinerNoVerfiyFlag,
 		utils.NATFlag,
 		utils.NoDiscoverFlag,
 		utils.DiscoveryV5Flag,
@@ -118,7 +130,6 @@ var (
 		utils.NoCompactionFlag,
 		utils.GpoBlocksFlag,
 		utils.GpoPercentileFlag,
-		utils.ExtraDataFlag,
 		utils.EthdbEndpointFlag,
 		utils.EthdbBucketFlag,
 		utils.EthdbAccessKeyIDFlag,
@@ -193,7 +204,6 @@ func init() {
 		// Start system runtime metrics collection
 		go metrics.CollectProcessMetrics(3 * time.Second)
 
-		utils.SetupNetwork(ctx)
 		return nil
 	}
 
@@ -309,16 +319,18 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 		if err := stack.Service(&gochain); err != nil {
 			utils.Fatalf("GoChain service not running: %v", err)
 		}
-		// Use a reduced number of threads if requested
-		if threads := ctx.GlobalInt(utils.MinerThreadsFlag.Name); threads > 0 {
-			type threaded interface {
-				SetThreads(threads int)
-			}
-			if th, ok := gochain.Engine().(threaded); ok {
-				th.SetThreads(threads)
-			}
+		// Set the gas price to the limits from the CLI and start mining
+		gasprice := utils.GlobalBig(ctx, utils.MinerLegacyGasPriceFlag.Name)
+		if ctx.IsSet(utils.MinerGasPriceFlag.Name) {
+			gasprice = utils.GlobalBig(ctx, utils.MinerGasPriceFlag.Name)
 		}
-		if err := gochain.StartMining(true); err != nil {
+		gochain.TxPool().SetGasPrice(context.Background(), gasprice)
+
+		threads := ctx.GlobalInt(utils.MinerLegacyThreadsFlag.Name)
+		if ctx.GlobalIsSet(utils.MinerThreadsFlag.Name) {
+			threads = ctx.GlobalInt(utils.MinerThreadsFlag.Name)
+		}
+		if err := gochain.StartMining(threads); err != nil {
 			utils.Fatalf("Failed to start mining: %v", err)
 		}
 	}
