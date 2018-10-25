@@ -153,7 +153,7 @@ func (dl *downloadTester) makeChainFork(ctx context.Context, n, f int, parent *t
 	// Create the common suffix
 	hashes, headers, blocks, receipts := dl.makeChain(ctx, n-f, 0, parent, parentReceipts, false)
 
-	// Create the forks, making the second heavyer if non balanced forks were requested
+	// Create the forks, making the second heavier if non balanced forks were requested
 	hashes1, headers1, blocks1, receipts1 := dl.makeChain(ctx, f, 1, blocks[hashes[0]], receipts[hashes[0]], false)
 	hashes1 = append(hashes1, hashes[1:]...)
 
@@ -738,7 +738,7 @@ func testThrottling(t *testing.T, protocol int, mode SyncMode) {
 			tester.downloader.queue.lock.Unlock()
 			tester.lock.Unlock()
 
-			if cached == blockCacheItems || retrieved+cached+frozen == targetBlocks+1 {
+			if cached == blockCacheItems || cached == blockCacheItems-reorgProtHeaderDelay || retrieved+cached+frozen == targetBlocks+1 || retrieved+cached+frozen == targetBlocks+1-reorgProtHeaderDelay {
 				break
 			}
 		}
@@ -748,7 +748,7 @@ func testThrottling(t *testing.T, protocol int, mode SyncMode) {
 		tester.lock.RLock()
 		retrieved = len(tester.ownBlocks)
 		tester.lock.RUnlock()
-		if cached != blockCacheItems && retrieved+cached+frozen != targetBlocks+1 {
+		if cached != blockCacheItems && cached != blockCacheItems-reorgProtHeaderDelay && retrieved+cached+frozen != targetBlocks+1 && retrieved+cached+frozen != targetBlocks+1-reorgProtHeaderDelay {
 			t.Fatalf("block count mismatch: have %v, want %v (owned %v, blocked %v, target %v)", cached, blockCacheItems, retrieved, frozen, targetBlocks+1)
 		}
 		// Permit the blocked blocks to import
