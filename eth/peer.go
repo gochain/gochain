@@ -659,7 +659,8 @@ func (ps *peerSet) PeersWithoutTxs(ctx context.Context, txs types.Transactions) 
 	return peerTxs
 }
 
-// BestPeer retrieves the known peer with the currently highest total difficulty.
+// BestPeer retrieves the known peer with the currently highest total difficulty, and breaks ties with the 'larger'
+// hash since non-determinism here can lead to deadlock.
 func (ps *peerSet) BestPeer(ctx context.Context) *peer {
 	ctx, span := trace.StartSpan(ctx, "peerSet.BestPeer")
 	defer span.End()
@@ -669,10 +670,16 @@ func (ps *peerSet) BestPeer(ctx context.Context) *peer {
 	var (
 		bestPeer *peer
 		bestTd   *big.Int
+		bestHash *big.Int
 	)
 	for _, p := range ps.peers {
-		if _, td := p.Head(); bestPeer == nil || td.Cmp(bestTd) > 0 {
-			bestPeer, bestTd = p, td
+		hash, td := p.Head()
+		if bestPeer == nil {
+			bestPeer, bestTd, bestHash = p, td, hash.Big()
+			continue
+		}
+		if cmp := td.Cmp(bestTd); cmp > 0 || cmp == 0 && hash.Big().Cmp(bestHash) > 0 {
+			bestPeer, bestTd, bestHash = p, td, hash.Big()
 		}
 	}
 	return bestPeer

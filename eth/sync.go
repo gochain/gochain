@@ -228,10 +228,13 @@ func (pm *ProtocolManager) synchronise(ctx context.Context, peer *peer) {
 	}
 	// Make sure the peer's TD is higher than our own
 	currentBlock := pm.blockchain.CurrentBlock()
-	td := pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())
+	hash := currentBlock.Hash()
+	td := pm.blockchain.GetTd(hash, currentBlock.NumberU64())
 
 	pHead, pTd := peer.Head()
-	if pTd.Cmp(td) <= 0 {
+	if cmp := pTd.Cmp(td); cmp < 0 {
+		return
+	} else if cmp == 0 && pHead.Big().Cmp(hash.Big()) <= 0 {
 		return
 	}
 	// Otherwise try to sync with the downloader
