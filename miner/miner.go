@@ -21,10 +21,10 @@ import (
 	"context"
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain-io/gochain/accounts"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/consensus"
 	"github.com/gochain-io/gochain/core"
@@ -38,36 +38,32 @@ import (
 
 // Backend wraps all methods required for mining.
 type Backend interface {
-	AccountManager() *accounts.Manager
 	BlockChain() *core.BlockChain
 	TxPool() *core.TxPool
-	ChainDb() common.Database
 }
 
 // Miner creates blocks and searches for proof-of-work values.
 type Miner struct {
-	mux *event.TypeMux
-
-	worker *worker
-
+	mux      *event.TypeMux
+	worker   *worker
 	coinbase common.Address
-	mining   int32
 	eth      Backend
 	engine   consensus.Engine
+	exitCh   chan struct{}
 
 	canStart    int32 // can start indicates whether we can start the mining operation
 	shouldStart int32 // should start indicates whether we should start after sync
 }
 
-func New(eth Backend, config *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine) *Miner {
+func New(eth Backend, config *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, recommit time.Duration, gasFloor, gasCeil uint64, isLocalBlock func(block *types.Block) bool) *Miner {
 	miner := &Miner{
 		eth:      eth,
 		mux:      mux,
 		engine:   engine,
-		worker:   newWorker(config, engine, common.Address{}, eth, mux),
+		exitCh:   make(chan struct{}),
+		worker:   newWorker(config, engine, eth, mux, recommit, gasFloor, gasCeil, isLocalBlock),
 		canStart: 1,
 	}
-	miner.Register(NewCpuAgent(eth.BlockChain(), engine))
 	go miner.update()
 
 	return miner
@@ -79,67 +75,62 @@ func New(eth Backend, config *params.ChainConfig, mux *event.TypeMux, engine con
 // and halt your mining operation for as long as the DOS continues.
 func (self *Miner) update() {
 	events := self.mux.Subscribe(downloader.StartEvent{}, downloader.DoneEvent{}, downloader.FailedEvent{})
-out:
-	for ev := range events.Chan() {
-		switch ev.Data.(type) {
-		case downloader.StartEvent:
-			atomic.StoreInt32(&self.canStart, 0)
-			if self.Mining() {
-				self.Stop()
-				atomic.StoreInt32(&self.shouldStart, 1)
-				log.Info("Mining aborted due to sync")
-			}
-		case downloader.DoneEvent, downloader.FailedEvent:
-			shouldStart := atomic.LoadInt32(&self.shouldStart) == 1
+	defer events.Unsubscribe()
 
-			atomic.StoreInt32(&self.canStart, 1)
-			atomic.StoreInt32(&self.shouldStart, 0)
-			if shouldStart {
-				self.Start(self.coinbase)
+	for {
+		select {
+		case ev := <-events.Chan():
+			if ev == nil {
+				return
 			}
-			// unsubscribe. we're only interested in this event once
-			events.Unsubscribe()
-			// stop immediately and ignore all further pending events
-			break out
+			switch ev.Data.(type) {
+			case downloader.StartEvent:
+				atomic.StoreInt32(&self.canStart, 0)
+				if self.Mining() {
+					self.Stop()
+					atomic.StoreInt32(&self.shouldStart, 1)
+					log.Info("Mining aborted due to sync")
+				}
+			case downloader.DoneEvent, downloader.FailedEvent:
+				shouldStart := atomic.LoadInt32(&self.shouldStart) == 1
+
+				atomic.StoreInt32(&self.canStart, 1)
+				atomic.StoreInt32(&self.shouldStart, 0)
+				if shouldStart {
+					self.Start(self.coinbase)
+				}
+				// stop immediately and ignore all further pending events
+				return
+			}
+		case <-self.exitCh:
+			return
 		}
 	}
 }
 
 func (self *Miner) Start(coinbase common.Address) {
 	atomic.StoreInt32(&self.shouldStart, 1)
-	self.worker.setEtherbase(coinbase)
-	self.coinbase = coinbase
+	self.SetEtherbase(coinbase)
 
 	if atomic.LoadInt32(&self.canStart) == 0 {
 		log.Info("Network syncing, will start miner afterwards")
 		return
 	}
-	atomic.StoreInt32(&self.mining, 1)
-
-	log.Info("Starting mining operation")
 	self.worker.start()
-	self.worker.commitNewWork(context.Background())
 }
 
 func (self *Miner) Stop() {
 	self.worker.stop()
-	atomic.StoreInt32(&self.mining, 0)
 	atomic.StoreInt32(&self.shouldStart, 0)
 }
 
-func (self *Miner) Register(agent Agent) {
-	if self.Mining() {
-		agent.Start()
-	}
-	self.worker.register(agent)
-}
-
-func (self *Miner) Unregister(agent Agent) {
-	self.worker.unregister(agent)
+func (self *Miner) Close() {
+	self.worker.close()
+	close(self.exitCh)
 }
 
 func (self *Miner) Mining() bool {
-	return atomic.LoadInt32(&self.mining) > 0
+	return self.worker.isRunning()
 }
 
 func (self *Miner) SetExtra(extra []byte) error {
@@ -150,16 +141,16 @@ func (self *Miner) SetExtra(extra []byte) error {
 	return nil
 }
 
+// SetRecommitInterval sets the interval for sealing work resubmitting.
+func (self *Miner) SetRecommitInterval(interval time.Duration) {
+	self.worker.setRecommitInterval(interval)
+}
+
 // Pending returns the currently pending block and associated state.
 func (self *Miner) Pending(ctx context.Context) (*types.Block, *state.StateDB) {
 	ctx, span := trace.StartSpan(ctx, "Miner.Pending")
 	defer span.End()
 	return self.worker.pending(ctx)
-}
-
-// PendingQuery calls fn with the pending (ready-only) state.
-func (self *Miner) PendingQuery(fn func(*state.StateDB) error) error {
-	return self.worker.pendingQuery(fn)
 }
 
 // PendingBlock returns the currently pending block.

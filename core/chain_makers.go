@@ -159,7 +159,7 @@ func GenerateChain(ctx context.Context, config *params.ChainConfig, first *types
 		b.header = &types.Header{
 			Root:       statedb.IntermediateRoot(b.config.IsEIP158(parent.Number())),
 			ParentHash: parent.Hash(),
-			GasLimit:   CalcGasLimit(parent),
+			GasLimit:   CalcGasLimit(parent, parent.GasLimit(), parent.GasLimit()),
 			Number:     new(big.Int).Add(parent.Number(), common.Big1),
 			Signers:    parent.Signers(),
 			Voters:     parent.Voters(),
@@ -172,13 +172,13 @@ func GenerateChain(ctx context.Context, config *params.ChainConfig, first *types
 		}
 
 		if b.engine != nil {
-			if _, err := b.engine.Prepare(ctx, b.chainReader, b.header); err != nil {
+			if err := b.engine.Prepare(ctx, b.chainReader, b.header); err != nil {
 				panic(fmt.Sprintf("failed to prepare %d: %v", b.header.Number.Uint64(), err))
 			}
 			block := b.engine.Finalize(ctx, b.chainReader, b.header, statedb, b.txs, b.receipts, true)
 
 			stop := make(chan struct{})
-			block, err := b.engine.Seal(ctx, b.chainReader, block, stop)
+			block, _, err := b.engine.Seal(ctx, b.chainReader, block, stop)
 			close(stop)
 			if err != nil {
 				panic(fmt.Sprintf("block seal error: %v", err))

@@ -19,11 +19,14 @@ package eth
 import (
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
 	"os"
+	"runtime"
 	"strings"
+	"time"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/hexutil"
@@ -31,8 +34,6 @@ import (
 	"github.com/gochain-io/gochain/core/rawdb"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/miner"
 	"github.com/gochain-io/gochain/params"
 	"github.com/gochain-io/gochain/rlp"
 	"github.com/gochain-io/gochain/rpc"
@@ -72,16 +73,12 @@ func (api *PublicEthereumAPI) ChainId() hexutil.Uint64 {
 // PublicMinerAPI provides an API to control the miner.
 // It offers only methods that operate on data that pose no security risk when it is publicly accessible.
 type PublicMinerAPI struct {
-	e     *GoChain
-	agent *miner.RemoteAgent
+	e *GoChain
 }
 
 // NewPublicMinerAPI create a new PublicMinerAPI instance.
 func NewPublicMinerAPI(e *GoChain) *PublicMinerAPI {
-	agent := miner.NewRemoteAgent(e.BlockChain(), e.Engine())
-	e.Miner().Register(agent)
-
-	return &PublicMinerAPI{e, agent}
+	return &PublicMinerAPI{e}
 }
 
 // Mining returns an indication if this node is currently mining.
@@ -100,47 +97,22 @@ func NewPrivateMinerAPI(e *GoChain) *PrivateMinerAPI {
 	return &PrivateMinerAPI{e: e}
 }
 
-// Start the miner with the given number of threads. If threads is nil the number
-// of workers started is equal to the number of logical CPUs that are usable by
-// this process. If mining is already running, this method adjust the number of
-// threads allowed to use.
+// Start starts the miner with the given number of threads. If threads is nil,
+// the number of workers started is equal to the number of logical CPUs that are
+// usable by this process. If mining is already running, this method adjust the
+// number of threads allowed to use and updates the minimum price required by the
+// transaction pool.
 func (api *PrivateMinerAPI) Start(threads *int) error {
-	// Set the number of threads if the seal engine supports it
 	if threads == nil {
-		threads = new(int)
-	} else if *threads == 0 {
-		*threads = -1 // Disable the miner from within
+		return api.e.StartMining(runtime.NumCPU())
 	}
-	type threaded interface {
-		SetThreads(threads int)
-	}
-	if th, ok := api.e.engine.(threaded); ok {
-		log.Info("Updated mining threads", "threads", *threads)
-		th.SetThreads(*threads)
-	}
-	// Start the miner and return
-	if !api.e.IsMining() {
-		// Propagate the initial price point to the transaction pool
-		api.e.lock.RLock()
-		price := api.e.gasPrice
-		api.e.lock.RUnlock()
-
-		api.e.txPool.SetGasPrice(context.Background(), price)
-		return api.e.StartMining(true)
-	}
-	return nil
+	return api.e.StartMining(*threads)
 }
 
-// Stop the miner
-func (api *PrivateMinerAPI) Stop() bool {
-	type threaded interface {
-		SetThreads(threads int)
-	}
-	if th, ok := api.e.engine.(threaded); ok {
-		th.SetThreads(-1)
-	}
+// Stop terminates the miner, both at the consensus engine level as well as at
+// the block creation level.
+func (api *PrivateMinerAPI) Stop() {
 	api.e.StopMining()
-	return true
 }
 
 // SetExtra sets the extra data string that is included when this miner mines a block.
@@ -167,6 +139,11 @@ func (api *PrivateMinerAPI) SetEtherbase(etherbase common.Address) bool {
 	return true
 }
 
+// SetRecommitInterval updates the interval for miner sealing work recommitting.
+func (api *PrivateMinerAPI) SetRecommitInterval(interval int) {
+	api.e.Miner().SetRecommitInterval(time.Duration(interval) * time.Millisecond)
+}
+
 // PrivateAdminAPI is the collection of GoChain full node-related APIs
 // exposed over the private admin endpoint.
 type PrivateAdminAPI struct {
@@ -189,25 +166,13 @@ func (api *PrivateAdminAPI) ExportChain(file string) (bool, error) {
 	defer out.Close()
 
 	var writer io.Writer = out
-	var gz *gzip.Writer
 	if strings.HasSuffix(file, ".gz") {
-		gz = gzip.NewWriter(writer)
-		defer gz.Close()
-		writer = gz
+		writer = gzip.NewWriter(writer)
+		defer writer.(*gzip.Writer).Close()
 	}
 
 	// Export the blockchain
 	if err := api.eth.BlockChain().Export(writer); err != nil {
-		return false, err
-	}
-
-	// Ensure file flushes and closes.
-	if gz != nil {
-		if err := gz.Close(); err != nil {
-			return false, err
-		}
-	}
-	if err := out.Close(); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -325,8 +290,10 @@ func NewPrivateDebugAPI(config *params.ChainConfig, eth *GoChain) *PrivateDebugA
 
 // Preimage is a debug API function that returns the preimage for a sha3 hash, if known.
 func (api *PrivateDebugAPI) Preimage(ctx context.Context, hash common.Hash) (hexutil.Bytes, error) {
-	db := rawdb.PreimageTablePrefixer(api.eth.ChainDb().GlobalTable())
-	return db.Get(hash.Bytes())
+	if preimage := rawdb.ReadPreimage(api.eth.ChainDb().GlobalTable(), hash); preimage != nil {
+		return preimage, nil
+	}
+	return nil, errors.New("unknown preimage")
 }
 
 // GetBadBLocks returns a list of the last 'bad blocks' that the client has seen on the network

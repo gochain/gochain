@@ -17,7 +17,6 @@
 package core
 
 import (
-	"context"
 	"math/big"
 
 	"github.com/gochain-io/gochain/common"
@@ -41,7 +40,7 @@ func NewEVMContext(msg Message, header *types.Header, chain ChainContext, author
 	// If we don't have an explicit author (i.e. not mining), extract from the header
 	var beneficiary common.Address
 	if author == nil {
-		beneficiary, _ = chain.Engine().Author(context.Background(), header) // Ignore error, we're past header validation
+		beneficiary, _ = chain.Engine().Author(header) // Ignore error, we're past header validation
 	} else {
 		beneficiary = *author
 	}
@@ -64,7 +63,7 @@ func NewEVMContextLite(header *types.Header, chain ChainContext, author *common.
 	// If we don't have an explicit author (i.e. not mining), extract from the header
 	var beneficiary common.Address
 	if author == nil {
-		beneficiary, _ = chain.Engine().Author(context.Background(), header) // Ignore error, we're past header validation
+		beneficiary, _ = chain.Engine().Author(header) // Ignore error, we're past header validation
 	} else {
 		beneficiary = *author
 	}

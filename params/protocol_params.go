@@ -17,7 +17,7 @@
 package params
 
 var (
-	// The artificial target gas limit. Overridable via TargetGasLimitFlag.
+	// The artificial target gas limit.
 	TargetGasLimit uint64 = TargetTxsPerSec * DefaultCliquePeriod * TxGas
 )
 

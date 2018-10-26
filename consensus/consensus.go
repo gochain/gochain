@@ -56,7 +56,7 @@ type Engine interface {
 	// Author retrieves the GoChain address of the account that minted the given
 	// block, which may be different from the header's coinbase if a consensus
 	// engine is based on signatures.
-	Author(ctx context.Context, header *types.Header) (common.Address, error)
+	Author(header *types.Header) (common.Address, error)
 
 	// VerifyHeader checks whether a header conforms to the consensus rules of a
 	// given engine. Verifying the seal may be done optionally here, or explicitly
@@ -71,8 +71,7 @@ type Engine interface {
 
 	// Prepare initializes the consensus fields of a block header according to the
 	// rules of a particular engine. The changes are executed inline.
-	// Returns a deadline for block finalization, if applicable.
-	Prepare(ctx context.Context, chain ChainReader, header *types.Header) (*time.Time, error)
+	Prepare(ctx context.Context, chain ChainReader, header *types.Header) error
 
 	// Finalize runs any post-transaction state modifications (e.g. block rewards)
 	// and assembles the final block (if block is true).
@@ -82,8 +81,11 @@ type Engine interface {
 		receipts []*types.Receipt, block bool) *types.Block
 
 	// Seal generates a new block for the given input block with the local miner's
-	// seal place on top.
-	Seal(ctx context.Context, chain ChainReader, block *types.Block, stop <-chan struct{}) (*types.Block, error)
+	// seal place on top, and returns a timestamp at which the block may be broadcast.
+	Seal(ctx context.Context, chain ChainReader, block *types.Block, stop <-chan struct{}) (*types.Block, *time.Time, error)
+
+	// SealHash returns the hash of a block prior to it being sealed.
+	SealHash(header *types.Header) common.Hash
 
 	// APIs returns the RPC APIs this consensus engine provides.
 	APIs(chain ChainReader) []rpc.API
