@@ -646,6 +646,8 @@ func (w *worker) commitTransaction(ctx context.Context, vmenv *vm.EVM, tx *types
 	return receipt.Logs, nil
 }
 
+const maxCommitTransactionsDur = time.Second
+
 func (w *worker) commitTransactions(ctx context.Context, txs *types.TransactionsByPriceAndNonce, coinbase common.Address, interrupt *int32) bool {
 	// Short circuit if current is nil
 	if w.current == nil {
@@ -656,11 +658,7 @@ func (w *worker) commitTransactions(ctx context.Context, txs *types.Transactions
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
 	}
 
-	var deadline *time.Time
-	if w.current.header.Time != nil && w.config.Clique != nil && w.config.Clique.Period > 0 {
-		t := time.Unix(w.current.header.Time.Int64(), 0)
-		deadline = &t
-	}
+	start := time.Now()
 
 	tracing := log.Tracing()
 	// Create a new emv context and environment.
@@ -696,7 +694,7 @@ func (w *worker) commitTransactions(ctx context.Context, txs *types.Transactions
 			log.Info(fmt.Sprintf("Commit interrupted, %s incomplete work", action), "num", w.current.header.Number)
 			return drop
 		}
-		if deadline != nil && time.Until(*deadline) <= 0 {
+		if time.Since(start) > maxCommitTransactionsDur {
 			log.Info("Commit deadline reached", "num", w.current.header.Number)
 			break
 		}
