@@ -72,7 +72,7 @@ func odrGetReceipts(ctx context.Context, db common.Database, config *params.Chai
 			receipts, _ = light.GetBlockReceipts(ctx, lc.Odr(), bhash, *number)
 		}
 	}
-	if receipts == nil {
+	if len(receipts) == 0 {
 		return nil
 	}
 	rlp, _ := rlp.EncodeToBytes(receipts)
@@ -194,7 +194,7 @@ func testOdr(t *testing.T, protocol int, expFail uint64, fn odrTestFn) {
 			eq := bytes.Equal(b1, b2)
 			exp := i < expFail
 			if exp && !eq {
-				t.Errorf("odr mismatch")
+				t.Errorf("odr mismatch:\n\twant: %X\n\thave: %X", b1, b2)
 			}
 			if !exp && eq {
 				t.Errorf("unexpected odr match")

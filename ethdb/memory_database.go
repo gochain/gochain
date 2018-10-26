@@ -17,7 +17,6 @@
 package ethdb
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/gochain-io/gochain/common"
@@ -71,7 +70,7 @@ func (db *MemDatabase) Get(key []byte) ([]byte, error) {
 	if entry, ok := db.db[string(key)]; ok {
 		return common.CopyBytes(entry), nil
 	}
-	return nil, errors.New("not found")
+	return nil, common.ErrNotFound
 }
 
 func (db *MemDatabase) Keys() [][]byte {

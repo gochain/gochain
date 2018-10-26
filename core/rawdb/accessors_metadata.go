@@ -18,6 +18,7 @@ package rawdb
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/log"
@@ -35,23 +36,43 @@ var (
 func ReadDatabaseVersion(db DatabaseReader) int {
 	var version int
 
-	enc, _ := db.Get(databaseVersionKey)
-	rlp.DecodeBytes(enc, &version)
-
+	var enc []byte
+	Must("get", func() (err error) {
+		enc, err = db.Get(databaseVersionKey)
+		if err == common.ErrNotFound {
+			err = nil
+		}
+		return
+	})
+	if err := rlp.DecodeBytes(enc, &version); err != nil {
+		log.Error("Failed to decode database version", "encoded", enc)
+		return 0
+	}
 	return version
 }
 
 // WriteDatabaseVersion stores the version number of the database
 func WriteDatabaseVersion(db DatabaseWriter, version int) {
-	enc, _ := rlp.EncodeToBytes(version)
-	if err := db.Put(databaseVersionKey, enc); err != nil {
-		log.Crit("Failed to store the database version", "err", err)
+	enc, err := rlp.EncodeToBytes(version)
+	if err != nil {
+		log.Error("Failed to encode database version", "version", version)
+		return
 	}
+	Must("put database version", func() error {
+		return db.Put(databaseVersionKey, enc)
+	})
 }
 
 // ReadChainConfig retrieves the consensus settings based on the given genesis hash.
 func ReadChainConfig(db DatabaseReader, hash common.Hash) *params.ChainConfig {
-	data, _ := db.Get(configKey(hash))
+	var data []byte
+	Must("get chain config", func() (err error) {
+		data, err = db.Get(configKey(hash))
+		if err == common.ErrNotFound {
+			err = nil
+		}
+		return
+	})
 	if len(data) == 0 {
 		return nil
 	}
@@ -72,14 +93,21 @@ func WriteChainConfig(db DatabaseWriter, hash common.Hash, cfg *params.ChainConf
 	if err != nil {
 		log.Crit("Failed to JSON encode chain config", "err", err)
 	}
-	if err := db.Put(configKey(hash), data); err != nil {
-		log.Crit("Failed to store chain config", "err", err)
-	}
+	Must("put chain config", func() error {
+		return db.Put(configKey(hash), data)
+	})
 }
 
 // ReadPreimage retrieves a single preimage of the provided hash.
 func ReadPreimage(db DatabaseReader, hash common.Hash) []byte {
-	data, _ := db.Get(preimageKey(hash))
+	var data []byte
+	Must("get preimage", func() (err error) {
+		data, err = db.Get(preimageKey(hash))
+		if err == common.ErrNotFound {
+			err = nil
+		}
+		return
+	})
 	return data
 }
 
@@ -94,21 +122,18 @@ func WritePreimages(tbl common.Table, number uint64, preimages map[common.Hash][
 	p := PreimageTablePrefixer(tbl)
 	batch := tbl.NewBatch()
 	hitCount := 0
+	op := fmt.Sprintf("add preimage %d to batch", number)
 	for hash, preimage := range preimages {
 		if _, err := p.Get(hash.Bytes()); err != nil {
-			if err := batch.Put(hash.Bytes(), preimage); err != nil {
-				log.Crit("preimage write fail for block %d: %v", number, err)
-				return
-			}
+			Must(op, func() error {
+				return batch.Put(hash.Bytes(), preimage)
+			})
 			hitCount++
 		}
 	}
 	preimageCounter.Inc(int64(len(preimages)))
 	preimageHitCounter.Inc(int64(hitCount))
 	if hitCount > 0 {
-		if err := batch.Write(); err != nil {
-			log.Crit("preimage write fail for block %d: %v", number, err)
-			return
-		}
+		Must(fmt.Sprintf("write preimage %d batch", number), batch.Write)
 	}
 }

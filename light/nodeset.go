@@ -17,7 +17,6 @@
 package light
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/gochain-io/gochain/common"
@@ -68,7 +67,7 @@ func (db *NodeSet) Get(key []byte) ([]byte, error) {
 	if entry, ok := db.nodes[string(key)]; ok {
 		return entry, nil
 	}
-	return nil, errors.New("not found")
+	return nil, common.ErrNotFound
 }
 
 // Has returns true if the node set contains the given key

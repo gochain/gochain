@@ -64,7 +64,7 @@ func TestTable_Delete(t *testing.T) {
 		t.Fatal("expected value to not exist")
 	}
 
-	if _, err := tbl.Get(numHashKey('b', 1000, common.Hash{})); err != ethdb.ErrKeyNotFound {
+	if _, err := tbl.Get(numHashKey('b', 1000, common.Hash{})); err != common.ErrNotFound {
 		t.Fatal(err)
 	}
 }

@@ -147,9 +147,7 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 	externTd := new(big.Int).Add(header.Difficulty, ptd)
 
 	// Irrelevant of the canonical status, write the td and header to the database
-	if err := hc.WriteTd(hash, number, externTd); err != nil {
-		log.Crit("Failed to write header total difficulty", "err", err)
-	}
+	hc.WriteTd(hash, number, externTd)
 	rawdb.WriteHeader(hc.chainDb.GlobalTable(), hc.chainDb.HeaderTable(), header)
 	local := chainHead{localTd, currentHeader.Number.Uint64(), currentHeader.GasUsed}
 	external := chainHead{externTd, header.Number.Uint64(), header.GasUsed}
@@ -377,10 +375,9 @@ func (hc *HeaderChain) GetTdByHash(hash common.Hash) *big.Int {
 
 // WriteTd stores a block's total difficulty into the database, also caching it
 // along the way.
-func (hc *HeaderChain) WriteTd(hash common.Hash, number uint64, td *big.Int) error {
+func (hc *HeaderChain) WriteTd(hash common.Hash, number uint64, td *big.Int) {
 	rawdb.WriteTd(hc.chainDb.GlobalTable(), hash, number, td)
 	hc.tdCache.Add(hash, new(big.Int).Set(td))
-	return nil
 }
 
 // GetHeader retrieves a block header from the database by hash and number,
@@ -472,9 +469,9 @@ func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) {
 	for i := height; i > head; i-- {
 		rawdb.DeleteCanonicalHash(hc.chainDb, i)
 	}
-	hbatch.Write()
-	bbatch.Write()
-	gbatch.Write()
+	rawdb.Must("write header batch", hbatch.Write)
+	rawdb.Must("write body batch", bbatch.Write)
+	rawdb.Must("write global batch", gbatch.Write)
 
 	// Clear out any stale content from the caches
 	hc.headerCache.Purge()

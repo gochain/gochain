@@ -268,7 +268,7 @@ func (t *Table) Has(key []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	} else if s == nil {
-		return false, ErrKeyNotFound
+		return false, common.ErrNotFound
 	}
 	defer t.ReleaseSegment(s)
 	return s.Has(key)
@@ -290,7 +290,7 @@ func (t *Table) Get(key []byte) ([]byte, error) {
 // Put associates a value with key.
 func (t *Table) Put(key, value []byte) error {
 	// Ignore if value is the same.
-	if v, err := t.Get(key); err != nil && err != ErrKeyNotFound {
+	if v, err := t.Get(key); err != nil && err != common.ErrNotFound {
 		return err
 	} else if bytes.Equal(v, value) {
 		return nil
@@ -391,7 +391,7 @@ type tableBatch struct {
 
 func (b *tableBatch) Put(key, value []byte) error {
 	// Ignore if value is the same.
-	if v, err := b.table.Get(key); err != nil && err != ErrKeyNotFound {
+	if v, err := b.table.Get(key); err != nil && err != common.ErrNotFound {
 		return err
 	} else if bytes.Equal(v, value) {
 		return nil
@@ -418,7 +418,7 @@ func (b *tableBatch) Put(key, value []byte) error {
 
 func (b *tableBatch) Delete(key []byte) error {
 	// Ignore if value doesn't exist.
-	if _, err := b.table.Get(key); err == ErrKeyNotFound {
+	if _, err := b.table.Get(key); err == common.ErrNotFound {
 		return nil
 	} else if err != nil {
 		return err

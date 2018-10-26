@@ -16,7 +16,12 @@
 
 package common
 
-import "io"
+import (
+	"errors"
+	"io"
+)
+
+var ErrNotFound = errors.New("not found")
 
 // Database wraps all database operations. All methods are safe for concurrent use.
 type Database interface {
