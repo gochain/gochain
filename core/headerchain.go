@@ -152,7 +152,10 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 	local := chainHead{localTd, currentHeader.Number.Uint64(), currentHeader.GasUsed}
 	external := chainHead{externTd, header.Number.Uint64(), header.GasUsed}
 	if reorg(local, external) {
-		log.Info("Reorganizing header chain", "oldnum", currentHeader.Number, "newnum", header.Number, "oldtd", localTd, "newtd", externTd, "oldhash", hc.currentHeaderHash, "newhash", hash, "newparent", header.ParentHash)
+		significant := header.ParentHash != hc.currentHeaderHash
+		if significant {
+			log.Info("Reorganizing header chain", "oldnum", currentHeader.Number, "newnum", header.Number, "oldtd", localTd, "newtd", externTd, "oldhash", hc.currentHeaderHash, "newhash", hash, "newparent", header.ParentHash)
+		}
 		start := time.Now()
 
 		// Delete any canonical number assignments above the new head
@@ -183,8 +186,10 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 		hc.currentHeaderHash = hash
 		hc.currentHeader.Store(types.CopyHeader(header))
 
-		dur := time.Since(start)
-		log.Info("Reorganized header chain", "dur", common.PrettyDuration(dur))
+		if significant {
+			dur := time.Since(start)
+			log.Info("Reorganized header chain", "dur", common.PrettyDuration(dur))
+		}
 
 		status = CanonStatTy
 	} else {
