@@ -27,6 +27,8 @@ func run(args []string) error {
 		return nil
 	case "check":
 		return NewCheckCommand().Run(args)
+	case "keys":
+		return NewKeysCommand().Run(args)
 	default:
 		return fmt.Errorf("unknown command: %q", cmd)
 	}
@@ -44,5 +46,6 @@ The commands are:
 
 	check       verify integrity of a segment
 	help        print this screen
+	keys        dump all keys for a table
 `[1:])
 }
