@@ -148,6 +148,22 @@ func (db *DB) Tables() []*Table {
 	return []*Table{db.global, db.body, db.header, db.receipt}
 }
 
+// Table returns a table by name.
+func (db *DB) Table(name string) *Table {
+	switch name {
+	case "global":
+		return db.global
+	case "body":
+		return db.body
+	case "header":
+		return db.header
+	case "receipt":
+		return db.receipt
+	default:
+		return nil
+	}
+}
+
 // migrate converts a source LevelDB database to the new ethdb formatted database.
 func (db *DB) migrate() error {
 	const suffix = ".migrating"
