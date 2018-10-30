@@ -627,15 +627,18 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			trueHead = request.Block.ParentHash()
 			trueTD   = new(big.Int).Sub(request.TD, request.Block.Difficulty())
 		)
-		// Update the peers total difficulty if better than the previous
-		if _, td := p.Head(); trueTD.Cmp(td) > 0 {
+		// Update the peer's head if better than the previous, or if same and hash has changed.
+		head, td := p.Head()
+		if cmp := trueTD.Cmp(td); cmp > 0 || cmp == 0 && head != trueHead {
 			p.SetHead(trueHead, trueTD)
 
-			// Schedule a sync if above ours. Note, this will not fire a sync for a gap of
+			// Schedule a sync if above ours, or same and different hash. Note, this will not fire a sync for a gap of
 			// a singe block (as the true TD is below the propagated block), however this
 			// scenario should easily be covered by the fetcher.
 			currentBlock := pm.blockchain.CurrentBlock()
-			if trueTD.Cmp(pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())) > 0 {
+			currentHash := currentBlock.Hash()
+			currentTD := pm.blockchain.GetTd(currentHash, currentBlock.NumberU64())
+			if cmp := trueTD.Cmp(currentTD); cmp > 0 || cmp == 0 && trueHead != currentHash {
 				go pm.synchronise(ctx, p)
 			}
 		}
