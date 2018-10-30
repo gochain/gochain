@@ -278,10 +278,7 @@ func (b *BloomTrieIndexerBackend) Commit() error {
 		binary.BigEndian.PutUint64(encKey[2:10], b.section)
 		var decomp []byte
 		for j := uint64(0); j < b.bloomTrieRatio; j++ {
-			data, err := rawdb.ReadBloomBits(b.diskdb.GlobalTable(), i, b.section*b.bloomTrieRatio+j, b.sectionHeads[j])
-			if err != nil {
-				return err
-			}
+			data := rawdb.ReadBloomBits(b.diskdb.GlobalTable(), i, b.section*b.bloomTrieRatio+j, b.sectionHeads[j])
 			decompData, err2 := bitutil.DecompressBytes(data, int(b.parentSectionSize/8))
 			if err2 != nil {
 				return err2

@@ -205,16 +205,8 @@ func GetBloomBits(ctx context.Context, odr OdrBackend, bitIdx uint, sectionIdxLi
 		// if we don't have the canonical hash stored for this section head number, we'll still look for
 		// an entry with a zero sectionHead (we store it with zero section head too if we don't know it
 		// at the time of the retrieval)
-		bloomBits, err := rawdb.ReadBloomBits(db.GlobalTable(), bitIdx, sectionIdx, sectionHead)
-		if err == nil {
-			result[i] = bloomBits
-		} else {
-			if sectionIdx >= bloomTrieCount {
-				return nil, ErrNoTrustedBloomTrie
-			}
-			reqList = append(reqList, sectionIdx)
-			reqIdx = append(reqIdx, i)
-		}
+		result[i] = rawdb.ReadBloomBits(db.GlobalTable(), bitIdx, sectionIdx, sectionHead)
+
 	}
 	if reqList == nil {
 		return result, nil
