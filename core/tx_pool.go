@@ -468,12 +468,16 @@ func (pool *TxPool) reset(ctx context.Context, oldBlock, newBlock *types.Block) 
 	ctx, span := trace.StartSpan(ctx, "TxPool.reset")
 	defer span.End()
 
+	significant := true
 	if oldBlock == nil {
 		if newBlock != nil {
 			log.Info("Resetting tx pool", "old", nil, "newnum", newBlock.NumberU64(), "newhash", newBlock.Hash())
 		}
 	} else {
-		log.Info("Resetting tx pool", "oldnum", oldBlock.NumberU64(), "newnum", newBlock.NumberU64(), "oldhash", oldBlock.Hash(), "newhash", newBlock.Hash(), "newparent", newBlock.ParentHash())
+		significant = newBlock.ParentHash() != oldBlock.Hash()
+		if significant {
+			log.Info("Resetting tx pool", "oldnum", oldBlock.NumberU64(), "newnum", newBlock.NumberU64(), "oldhash", oldBlock.Hash(), "newhash", newBlock.Hash(), "newparent", newBlock.ParentHash())
+		}
 	}
 	start := time.Now()
 
@@ -588,8 +592,10 @@ func (pool *TxPool) reset(ctx context.Context, oldBlock, newBlock *types.Block) 
 	// or remove those that have become invalid
 	pool.promoteExecutablesAll(ctx)
 
-	dur := time.Since(start)
-	log.Info("Reset tx pool", "dur", common.PrettyDuration(dur))
+	if significant {
+		dur := time.Since(start)
+		log.Info("Reset tx pool", "dur", common.PrettyDuration(dur))
+	}
 }
 
 // Stop terminates the transaction pool.
