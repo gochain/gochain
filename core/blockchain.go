@@ -53,6 +53,7 @@ var (
 	blockInsertTimer = metrics.NewRegisteredTimer("chain/inserts", nil)
 
 	ErrNoGenesis = errors.New("Genesis not found in chain")
+	ErrStopping  = errors.New("stopping")
 )
 
 const (
@@ -123,11 +124,12 @@ type BlockChain struct {
 	blockCache    *lru.Cache     // Cache for the most recent entire blocks
 	futureBlocks  *lru.Cache     // future blocks are blocks added for later processing
 
-	quit    chan struct{} // blockchain quit channel
+	quit    chan struct{} // blockchain quit channel. Must hold write lock on wgQuitMu to close.
 	running int32         // running must be called atomically
 	// procInterrupt must be atomically called
 	procInterrupt int32          // interrupt signaler for block processing
-	wg            sync.WaitGroup // chain processing wait group for shutting down
+	wg            sync.WaitGroup // chain processing wait group for shutting down. Must hold read lock on wgQuitMu to Add.
+	wgQuitMu      sync.RWMutex   // Lock to ensure wg.Add is not called after quit is closed. Write locked when closing quit, read locked when checking quit and adding to wg.
 
 	engine     consensus.Engine
 	processor  Processor // block processor interface
@@ -673,7 +675,7 @@ func (bc *BlockChain) Stop() {
 	bc.chainSideFeed.Close()
 	bc.chainHeadFeed.Close()
 	bc.logsFeed.Close()
-	close(bc.quit)
+	bc.closeQuit()
 	atomic.StoreInt32(&bc.procInterrupt, 1)
 
 	bc.wg.Wait()
@@ -814,7 +816,9 @@ func SetReceiptsData(ctx context.Context, config *params.ChainConfig, block *typ
 // InsertReceiptChain attempts to complete an already existing header chain with
 // transaction and receipt data.
 func (bc *BlockChain) InsertReceiptChain(ctx context.Context, blockChain types.Blocks, receiptChain []types.Receipts) (int, error) {
-	bc.wg.Add(1)
+	if !bc.wgAdd() {
+		return 0, ErrStopping
+	}
 	defer bc.wg.Done()
 
 	// Do a sanity check that the provided chain is actually ordered and linked
@@ -913,7 +917,9 @@ var lastWrite uint64
 // but does not write any state. This is used to construct competing side forks
 // up to the point where they exceed the canonical total difficulty.
 func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (err error) {
-	bc.wg.Add(1)
+	if !bc.wgAdd() {
+		return ErrStopping
+	}
 	defer bc.wg.Done()
 
 	bc.hc.WriteTd(block.Hash(), block.NumberU64(), td)
@@ -926,7 +932,9 @@ func (bc *BlockChain) WriteBlockWithState(ctx context.Context, block *types.Bloc
 	ctx, span := trace.StartSpan(ctx, "BlockChain.WriteBlockWithState")
 	defer span.End()
 
-	bc.wg.Add(1)
+	if !bc.wgAdd() {
+		return 0, ErrStopping
+	}
 	defer bc.wg.Done()
 
 	// Calculate the total difficulty of the block
@@ -1103,7 +1111,10 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 		}
 	}
 	// Pre-checks passed, start the full block imports
-	bc.wg.Add(1)
+
+	if !bc.wgAdd() {
+		return 0, nil, nil, ErrStopping
+	}
 	defer bc.wg.Done()
 
 	// A queued approach to delivering events. This is generally
@@ -1595,7 +1606,9 @@ func (bc *BlockChain) InsertHeaderChain(ctx context.Context, chain []*types.Head
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
 
-	bc.wg.Add(1)
+	if !bc.wgAdd() {
+		return 0, ErrStopping
+	}
 	defer bc.wg.Done()
 
 	whFunc := func(header *types.Header) error {
@@ -1619,7 +1632,9 @@ func (bc *BlockChain) InsertHeaderChain(ctx context.Context, chain []*types.Head
 // in two scenarios: pure-header mode of operation (light clients), or properly
 // separated header/block phases (non-archive clients).
 func (bc *BlockChain) writeHeader(header *types.Header) error {
-	bc.wg.Add(1)
+	if !bc.wgAdd() {
+		return ErrStopping
+	}
 	defer bc.wg.Done()
 
 	bc.mu.Lock()
@@ -1740,4 +1755,25 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log, name string) {
 
 func (bc *BlockChain) UnsubscribeLogsEvent(ch chan<- []*types.Log) {
 	bc.logsFeed.Unsubscribe(ch)
+}
+
+// wgAdd adds 1 to wg while holding the read lock, unless the quit channel has been closed.
+// Returns true if added, or false if stopped.
+func (bc *BlockChain) wgAdd() bool {
+	bc.wgQuitMu.RLock()
+	defer bc.wgQuitMu.RUnlock()
+	select {
+	case <-bc.quit:
+		return false
+	default:
+	}
+	bc.wg.Add(1)
+	return true
+}
+
+// closeQuit closes the quit channel while holding the write lock.
+func (bc *BlockChain) closeQuit() {
+	bc.wgQuitMu.Lock()
+	defer bc.wgQuitMu.Unlock()
+	close(bc.quit)
 }
