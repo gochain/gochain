@@ -105,13 +105,21 @@ func ReadReceipt(db common.Database, hash common.Hash) (*types.Receipt, common.H
 
 // ReadBloomBits retrieves the compressed bloom bit vector belonging to the given
 // section and bit index from the.
-func ReadBloomBits(db DatabaseReader, bit uint, section uint64, head common.Hash) ([]byte, error) {
+func ReadBloomBits(db DatabaseReader, bit uint, section uint64, head common.Hash) []byte {
 	var key [43]byte
 	key[0] = bloomBitsPrefix
 	binary.BigEndian.PutUint16(key[1:], uint16(bit))
 	binary.BigEndian.PutUint64(key[3:], section)
 	copy(key[11:], head[:])
-	return db.Get(key[:])
+	var data []byte
+	Must("get bloom bits", func() (err error) {
+		data, err = db.Get(key[:])
+		if err == common.ErrNotFound {
+			err = nil
+		}
+		return
+	})
+	return data
 }
 
 // WriteBloomBits stores the compressed bloom bits vector belonging to the given

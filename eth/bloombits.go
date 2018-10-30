@@ -62,12 +62,9 @@ func (gc *GoChain) startBloomHandlers() {
 					task.Bitsets = make([][]byte, len(task.Sections))
 					for i, section := range task.Sections {
 						head := rawdb.ReadCanonicalHash(gc.chainDb, (section+1)*params.BloomBitsBlocks-1)
-						if compVector, err := rawdb.ReadBloomBits(gc.chainDb.GlobalTable(), task.Bit, section, head); err == nil {
-							if blob, err := bitutil.DecompressBytes(compVector, int(params.BloomBitsBlocks)/8); err == nil {
-								task.Bitsets[i] = blob
-							} else {
-								task.Error = err
-							}
+						compVector := rawdb.ReadBloomBits(gc.chainDb.GlobalTable(), task.Bit, section, head)
+						if blob, err := bitutil.DecompressBytes(compVector, int(params.BloomBitsBlocks)/8); err == nil {
+							task.Bitsets[i] = blob
 						} else {
 							task.Error = err
 						}
