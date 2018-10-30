@@ -88,6 +88,20 @@ func (b *testBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.
 	return nil, nil
 }
 
+func (b *testBackend) GetLogs(ctx context.Context, hash common.Hash) ([][]*types.Log, error) {
+	number := rawdb.ReadHeaderNumber(b.db.GlobalTable(), hash)
+	if number == nil {
+		return nil, nil
+	}
+	receipts := rawdb.ReadReceipts(b.db.ReceiptTable(), hash, *number)
+
+	logs := make([][]*types.Log, len(receipts))
+	for i, receipt := range receipts {
+		logs[i] = receipt.Logs
+	}
+	return logs, nil
+}
+
 func (b *testBackend) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent, name string) {
 	b.txFeed.Subscribe(ch, name)
 }
@@ -332,6 +346,29 @@ func TestInvalidLogFilterCreation(t *testing.T) {
 	for i, test := range testCases {
 		if _, err := api.NewFilter(test); err == nil {
 			t.Errorf("Expected NewFilter for case #%d to fail", i)
+		}
+	}
+}
+
+func TestInvalidGetLogsRequest(t *testing.T) {
+	var (
+		mux       = new(event.TypeMux)
+		db        = ethdb.NewMemDatabase()
+		backend   = &testBackend{mux: mux, db: db}
+		api       = NewPublicFilterAPI(backend, false)
+		blockHash = common.HexToHash("0x1111111111111111111111111111111111111111111111111111111111111111")
+	)
+
+	// Reason: Cannot specify both BlockHash and FromBlock/ToBlock)
+	testCases := []FilterCriteria{
+		0: {BlockHash: &blockHash, FromBlock: big.NewInt(100)},
+		1: {BlockHash: &blockHash, ToBlock: big.NewInt(500)},
+		2: {BlockHash: &blockHash, FromBlock: big.NewInt(rpc.LatestBlockNumber.Int64())},
+	}
+
+	for i, test := range testCases {
+		if _, err := api.GetLogs(context.Background(), test); err == nil {
+			t.Errorf("Expected Logs for case #%d to fail", i)
 		}
 	}
 }
