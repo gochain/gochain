@@ -646,7 +646,7 @@ func (w *worker) commitTransaction(ctx context.Context, vmenv *vm.EVM, tx *types
 	return receipt.Logs, nil
 }
 
-const maxCommitTransactionsDur = time.Second
+const maxCommitTransactionsDur = 1500 * time.Millisecond
 
 func (w *worker) commitTransactions(ctx context.Context, txs *types.TransactionsByPriceAndNonce, coinbase common.Address, interrupt *int32) bool {
 	// Short circuit if current is nil
