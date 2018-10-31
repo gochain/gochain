@@ -166,7 +166,7 @@ func (gpo *Oracle) fetchMinBlockPrice(ctx context.Context, blockNum uint64, ch c
 func minBlockPrice(ctx context.Context, signer types.Signer, block *types.Block) *big.Int {
 	var min *big.Int
 	for _, tx := range block.Transactions() {
-		sender, err := types.Sender(ctx, signer, tx)
+		sender, err := types.Sender(signer, tx)
 		if err != nil || sender == block.Coinbase() {
 			continue
 		}

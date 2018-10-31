@@ -359,7 +359,7 @@ func (w *ledgerDriver) ledgerSign(ctx context.Context, derivationPath []uint32, 
 	if err != nil {
 		return common.Address{}, nil, err
 	}
-	sender, err := types.Sender(ctx, signer, signed)
+	sender, err := types.Sender(signer, signed)
 	if err != nil {
 		return common.Address{}, nil, err
 	}

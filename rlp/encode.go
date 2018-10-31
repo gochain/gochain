@@ -17,7 +17,6 @@
 package rlp
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"math/big"
@@ -97,38 +96,30 @@ type SliceEncoder interface {
 // Boolean values are not supported, nor are signed integers, floating
 // point numbers, maps, channels and functions.
 func Encode(w io.Writer, val interface{}) error {
-	return EncodeCtx(context.Background(), w, val)
-}
-
-func EncodeCtx(ctx context.Context, w io.Writer, val interface{}) error {
 	if outer, ok := w.(*encbuf); ok {
 		// Encode was called by some type's EncodeRLP.
 		// Avoid copying by writing to the outer encbuf directly.
-		return outer.encode(ctx, val)
+		return outer.encode(val)
 	}
 	eb := encbufPool.Get().(*encbuf)
 	defer encbufPool.Put(eb)
 	eb.reset()
-	if err := eb.encode(ctx, val); err != nil {
+	if err := eb.encode(val); err != nil {
 		return err
 	}
-	return eb.toWriter(ctx, w)
+	return eb.toWriter(w)
 }
 
 // EncodeBytes returns the RLP encoding of val.
 // Please see the documentation of Encode for the encoding rules.
 func EncodeToBytes(val interface{}) ([]byte, error) {
-	return EncodeToBytesCtx(context.Background(), val)
-}
-
-func EncodeToBytesCtx(ctx context.Context, val interface{}) ([]byte, error) {
 	eb := encbufPool.Get().(*encbuf)
 	defer encbufPool.Put(eb)
 	eb.reset()
-	if err := eb.encode(ctx, val); err != nil {
+	if err := eb.encode(val); err != nil {
 		return nil, err
 	}
-	return eb.toBytes(ctx), nil
+	return eb.toBytes(), nil
 }
 
 // EncodeReader returns a reader from which the RLP encoding of val
@@ -137,13 +128,9 @@ func EncodeToBytesCtx(ctx context.Context, val interface{}) ([]byte, error) {
 //
 // Please see the documentation of Encode for the encoding rules.
 func EncodeToReader(val interface{}) (size int, r io.Reader, err error) {
-	return EncodeToReaderCtx(context.Background(), val)
-}
-
-func EncodeToReaderCtx(ctx context.Context, val interface{}) (size int, r io.Reader, err error) {
 	eb := encbufPool.Get().(*encbuf)
 	eb.reset()
-	if err := eb.encode(ctx, val); err != nil {
+	if err := eb.encode(val); err != nil {
 		return 0, nil, err
 	}
 	return eb.size(), &encReader{buf: eb}, nil
@@ -210,7 +197,7 @@ func (w *encbuf) Write(b []byte) (int, error) {
 	return len(b), nil
 }
 
-func (w *encbuf) encode(ctx context.Context, val interface{}) error {
+func (w *encbuf) encode(val interface{}) error {
 	rval := reflect.ValueOf(val)
 	t := rval.Type()
 	ti, err := cachedTypeInfo(t, tags{})
@@ -260,7 +247,7 @@ func (w *encbuf) size() int {
 	return len(w.str) + w.lhsize
 }
 
-func (w *encbuf) toBytes(ctx context.Context) []byte {
+func (w *encbuf) toBytes() []byte {
 	out := make([]byte, w.size())
 	strpos := 0
 	pos := 0
@@ -278,7 +265,7 @@ func (w *encbuf) toBytes(ctx context.Context) []byte {
 	return out
 }
 
-func (w *encbuf) toWriter(ctx context.Context, out io.Writer) (err error) {
+func (w *encbuf) toWriter(out io.Writer) (err error) {
 	strpos := 0
 	for _, head := range w.lheads {
 		// write string data before header

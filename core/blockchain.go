@@ -791,7 +791,7 @@ func SetReceiptsData(ctx context.Context, config *params.ChainConfig, block *typ
 		// The contract address can be derived from the transaction itself
 		if transactions[j].To() == nil {
 			// Deriving the signer is expensive, only do if it's actually needed
-			from, _ := types.Sender(ctx, signer, transactions[j])
+			from, _ := types.Sender(signer, transactions[j])
 			receipts[j].ContractAddress = crypto.CreateAddress(from, transactions[j].Nonce())
 		}
 		// The used gas can be calculated based on previous receipts
@@ -1167,11 +1167,11 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 			for s := 0; s < bc.parWorkers; s++ {
 				go func() {
 					defer wg.Done()
-					ctx, span := trace.StartSpan(ctx, "parWorker")
+					_, span := trace.StartSpan(ctx, "parWorker")
 					defer span.End()
 					for i := atomic.AddInt32(&wi, 1); i < l32; i = atomic.AddInt32(&wi, 1) {
 						txs[i].Hash()
-						if _, err := types.Sender(ctx, signer, txs[i]); err != nil {
+						if _, err := types.Sender(signer, txs[i]); err != nil {
 							log.Error("Cannot derive address from signature")
 						}
 					}

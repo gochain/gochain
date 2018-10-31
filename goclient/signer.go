@@ -37,7 +37,7 @@ var errNotCached = errors.New("sender not cached")
 
 func setSenderFromServer(ctx context.Context, tx *types.Transaction, addr common.Address, block common.Hash) {
 	// Use types.Sender for side-effect to store our signer into the cache.
-	types.Sender(ctx, &senderFromServer{addr, block}, tx)
+	types.Sender(&senderFromServer{addr, block}, tx)
 }
 
 func (s *senderFromServer) Equal(other types.Signer) bool {

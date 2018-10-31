@@ -118,7 +118,7 @@ func (p *testTxPool) Pending(ctx context.Context) map[common.Address]types.Trans
 
 	batches := make(map[common.Address]types.Transactions)
 	for _, tx := range p.pool {
-		from, _ := types.Sender(ctx, types.HomesteadSigner{}, tx)
+		from, _ := types.Sender(types.HomesteadSigner{}, tx)
 		batches[from] = append(batches[from], tx)
 	}
 	for _, batch := range batches {

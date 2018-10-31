@@ -430,11 +430,11 @@ func (w *worker) mainLoop() {
 				txs := make(map[common.Address]types.Transactions)
 				for _, ev := range evs {
 					for _, tx := range ev.Txs {
-						acc, _ := types.Sender(ctx, w.current.signer, tx)
+						acc, _ := types.Sender(w.current.signer, tx)
 						txs[acc] = append(txs[acc], tx)
 					}
 				}
-				txset := types.NewTransactionsByPriceAndNonce(ctx, w.current.signer, txs)
+				txset := types.NewTransactionsByPriceAndNonce(w.current.signer, txs)
 				w.commitTransactions(ctx, txset, coinbase, nil)
 				w.updateSnapshot(ctx)
 			} else {
@@ -712,7 +712,7 @@ func (w *worker) commitTransactions(ctx context.Context, txs *types.Transactions
 		// during transaction acceptance is the transaction pool.
 		//
 		// We use the eip155 signer regardless of the current hf.
-		from, _ := types.Sender(ctx, w.current.signer, tx)
+		from, _ := types.Sender(w.current.signer, tx)
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
 		if tx.Protected() && !w.config.IsEIP155(w.current.header.Number) {
@@ -740,7 +740,7 @@ func (w *worker) commitTransactions(ctx context.Context, txs *types.Transactions
 			if tracing {
 				log.Trace("Skipping transaction with low nonce", "sender", from, "nonce", tx.Nonce())
 			}
-			txs.Shift(ctx)
+			txs.Shift()
 
 		case core.ErrNonceTooHigh:
 			// Reorg notification data race between the transaction pool and miner, skip account =
@@ -753,13 +753,13 @@ func (w *worker) commitTransactions(ctx context.Context, txs *types.Transactions
 			// Everything ok, collect the logs and shift in the next transaction from the same account
 			coalescedLogs = append(coalescedLogs, logs...)
 			w.current.tcount++
-			txs.Shift(ctx)
+			txs.Shift()
 
 		default:
 			// Strange error, discard the transaction and get the next in line (note, the
 			// nonce-too-high clause will prevent us from executing in vain).
 			log.Debug("Transaction failed, account skipped", "hash", tx.Hash(), "err", err)
-			txs.Shift(ctx)
+			txs.Shift()
 		}
 	}
 
@@ -852,13 +852,13 @@ func (w *worker) commitNewWork(ctx context.Context, interrupt *int32, noempty bo
 		}
 	}
 	if len(localTxs) > 0 {
-		txs := types.NewTransactionsByPriceAndNonce(ctx, w.current.signer, localTxs)
+		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, localTxs)
 		if w.commitTransactions(ctx, txs, w.coinbase, interrupt) {
 			return
 		}
 	}
 	if len(remoteTxs) > 0 {
-		txs := types.NewTransactionsByPriceAndNonce(ctx, w.current.signer, remoteTxs)
+		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, remoteTxs)
 		if w.commitTransactions(ctx, txs, w.coinbase, interrupt) {
 			return
 		}

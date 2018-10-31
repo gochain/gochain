@@ -19,7 +19,6 @@
 package geth
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -251,12 +250,11 @@ func (tx *Transaction) GetSigHash() *Hash { return &Hash{types.HomesteadSigner{}
 
 // Deprecated: use GoClient.TransactionSender
 func (tx *Transaction) GetFrom(chainID *BigInt) (address *Address, _ error) {
-	ctx := context.TODO()
 	var signer types.Signer = types.HomesteadSigner{}
 	if chainID != nil {
 		signer = types.NewEIP155Signer(chainID.bigint)
 	}
-	from, err := types.Sender(ctx, signer, tx.tx)
+	from, err := types.Sender(signer, tx.tx)
 	return &Address{from}, err
 }
 
