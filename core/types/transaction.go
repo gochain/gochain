@@ -217,7 +217,7 @@ func (tx *Transaction) Size() common.StorageSize {
 //
 // XXX Rename message to something less arbitrary?
 func (tx *Transaction) AsMessage(ctx context.Context, s Signer) (*Message, error) {
-	from, err := Sender(ctx, s, tx)
+	from, err := Sender(s, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -315,14 +315,14 @@ type TransactionsByPriceAndNonce struct {
 //
 // Note, the input map is reowned so the caller should not interact any more with
 // if after providing it to the constructor.
-func NewTransactionsByPriceAndNonce(ctx context.Context, signer Signer, txs map[common.Address]Transactions) *TransactionsByPriceAndNonce {
+func NewTransactionsByPriceAndNonce(signer Signer, txs map[common.Address]Transactions) *TransactionsByPriceAndNonce {
 	// Initialize a price based heap with the head transactions
 	heads := make(TxByPrice, 0, len(txs))
 	for from, accTxs := range txs {
 		if len(accTxs) > 0 {
 			heads = append(heads, accTxs[0])
 			// Ensure the sender address is from the signer
-			acc, _ := Sender(ctx, signer, accTxs[0])
+			acc, _ := Sender(signer, accTxs[0])
 			txs[acc] = accTxs[1:]
 			if from != acc {
 				delete(txs, from)
@@ -348,8 +348,8 @@ func (t *TransactionsByPriceAndNonce) Peek() *Transaction {
 }
 
 // Shift replaces the current best head with the next one from the same account.
-func (t *TransactionsByPriceAndNonce) Shift(ctx context.Context) {
-	acc, _ := Sender(ctx, t.signer, t.heads[0])
+func (t *TransactionsByPriceAndNonce) Shift() {
+	acc, _ := Sender(t.signer, t.heads[0])
 	if txs, ok := t.txs[acc]; ok && len(txs) > 0 {
 		t.heads[0], t.txs[acc] = txs[0], txs[1:]
 		heap.Fix(&t.heads, 0)

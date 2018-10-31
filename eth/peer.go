@@ -84,19 +84,16 @@ func (s *knownHashes) reset() {
 	s.lastReset = time.Now()
 }
 
-func (s *knownHashes) Add(ctx context.Context, h common.Hash) {
-	_, span := trace.StartSpan(ctx, "knownHashes.Add")
+func (s *knownHashes) Add(h common.Hash) {
 	s.Lock()
 	if s.m == nil || (s.forgetInterval != 0 && time.Since(s.lastReset) > s.forgetInterval) {
 		s.reset()
 	}
 	s.m[h] = struct{}{}
 	s.Unlock()
-	span.End()
 }
 
-func (s *knownHashes) AddAll(ctx context.Context, txs types.Transactions) {
-	_, span := trace.StartSpan(ctx, "knownHashes.AddAll")
+func (s *knownHashes) AddAll(txs types.Transactions) {
 	s.Lock()
 	if s.m == nil || (s.forgetInterval != 0 && time.Since(s.lastReset) > s.forgetInterval) {
 		s.reset()
@@ -105,12 +102,10 @@ func (s *knownHashes) AddAll(ctx context.Context, txs types.Transactions) {
 		s.m[tx.Hash()] = struct{}{}
 	}
 	s.Unlock()
-	span.End()
 }
 
 // AddCapped is like Add, but first makes room if cap has been reached.
-func (s *knownHashes) AddCapped(ctx context.Context, h common.Hash) {
-	_, span := trace.StartSpan(ctx, "knownHashes.AddCapped")
+func (s *knownHashes) AddCapped(h common.Hash) {
 	s.Lock()
 	if s.m == nil || (s.forgetInterval != 0 && time.Since(s.lastReset) > s.forgetInterval) {
 		s.reset()
@@ -126,7 +121,6 @@ func (s *knownHashes) AddCapped(ctx context.Context, h common.Hash) {
 	}
 	s.m[h] = struct{}{}
 	s.Unlock()
-	span.End()
 }
 
 func (s *knownHashes) Has(h common.Hash) bool {
@@ -290,13 +284,13 @@ func (p *peer) SetHead(hash common.Hash, td *big.Int) {
 // MarkBlock marks a block as known for the peer, ensuring that the block will
 // never be propagated to this particular peer.
 func (p *peer) MarkBlock(ctx context.Context, hash common.Hash) {
-	p.knownBlocks.AddCapped(ctx, hash)
+	p.knownBlocks.AddCapped(hash)
 }
 
 // MarkTransaction marks a transaction as known for the peer, ensuring that it
 // will never be propagated to this particular peer.
 func (p *peer) MarkTransaction(ctx context.Context, hash common.Hash) {
-	p.knownTxs.AddCapped(ctx, hash)
+	p.knownTxs.AddCapped(hash)
 }
 
 // SendTransactions sends transactions to the peer and includes the hashes
@@ -312,7 +306,7 @@ func (p *peer) SendTransactions(ctx context.Context, txs types.Transactions) err
 		})
 		return err
 	}
-	p.knownTxs.AddAll(ctx, txs)
+	p.knownTxs.AddAll(txs)
 	return nil
 }
 
@@ -348,7 +342,7 @@ func (p *peer) SendNewBlockHash(ctx context.Context, hash common.Hash, number ui
 	ctx, span := trace.StartSpan(ctx, "peer.SendNewBlockHash")
 	defer span.End()
 
-	b, err := rlp.EncodeToBytesCtx(ctx, newBlockHashesData{{Hash: hash, Number: number}})
+	b, err := rlp.EncodeToBytes(newBlockHashesData{{Hash: hash, Number: number}})
 	if err != nil {
 		return err
 	}
@@ -357,7 +351,7 @@ func (p *peer) SendNewBlockHash(ctx context.Context, hash common.Hash, number ui
 	if err := p.rw.WriteMsg(ctx, msg); err != nil {
 		return err
 	}
-	p.knownBlocks.Add(ctx, hash)
+	p.knownBlocks.Add(hash)
 	return nil
 }
 
@@ -366,7 +360,7 @@ func (p *peer) SendNewBlock(ctx context.Context, block *types.Block, td *big.Int
 	ctx, span := trace.StartSpan(ctx, "peer.SendNewBlock")
 	defer span.End()
 
-	b, err := rlp.EncodeToBytesCtx(ctx, []interface{}{block, td})
+	b, err := rlp.EncodeToBytes([]interface{}{block, td})
 	if err != nil {
 		return err
 	}
@@ -382,7 +376,7 @@ func (p *peer) SendNewBlock(ctx context.Context, block *types.Block, td *big.Int
 		return err
 	}
 	ws.End()
-	p.knownBlocks.Add(ctx, block.Hash())
+	p.knownBlocks.Add(block.Hash())
 	return nil
 }
 

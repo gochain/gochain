@@ -208,7 +208,7 @@ func (ec *Client) TransactionByHash(ctx context.Context, hash common.Hash) (tx *
 // TransactionInBlock. Getting their sender address can be done without an RPC interaction.
 func (ec *Client) TransactionSender(ctx context.Context, tx *types.Transaction, block common.Hash, index uint) (common.Address, error) {
 	// Try to load the address from the cache.
-	sender, err := types.Sender(ctx, &senderFromServer{blockhash: block}, tx)
+	sender, err := types.Sender(&senderFromServer{blockhash: block}, tx)
 	if err == nil {
 		return sender, nil
 	}
@@ -476,7 +476,7 @@ func (ec *Client) EstimateGas(ctx context.Context, msg gochain.CallMsg) (uint64,
 // If the transaction was a contract creation use the TransactionReceipt method to get the
 // contract address after the transaction has been mined.
 func (ec *Client) SendTransaction(ctx context.Context, tx *types.Transaction) error {
-	data, err := rlp.EncodeToBytesCtx(ctx, tx)
+	data, err := rlp.EncodeToBytes(tx)
 	if err != nil {
 		return err
 	}

@@ -17,13 +17,10 @@
 package types
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"math/big"
-
-	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/crypto"
@@ -72,7 +69,7 @@ func SignTx(tx *Transaction, s Signer, prv *ecdsa.PrivateKey) (*Transaction, err
 // Sender may cache the address, allowing it to be used regardless of
 // signing method. The cache is invalidated if the cached signer does
 // not match the signer used in the current call.
-func Sender(ctx context.Context, signer Signer, tx *Transaction) (common.Address, error) {
+func Sender(signer Signer, tx *Transaction) (common.Address, error) {
 	if sc := tx.from.Load(); sc != nil {
 		sigCache := sc.(sigCache)
 		// If the signer used to derive from in a previous
@@ -83,9 +80,7 @@ func Sender(ctx context.Context, signer Signer, tx *Transaction) (common.Address
 		}
 	}
 
-	_, span := trace.StartSpan(ctx, "signer.Sender")
 	addr, err := signer.Sender(tx)
-	span.End()
 	if err != nil {
 		return common.Address{}, err
 	}

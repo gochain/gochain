@@ -343,7 +343,7 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction) error
 
 	// Validate the transaction sender and it's sig. Throw
 	// if the from fields is invalid.
-	if from, err = types.Sender(ctx, pool.signer, tx); err != nil {
+	if from, err = types.Sender(pool.signer, tx); err != nil {
 		return core.ErrInvalidSender
 	}
 	// Last but not least check for nonce errors
@@ -401,7 +401,7 @@ func (pool *TxPool) add(ctx context.Context, tx *types.Transaction) error {
 
 		nonce := tx.Nonce() + 1
 
-		addr, _ := types.Sender(ctx, pool.signer, tx)
+		addr, _ := types.Sender(pool.signer, tx)
 		if nonce > pool.nonce[addr] {
 			pool.nonce[addr] = nonce
 		}
@@ -410,7 +410,7 @@ func (pool *TxPool) add(ctx context.Context, tx *types.Transaction) error {
 	}
 
 	// Print a log message if low enough level is set
-	log.Debug("Pooled new transaction", "hash", hash, "from", log.Lazy{Fn: func() common.Address { from, _ := types.Sender(ctx, pool.signer, tx); return from }}, "to", tx.To())
+	log.Debug("Pooled new transaction", "hash", hash, "from", log.Lazy{Fn: func() common.Address { from, _ := types.Sender(pool.signer, tx); return from }}, "to", tx.To())
 	return nil
 }
 
@@ -420,7 +420,7 @@ func (self *TxPool) Add(ctx context.Context, tx *types.Transaction) error {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 
-	data, err := rlp.EncodeToBytesCtx(ctx, tx)
+	data, err := rlp.EncodeToBytes(tx)
 	if err != nil {
 		return err
 	}
@@ -488,7 +488,7 @@ func (self *TxPool) Content(ctx context.Context) (map[common.Address]types.Trans
 	// Retrieve all the pending transactions and sort by account and by nonce
 	pending := make(map[common.Address]types.Transactions)
 	for _, tx := range self.pending {
-		account, _ := types.Sender(ctx, self.signer, tx)
+		account, _ := types.Sender(self.signer, tx)
 		pending[account] = append(pending[account], tx)
 	}
 	// There are no queued transactions in a light pool, just return an empty map

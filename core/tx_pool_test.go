@@ -188,7 +188,7 @@ func validateEvents(events chan NewTxsEvent, expTxs int) error {
 }
 
 func deriveSender(ctx context.Context, tx *types.Transaction) (common.Address, error) {
-	return types.Sender(ctx, types.HomesteadSigner{}, tx)
+	return types.Sender(types.HomesteadSigner{}, tx)
 }
 
 type testChain struct {

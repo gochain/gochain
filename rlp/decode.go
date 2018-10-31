@@ -19,7 +19,6 @@ package rlp
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -118,12 +117,8 @@ type SliceDecoder interface {
 //
 //     NewStream(r, limit).Decode(val)
 func Decode(r io.Reader, val interface{}) error {
-	return DecodeCtx(context.Background(), r, val)
-}
-
-func DecodeCtx(ctx context.Context, r io.Reader, val interface{}) error {
 	s := NewStream(r, 0)
-	err := s.DecodeCtx(ctx, val)
+	err := s.Decode(val)
 	Discard(s)
 	return err
 }
@@ -132,14 +127,10 @@ func DecodeCtx(ctx context.Context, r io.Reader, val interface{}) error {
 // Please see the documentation of Decode for the decoding rules.
 // The input must contain exactly one value and no trailing data.
 func DecodeBytes(b []byte, val interface{}) error {
-	return DecodeBytesCtx(context.Background(), b, val)
-}
-
-func DecodeBytesCtx(ctx context.Context, b []byte, val interface{}) error {
 	r := bytes.NewReader(b)
 	s := NewStream(r, uint64(len(b)))
 	defer Discard(s)
-	if err := s.DecodeCtx(ctx, val); err != nil {
+	if err := s.Decode(val); err != nil {
 		return err
 	}
 	if r.Len() > 0 {
@@ -874,9 +865,6 @@ func (s *Stream) ListEnd() error {
 // to by val. Please see the documentation for the Decode function
 // to learn about the decoding rules.
 func (s *Stream) Decode(val interface{}) error {
-	return s.DecodeCtx(context.Background(), val)
-}
-func (s *Stream) DecodeCtx(ctx context.Context, val interface{}) error {
 	if val == nil {
 		return errDecodeIntoNil
 	}

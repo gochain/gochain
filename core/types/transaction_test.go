@@ -18,7 +18,6 @@ package types
 
 import (
 	"bytes"
-	"context"
 	"crypto/ecdsa"
 	"encoding/json"
 	"math/big"
@@ -87,7 +86,6 @@ func defaultTestKey() (*ecdsa.PrivateKey, common.Address) {
 }
 
 func TestRecipientEmpty(t *testing.T) {
-	ctx := context.Background()
 	_, addr := defaultTestKey()
 	tx, err := decodeTx(common.Hex2Bytes("f8498080808080011ca09b16de9d5bdee2cf56c28d16275a4da68cd30273e2525f3959f5d62557489921a0372ebd8fb3345f7db7b5a86d42e24d36e983e259b0664ceb8c227ec9af572f3d"))
 	if err != nil {
@@ -95,7 +93,7 @@ func TestRecipientEmpty(t *testing.T) {
 		t.FailNow()
 	}
 
-	from, err := Sender(ctx, HomesteadSigner{}, tx)
+	from, err := Sender(HomesteadSigner{}, tx)
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
@@ -106,7 +104,6 @@ func TestRecipientEmpty(t *testing.T) {
 }
 
 func TestRecipientNormal(t *testing.T) {
-	ctx := context.Background()
 	_, addr := defaultTestKey()
 
 	tx, err := decodeTx(common.Hex2Bytes("f85d80808094000000000000000000000000000000000000000080011ca0527c0d8f5c63f7b9f41324a7c8a563ee1190bcbf0dac8ab446291bdbf32f5c79a0552c4ef0a09a04395074dab9ed34d3fbfb843c2f2546cc30fe89ec143ca94ca6"))
@@ -115,7 +112,7 @@ func TestRecipientNormal(t *testing.T) {
 		t.FailNow()
 	}
 
-	from, err := Sender(ctx, HomesteadSigner{}, tx)
+	from, err := Sender(HomesteadSigner{}, tx)
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
@@ -130,7 +127,6 @@ func TestRecipientNormal(t *testing.T) {
 // decreasing order, but at the same time with increasing nonces when issued by
 // the same account.
 func TestTransactionPriceNonceSort(t *testing.T) {
-	ctx := context.Background()
 	// Generate a batch of accounts to start with
 	keys := make([]*ecdsa.PrivateKey, 25)
 	for i := 0; i < len(keys); i++ {
@@ -148,22 +144,22 @@ func TestTransactionPriceNonceSort(t *testing.T) {
 		}
 	}
 	// Sort the transactions and cross check the nonce ordering
-	txset := NewTransactionsByPriceAndNonce(ctx, signer, groups)
+	txset := NewTransactionsByPriceAndNonce(signer, groups)
 
 	txs := Transactions{}
 	for tx := txset.Peek(); tx != nil; tx = txset.Peek() {
 		txs = append(txs, tx)
-		txset.Shift(ctx)
+		txset.Shift()
 	}
 	if len(txs) != 25*25 {
 		t.Errorf("expected %d transactions, found %d", 25*25, len(txs))
 	}
 	for i, txi := range txs {
-		fromi, _ := Sender(ctx, signer, txi)
+		fromi, _ := Sender(signer, txi)
 
 		// Make sure the nonce order is valid
 		for j, txj := range txs[i+1:] {
-			fromj, _ := Sender(ctx, signer, txj)
+			fromj, _ := Sender(signer, txj)
 
 			if fromi == fromj && txi.Nonce() > txj.Nonce() {
 				t.Errorf("invalid nonce ordering: tx #%d (A=%x N=%v) < tx #%d (A=%x N=%v)", i, fromi[:4], txi.Nonce(), i+j, fromj[:4], txj.Nonce())
@@ -173,7 +169,7 @@ func TestTransactionPriceNonceSort(t *testing.T) {
 		// If the next tx has different from account, the price must be lower than the current one
 		if i+1 < len(txs) {
 			next := txs[i+1]
-			fromNext, _ := Sender(ctx, signer, next)
+			fromNext, _ := Sender(signer, next)
 			if fromi != fromNext && txi.GasPrice().Cmp(next.GasPrice()) < 0 {
 				t.Errorf("invalid gasprice ordering: tx #%d (A=%x P=%v) < tx #%d (A=%x P=%v)", i, fromi[:4], txi.GasPrice(), i+1, fromNext[:4], next.GasPrice())
 			}

@@ -397,7 +397,7 @@ func (s *PrivateAccountAPI) SignTransaction(ctx context.Context, args SendTxArgs
 	if err != nil {
 		return nil, err
 	}
-	data, err := rlp.EncodeToBytesCtx(ctx, signed)
+	data, err := rlp.EncodeToBytes(signed)
 	if err != nil {
 		return nil, err
 	}
@@ -925,7 +925,7 @@ func newRPCTransaction(ctx context.Context, tx *types.Transaction, blockHash com
 	if tx.Protected() {
 		signer = types.NewEIP155Signer(tx.ChainId())
 	}
-	from, _ := types.Sender(ctx, signer, tx)
+	from, _ := types.Sender(signer, tx)
 	v, r, s := tx.RawSignatureValues()
 
 	result := &RPCTransaction{
@@ -1080,7 +1080,7 @@ func (s *PublicTransactionPoolAPI) GetRawTransactionByHash(ctx context.Context, 
 		}
 	}
 	// Serialize to RLP and return
-	return rlp.EncodeToBytesCtx(ctx, tx)
+	return rlp.EncodeToBytes(tx)
 }
 
 // GetTransactionReceipt returns the transaction receipt for the given transaction hash.
@@ -1098,7 +1098,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 	if tx.Protected() {
 		signer = types.NewEIP155Signer(tx.ChainId())
 	}
-	from, _ := types.Sender(ctx, signer, tx)
+	from, _ := types.Sender(signer, tx)
 
 	fields := map[string]interface{}{
 		"blockHash":         blockHash,
@@ -1213,7 +1213,7 @@ func submitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 	}
 	if tx.To() == nil {
 		signer := types.MakeSigner(b.ChainConfig(), b.CurrentBlock().Number())
-		from, err := types.Sender(ctx, signer, tx)
+		from, err := types.Sender(signer, tx)
 		if err != nil {
 			return common.Hash{}, err
 		}
@@ -1330,7 +1330,7 @@ func (s *PublicTransactionPoolAPI) SignTransaction(ctx context.Context, args Sen
 	if err != nil {
 		return nil, err
 	}
-	data, err := rlp.EncodeToBytesCtx(ctx, tx)
+	data, err := rlp.EncodeToBytes(tx)
 	if err != nil {
 		return nil, err
 	}
@@ -1353,7 +1353,7 @@ func (s *PublicTransactionPoolAPI) PendingTransactions(ctx context.Context) ([]*
 		if tx.Protected() {
 			signer = types.NewEIP155Signer(tx.ChainId())
 		}
-		from, _ := types.Sender(ctx, signer, tx)
+		from, _ := types.Sender(signer, tx)
 		if _, exists := accounts[from]; exists {
 			transactions = append(transactions, newRPCPendingTransaction(ctx, tx))
 		}
@@ -1380,7 +1380,7 @@ func (s *PublicTransactionPoolAPI) Resend(ctx context.Context, sendArgs SendTxAr
 		}
 		wantSigHash := signer.Hash(matchTx)
 
-		if pFrom, err := types.Sender(ctx, signer, p); err == nil && pFrom == sendArgs.From && signer.Hash(p) == wantSigHash {
+		if pFrom, err := types.Sender(signer, p); err == nil && pFrom == sendArgs.From && signer.Hash(p) == wantSigHash {
 			// Match. Re-sign and send the transaction.
 			if gasPrice != nil {
 				sendArgs.GasPrice = gasPrice
@@ -1420,7 +1420,7 @@ func (api *PublicDebugAPI) GetBlockRlp(ctx context.Context, number uint64) (stri
 	if block == nil {
 		return "", fmt.Errorf("block #%d not found", number)
 	}
-	encoded, err := rlp.EncodeToBytesCtx(ctx, block)
+	encoded, err := rlp.EncodeToBytes(block)
 	if err != nil {
 		return "", err
 	}

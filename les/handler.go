@@ -691,7 +691,7 @@ func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 				}
 			}
 			// If known, encode and queue for response packet
-			if encoded, err := rlp.EncodeToBytesCtx(ctx, results); err != nil {
+			if encoded, err := rlp.EncodeToBytes(results); err != nil {
 				log.Error("Failed to encode receipt", "err", err)
 			} else {
 				receipts = append(receipts, encoded)
