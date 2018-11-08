@@ -106,7 +106,7 @@ func (set *unconfirmedBlocks) Shift(height uint64) {
 		case header.Hash() == next.hash:
 			log.Info("🔗 block reached canonical chain", "number", next.index, "hash", next.hash)
 		default:
-			log.Info("😱 block lost", "number", next.index, "hash", next.hash)
+			log.Debug("Block did not reach canonical chain", "number", next.index, "hash", next.hash)
 		}
 		// Drop the block out of the ring
 		if set.blocks.Value == set.blocks.Next().Value {
