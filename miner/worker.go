@@ -28,6 +28,7 @@ import (
 
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/consensus"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core"
 	"github.com/gochain-io/gochain/core/state"
 	"github.com/gochain-io/gochain/core/types"
@@ -819,6 +820,10 @@ func (w *worker) commitNewWork(ctx context.Context, interrupt *int32, noempty bo
 		header.Coinbase = w.coinbase
 	}
 	if err := w.engine.Prepare(ctx, w.chain, header); err != nil {
+		if err == clique.ErrIneligibleSigner {
+			log.Info("Not eligible to sign block", "number", header.Number)
+			return
+		}
 		log.Error("Failed to prepare header for mining", "err", err)
 		return
 	}

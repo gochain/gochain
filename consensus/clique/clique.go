@@ -128,6 +128,11 @@ var (
 	// on an instant chain (0 second period). It's important to refuse these as the
 	// block reward is zero, so an empty block just bloats the chain... fast.
 	errWaitTransactions = errors.New("waiting for transactions")
+
+	// ErrIneligibleSigner is returned if a signer is authorized to sign, but not
+	// eligible to sign this block. It has either signed too recently, or the chain
+	// has just started and it is not yet its turn.
+	ErrIneligibleSigner = errors.New("signer is not eligible to sign this block")
 )
 
 // sigHash returns the hash which is used as input for the proof-of-authority
@@ -560,7 +565,7 @@ func (c *Clique) Prepare(ctx context.Context, chain consensus.ChainReader, heade
 	// Calculate and validate the difficulty.
 	diff := CalcDifficulty(snap.Signers, c.signer)
 	if c.signer != (common.Address{}) && diff == 0 {
-		return fmt.Errorf("signed too recently: %s", c.signer.Hex())
+		return ErrIneligibleSigner
 	}
 	header.Difficulty = new(big.Int).SetUint64(diff)
 
