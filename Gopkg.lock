@@ -336,12 +336,6 @@
   version = "v1.0.0"
 
 [[projects]]
-  name = "github.com/prometheus/prometheus"
-  packages = ["util/flock"]
-  revision = "85f23d82a045d103ea7f3c89a91fba4a93e6367a"
-  version = "v2.1.0"
-
-[[projects]]
   branch = "master"
   name = "github.com/rjeczalik/notify"
   packages = ["."]
@@ -668,6 +662,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "68f549e4bef5bd068ed399f9b7c17a7957597c41bc14ae11d6614fae18785a94"
+  inputs-digest = "41f7083c2c2301d7f1197c5aaf33b4895f6e0dca2277ea1bf41cfcb34199782f"
   solver-name = "gps-cdcl"
   solver-version = 1

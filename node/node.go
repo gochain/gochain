@@ -31,11 +31,11 @@ import (
 	"github.com/gochain-io/gochain/ethdb"
 	"github.com/gochain-io/gochain/ethdb/s3"
 	"github.com/gochain-io/gochain/event"
+	"github.com/gochain-io/gochain/flock"
 	"github.com/gochain-io/gochain/internal/debug"
 	"github.com/gochain-io/gochain/log"
 	"github.com/gochain-io/gochain/p2p"
 	"github.com/gochain-io/gochain/rpc"
-	"github.com/prometheus/prometheus/util/flock"
 )
 
 // Node is a container on which services can be registered.
