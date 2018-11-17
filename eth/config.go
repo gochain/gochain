@@ -39,7 +39,7 @@ var DefaultConfig = Config{
 	MinerGasFloor: params.TargetGasLimit,
 	MinerGasCeil:  params.TargetGasLimit,
 	MinerGasPrice: gasprice.Default,
-	MinerRecommit: 1 * time.Second,
+	MinerRecommit: 2 * time.Second,
 
 	TxPool: core.DefaultTxPoolConfig,
 	GPO: gasprice.Config{

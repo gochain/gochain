@@ -57,11 +57,11 @@ const (
 
 	// minRecommitInterval is the minimal time interval to recreate the mining block with
 	// any newly arrived transactions.
-	minRecommitInterval = 1 * time.Second
+	minRecommitInterval = 2 * time.Second
 
 	// maxRecommitInterval is the maximum time interval to recreate the mining block with
 	// any newly arrived transactions.
-	maxRecommitInterval = 15 * time.Second
+	maxRecommitInterval = 5 * time.Second
 
 	// intervalAdjustRatio is the impact a single interval adjustment has on sealing work
 	// resubmitting interval.
@@ -647,7 +647,7 @@ func (w *worker) commitTransaction(ctx context.Context, vmenv *vm.EVM, tx *types
 	return receipt.Logs, nil
 }
 
-const maxCommitTransactionsDur = time.Second
+const maxCommitTransactionsDur = 2 * time.Second
 
 func (w *worker) commitTransactions(ctx context.Context, txs *types.TransactionsByPriceAndNonce, coinbase common.Address, interrupt *int32) bool {
 	// Short circuit if current is nil
