@@ -795,10 +795,11 @@ func (w *worker) commitNewWork(ctx context.Context, interrupt *int32, noempty bo
 	tstart := time.Now()
 	parent := w.chain.CurrentBlock()
 
-	if parent.Time().Cmp(new(big.Int).SetInt64(timestamp)) >= 0 {
-		timestamp = parent.Time().Int64() + 1
+	// Don't start sooner than 1s after the parent.
+	if earliest := parent.Time().Int64() + 1; earliest > timestamp {
+		timestamp = earliest
 	}
-	// this will ensure we're not going off too far in the future
+	// Wait to ensure we're not going off too far in the future.
 	if wait := time.Until(time.Unix(timestamp, 0)); wait > 0 {
 		log.Info("Mining too far in the future", "wait", common.PrettyDuration(wait))
 		time.Sleep(wait)
