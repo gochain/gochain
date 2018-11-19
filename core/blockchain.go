@@ -1079,7 +1079,7 @@ func reorg(local, external chainHead) bool {
 //
 // After insertion is done, all accumulated events will be fired.
 func (bc *BlockChain) InsertChain(ctx context.Context, chain types.Blocks) (int, error) {
-	ctx, span := trace.StartSpan(ctx, "BlockChain.InsertChain")
+	ctx, span := trace.StartSpan(ctx, "BlockChain.InsertChain", trace.WithSampler(trace.AlwaysSample()))
 	defer span.End()
 	span.AddAttributes(trace.Int64Attribute("len", int64(len(chain))))
 

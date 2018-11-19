@@ -395,7 +395,11 @@ func (w *worker) mainLoop() {
 	for {
 		select {
 		case req := <-w.newWorkCh:
-			w.commitNewWork(context.Background(), req.interrupt, req.noempty, req.timestamp)
+			ctx, span := trace.StartSpan(context.Background(),
+				"worker.mainLoop-newWork",
+				trace.WithSampler(trace.AlwaysSample()))
+			w.commitNewWork(ctx, req.interrupt, req.noempty, req.timestamp)
+			span.End()
 
 		case first, ok := <-w.txsCh:
 			if !ok {
@@ -417,7 +421,7 @@ func (w *worker) mainLoop() {
 					break batchloop
 				}
 			}
-			ctx := context.Background()
+			ctx, span := trace.StartSpan(context.Background(), "worker.mainLoop-txs")
 			// Apply transactions to the pending state if we're not mining.
 			//
 			// Note all transactions received may not be continuous with transactions
@@ -445,6 +449,7 @@ func (w *worker) mainLoop() {
 				}
 			}
 			atomic.AddInt32(&w.newTxs, int32(cnt))
+			span.End()
 
 		// System stopped
 		case <-w.exitCh:
@@ -535,7 +540,7 @@ func (w *worker) resultLoop() {
 				continue
 			}
 
-			ctx, span := trace.StartSpan(context.Background(), "worker.resultLoop-resultCh")
+			ctx, span := trace.StartSpan(context.Background(), "worker.resultLoop-resultCh", trace.WithSampler(trace.AlwaysSample()))
 			var (
 				sealhash = w.engine.SealHash(block.Header())
 				hash     = block.Hash()
@@ -621,6 +626,7 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 func (w *worker) updateSnapshot(ctx context.Context) {
 	ctx, span := trace.StartSpan(ctx, "worker.updateSnapshot")
 	defer span.End()
+
 	w.snapshotMu.Lock()
 	defer w.snapshotMu.Unlock()
 
@@ -654,6 +660,14 @@ func (w *worker) commitTransactions(ctx context.Context, txs *types.Transactions
 	if w.current == nil {
 		return true
 	}
+
+	ctx, span := trace.StartSpan(ctx, "worker.commitTransactions")
+	defer span.End()
+	defer func() {
+		span.AddAttributes(
+
+			trace.Int64Attribute("gas", int64(w.current.gasPool.Gas())))
+	}()
 
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
@@ -789,6 +803,9 @@ func (w *worker) commitTransactions(ctx context.Context, txs *types.Transactions
 
 // commitNewWork generates several new sealing tasks based on the parent block.
 func (w *worker) commitNewWork(ctx context.Context, interrupt *int32, noempty bool, timestamp int64) {
+	ctx, span := trace.StartSpan(ctx, "worker.commitNewWork")
+	defer span.End()
+
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
@@ -875,6 +892,9 @@ func (w *worker) commitNewWork(ctx context.Context, interrupt *int32, noempty bo
 // commit runs any post-transaction state modifications, assembles the final block
 // and commits new work if consensus engine is running.
 func (w *worker) commit(ctx context.Context, interval func(), update bool, start time.Time) error {
+	ctx, span := trace.StartSpan(ctx, "worker.commit")
+	defer span.End()
+
 	// Deep copy receipts here to avoid interaction between different tasks.
 	receipts := make([]*types.Receipt, len(w.current.receipts))
 	for i, l := range w.current.receipts {
