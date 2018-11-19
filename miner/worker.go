@@ -665,7 +665,6 @@ func (w *worker) commitTransactions(ctx context.Context, txs *types.Transactions
 	defer span.End()
 	defer func() {
 		span.AddAttributes(
-
 			trace.Int64Attribute("gas", int64(w.current.gasPool.Gas())))
 	}()
 
@@ -673,7 +672,12 @@ func (w *worker) commitTransactions(ctx context.Context, txs *types.Transactions
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
 	}
 
-	start := time.Now()
+	deadline := time.Now().Add(maxCommitTransactionsDur)
+	if w.current.header.Time != nil {
+		if alternate := time.Unix(w.current.header.Time.Int64(), 0); alternate.Before(deadline) {
+			deadline = alternate
+		}
+	}
 
 	tracing := log.Tracing()
 	// Create a new emv context and environment.
@@ -709,7 +713,7 @@ func (w *worker) commitTransactions(ctx context.Context, txs *types.Transactions
 			log.Info(fmt.Sprintf("Commit interrupted, %s incomplete work", action), "num", w.current.header.Number)
 			return drop
 		}
-		if time.Since(start) > maxCommitTransactionsDur {
+		if time.Until(deadline) <= 0 {
 			log.Info("Commit deadline reached", "num", w.current.header.Number)
 			break
 		}
