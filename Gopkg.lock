@@ -124,6 +124,15 @@
   version = "v1.6.0"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/fjl/memsize"
+  packages = [
+    ".",
+    "memsizeui"
+  ]
+  revision = "2a09253e352a56f419bd88effab0483f52da4c7d"
+
+[[projects]]
   name = "github.com/gizak/termui"
   packages = ["."]
   revision = "24acd523c756fd9728824cdfac66aad9d8982fb7"
@@ -662,6 +671,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "41f7083c2c2301d7f1197c5aaf33b4895f6e0dca2277ea1bf41cfcb34199782f"
+  inputs-digest = "620e8b0690ad8060e21adec6d1179e5729a457402c434599391303552c57e002"
   solver-name = "gps-cdcl"
   solver-version = 1
