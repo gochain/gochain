@@ -53,7 +53,7 @@ jobs:
               - /tmp/go/cache
       - attach_workspace:
           at: .
-      - run: go test $(go list ./... | grep -v /swarm/fuse)
+      - run: go test -p=8 $(go list ./... | grep -v /swarm/fuse)
       - save_cache:
           key: test-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
           paths:
