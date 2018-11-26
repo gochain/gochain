@@ -368,7 +368,6 @@ func WriteReceipts(db DatabaseWriter, hash common.Hash, number uint64, receipts 
 	bytes, err := rlp.EncodeToBytes((types.ReceiptsForStorage)(receipts))
 	if err != nil {
 		log.Crit("Failed to encode block receipts", "err", err)
-		return
 	}
 	// Store the flattened receipt slice
 	Must("put receipts", func() error {

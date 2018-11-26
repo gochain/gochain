@@ -20,4 +20,4 @@ package vm
 
 const verifyPool = false
 
-func verifyIntegerPool(ip *IntPool) {}
+func verifyIntegerPool(ip *intPool) {}

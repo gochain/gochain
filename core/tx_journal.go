@@ -33,7 +33,7 @@ var errNoActiveJournal = errors.New("no active journal")
 // devNull is a WriteCloser that just discards anything written into it. Its
 // goal is to allow the transaction journal to write into a fake journal when
 // loading transactions on startup without printing warnings due to no file
-// being readt for write.
+// being read for write.
 type devNull struct{}
 
 func (*devNull) Write(p []byte) (n int, err error) { return len(p), nil }
@@ -95,7 +95,7 @@ func (journal *txJournal) load(add func(types.Transactions) []error) error {
 			}
 			break
 		}
-		// New transaction parsed, queue up for later, import if threnshold is reached
+		// New transaction parsed, queue up for later, import if threshold is reached
 		total++
 		batch = append(batch, tx)
 		if len(batch) >= batchSize {
