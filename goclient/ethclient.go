@@ -27,6 +27,7 @@ import (
 	"github.com/gochain-io/gochain"
 	"github.com/gochain-io/gochain/common"
 	"github.com/gochain-io/gochain/common/hexutil"
+	"github.com/gochain-io/gochain/consensus/clique"
 	"github.com/gochain-io/gochain/core/types"
 	"github.com/gochain-io/gochain/rlp"
 	"github.com/gochain-io/gochain/rpc"
@@ -481,6 +482,66 @@ func (ec *Client) SendTransaction(ctx context.Context, tx *types.Transaction) er
 		return err
 	}
 	return ec.c.CallContext(ctx, nil, "eth_sendRawTransaction", common.ToHex(data))
+}
+
+// SignersAt returns the set of clique signers at the given block.
+func (ec *Client) SignersAt(ctx context.Context, blockNumber *big.Int) ([]common.Address, error) {
+	var signers []common.Address
+	err := ec.c.CallContext(ctx, &signers, "clique_getSigners", toBlockNumArg(blockNumber))
+	if err != nil {
+		return nil, err
+	}
+	return signers, nil
+}
+
+// SignersAtHash returns the set of clique signers at the given block.
+func (ec *Client) SignersAtHash(ctx context.Context, blockHash common.Hash) ([]common.Address, error) {
+	var signers []common.Address
+	err := ec.c.CallContext(ctx, &signers, "clique_getSignersAtHash", blockHash)
+	if err != nil {
+		return nil, err
+	}
+	return signers, nil
+}
+
+// VotersAt returns the set of clique voters at the given block.
+func (ec *Client) VotersAt(ctx context.Context, blockNumber *big.Int) ([]common.Address, error) {
+	var voters []common.Address
+	err := ec.c.CallContext(ctx, &voters, "clique_getVoters", toBlockNumArg(blockNumber))
+	if err != nil {
+		return nil, err
+	}
+	return voters, nil
+}
+
+// VotersAtHash returns the set of clique voters at the given block.
+func (ec *Client) VotersAtHash(ctx context.Context, blockHash common.Hash) ([]common.Address, error) {
+	var voters []common.Address
+	err := ec.c.CallContext(ctx, &voters, "clique_getVotersAtHash", blockHash)
+	if err != nil {
+		return nil, err
+	}
+	return voters, nil
+}
+
+// SnapshotAt returns the clique snapshot at the given block.
+func (ec *Client) SnapshotAt(ctx context.Context, blockNumber *big.Int) (*clique.Snapshot, error) {
+	var s clique.Snapshot
+	err := ec.c.CallContext(ctx, &s, "clique_getSnapshot", toBlockNumArg(blockNumber))
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+// SnapshotAt returns the clique snapshot at the given block.
+func (ec *Client) SnapshotAtHash(ctx context.Context, blockHash common.Hash) (*clique.Snapshot, error) {
+	var s clique.Snapshot
+	err := ec.c.CallContext(ctx, &s, "clique_getSnapshotAtHash", blockHash)
+	if err != nil {
+		return nil, err
+	}
+	return &s, nil
 }
 
 func toCallArg(msg gochain.CallMsg) interface{} {
