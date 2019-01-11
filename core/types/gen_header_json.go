@@ -13,13 +13,14 @@ import (
 
 var _ = (*headerMarshaling)(nil)
 
+// MarshalJSON marshals as JSON.
 func (h Header) MarshalJSON() ([]byte, error) {
 	type Header struct {
 		ParentHash  common.Hash      `json:"parentHash"       gencodec:"required"`
 		UncleHash   common.Hash      `json:"sha3Uncles"       gencodec:"required"`
 		Coinbase    common.Address   `json:"miner"            gencodec:"required"`
-		Signers     []common.Address `json:"signers"          gencodec:"required"`
-		Voters      []common.Address `json:"voters"           gencodec:"required"`
+		Signers     []common.Address `json:"signers"`
+		Voters      []common.Address `json:"voters"`
 		Signer      hexutil.Bytes    `json:"signer"           gencodec:"required"`
 		Root        common.Hash      `json:"stateRoot"        gencodec:"required"`
 		TxHash      common.Hash      `json:"transactionsRoot" gencodec:"required"`
@@ -58,13 +59,14 @@ func (h Header) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&enc)
 }
 
+// UnmarshalJSON unmarshals from JSON.
 func (h *Header) UnmarshalJSON(input []byte) error {
 	type Header struct {
 		ParentHash  *common.Hash     `json:"parentHash"       gencodec:"required"`
 		UncleHash   *common.Hash     `json:"sha3Uncles"       gencodec:"required"`
 		Coinbase    *common.Address  `json:"miner"            gencodec:"required"`
-		Signers     []common.Address `json:"signers"          gencodec:"required"`
-		Voters      []common.Address `json:"voters"           gencodec:"required"`
+		Signers     []common.Address `json:"signers"`
+		Voters      []common.Address `json:"voters"`
 		Signer      *hexutil.Bytes   `json:"signer"           gencodec:"required"`
 		Root        *common.Hash     `json:"stateRoot"        gencodec:"required"`
 		TxHash      *common.Hash     `json:"transactionsRoot" gencodec:"required"`
@@ -95,14 +97,12 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 		return errors.New("missing required field 'miner' for Header")
 	}
 	h.Coinbase = *dec.Coinbase
-	if dec.Signers == nil {
-		return errors.New("missing required field 'signers' for Header")
+	if dec.Signers != nil {
+		h.Signers = dec.Signers
 	}
-	h.Signers = dec.Signers
-	if dec.Voters == nil {
-		return errors.New("missing required field 'voters' for Header")
+	if dec.Voters != nil {
+		h.Voters = dec.Voters
 	}
-	h.Voters = dec.Voters
 	if dec.Signer == nil {
 		return errors.New("missing required field 'signer' for Header")
 	}
