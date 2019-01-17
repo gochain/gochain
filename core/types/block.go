@@ -73,7 +73,7 @@ type Header struct {
 	Coinbase    common.Address   `json:"miner"            gencodec:"required"`
 	Signers     []common.Address `json:"signers"`
 	Voters      []common.Address `json:"voters"`
-	Signer      []byte           `json:"signer"           gencodec:"required"`
+	Signer      []byte           `json:"signer"`
 	Root        common.Hash      `json:"stateRoot"        gencodec:"required"`
 	TxHash      common.Hash      `json:"transactionsRoot" gencodec:"required"`
 	ReceiptHash common.Hash      `json:"receiptsRoot"     gencodec:"required"`
