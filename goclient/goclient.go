@@ -309,7 +309,7 @@ func (ec *Client) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header)
 
 // State Access
 
-// NetworkID returns the network ID (also known as the chain ID) for this chain.
+// NetworkID returns the network ID for this chain.
 func (ec *Client) NetworkID(ctx context.Context) (*big.Int, error) {
 	version := new(big.Int)
 	var ver string
@@ -320,6 +320,13 @@ func (ec *Client) NetworkID(ctx context.Context) (*big.Int, error) {
 		return nil, fmt.Errorf("invalid net_version result %q", ver)
 	}
 	return version, nil
+}
+
+// ChainID returns the chain ID for this chain.
+func (ec *Client) ChainID(ctx context.Context) (*big.Int, error) {
+	var result hexutil.Big
+	err := ec.c.CallContext(ctx, &result, "eth_chainId")
+	return (*big.Int)(&result), err
 }
 
 // BalanceAt returns the wei balance of the given account.
