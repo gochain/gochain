@@ -20,7 +20,7 @@ import (
 	"html/template"
 	"path"
 
-	"github.com/gochain-io/gochain/swarm/api"
+	"github.com/gochain-io/gochain/v3/swarm/api"
 )
 
 type htmlListData struct {

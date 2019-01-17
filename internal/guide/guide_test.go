@@ -30,8 +30,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain-io/gochain/accounts/keystore"
-	"github.com/gochain-io/gochain/core/types"
+	"github.com/gochain-io/gochain/v3/accounts/keystore"
+	"github.com/gochain-io/gochain/v3/core/types"
 )
 
 // Tests that the account management snippets work correctly.

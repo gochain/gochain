@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/log"
 )
 
 // walletDockerfile is the Dockerfile required to run a web wallet.

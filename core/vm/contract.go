@@ -19,7 +19,7 @@ package vm
 import (
 	"math/big"
 
-	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/v3/common"
 )
 
 // ContractRef is a reference to the contract's backing object

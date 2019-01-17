@@ -22,10 +22,10 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/params"
-	"github.com/gochain-io/gochain/rpc"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/params"
+	"github.com/gochain-io/gochain/v3/rpc"
 )
 
 var (

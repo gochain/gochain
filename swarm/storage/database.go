@@ -22,7 +22,7 @@ package storage
 import (
 	"fmt"
 
-	"github.com/gochain-io/gochain/compression/rle"
+	"github.com/gochain-io/gochain/v3/compression/rle"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/opt"

@@ -24,8 +24,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gochain-io/gochain/accounts/abi/bind"
-	"github.com/gochain-io/gochain/common/compiler"
+	"github.com/gochain-io/gochain/v3/accounts/abi/bind"
+	"github.com/gochain-io/gochain/v3/common/compiler"
 )
 
 var (

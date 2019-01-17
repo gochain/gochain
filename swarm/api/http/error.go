@@ -28,8 +28,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/swarm/api"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/swarm/api"
 )
 
 //templateMap holds a mapping of an HTTP error code to a template
@@ -56,7 +56,7 @@ func initErrHandling() {
 	multipleChoicesPage := GetMultipleChoicesErrorPage()
 	//map the codes to the available pages
 	tnames := map[int]string{
-		0: genErrPage, //default
+		0:                              genErrPage, //default
 		http.StatusBadRequest:          genErrPage,
 		http.StatusNotFound:            notFoundPage,
 		http.StatusMultipleChoices:     multipleChoicesPage,

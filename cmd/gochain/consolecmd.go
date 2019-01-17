@@ -24,10 +24,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/gochain-io/gochain/cmd/utils"
-	"github.com/gochain-io/gochain/console"
-	"github.com/gochain-io/gochain/node"
-	"github.com/gochain-io/gochain/rpc"
+	"github.com/gochain-io/gochain/v3/cmd/utils"
+	"github.com/gochain-io/gochain/v3/console"
+	"github.com/gochain-io/gochain/v3/node"
+	"github.com/gochain-io/gochain/v3/rpc"
 	"gopkg.in/urfave/cli.v1"
 )
 

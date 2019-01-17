@@ -24,9 +24,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/swarm/storage"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/swarm/storage"
 )
 
 func testApi(t *testing.T, f func(*Api)) {

@@ -29,13 +29,13 @@ import (
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/eth"
-	"github.com/gochain-io/gochain/les/flowcontrol"
-	"github.com/gochain-io/gochain/light"
-	"github.com/gochain-io/gochain/p2p"
-	"github.com/gochain-io/gochain/rlp"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/eth"
+	"github.com/gochain-io/gochain/v3/les/flowcontrol"
+	"github.com/gochain-io/gochain/v3/light"
+	"github.com/gochain-io/gochain/v3/p2p"
+	"github.com/gochain-io/gochain/v3/rlp"
 )
 
 var (

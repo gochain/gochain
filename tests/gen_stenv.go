@@ -7,8 +7,8 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/common/math"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/common/math"
 )
 
 var _ = (*stEnvMarshaling)(nil)

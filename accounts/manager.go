@@ -24,7 +24,7 @@ import (
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain-io/gochain/event"
+	"github.com/gochain-io/gochain/v3/event"
 )
 
 // Manager is an overarching account manager that can communicate with various

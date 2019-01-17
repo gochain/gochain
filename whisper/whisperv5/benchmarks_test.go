@@ -19,7 +19,7 @@ package whisperv5
 import (
 	"testing"
 
-	"github.com/gochain-io/gochain/crypto"
+	"github.com/gochain-io/gochain/v3/crypto"
 )
 
 func BenchmarkDeriveKeyMaterial(b *testing.B) {

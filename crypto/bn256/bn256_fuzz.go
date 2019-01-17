@@ -22,8 +22,8 @@ import (
 	"bytes"
 	"math/big"
 
-	cloudflare "github.com/gochain-io/gochain/crypto/bn256/cloudflare"
-	google "github.com/gochain-io/gochain/crypto/bn256/google"
+	cloudflare "github.com/gochain-io/gochain/v3/crypto/bn256/cloudflare"
+	google "github.com/gochain-io/gochain/v3/crypto/bn256/google"
 )
 
 // FuzzAdd fuzzez bn256 addition between the Google and Cloudflare libraries.

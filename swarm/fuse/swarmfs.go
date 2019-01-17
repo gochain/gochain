@@ -17,9 +17,10 @@
 package fuse
 
 import (
-	"github.com/gochain-io/gochain/swarm/api"
 	"sync"
 	"time"
+
+	"github.com/gochain-io/gochain/v3/swarm/api"
 )
 
 const (

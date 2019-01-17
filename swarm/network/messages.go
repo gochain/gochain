@@ -21,11 +21,11 @@ import (
 	"net"
 	"time"
 
-	"github.com/gochain-io/gochain/contracts/chequebook"
-	"github.com/gochain-io/gochain/p2p/discover"
-	"github.com/gochain-io/gochain/swarm/network/kademlia"
-	"github.com/gochain-io/gochain/swarm/services/swap"
-	"github.com/gochain-io/gochain/swarm/storage"
+	"github.com/gochain-io/gochain/v3/contracts/chequebook"
+	"github.com/gochain-io/gochain/v3/p2p/discover"
+	"github.com/gochain-io/gochain/v3/swarm/network/kademlia"
+	"github.com/gochain-io/gochain/v3/swarm/services/swap"
+	"github.com/gochain-io/gochain/v3/swarm/storage"
 )
 
 /*

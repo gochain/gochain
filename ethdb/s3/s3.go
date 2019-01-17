@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/metrics"
+	"github.com/gochain-io/gochain/v3/ethdb"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/metrics"
 	"github.com/minio/minio-go"
 )
 

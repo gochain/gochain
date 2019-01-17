@@ -28,8 +28,9 @@ import (
 	"text/template"
 	"unicode"
 
-	"github.com/gochain-io/gochain/accounts/abi"
 	"golang.org/x/tools/imports"
+
+	"github.com/gochain-io/gochain/v3/accounts/abi"
 )
 
 // Lang is a target programming language selector to generate bindings for.
@@ -149,7 +150,7 @@ func Bind(types []string, abis []string, bytecodes []string, pkg string, lang La
 	if lang == LangGo {
 		code, err := imports.Process(".", buffer.Bytes(), nil)
 		if err != nil {
-			return "", fmt.Errorf("%v\n%s", err, buffer)
+			return "", fmt.Errorf("failed to run goimports: %v\n%s", err, buffer)
 		}
 		return string(code), nil
 	}

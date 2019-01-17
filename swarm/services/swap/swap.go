@@ -26,14 +26,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain-io/gochain/accounts/abi/bind"
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/contracts/chequebook"
-	"github.com/gochain-io/gochain/contracts/chequebook/contract"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/swarm/services/swap/swap"
+	"github.com/gochain-io/gochain/v3/accounts/abi/bind"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/contracts/chequebook"
+	"github.com/gochain-io/gochain/v3/contracts/chequebook/contract"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/swarm/services/swap/swap"
 )
 
 // SwAP       Swarm Accounting Protocol with

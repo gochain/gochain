@@ -26,7 +26,7 @@ import (
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/log"
 )
 
 var errBadChannel = errors.New("event: Subscribe argument does not have sendable channel type")

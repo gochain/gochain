@@ -20,10 +20,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/common/mclock"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/common/mclock"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/log"
 )
 
 // insertStats tracks and reports on block insertion.

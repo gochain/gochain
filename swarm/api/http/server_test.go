@@ -26,11 +26,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/swarm/api"
-	swarm "github.com/gochain-io/gochain/swarm/api/client"
-	"github.com/gochain-io/gochain/swarm/storage"
-	"github.com/gochain-io/gochain/swarm/testutil"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/swarm/api"
+	swarm "github.com/gochain-io/gochain/v3/swarm/api/client"
+	"github.com/gochain-io/gochain/v3/swarm/storage"
+	"github.com/gochain-io/gochain/v3/swarm/testutil"
 )
 
 func TestBzzGetPath(t *testing.T) {

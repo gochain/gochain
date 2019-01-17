@@ -19,7 +19,7 @@ package vm
 import (
 	"fmt"
 
-	"github.com/gochain-io/gochain/params"
+	"github.com/gochain-io/gochain/v3/params"
 )
 
 func makeStackFunc(pop, push int) stackValidationFunc {

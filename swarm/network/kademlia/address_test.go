@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/v3/common"
 )
 
 func (Address) Generate(rand *rand.Rand, size int) reflect.Value {

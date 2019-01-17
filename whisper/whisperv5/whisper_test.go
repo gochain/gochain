@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/v3/common"
 )
 
 func TestWhisperBasic(t *testing.T) {

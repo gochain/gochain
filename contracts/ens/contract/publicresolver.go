@@ -7,12 +7,12 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/gochain-io/gochain"
-	"github.com/gochain-io/gochain/accounts/abi"
-	"github.com/gochain-io/gochain/accounts/abi/bind"
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/event"
+	"github.com/gochain-io/gochain/v3"
+	"github.com/gochain-io/gochain/v3/accounts/abi"
+	"github.com/gochain-io/gochain/v3/accounts/abi/bind"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/event"
 )
 
 // PublicResolverABI is the input ABI used to generate the binding from.
@@ -511,10 +511,10 @@ type PublicResolverABIChangedIterator struct {
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
 
-	logs chan types.Log        // Log channel receiving the found contract events
+	logs chan types.Log       // Log channel receiving the found contract events
 	sub  gochain.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
+	done bool                 // Whether the subscription completed delivering logs
+	fail error                // Occurred error to stop iteration
 }
 
 // Next advances the iterator to the subsequent event, returning whether there
@@ -652,10 +652,10 @@ type PublicResolverAddrChangedIterator struct {
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
 
-	logs chan types.Log        // Log channel receiving the found contract events
+	logs chan types.Log       // Log channel receiving the found contract events
 	sub  gochain.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
+	done bool                 // Whether the subscription completed delivering logs
+	fail error                // Occurred error to stop iteration
 }
 
 // Next advances the iterator to the subsequent event, returning whether there
@@ -785,10 +785,10 @@ type PublicResolverContentChangedIterator struct {
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
 
-	logs chan types.Log        // Log channel receiving the found contract events
+	logs chan types.Log       // Log channel receiving the found contract events
 	sub  gochain.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
+	done bool                 // Whether the subscription completed delivering logs
+	fail error                // Occurred error to stop iteration
 }
 
 // Next advances the iterator to the subsequent event, returning whether there
@@ -918,10 +918,10 @@ type PublicResolverNameChangedIterator struct {
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
 
-	logs chan types.Log        // Log channel receiving the found contract events
+	logs chan types.Log       // Log channel receiving the found contract events
 	sub  gochain.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
+	done bool                 // Whether the subscription completed delivering logs
+	fail error                // Occurred error to stop iteration
 }
 
 // Next advances the iterator to the subsequent event, returning whether there
@@ -1051,10 +1051,10 @@ type PublicResolverPubkeyChangedIterator struct {
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
 
-	logs chan types.Log        // Log channel receiving the found contract events
+	logs chan types.Log       // Log channel receiving the found contract events
 	sub  gochain.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
+	done bool                 // Whether the subscription completed delivering logs
+	fail error                // Occurred error to stop iteration
 }
 
 // Next advances the iterator to the subsequent event, returning whether there
@@ -1185,10 +1185,10 @@ type PublicResolverTextChangedIterator struct {
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
 
-	logs chan types.Log        // Log channel receiving the found contract events
+	logs chan types.Log       // Log channel receiving the found contract events
 	sub  gochain.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
+	done bool                 // Whether the subscription completed delivering logs
+	fail error                // Occurred error to stop iteration
 }
 
 // Next advances the iterator to the subsequent event, returning whether there

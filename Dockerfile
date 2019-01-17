@@ -1,11 +1,14 @@
 # Build GoChain in a stock Go builder container
-FROM golang:1.11.2-alpine as builder
+FROM golang:1.12beta2-alpine as builder
 
 RUN apk --no-cache add build-base git bzr mercurial gcc linux-headers
-ENV D=/go/src/github.com/gochain-io/gochain
-RUN go get -u github.com/golang/dep/cmd/dep
-ADD Gopkg.* $D/
-RUN cd $D && dep ensure --vendor-only
+ENV D=/gochain
+WORKDIR $D
+# cache dependencies
+ADD go.mod $D
+ADD go.sum $D
+RUN go mod download
+# build
 ADD . $D
 RUN cd $D && make all && mkdir -p /tmp/gochain && cp $D/bin/* /tmp/gochain/
 

@@ -28,14 +28,14 @@ import (
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/common/prque"
-	"github.com/gochain-io/gochain/core/state"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/eth/gasprice"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/metrics"
-	"github.com/gochain-io/gochain/params"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/common/prque"
+	"github.com/gochain-io/gochain/v3/core/state"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/eth/gasprice"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/metrics"
+	"github.com/gochain-io/gochain/v3/params"
 )
 
 const (

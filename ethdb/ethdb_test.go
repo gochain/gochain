@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"io/ioutil"
 
-	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/v3/common"
 )
 
 func MustTempFile() string {

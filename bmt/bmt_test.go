@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain-io/gochain/crypto/sha3"
+	"github.com/gochain-io/gochain/v3/crypto/sha3"
 )
 
 const (

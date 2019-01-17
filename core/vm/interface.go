@@ -19,8 +19,8 @@ package vm
 import (
 	"math/big"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/core/types"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core/types"
 )
 
 // StateDB is an EVM database for full state querying.

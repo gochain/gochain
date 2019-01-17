@@ -40,13 +40,13 @@ import (
 	"github.com/golang/snappy"
 	"go.opencensus.io/trace"
 
-	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/crypto/ecies"
-	"github.com/gochain-io/gochain/crypto/secp256k1"
-	"github.com/gochain-io/gochain/crypto/sha3"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/p2p/discover"
-	"github.com/gochain-io/gochain/rlp"
+	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain-io/gochain/v3/crypto/ecies"
+	"github.com/gochain-io/gochain/v3/crypto/secp256k1"
+	"github.com/gochain-io/gochain/v3/crypto/sha3"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/p2p/discover"
+	"github.com/gochain-io/gochain/v3/rlp"
 )
 
 const (

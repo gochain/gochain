@@ -24,11 +24,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain-io/gochain/event"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/p2p"
-	"github.com/gochain-io/gochain/p2p/discover"
-	"github.com/gochain-io/gochain/p2p/simulations/adapters"
+	"github.com/gochain-io/gochain/v3/event"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/p2p"
+	"github.com/gochain-io/gochain/v3/p2p/discover"
+	"github.com/gochain-io/gochain/v3/p2p/simulations/adapters"
 )
 
 var dialBanTimeout = 200 * time.Millisecond

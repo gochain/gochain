@@ -16,7 +16,7 @@
 
 package goclient
 
-import "github.com/gochain-io/gochain"
+import "github.com/gochain-io/gochain/v3"
 
 // Verify that Client implements the ethereum interfaces.
 var (

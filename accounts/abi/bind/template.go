@@ -16,7 +16,7 @@
 
 package bind
 
-import "github.com/gochain-io/gochain/accounts/abi"
+import "github.com/gochain-io/gochain/v3/accounts/abi"
 
 // tmplData is the data structure required to fill the binding template.
 type tmplData struct {

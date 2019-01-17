@@ -22,7 +22,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/log"
 	"gopkg.in/urfave/cli.v1"
 )
 

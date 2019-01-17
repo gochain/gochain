@@ -20,8 +20,8 @@ import (
 	"context"
 	"net"
 
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/p2p/netutil"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/p2p/netutil"
 )
 
 // ServeListener accepts connections on l, serving JSON-RPC on them.

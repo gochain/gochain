@@ -21,12 +21,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/gochain-io/gochain/accounts"
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/core/state"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/params"
-	"github.com/gochain-io/gochain/rpc"
+	"github.com/gochain-io/gochain/v3/accounts"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core/state"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/params"
+	"github.com/gochain-io/gochain/v3/rpc"
 )
 
 // ChainReader defines a small collection of methods needed to access the local

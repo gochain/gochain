@@ -21,7 +21,7 @@ package dashboard
 import (
 	"syscall"
 
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/log"
 )
 
 // getProcessCPUTime retrieves the process' CPU time since program startup.

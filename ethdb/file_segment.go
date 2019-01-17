@@ -15,8 +15,8 @@ import (
 
 	"github.com/cespare/xxhash"
 	"github.com/edsrzf/mmap-go"
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/log"
 )
 
 var (

@@ -19,8 +19,8 @@ package trie
 import (
 	"fmt"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/log"
 )
 
 // SecureTrie wraps a trie with key hashing. In a secure trie, all

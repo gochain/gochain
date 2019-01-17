@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/gochain-io/gochain/event"
+	"github.com/gochain-io/gochain/v3/event"
 )
 
 // This example demonstrates how SubscriptionScope can be used to control the lifetime of

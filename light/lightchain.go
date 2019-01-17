@@ -24,16 +24,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/consensus"
-	"github.com/gochain-io/gochain/core"
-	"github.com/gochain-io/gochain/core/rawdb"
-	"github.com/gochain-io/gochain/core/state"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/params"
-	"github.com/gochain-io/gochain/rlp"
 	"github.com/hashicorp/golang-lru"
+
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/consensus"
+	"github.com/gochain-io/gochain/v3/core"
+	"github.com/gochain-io/gochain/v3/core/rawdb"
+	"github.com/gochain-io/gochain/v3/core/state"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/params"
+	"github.com/gochain-io/gochain/v3/rlp"
 )
 
 var (

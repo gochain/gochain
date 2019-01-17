@@ -21,11 +21,11 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/gochain-io/gochain/accounts/abi/bind"
-	"github.com/gochain-io/gochain/accounts/abi/bind/backends"
-	"github.com/gochain-io/gochain/contracts/ens/contract"
-	"github.com/gochain-io/gochain/core"
-	"github.com/gochain-io/gochain/crypto"
+	"github.com/gochain-io/gochain/v3/accounts/abi/bind"
+	"github.com/gochain-io/gochain/v3/accounts/abi/bind/backends"
+	"github.com/gochain-io/gochain/v3/contracts/ens/contract"
+	"github.com/gochain-io/gochain/v3/core"
+	"github.com/gochain-io/gochain/v3/crypto"
 )
 
 var (

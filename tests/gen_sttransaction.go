@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"math/big"
 
-	"github.com/gochain-io/gochain/common/hexutil"
-	"github.com/gochain-io/gochain/common/math"
+	"github.com/gochain-io/gochain/v3/common/hexutil"
+	"github.com/gochain-io/gochain/v3/common/math"
 )
 
 var _ = (*stTransactionMarshaling)(nil)

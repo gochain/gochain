@@ -22,9 +22,9 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/gochain-io/gochain/cmd/utils"
-	"github.com/gochain-io/gochain/eth"
-	"github.com/gochain-io/gochain/params"
+	"github.com/gochain-io/gochain/v3/cmd/utils"
+	"github.com/gochain-io/gochain/v3/eth"
+	"github.com/gochain-io/gochain/v3/params"
 	"gopkg.in/urfave/cli.v1"
 )
 

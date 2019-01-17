@@ -6,11 +6,11 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/common/hexutil"
-	"github.com/gochain-io/gochain/core"
-	"github.com/gochain-io/gochain/eth/downloader"
-	"github.com/gochain-io/gochain/eth/gasprice"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/common/hexutil"
+	"github.com/gochain-io/gochain/v3/core"
+	"github.com/gochain-io/gochain/v3/eth/downloader"
+	"github.com/gochain-io/gochain/v3/eth/gasprice"
 )
 
 var _ = (*configMarshaling)(nil)

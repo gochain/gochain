@@ -20,7 +20,7 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/v3/common"
 )
 
 const Version = "1.0"

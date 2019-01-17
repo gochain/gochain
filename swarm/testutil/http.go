@@ -22,9 +22,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gochain-io/gochain/swarm/api"
-	httpapi "github.com/gochain-io/gochain/swarm/api/http"
-	"github.com/gochain-io/gochain/swarm/storage"
+	"github.com/gochain-io/gochain/v3/swarm/api"
+	httpapi "github.com/gochain-io/gochain/v3/swarm/api/http"
+	"github.com/gochain-io/gochain/v3/swarm/storage"
 )
 
 func NewTestSwarmServer(t *testing.T) *TestSwarmServer {

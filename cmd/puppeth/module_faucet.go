@@ -26,8 +26,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/log"
 )
 
 // faucetDockerfile is the Dockerfile required to build an faucet container to

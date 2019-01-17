@@ -19,7 +19,7 @@ package ethdb
 import (
 	"sync"
 
-	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/v3/common"
 )
 
 /*

@@ -28,12 +28,12 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/gochain-io/gochain/core"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/internal/debug"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/node"
-	"github.com/gochain-io/gochain/rlp"
+	"github.com/gochain-io/gochain/v3/core"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/internal/debug"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/node"
+	"github.com/gochain-io/gochain/v3/rlp"
 )
 
 const (

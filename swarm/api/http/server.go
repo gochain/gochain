@@ -35,10 +35,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/swarm/api"
-	"github.com/gochain-io/gochain/swarm/storage"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/swarm/api"
+	"github.com/gochain-io/gochain/v3/swarm/storage"
 	"github.com/rs/cors"
 )
 

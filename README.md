@@ -26,8 +26,6 @@ You can install them using your favourite package manager.
 Once the dependencies are installed, run:
 
 ```sh
-# install dependencies, one time only
-make dep
 # build gochain
 make gochain
 ```

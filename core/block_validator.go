@@ -23,10 +23,10 @@ import (
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain-io/gochain/consensus"
-	"github.com/gochain-io/gochain/core/state"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/params"
+	"github.com/gochain-io/gochain/v3/consensus"
+	"github.com/gochain-io/gochain/v3/core/state"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/params"
 )
 
 // BlockValidator is responsible for validating block headers, uncles and

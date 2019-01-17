@@ -26,8 +26,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain-io/gochain/common/mclock"
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/common/mclock"
+	"github.com/gochain-io/gochain/v3/log"
 )
 
 var (

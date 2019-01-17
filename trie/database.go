@@ -23,11 +23,11 @@ import (
 	"time"
 
 	"github.com/allegro/bigcache"
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/metrics"
-	"github.com/gochain-io/gochain/rlp"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/ethdb"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/metrics"
+	"github.com/gochain-io/gochain/v3/rlp"
 )
 
 var (

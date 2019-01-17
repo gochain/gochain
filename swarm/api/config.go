@@ -22,14 +22,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/contracts/ens"
-	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/node"
-	"github.com/gochain-io/gochain/swarm/network"
-	"github.com/gochain-io/gochain/swarm/services/swap"
-	"github.com/gochain-io/gochain/swarm/storage"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/contracts/ens"
+	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/node"
+	"github.com/gochain-io/gochain/v3/swarm/network"
+	"github.com/gochain-io/gochain/v3/swarm/services/swap"
+	"github.com/gochain-io/gochain/v3/swarm/storage"
 )
 
 const (
