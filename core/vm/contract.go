@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"bytes"
 	"math/big"
 
 	"github.com/gochain-io/gochain/v3/common"
@@ -52,10 +53,11 @@ type Contract struct {
 	jumpdests map[common.Hash]bitvec // Aggregated result of JUMPDEST analysis.
 	analysis  bitvec                 // Locally cached result of JUMPDEST analysis
 
-	Code     []byte
-	CodeHash common.Hash
-	CodeAddr *common.Address
-	Input    []byte
+	Code             []byte
+	CodeHash         common.Hash
+	CodeAddr         *common.Address
+	Input            []byte
+	IsSystemContract bool
 
 	Gas   uint64
 	value *big.Int
@@ -173,6 +175,7 @@ func (c *Contract) SetCallCode(addr *common.Address, hash common.Hash, code []by
 	c.Code = code
 	c.CodeHash = hash
 	c.CodeAddr = addr
+	c.IsSystemContract = IsSystemContractCode(c.Code)
 }
 
 // SetCodeOptionalHash can be used to provide code, but it's optional to provide hash.
@@ -181,4 +184,28 @@ func (c *Contract) SetCodeOptionalHash(addr *common.Address, codeAndHash *codeAn
 	c.Code = codeAndHash.code
 	c.CodeHash = codeAndHash.hash
 	c.CodeAddr = addr
+	c.IsSystemContract = IsSystemContractCode(c.Code)
+}
+
+// SystemContractSuffix is used to mark contracts as system contracts with free usage.
+var SystemContractSuffix = []byte{0xDF, 0xDF, 0xDF, 0xDF, 0xDF, 0xDF, 0xDF, 0xDF}
+
+// IsSystemContractCode returns true if the contract code contains the system
+// contract suffix at the end.
+func IsSystemContractCode(code []byte) bool {
+	return bytes.HasSuffix(code, SystemContractSuffix)
+}
+
+// TrimContractCodeAuxdata removes the auxdata produced at the end of a contract.
+// This only used to strip system contract code so it only supports "bzzr0".
+func TrimContractCodeAuxdata(code []byte) []byte {
+	const auxdataLen = 43
+	if len(code) < auxdataLen {
+		return code
+	}
+	auxdata := code[len(code)-auxdataLen:]
+	if !bytes.HasPrefix(auxdata, []byte("\xa1\x65bzzr0")) {
+		return code
+	}
+	return bytes.TrimSuffix(code, auxdata)
 }

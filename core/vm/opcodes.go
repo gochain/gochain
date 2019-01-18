@@ -203,6 +203,11 @@ const (
 	SWAP
 )
 
+// GoChain custom opcodes.
+const (
+	SYSCON OpCode = 0xdf // designates system contract
+)
+
 // 0xf0 range - closures.
 const (
 	CREATE OpCode = 0xf0 + iota
@@ -366,6 +371,9 @@ var opCodeToString = map[OpCode]string{
 	LOG2:   "LOG2",
 	LOG3:   "LOG3",
 	LOG4:   "LOG4",
+
+	// 0xd0 range
+	SYSCON: "SYSCON",
 
 	// 0xf0 range.
 	CREATE:       "CREATE",
@@ -532,6 +540,7 @@ var stringToOp = map[string]OpCode{
 	"CALLCODE":       CALLCODE,
 	"REVERT":         REVERT,
 	"SELFDESTRUCT":   SELFDESTRUCT,
+	"SYSCON":         SYSCON,
 }
 
 // StringToOp finds the opcode whose name is stored in `str`.

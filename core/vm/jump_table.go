@@ -95,6 +95,12 @@ func newConstantinopleInstructionSet() [256]operation {
 		writes:        true,
 		returns:       true,
 	}
+	instructionSet[SYSCON] = operation{
+		execute:       opSyscon,
+		gasCost:       constGasFunc(0),
+		validateStack: makeStackFunc(0, 0),
+		valid:         true,
+	}
 	return instructionSet
 }
 
