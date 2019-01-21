@@ -17,15 +17,15 @@
 package geth
 
 import (
+	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
-
-	"github.com/gochain-io/gochain/internal/build"
 )
 
 // androidTestClass is a Java class to do some lightweight tests against the Android
@@ -212,7 +212,7 @@ func TestAndroid(t *testing.T) {
 		t.Logf("%s", output)
 		t.Fatalf("failed to run gomobile bind: %v", err)
 	}
-	build.CopyFile(filepath.Join("libs", "geth.aar"), "geth.aar", os.ModePerm)
+	copyFile(filepath.Join("libs", "geth.aar"), "geth.aar", os.ModePerm)
 
 	if err = ioutil.WriteFile(filepath.Join("src", "androidTest", "java", "io", "gochain", "gethtest", "AndroidTest.java"), []byte(androidTestClass), os.ModePerm); err != nil {
 		t.Fatalf("failed to write Android test class: %v", err)
@@ -227,6 +227,27 @@ func TestAndroid(t *testing.T) {
 	if output, err := exec.Command("gradle", "connectedAndroidTest").CombinedOutput(); err != nil {
 		t.Logf("%s", output)
 		t.Errorf("failed to run gradle test: %v", err)
+	}
+}
+
+func copyFile(dst, src string, mode os.FileMode) {
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		log.Fatal(err)
+	}
+	destFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer destFile.Close()
+
+	srcFile, err := os.Open(src)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer srcFile.Close()
+
+	if _, err := io.Copy(destFile, srcFile); err != nil {
+		log.Fatal(err)
 	}
 }
 
