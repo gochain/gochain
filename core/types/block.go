@@ -71,9 +71,9 @@ type Header struct {
 	ParentHash  common.Hash      `json:"parentHash"       gencodec:"required"`
 	UncleHash   common.Hash      `json:"sha3Uncles"       gencodec:"required"`
 	Coinbase    common.Address   `json:"miner"            gencodec:"required"`
-	Signers     []common.Address `json:"signers"`
-	Voters      []common.Address `json:"voters"`
-	Signer      []byte           `json:"signer"`
+	Signers     []common.Address `json:"signers"          gencodec:"required"`
+	Voters      []common.Address `json:"voters"           gencodec:"required"`
+	Signer      []byte           `json:"signer"           gencodec:"required"`
 	Root        common.Hash      `json:"stateRoot"        gencodec:"required"`
 	TxHash      common.Hash      `json:"transactionsRoot" gencodec:"required"`
 	ReceiptHash common.Hash      `json:"receiptsRoot"     gencodec:"required"`
