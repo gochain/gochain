@@ -25,9 +25,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain-io/gochain/rpc"
-	"github.com/gochain-io/gochain/swarm"
-	"github.com/gochain-io/gochain/swarm/api"
+	"github.com/gochain-io/gochain/v3/rpc"
+	"github.com/gochain-io/gochain/v3/swarm"
+	"github.com/gochain-io/gochain/v3/swarm/api"
 
 	"github.com/docker/docker/pkg/reexec"
 )

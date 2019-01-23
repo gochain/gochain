@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/log"
 )
 
 /*
@@ -29,8 +29,8 @@ see https://github.com/ethereum/go-ethereum/issues/2040
 Usage:
 
 import (
- "github.com/gochain-io/gochain/common/httpclient"
- "github.com/gochain-io/gochain/swarm/api/http"
+ "github.com/gochain-io/gochain/v3/common/httpclient"
+ "github.com/gochain-io/gochain/v3/swarm/api/http"
 )
 client := httpclient.New()
 // for (private) swarm proxy running locally

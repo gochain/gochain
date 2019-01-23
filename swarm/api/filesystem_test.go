@@ -24,8 +24,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/swarm/storage"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/swarm/storage"
 )
 
 var testDownloadDir, _ = ioutil.TempDir(os.TempDir(), "bzz-test")

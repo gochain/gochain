@@ -19,7 +19,7 @@ package event_test
 import (
 	"fmt"
 
-	"github.com/gochain-io/gochain/event"
+	"github.com/gochain-io/gochain/v3/event"
 )
 
 func ExampleNewSubscription() {

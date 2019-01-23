@@ -20,8 +20,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/ethdb"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/ethdb"
 )
 
 var addr = common.BytesToAddress([]byte("test"))

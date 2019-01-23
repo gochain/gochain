@@ -21,9 +21,9 @@ import (
 	"hash"
 	"sync/atomic"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/common/math"
-	"github.com/gochain-io/gochain/params"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/common/math"
+	"github.com/gochain-io/gochain/v3/params"
 )
 
 // Config are the configuration options for the Interpreter

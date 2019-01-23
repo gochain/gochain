@@ -28,10 +28,10 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/common/math"
-	"github.com/gochain-io/gochain/crypto/sha3"
-	"github.com/gochain-io/gochain/rlp"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/common/math"
+	"github.com/gochain-io/gochain/v3/crypto/sha3"
+	"github.com/gochain-io/gochain/v3/rlp"
 )
 
 var (

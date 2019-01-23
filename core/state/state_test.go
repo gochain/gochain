@@ -21,9 +21,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/ethdb"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain-io/gochain/v3/ethdb"
 	checker "gopkg.in/check.v1"
 )
 

@@ -26,11 +26,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/core"
-	"github.com/gochain-io/gochain/eth"
-	"github.com/gochain-io/gochain/internal/jsre"
-	"github.com/gochain-io/gochain/node"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core"
+	"github.com/gochain-io/gochain/v3/eth"
+	"github.com/gochain-io/gochain/v3/internal/jsre"
+	"github.com/gochain-io/gochain/v3/node"
 )
 
 const (

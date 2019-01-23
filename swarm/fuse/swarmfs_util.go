@@ -24,7 +24,7 @@ import (
 	"os/exec"
 	"runtime"
 
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/log"
 )
 
 func externalUnmount(mountPoint string) error {

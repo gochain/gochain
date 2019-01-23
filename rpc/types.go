@@ -23,7 +23,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gochain-io/gochain/common/hexutil"
+	"github.com/gochain-io/gochain/v3/common/hexutil"
 )
 
 // API describes the set of methods offered over the RPC interface

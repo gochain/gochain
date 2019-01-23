@@ -20,9 +20,9 @@ import (
 	"context"
 	"sync"
 
-	"github.com/gochain-io/gochain"
-	"github.com/gochain-io/gochain/event"
-	"github.com/gochain-io/gochain/rpc"
+	"github.com/gochain-io/gochain/v3"
+	"github.com/gochain-io/gochain/v3/event"
+	"github.com/gochain-io/gochain/v3/rpc"
 )
 
 // PublicDownloaderAPI provides an API which gives information about the current synchronisation status.

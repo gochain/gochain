@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/gochain-io/gochain/consensus/clique"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/core/vm"
-	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/params"
+	"github.com/gochain-io/gochain/v3/consensus/clique"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/core/vm"
+	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain-io/gochain/v3/ethdb"
+	"github.com/gochain-io/gochain/v3/params"
 )
 
 func ExampleGenerateChain() {

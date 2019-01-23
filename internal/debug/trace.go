@@ -23,7 +23,7 @@ import (
 	"os"
 	"runtime/trace"
 
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/log"
 )
 
 // StartGoTrace turns on tracing, writing to the given file.

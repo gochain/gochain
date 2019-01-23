@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/ethdb"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/ethdb"
 )
 
 func TestTable_Put(t *testing.T) {

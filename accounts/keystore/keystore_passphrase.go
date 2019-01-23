@@ -37,9 +37,9 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/common/math"
-	"github.com/gochain-io/gochain/crypto"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/common/math"
+	"github.com/gochain-io/gochain/v3/crypto"
 	"github.com/pborman/uuid"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/crypto/scrypt"

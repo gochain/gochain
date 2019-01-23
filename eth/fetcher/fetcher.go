@@ -25,11 +25,11 @@ import (
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/common/prque"
-	"github.com/gochain-io/gochain/consensus"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/common/prque"
+	"github.com/gochain-io/gochain/v3/consensus"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/log"
 )
 
 const (

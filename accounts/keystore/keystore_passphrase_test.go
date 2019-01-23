@@ -20,7 +20,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/v3/common"
 )
 
 const (

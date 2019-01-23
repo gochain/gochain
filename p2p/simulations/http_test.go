@@ -27,12 +27,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain-io/gochain/event"
-	"github.com/gochain-io/gochain/node"
-	"github.com/gochain-io/gochain/p2p"
-	"github.com/gochain-io/gochain/p2p/discover"
-	"github.com/gochain-io/gochain/p2p/simulations/adapters"
-	"github.com/gochain-io/gochain/rpc"
+	"github.com/gochain-io/gochain/v3/event"
+	"github.com/gochain-io/gochain/v3/node"
+	"github.com/gochain-io/gochain/v3/p2p"
+	"github.com/gochain-io/gochain/v3/p2p/discover"
+	"github.com/gochain-io/gochain/v3/p2p/simulations/adapters"
+	"github.com/gochain-io/gochain/v3/rpc"
 )
 
 // testService implements the node.Service interface and provides protocols

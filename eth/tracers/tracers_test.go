@@ -26,15 +26,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/common/hexutil"
-	"github.com/gochain-io/gochain/common/math"
-	"github.com/gochain-io/gochain/core"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/core/vm"
-	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/rlp"
-	"github.com/gochain-io/gochain/tests"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/common/hexutil"
+	"github.com/gochain-io/gochain/v3/common/math"
+	"github.com/gochain-io/gochain/v3/core"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/core/vm"
+	"github.com/gochain-io/gochain/v3/ethdb"
+	"github.com/gochain-io/gochain/v3/rlp"
+	"github.com/gochain-io/gochain/v3/tests"
 )
 
 // To generate a new callTracer test, copy paste the makeTest method below into

@@ -27,8 +27,8 @@ import (
 
 	"reflect"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/crypto"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/crypto"
 )
 
 const jsondata = `

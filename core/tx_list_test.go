@@ -20,8 +20,8 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/crypto"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/crypto"
 )
 
 // Tests that transactions can be added to strict lists and list contents and

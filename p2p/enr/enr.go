@@ -35,9 +35,9 @@ import (
 	"io"
 	"sort"
 
-	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/crypto/sha3"
-	"github.com/gochain-io/gochain/rlp"
+	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain-io/gochain/v3/crypto/sha3"
+	"github.com/gochain-io/gochain/v3/rlp"
 )
 
 const SizeLimit = 300 // maximum encoded size of a node record in bytes

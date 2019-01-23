@@ -23,8 +23,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gochain-io/gochain/core"
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/core"
+	"github.com/gochain-io/gochain/v3/log"
 	"github.com/olekukonko/tablewriter"
 )
 

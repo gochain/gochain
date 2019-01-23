@@ -20,9 +20,9 @@ import (
 	"context"
 	"sync"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/log"
 )
 
 type ltrInfo struct {

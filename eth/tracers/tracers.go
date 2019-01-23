@@ -21,7 +21,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/gochain-io/gochain/eth/tracers/internal/tracers"
+	"github.com/gochain-io/gochain/v3/eth/tracers/internal/tracers"
 )
 
 // all contains all the built in JavaScript tracers by name.

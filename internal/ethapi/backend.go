@@ -21,16 +21,16 @@ import (
 	"context"
 	"math/big"
 
-	"github.com/gochain-io/gochain/accounts"
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/core"
-	"github.com/gochain-io/gochain/core/state"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/core/vm"
-	"github.com/gochain-io/gochain/eth/downloader"
-	"github.com/gochain-io/gochain/event"
-	"github.com/gochain-io/gochain/params"
-	"github.com/gochain-io/gochain/rpc"
+	"github.com/gochain-io/gochain/v3/accounts"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core"
+	"github.com/gochain-io/gochain/v3/core/state"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/core/vm"
+	"github.com/gochain-io/gochain/v3/eth/downloader"
+	"github.com/gochain-io/gochain/v3/event"
+	"github.com/gochain-io/gochain/v3/params"
+	"github.com/gochain-io/gochain/v3/rpc"
 )
 
 // Backend interface provides the common API services (that are provided by

@@ -1,7 +1,7 @@
 package ethdb
 
 import (
-	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/v3/common"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/iterator"

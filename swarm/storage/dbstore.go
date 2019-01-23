@@ -32,8 +32,8 @@ import (
 	"io/ioutil"
 	"sync"
 
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/rlp"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/rlp"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 )

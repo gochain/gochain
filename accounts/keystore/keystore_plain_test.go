@@ -27,8 +27,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/crypto"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/crypto"
 )
 
 func tmpKeyStoreIface(t *testing.T, encrypted bool) (dir string, ks keyStore) {

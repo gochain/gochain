@@ -3,13 +3,10 @@
 .PHONY: gochain-linux-arm gochain-linux-arm-5 gochain-linux-arm-6 gochain-linux-arm-7 gochain-linux-arm64
 .PHONY: gochain-darwin gochain-darwin-386 gochain-darwin-amd64
 .PHONY: gochain-windows gochain-windows-386 gochain-windows-amd64
-.PHONY: dep docker release
+.PHONY: docker release
 
 GOBIN = $(shell pwd)/build/bin
 GO ?= latest
-
-dep:
-	dep ensure --vendor-only
 
 gochain:
 	cd cmd/gochain; go build -o ../../bin/gochain

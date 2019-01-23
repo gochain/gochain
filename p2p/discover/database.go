@@ -27,9 +27,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/rlp"
+	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/rlp"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"github.com/syndtr/goleveldb/leveldb/iterator"

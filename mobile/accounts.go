@@ -23,10 +23,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gochain-io/gochain/accounts"
-	"github.com/gochain-io/gochain/accounts/keystore"
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/crypto"
+	"github.com/gochain-io/gochain/v3/accounts"
+	"github.com/gochain-io/gochain/v3/accounts/keystore"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/crypto"
 )
 
 const (

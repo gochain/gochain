@@ -23,12 +23,12 @@ import (
 	"net"
 	"sync"
 
-	"github.com/gochain-io/gochain/event"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/node"
-	"github.com/gochain-io/gochain/p2p"
-	"github.com/gochain-io/gochain/p2p/discover"
-	"github.com/gochain-io/gochain/rpc"
+	"github.com/gochain-io/gochain/v3/event"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/node"
+	"github.com/gochain-io/gochain/v3/p2p"
+	"github.com/gochain-io/gochain/v3/p2p/discover"
+	"github.com/gochain-io/gochain/v3/rpc"
 )
 
 // SimAdapter is a NodeAdapter which creates in-memory simulation nodes and

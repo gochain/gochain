@@ -23,9 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gochain-io/gochain/accounts/usbwallet"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/rpc"
+	"github.com/gochain-io/gochain/v3/accounts/usbwallet"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/rpc"
 	"github.com/robertkrimen/otto"
 )
 

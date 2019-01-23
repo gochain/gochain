@@ -27,7 +27,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/gochain-io/gochain/common/math"
+	"github.com/gochain-io/gochain/v3/common/math"
 	"gopkg.in/urfave/cli.v1"
 )
 

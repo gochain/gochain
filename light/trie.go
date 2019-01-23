@@ -21,11 +21,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/core/state"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/trie"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core/state"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain-io/gochain/v3/trie"
 )
 
 func NewState(ctx context.Context, head *types.Header, odr OdrBackend) *state.StateDB {

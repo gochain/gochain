@@ -28,18 +28,18 @@ import (
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/consensus"
-	"github.com/gochain-io/gochain/core"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/eth/downloader"
-	"github.com/gochain-io/gochain/eth/fetcher"
-	"github.com/gochain-io/gochain/event"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/p2p"
-	"github.com/gochain-io/gochain/p2p/discover"
-	"github.com/gochain-io/gochain/params"
-	"github.com/gochain-io/gochain/rlp"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/consensus"
+	"github.com/gochain-io/gochain/v3/core"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/eth/downloader"
+	"github.com/gochain-io/gochain/v3/eth/fetcher"
+	"github.com/gochain-io/gochain/v3/event"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/p2p"
+	"github.com/gochain-io/gochain/v3/p2p/discover"
+	"github.com/gochain-io/gochain/v3/params"
+	"github.com/gochain-io/gochain/v3/rlp"
 )
 
 const (

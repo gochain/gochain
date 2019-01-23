@@ -3,22 +3,27 @@ version: 2.0
 defaults: &defaults
   working_directory: /go/src/github.com/gochain-io/gochain
   docker:
-    - image: circleci/golang:1.11.2
+    - image: circleci/golang:1.12beta2
   environment: # apparently expansion doesn't work here yet: https://discuss.circleci.com/t/environment-variable-expansion-in-working-directory/11322
     - OS=linux
     - ARCH=amd64
     - GOCACHE=/tmp/go/cache
+    - GO111MODULE=on
 
 jobs:
   prepare:
     <<: *defaults
     steps:
       - checkout
-      - run:
-          name: install dependencies
-          command: |
-            go get -u github.com/golang/dep/cmd/dep
-            dep ensure --vendor-only
+      - restore_cache:
+          key: go-mod-v1-{{ checksum "go.sum" }}
+          paths:
+              - /go/pkg/mod
+      - run: go mod download
+      - save_cache:
+          key: go-mod-v1-{{ checksum "go.sum" }}
+          paths:
+            - /go/pkg/mod
       - persist_to_workspace:
           root: .
           paths:
@@ -65,7 +70,9 @@ jobs:
     working_directory: ~/go/src/github.com/gochain-io/gochain
     environment: # apparently expansion doesn't work here yet: https://discuss.circleci.com/t/environment-variable-expansion-in-working-directory/11322
       - GOPATH=/home/circleci/go
-      - GOVERSION=1.11.2
+      - GOCACHE=/tmp/go/cache
+      - GOVERSION=1.12beta2
+      - GO111MODULE=on
       - OS=linux
       - ARCH=amd64
     steps:
@@ -89,11 +96,6 @@ jobs:
             sudo tar -C /usr/local -xzf go$GOVERSION.$OS-$ARCH.tar.gz
             export PATH=$PATH:$HOME/go/bin
       - run: go version
-      - run:
-          name: install dependencies
-          command: |
-            go get -u github.com/golang/dep/cmd/dep
-            ${GOPATH}/bin/dep ensure --vendor-only
       - run: make all
       - run: go test ./swarm/fuse
       - save_cache:

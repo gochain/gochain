@@ -20,10 +20,10 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/rlp"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/rlp"
 )
 
 // Prove constructs a merkle proof for key. The result contains all encoded nodes

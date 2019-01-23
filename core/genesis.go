@@ -25,15 +25,15 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/common/hexutil"
-	"github.com/gochain-io/gochain/common/math"
-	"github.com/gochain-io/gochain/core/rawdb"
-	"github.com/gochain-io/gochain/core/state"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/params"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/common/hexutil"
+	"github.com/gochain-io/gochain/v3/common/math"
+	"github.com/gochain-io/gochain/v3/core/rawdb"
+	"github.com/gochain-io/gochain/v3/core/state"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/ethdb"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/params"
 )
 
 //go:generate gencodec -type Genesis -field-override genesisSpecMarshaling -out gen_genesis.go

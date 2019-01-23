@@ -21,10 +21,10 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/trie"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain-io/gochain/v3/ethdb"
+	"github.com/gochain-io/gochain/v3/trie"
 )
 
 // testAccount is the data associated with an account used by the state tests.

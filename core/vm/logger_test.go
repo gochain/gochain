@@ -20,9 +20,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/core/state"
-	"github.com/gochain-io/gochain/params"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core/state"
+	"github.com/gochain-io/gochain/v3/params"
 )
 
 type dummyContractRef struct {

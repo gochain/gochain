@@ -25,12 +25,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain-io/gochain"
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/common/hexutil"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/event"
-	"github.com/gochain-io/gochain/rpc"
+	"github.com/gochain-io/gochain/v3"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/common/hexutil"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/event"
+	"github.com/gochain-io/gochain/v3/rpc"
 )
 
 var (

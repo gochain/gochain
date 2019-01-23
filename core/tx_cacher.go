@@ -19,7 +19,7 @@ package core
 import (
 	"runtime"
 
-	"github.com/gochain-io/gochain/core/types"
+	"github.com/gochain-io/gochain/v3/core/types"
 )
 
 // senderCacher is a concurrent transaction sender recoverer anc cacher.

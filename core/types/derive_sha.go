@@ -22,9 +22,9 @@ import (
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/rlp"
-	"github.com/gochain-io/gochain/trie"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/rlp"
+	"github.com/gochain-io/gochain/v3/trie"
 )
 
 type DerivableList interface {

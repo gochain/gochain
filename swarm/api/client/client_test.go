@@ -25,8 +25,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/gochain-io/gochain/swarm/api"
-	"github.com/gochain-io/gochain/swarm/testutil"
+	"github.com/gochain-io/gochain/v3/swarm/api"
+	"github.com/gochain-io/gochain/v3/swarm/testutil"
 )
 
 // TestClientUploadDownloadRaw test uploading and downloading raw data to swarm

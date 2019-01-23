@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/gochain-io/gochain/common/hexutil"
-	"github.com/gochain-io/gochain/crypto"
+	"github.com/gochain-io/gochain/v3/common/hexutil"
+	"github.com/gochain-io/gochain/v3/crypto"
 )
 
 type bytesBacked interface {

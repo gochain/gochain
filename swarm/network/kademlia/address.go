@@ -21,7 +21,7 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/v3/common"
 )
 
 type Address common.Hash

@@ -25,11 +25,11 @@ import (
 	"os"
 
 	"github.com/docker/docker/pkg/reexec"
-	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/node"
-	"github.com/gochain-io/gochain/p2p"
-	"github.com/gochain-io/gochain/p2p/discover"
-	"github.com/gochain-io/gochain/rpc"
+	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain-io/gochain/v3/node"
+	"github.com/gochain-io/gochain/v3/p2p"
+	"github.com/gochain-io/gochain/v3/p2p/discover"
+	"github.com/gochain-io/gochain/v3/rpc"
 )
 
 // Node represents a node in a simulation network which is created by a

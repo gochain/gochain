@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gochain-io/gochain/accounts/keystore"
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/accounts/keystore"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/log"
 )
 
 // deployNode creates a new node configuration based on some user input.

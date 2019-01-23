@@ -36,11 +36,11 @@ import (
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain-io/gochain/accounts"
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/event"
+	"github.com/gochain-io/gochain/v3/accounts"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain-io/gochain/v3/event"
 )
 
 var (

@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain-io/gochain/common"
+	"github.com/gochain-io/gochain/v3/common"
 )
 
 type testInPayment struct {

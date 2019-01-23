@@ -28,9 +28,9 @@ import (
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain-io/gochain/event"
-	"github.com/gochain-io/gochain/p2p/discover"
-	"github.com/gochain-io/gochain/rlp"
+	"github.com/gochain-io/gochain/v3/event"
+	"github.com/gochain-io/gochain/v3/p2p/discover"
+	"github.com/gochain-io/gochain/v3/rlp"
 )
 
 // eth protocol message codes

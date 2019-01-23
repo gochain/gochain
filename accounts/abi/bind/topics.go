@@ -22,9 +22,9 @@ import (
 	"math/big"
 	"reflect"
 
-	"github.com/gochain-io/gochain/accounts/abi"
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/crypto/sha3"
+	"github.com/gochain-io/gochain/v3/accounts/abi"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/crypto/sha3"
 )
 
 // makeTopics converts a filter query argument list into a filter topic set.

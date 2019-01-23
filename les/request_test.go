@@ -21,12 +21,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/core/rawdb"
-	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/eth"
-	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/light"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core/rawdb"
+	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain-io/gochain/v3/eth"
+	"github.com/gochain-io/gochain/v3/ethdb"
+	"github.com/gochain-io/gochain/v3/light"
 )
 
 var testBankSecureTrieKey = secAddr(testBankAddress)

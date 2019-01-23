@@ -22,8 +22,8 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/gochain-io/gochain/cmd/utils"
-	swarm "github.com/gochain-io/gochain/swarm/api/client"
+	"github.com/gochain-io/gochain/v3/cmd/utils"
+	swarm "github.com/gochain-io/gochain/v3/swarm/api/client"
 	"gopkg.in/urfave/cli.v1"
 )
 

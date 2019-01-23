@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gochain-io/gochain/cmd/utils"
-	"github.com/gochain-io/gochain/swarm/storage"
+	"github.com/gochain-io/gochain/v3/cmd/utils"
+	"github.com/gochain-io/gochain/v3/swarm/storage"
 	"gopkg.in/urfave/cli.v1"
 )
 

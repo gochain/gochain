@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gochain-io/gochain/core/vm"
+	"github.com/gochain-io/gochain/v3/core/vm"
 )
 
 func TestState(t *testing.T) {

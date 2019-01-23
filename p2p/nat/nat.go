@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/log"
 	"github.com/jackpal/go-nat-pmp"
 )
 

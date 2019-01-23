@@ -17,7 +17,7 @@
 package api
 
 import (
-	"github.com/gochain-io/gochain/swarm/network"
+	"github.com/gochain-io/gochain/v3/swarm/network"
 )
 
 type Control struct {

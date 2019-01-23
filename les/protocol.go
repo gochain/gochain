@@ -26,12 +26,12 @@ import (
 	"io"
 	"math/big"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/core"
-	"github.com/gochain-io/gochain/core/rawdb"
-	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/crypto/secp256k1"
-	"github.com/gochain-io/gochain/rlp"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core"
+	"github.com/gochain-io/gochain/v3/core/rawdb"
+	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain-io/gochain/v3/crypto/secp256k1"
+	"github.com/gochain-io/gochain/v3/rlp"
 )
 
 // Constants to match up protocol versions and messages

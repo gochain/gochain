@@ -23,13 +23,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/consensus/clique"
-	"github.com/gochain-io/gochain/core"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/core/vm"
-	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/params"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/consensus/clique"
+	"github.com/gochain-io/gochain/v3/core"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/core/vm"
+	"github.com/gochain-io/gochain/v3/ethdb"
+	"github.com/gochain-io/gochain/v3/params"
 )
 
 type testTxRelay struct {

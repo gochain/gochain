@@ -22,12 +22,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/p2p/discover"
-	"github.com/gochain-io/gochain/p2p/netutil"
-	"github.com/gochain-io/gochain/swarm/network/kademlia"
-	"github.com/gochain-io/gochain/swarm/storage"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/p2p/discover"
+	"github.com/gochain-io/gochain/v3/p2p/netutil"
+	"github.com/gochain-io/gochain/v3/swarm/network/kademlia"
+	"github.com/gochain-io/gochain/v3/swarm/storage"
 )
 
 // Hive is the logistic manager of the swarm

@@ -30,17 +30,17 @@ import (
 	"github.com/hashicorp/golang-lru"
 	"go.opencensus.io/trace"
 
-	"github.com/gochain-io/gochain/accounts"
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/common/hexutil"
-	"github.com/gochain-io/gochain/consensus"
-	"github.com/gochain-io/gochain/core/types"
-	"github.com/gochain-io/gochain/crypto"
-	"github.com/gochain-io/gochain/crypto/sha3"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/params"
-	"github.com/gochain-io/gochain/rlp"
-	"github.com/gochain-io/gochain/rpc"
+	"github.com/gochain-io/gochain/v3/accounts"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/common/hexutil"
+	"github.com/gochain-io/gochain/v3/consensus"
+	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain-io/gochain/v3/crypto/sha3"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/params"
+	"github.com/gochain-io/gochain/v3/rlp"
+	"github.com/gochain-io/gochain/v3/rpc"
 )
 
 const (

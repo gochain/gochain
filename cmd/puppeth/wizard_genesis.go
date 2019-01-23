@@ -25,10 +25,10 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/core"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/params"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/params"
 )
 
 // makeGenesis creates a new genesis struct based on some user input.

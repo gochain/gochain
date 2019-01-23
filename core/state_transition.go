@@ -21,10 +21,10 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/core/vm"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/params"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core/vm"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/params"
 )
 
 var (

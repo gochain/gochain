@@ -25,9 +25,9 @@ import (
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain-io/gochain/accounts"
-	"github.com/gochain-io/gochain/event"
-	"github.com/gochain-io/gochain/log"
+	"github.com/gochain-io/gochain/v3/accounts"
+	"github.com/gochain-io/gochain/v3/event"
+	"github.com/gochain-io/gochain/v3/log"
 	"github.com/karalabe/hid"
 )
 

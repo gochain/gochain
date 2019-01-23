@@ -25,13 +25,13 @@ import (
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain-io/gochain/common"
-	"github.com/gochain-io/gochain/core/rawdb"
-	"github.com/gochain-io/gochain/core/state"
-	"github.com/gochain-io/gochain/crypto/sha3"
-	"github.com/gochain-io/gochain/ethdb"
-	"github.com/gochain-io/gochain/log"
-	"github.com/gochain-io/gochain/trie"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core/rawdb"
+	"github.com/gochain-io/gochain/v3/core/state"
+	"github.com/gochain-io/gochain/v3/crypto/sha3"
+	"github.com/gochain-io/gochain/v3/ethdb"
+	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/trie"
 )
 
 // stateReq represents a batch of state fetch requests grouped together into
