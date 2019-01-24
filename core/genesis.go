@@ -166,6 +166,9 @@ func (e *GenesisMismatchError) Error() string {
 //
 // The returned chain configuration is never nil.
 func SetupGenesisBlock(db common.Database, genesis *Genesis) (*params.ChainConfig, common.Hash, error) {
+	return SetupGenesisBlockWithOverride(db, genesis, nil)
+}
+func SetupGenesisBlockWithOverride(db common.Database, genesis *Genesis, constantinopleOverride *big.Int) (*params.ChainConfig, common.Hash, error) {
 	if genesis != nil && genesis.Config == nil {
 		return params.AllCliqueProtocolChanges, common.Hash{}, errGenesisNoConfig
 	}
@@ -193,6 +196,10 @@ func SetupGenesisBlock(db common.Database, genesis *Genesis) (*params.ChainConfi
 
 	// Get the existing chain configuration.
 	newcfg := genesis.configOrDefault(stored)
+	if constantinopleOverride != nil {
+		newcfg.ConstantinopleBlock = constantinopleOverride
+		newcfg.PetersburgBlock = constantinopleOverride
+	}
 	storedcfg := rawdb.ReadChainConfig(db.GlobalTable(), stored)
 	if storedcfg == nil {
 		// This case happens if a genesis write was interrupted.

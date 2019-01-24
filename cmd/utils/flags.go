@@ -135,6 +135,10 @@ var (
 		Name:  "testnet",
 		Usage: "Gochain test network: pre-configured test network",
 	}
+	ConstantinopleOverrideFlag = cli.Uint64Flag{
+		Name:  "override.constantinople",
+		Usage: "Manually specify constantinople fork-block, overriding the bundled setting",
+	}
 	DeveloperFlag = cli.BoolFlag{
 		Name:  "dev",
 		Usage: "Ephemeral network with a pre-funded developer account",
@@ -587,6 +591,17 @@ var (
 	EthdbMaxOpenSegmentCountFlag = cli.IntFlag{
 		Name:  "ethdb.maxopensegmentcount",
 		Usage: "Ethdb per-table open segment count.",
+	}
+
+	EWASMInterpreterFlag = cli.StringFlag{
+		Name:  "vm.ewasm",
+		Usage: "External ewasm configuration (default = built-in interpreter)",
+		Value: "",
+	}
+	EVMInterpreterFlag = cli.StringFlag{
+		Name:  "vm.evm",
+		Usage: "External EVM configuration (default = built-in interpreter)",
+		Value: "",
 	}
 )
 
