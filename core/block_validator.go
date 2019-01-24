@@ -52,7 +52,7 @@ func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engin
 // ValidateBody validates the given block's uncles and verifies the block
 // header's transaction and uncle roots. The headers are assumed to be already
 // validated at this point.
-func (v *BlockValidator) ValidateBody(ctx context.Context, block *types.Block, checkParent bool) error {
+func (v *BlockValidator) ValidateBody(ctx context.Context, block *types.Block) error {
 	ctx, span := trace.StartSpan(ctx, "BlockValidator.ValidateBody")
 	defer span.End()
 
@@ -60,13 +60,11 @@ func (v *BlockValidator) ValidateBody(ctx context.Context, block *types.Block, c
 	if v.bc.HasBlockAndState(block.Hash(), block.NumberU64()) {
 		return ErrKnownBlock
 	}
-	if checkParent {
-		if !v.bc.HasBlockAndState(block.ParentHash(), block.NumberU64()-1) {
-			if !v.bc.HasBlock(block.ParentHash(), block.NumberU64()-1) {
-				return consensus.ErrUnknownAncestor
-			}
-			return consensus.ErrPrunedAncestor
+	if !v.bc.HasBlockAndState(block.ParentHash(), block.NumberU64()-1) {
+		if !v.bc.HasBlock(block.ParentHash(), block.NumberU64()-1) {
+			return consensus.ErrUnknownAncestor
 		}
+		return consensus.ErrPrunedAncestor
 	}
 	if len(block.Uncles()) > 0 {
 		return errors.New("uncles not allowed")

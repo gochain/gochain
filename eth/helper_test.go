@@ -69,7 +69,7 @@ func newTestProtocolManager(ctx context.Context, mode downloader.SyncMode, block
 		panic(err)
 	}
 
-	pm, err := NewProtocolManager(ctx, gspec.Config, mode, DefaultConfig.NetworkId, evmux, &testTxPool{added: newtx}, engine, blockchain, db)
+	pm, err := NewProtocolManager(gspec.Config, mode, DefaultConfig.NetworkId, evmux, &testTxPool{added: newtx}, engine, blockchain, db)
 	if err != nil {
 		return nil, nil, err
 	}

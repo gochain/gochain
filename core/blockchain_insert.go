@@ -109,7 +109,7 @@ func (it *insertIterator) next(ctx context.Context) (*types.Block, error) {
 	if err := <-it.results; err != nil {
 		return it.chain[it.index], err
 	}
-	return it.chain[it.index], it.validator.ValidateBody(ctx, it.chain[it.index], true)
+	return it.chain[it.index], it.validator.ValidateBody(ctx, it.chain[it.index])
 }
 
 // current returns the current block that's being processed.
