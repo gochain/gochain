@@ -24,9 +24,10 @@ import (
 	"io"
 	"sync"
 
+	"golang.org/x/crypto/sha3"
+
 	"github.com/gochain-io/gochain/v3/bmt"
 	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/crypto/sha3"
 )
 
 type Hasher func() hash.Hash
@@ -84,10 +85,10 @@ func MakeHashFunc(hash string) SwarmHasher {
 	case "SHA256":
 		return func() SwarmHash { return &HashWithLength{crypto.SHA256.New()} }
 	case "SHA3":
-		return func() SwarmHash { return &HashWithLength{sha3.NewKeccak256()} }
+		return func() SwarmHash { return &HashWithLength{sha3.NewLegacyKeccak256()} }
 	case "BMT":
 		return func() SwarmHash {
-			hasher := sha3.NewKeccak256
+			hasher := sha3.NewLegacyKeccak256
 			pool := bmt.NewTreePool(hasher, bmt.DefaultSegmentCount, bmt.DefaultPoolSize)
 			return bmt.New(pool)
 		}

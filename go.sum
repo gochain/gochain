@@ -123,8 +123,8 @@ github.com/syndtr/goleveldb v0.0.0-20180502072349-ae970a0732be h1:1xQgEGH4qRftNC
 github.com/syndtr/goleveldb v0.0.0-20180502072349-ae970a0732be/go.mod h1:Z4AUp2Km+PwemOoO/VB5AOx9XSsIItzFjoJlOSiYmn0=
 go.opencensus.io v0.14.0 h1:1eTLxqxSIAylcKoxnNkdhvvBNZDA8JwkKNXxgyma0IA=
 go.opencensus.io v0.14.0/go.mod h1:UffZAU+4sDEINUGP/B7UfBBkq4fqLu9zXAX7ke6CHW0=
-golang.org/x/crypto v0.0.0-20180503153109-76a954637dfa h1:ZXr0R592Y7suZPWIotXJzfk5QYNl6pZzDa27hYJiQ5o=
-golang.org/x/crypto v0.0.0-20180503153109-76a954637dfa/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
+golang.org/x/crypto v0.0.0-20190123085648-057139ce5d2b h1:Elez2XeF2p9uyVj0yEUDqQ56NFcDtcBNkYP7yv8YbUE=
+golang.org/x/crypto v0.0.0-20190123085648-057139ce5d2b/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/net v0.0.0-20180906233101-161cd47e91fd h1:nTDtHvHSdCn1m6ITfMRqtOd/9+7a3s8RBNOZ3eYZzJA=
 golang.org/x/net v0.0.0-20180906233101-161cd47e91fd/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be h1:vEDujvNQGv4jgYKudGeI/+DAX4Jffq6hpD55MmoEvKs=
