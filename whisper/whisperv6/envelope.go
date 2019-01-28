@@ -30,7 +30,6 @@ import (
 	"github.com/gochain-io/gochain/v3/common/math"
 	"github.com/gochain-io/gochain/v3/crypto"
 	"github.com/gochain-io/gochain/v3/crypto/ecies"
-	"github.com/gochain-io/gochain/v3/crypto/sha3"
 	"github.com/gochain-io/gochain/v3/rlp"
 )
 
@@ -94,7 +93,8 @@ func (e *Envelope) Seal(options *MessageParams) error {
 	}
 
 	buf := make([]byte, 64)
-	sha3.Keccak256(buf[:32], e.rlpWithoutNonce())
+	h := crypto.Keccak256(e.rlpWithoutNonce())
+	copy(buf[:32], h)
 
 	finish := time.Now().Add(time.Duration(options.WorkTime) * time.Second).UnixNano()
 	for nonce := uint64(0); time.Now().UnixNano() < finish; {
@@ -130,7 +130,8 @@ func (e *Envelope) PoW() float64 {
 
 func (e *Envelope) calculatePoW(diff uint32) {
 	buf := make([]byte, 64)
-	sha3.Keccak256(buf[:32], e.rlpWithoutNonce())
+	h := crypto.Keccak256(e.rlpWithoutNonce())
+	copy(buf[:32], h)
 	binary.BigEndian.PutUint64(buf[56:], e.Nonce)
 	d := new(big.Int).SetBytes(crypto.Keccak256(buf))
 	firstBit := math.FirstBitSet(d)
@@ -207,6 +208,10 @@ func (e *Envelope) OpenSymmetric(key []byte) (msg *ReceivedMessage, err error) {
 
 // Open tries to decrypt an envelope, and populates the message fields in case of success.
 func (e *Envelope) Open(watcher *Filter) (msg *ReceivedMessage) {
+	if watcher == nil {
+		return nil
+	}
+
 	// The API interface forbids filters doing both symmetric and asymmetric encryption.
 	if watcher.expectsAsymmetricEncryption() && watcher.expectsSymmetricEncryption() {
 		return nil

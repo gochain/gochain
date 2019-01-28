@@ -21,10 +21,11 @@ import (
 	"fmt"
 	"math/big"
 
+	"golang.org/x/crypto/sha3"
+
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/common/math"
 	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/crypto/sha3"
 	"github.com/gochain-io/gochain/v3/params"
 )
 
@@ -387,7 +388,7 @@ func opSha3(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory 
 	data := memory.Get(offset.Int64(), size.Int64())
 
 	if interpreter.hasher == nil {
-		interpreter.hasher = sha3.NewKeccak256().(keccakState)
+		interpreter.hasher = sha3.NewLegacyKeccak256().(keccakState)
 	} else {
 		interpreter.hasher.Reset()
 	}

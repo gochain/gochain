@@ -63,7 +63,7 @@ require (
 	github.com/stretchr/testify v1.2.1
 	github.com/syndtr/goleveldb v0.0.0-20180502072349-ae970a0732be
 	go.opencensus.io v0.14.0
-	golang.org/x/crypto v0.0.0-20180503153109-76a954637dfa
+	golang.org/x/crypto v0.0.0-20190123085648-057139ce5d2b
 	golang.org/x/net v0.0.0-20180906233101-161cd47e91fd
 	golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be // indirect
 	golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f

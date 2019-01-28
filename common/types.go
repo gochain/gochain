@@ -26,8 +26,9 @@ import (
 	"reflect"
 	"strings"
 
+	"golang.org/x/crypto/sha3"
+
 	"github.com/gochain-io/gochain/v3/common/hexutil"
-	"github.com/gochain-io/gochain/v3/crypto/sha3"
 )
 
 // Lengths of hashes and addresses in bytes.
@@ -218,8 +219,9 @@ func (a Address) Hash() Hash { return BytesToHash(a[:]) }
 // Hex returns an EIP55-compliant hex string representation of the address.
 func (a Address) Hex() string {
 	unchecksummed := hex.EncodeToString(a[:])
-	var hash Hash
-	sha3.Keccak256(hash[:], []byte(unchecksummed))
+	sha := sha3.NewLegacyKeccak256()
+	sha.Write([]byte(unchecksummed))
+	hash := sha.Sum(nil)
 
 	result := []byte(unchecksummed)
 	for i := 0; i < len(result); i++ {
