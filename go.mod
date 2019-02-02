@@ -5,11 +5,12 @@ go 1.12
 require (
 	bazil.org/fuse v0.0.0-20180421153158-65cc252bf669
 	cloud.google.com/go v0.27.0 // indirect
-	contrib.go.opencensus.io/exporter/stackdriver v0.6.0 // indirect
+	contrib.go.opencensus.io/exporter/stackdriver v0.6.0
 	github.com/OneOfOne/xxhash v1.2.2 // indirect
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
 	github.com/allegro/bigcache v1.1.0
 	github.com/aristanetworks/goarista v0.0.0-20180424004133-70dca2f27708
+	github.com/aws/aws-sdk-go v1.16.26 // indirect
 	github.com/btcsuite/btcd v0.0.0-20180418030112-675abc5df3c5
 	github.com/cespare/cp v1.0.0
 	github.com/cespare/xxhash v1.0.0

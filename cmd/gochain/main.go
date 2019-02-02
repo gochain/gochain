@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"go.opencensus.io/exporter/stackdriver"
+	"contrib.go.opencensus.io/exporter/stackdriver"
 	"go.opencensus.io/trace"
 	"gopkg.in/urfave/cli.v1"
 
