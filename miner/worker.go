@@ -817,7 +817,7 @@ func (w *worker) commitNewWork(ctx context.Context, interrupt *int32, noempty bo
 	}
 	// Wait to ensure we're not going off too far in the future.
 	if wait := time.Until(time.Unix(timestamp, 0)); wait > 0 {
-		log.Info("Mining too far in the future", "wait", common.PrettyDuration(wait))
+		log.Debug("Mining too far in the future", "wait", common.PrettyDuration(wait))
 		time.Sleep(wait)
 	}
 
