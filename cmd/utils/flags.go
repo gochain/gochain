@@ -18,6 +18,7 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"fmt"
@@ -35,6 +36,7 @@ import (
 	"github.com/gochain-io/gochain/v3/consensus"
 	"github.com/gochain-io/gochain/v3/consensus/clique"
 	"github.com/gochain-io/gochain/v3/core"
+	"github.com/gochain-io/gochain/v3/core/rawdb"
 	"github.com/gochain-io/gochain/v3/core/state"
 	"github.com/gochain-io/gochain/v3/core/vm"
 	"github.com/gochain-io/gochain/v3/crypto"
@@ -135,12 +137,20 @@ var (
 	}
 	DeveloperFlag = cli.BoolFlag{
 		Name:  "dev",
-		Usage: "Ephemeral proof-of-authority network with a pre-funded developer account, mining enabled",
+		Usage: "Ephemeral network with a pre-funded developer account",
 	}
 	DeveloperPeriodFlag = cli.IntFlag{
 		Name:  "dev.period",
 		Usage: "Block period to use in developer mode (0 = mine only if transaction pending)",
 		Value: params.DefaultCliquePeriod,
+	}
+	LocalFlag = cli.BoolFlag{
+		Name:  "local",
+		Usage: "Persistent network with pre-funded accounts.",
+	}
+	LocalFundFlag = cli.StringSliceFlag{
+		Name:  "local.fund",
+		Usage: "Comma separated list of accounts to pre-fund",
 	}
 	IdentityFlag = cli.StringFlag{
 		Name:  "identity",
@@ -683,10 +693,12 @@ func splitAndTrim(input string) []string {
 // setHTTP creates the HTTP RPC listener interface string from the set
 // command line flags, returning empty if the HTTP endpoint is disabled.
 func setHTTP(ctx *cli.Context, cfg *node.Config) {
-	if ctx.GlobalBool(RPCEnabledFlag.Name) && cfg.HTTPHost == "" {
+	if ctx.GlobalBool(RPCEnabledFlag.Name) && cfg.HTTPHost == "" || ctx.GlobalBool(LocalFlag.Name) {
 		cfg.HTTPHost = "127.0.0.1"
 		if ctx.GlobalIsSet(RPCListenAddrFlag.Name) {
 			cfg.HTTPHost = ctx.GlobalString(RPCListenAddrFlag.Name)
+		} else if ctx.GlobalBool(LocalFlag.Name) {
+			cfg.HTTPHost = "0.0.0.0"
 		}
 	}
 
@@ -873,7 +885,7 @@ func SetP2PConfig(ctx *cli.Context, cfg *p2p.Config) {
 		cfg.NetRestrict = list
 	}
 
-	if ctx.GlobalBool(DeveloperFlag.Name) {
+	if ctx.GlobalBool(DeveloperFlag.Name) || ctx.GlobalBool(LocalFlag.Name) {
 		// --dev mode can't use p2p networking.
 		cfg.MaxPeers = 0
 		cfg.ListenAddr = ":0"
@@ -896,6 +908,8 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 		cfg.DataDir = ctx.GlobalString(DataDirFlag.Name)
 	case ctx.GlobalBool(DeveloperFlag.Name):
 		cfg.DataDir = "" // unless explicitly requested, use memory databases
+	case ctx.GlobalBool(LocalFlag.Name):
+		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "local")
 	case ctx.GlobalBool(TestnetFlag.Name):
 		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "testnet")
 	}
@@ -1035,7 +1049,7 @@ func SetShhConfig(ctx *cli.Context, stack *node.Node, cfg *whisper.Config) {
 // SetEthConfig applies eth-related command line flags to the config.
 func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 	// Avoid conflicting network flags
-	checkExclusive(ctx, DeveloperFlag, TestnetFlag)
+	checkExclusive(ctx, DeveloperFlag, TestnetFlag, LocalFlag)
 	checkExclusive(ctx, FastSyncFlag, LightModeFlag, SyncModeFlag)
 	checkExclusive(ctx, LightServFlag, LightModeFlag)
 	checkExclusive(ctx, LightServFlag, SyncModeFlag, "light")
@@ -1144,11 +1158,89 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 		if !ctx.GlobalIsSet(MinerGasPriceFlag.Name) && !ctx.GlobalIsSet(MinerLegacyGasPriceFlag.Name) {
 			cfg.MinerGasPrice = big.NewInt(1)
 		}
+	case ctx.GlobalBool(LocalFlag.Name):
+		if GenesisExists(ctx, stack) {
+			accs := ks.Accounts()
+			if len(accs) == 0 {
+				Fatalf("Genesis exists but keystore is empty")
+			}
+			if err := ks.Unlock(accs[0], ""); err != nil {
+				Fatalf("Failed to unlock signer account %q: %v", cfg.Etherbase, err)
+			}
+			break
+		}
+
+		var (
+			signer accounts.Account
+			err    error
+		)
+		if accs := ks.Accounts(); len(accs) > 0 {
+			signer = ks.Accounts()[0]
+		} else {
+			signer, err = ks.NewAccount("")
+			if err != nil {
+				Fatalf("Failed to create signer account: %v", err)
+			}
+		}
+		if err := ks.Unlock(signer, ""); err != nil {
+			Fatalf("Failed to unlock signer account: %v", err)
+		}
+		log.Info("Signing with account", "address", signer.Address)
+
+		var seeds []common.Address
+		seedStrs := ctx.GlobalStringSlice(LocalFundFlag.Name)
+		if len(seedStrs) > 0 {
+			for _, seed := range seedStrs {
+				if !common.IsHexAddress(seed) {
+					Fatalf("Failed to parse hex address: %s", seed)
+				}
+				seeds = append(seeds, common.HexToAddress(seed))
+			}
+		} else {
+			var keys []string
+			for i := 0; i < 10; i++ {
+				seed, err := ks.NewAccount("")
+				if err != nil {
+					Fatalf("Failed to create account: %v", err)
+				}
+				seeds = append(seeds, seed.Address)
+				json, err := ks.Export(seed, "", "")
+				if err != nil {
+					Fatalf("Failed to export account: %v", err)
+				}
+				key, err := keystore.DecryptKey(json, "")
+				if err != nil {
+					Fatalf("Failed to decrypt key: %v", err)
+				}
+				keys = append(keys, "0x"+common.Bytes2Hex(key.PrivateKey.D.Bytes()))
+			}
+
+			var buf bytes.Buffer
+			fmt.Fprintln(&buf, "Pre-funded accounts:")
+			fmt.Fprintln(&buf)
+			fmt.Fprintln(&buf, "\t\tAddress\t\t\t\t\t\tKey")
+			for i := range seeds {
+				fmt.Fprintf(&buf, "\t%s %s\n", seeds[i].Hex(), keys[i])
+			}
+			log.Info(buf.String())
+		}
+
+		cfg.Genesis = core.LocalGenesisBlock(uint64(ctx.GlobalInt(DeveloperPeriodFlag.Name)), signer.Address, seeds)
+		if !ctx.GlobalIsSet(MinerGasPriceFlag.Name) && !ctx.GlobalIsSet(MinerLegacyGasPriceFlag.Name) {
+			cfg.MinerGasPrice = big.NewInt(1)
+		}
 	}
 	// TODO(fjl): move trie cache generations into config
 	if gen := ctx.GlobalInt(TrieCacheGenFlag.Name); gen > 0 {
 		state.MaxTrieCacheGen = uint16(gen)
 	}
+}
+
+func GenesisExists(ctx *cli.Context, stack *node.Node) bool {
+	db := MakeChainDatabase(ctx, stack)
+	defer db.Close()
+	stored := rawdb.ReadCanonicalHash(db, 0)
+	return stored != common.Hash{}
 }
 
 // SetDashboardConfig applies dashboard related command line flags to the config.
@@ -1237,6 +1329,8 @@ func MakeGenesis(ctx *cli.Context) *core.Genesis {
 		genesis = core.DefaultTestnetGenesisBlock()
 	case ctx.GlobalBool(DeveloperFlag.Name):
 		Fatalf("Developer chains are ephemeral")
+	case ctx.GlobalBool(LocalFlag.Name):
+		Fatalf("Local chains not supported")
 	default:
 		genesis = core.DefaultGenesisBlock()
 	}

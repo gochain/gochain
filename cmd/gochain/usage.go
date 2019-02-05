@@ -88,6 +88,12 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.DeveloperPeriodFlag,
 		},
 	},
+	{Name: "LOCAL CHAIN",
+		Flags: []cli.Flag{
+			utils.LocalFlag,
+			utils.LocalFundFlag,
+		},
+	},
 	{
 		Name: "ETHDB",
 		Flags: []cli.Flag{

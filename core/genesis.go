@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"time"
 
 	"github.com/gochain-io/gochain/v3/common"
@@ -385,6 +386,7 @@ func DefaultTestnetGenesisBlock() *Genesis {
 func DeveloperGenesisBlock(period uint64, faucet common.Address) *Genesis {
 	// Override the default period to the user requested one
 	config := *params.AllCliqueProtocolChanges
+	config.ChainId = big.NewInt(rand.Int63())
 	config.Clique.Period = period
 
 	alloc, ok := new(big.Int).SetString("1000000000000000000000000000", 10)
@@ -403,5 +405,35 @@ func DeveloperGenesisBlock(period uint64, faucet common.Address) *Genesis {
 		Voters:     []common.Address{faucet},
 		Signer:     hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
 		Alloc:      GenesisAlloc{faucet: {Balance: alloc}},
+	}
+}
+
+// LocalGenesisBlock returns the 'gochain --local' genesis block.
+func LocalGenesisBlock(period uint64, signer common.Address, seeds []common.Address) *Genesis {
+	// Override the default period to the user requested one
+	config := *params.AllCliqueProtocolChanges
+	config.ChainId = big.NewInt(rand.Int63())
+	config.Clique.Period = period
+
+	alloc, ok := new(big.Int).SetString("1000000000000000000000", 10)
+	if !ok {
+		panic("failed to parse big.Int string")
+	}
+	var extra = []byte(signer.Hex())[:32]
+	allocMap := make(GenesisAlloc)
+	for _, seed := range seeds {
+		allocMap[seed] = GenesisAccount{Balance: alloc}
+	}
+	// Assemble and return the genesis with the precompiles and seeds pre-funded
+	return &Genesis{
+		Config:     &config,
+		Timestamp:  uint64(time.Now().Unix()),
+		ExtraData:  append(extra, make([]byte, 32-len(extra))...),
+		GasLimit:   params.GenesisGasLimit,
+		Difficulty: big.NewInt(1),
+		Signers:    []common.Address{signer},
+		Voters:     []common.Address{signer},
+		Signer:     hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		Alloc:      allocMap,
 	}
 }
