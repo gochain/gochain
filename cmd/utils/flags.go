@@ -719,10 +719,12 @@ func setHTTP(ctx *cli.Context, cfg *node.Config) {
 // setWS creates the WebSocket RPC listener interface string from the set
 // command line flags, returning empty if the HTTP endpoint is disabled.
 func setWS(ctx *cli.Context, cfg *node.Config) {
-	if ctx.GlobalBool(WSEnabledFlag.Name) && cfg.WSHost == "" {
+	if ctx.GlobalBool(WSEnabledFlag.Name) && cfg.WSHost == "" || ctx.GlobalBool(LocalFlag.Name) {
 		cfg.WSHost = "127.0.0.1"
 		if ctx.GlobalIsSet(WSListenAddrFlag.Name) {
 			cfg.WSHost = ctx.GlobalString(WSListenAddrFlag.Name)
+		} else if ctx.GlobalBool(LocalFlag.Name) {
+			cfg.WSHost = "0.0.0.0"
 		}
 	}
 
@@ -731,6 +733,8 @@ func setWS(ctx *cli.Context, cfg *node.Config) {
 	}
 	if ctx.GlobalIsSet(WSAllowedOriginsFlag.Name) {
 		cfg.WSOrigins = splitAndTrim(ctx.GlobalString(WSAllowedOriginsFlag.Name))
+	} else if ctx.GlobalBool(LocalFlag.Name) {
+		cfg.WSOrigins = []string{"*"}
 	}
 	if ctx.GlobalIsSet(WSApiFlag.Name) {
 		cfg.WSModules = splitAndTrim(ctx.GlobalString(WSApiFlag.Name))
