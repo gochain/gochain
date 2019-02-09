@@ -113,7 +113,7 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 
 	stopDbUpgrade := func() error { return nil } // upgradeDeduplicateData(chainDb)
 
-	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
+	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlockWithOverride(chainDb, config.Genesis, config.ConstantinopleOverride)
 	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {
 		return nil, genesisErr
 	}

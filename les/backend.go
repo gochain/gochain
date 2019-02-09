@@ -89,7 +89,7 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *eth.Config) (*L
 	if config.Genesis == nil {
 		config.Genesis = core.DefaultGenesisBlock()
 	}
-	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlock(chainDb, config.Genesis)
+	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlockWithOverride(chainDb, config.Genesis, config.ConstantinopleOverride)
 	if _, isCompat := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !isCompat {
 		return nil, genesisErr
 	}
