@@ -107,7 +107,7 @@ func ApplyTransaction(ctx context.Context, vmenv *vm.EVM, config *params.ChainCo
 	ctx, span := trace.StartSpan(ctx, "ApplyTransaction")
 	defer span.End()
 
-	msg, err := tx.AsMessage(ctx, signer)
+	msg, err := tx.AsMessage(signer)
 	if err != nil {
 		return nil, 0, err
 	}
