@@ -18,7 +18,6 @@ package types
 
 import (
 	"container/heap"
-	"context"
 	"errors"
 	"io"
 	"math/big"
@@ -221,7 +220,7 @@ func (tx *Transaction) Size() common.StorageSize {
 // AsMessage requires a signer to derive the sender.
 //
 // XXX Rename message to something less arbitrary?
-func (tx *Transaction) AsMessage(ctx context.Context, s Signer) (*Message, error) {
+func (tx *Transaction) AsMessage(s Signer) (*Message, error) {
 	from, err := Sender(s, tx)
 	if err != nil {
 		return nil, err
