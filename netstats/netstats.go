@@ -357,26 +357,20 @@ func (s *Service) reportLoop(conn *websocket.Conn, quitCh, txCh <-chan struct{},
 			}
 			span.End()
 		case list := <-s.histCh:
-			ctx, span := trace.StartSpan(context.Background(), "Service.reportLoop-histCh")
-			if err = s.reportHistory(ctx, conn, list); err != nil {
+			if err = s.reportHistory(conn, list); err != nil {
 				log.Warn("Requested history report failed", "err", err)
 			}
-			span.End()
 		case head := <-headCh:
-			ctx, span := trace.StartSpan(context.Background(), "Service.reportLoop-headCh")
-			if err = s.reportBlock(ctx, conn, head); err != nil {
+			if err = s.reportBlock(conn, head); err != nil {
 				log.Warn("Block stats report failed", "err", err)
 			}
-			if err = s.reportPending(ctx, conn); err != nil {
+			if err = s.reportPending(conn); err != nil {
 				log.Warn("Post-block transaction stats report failed", "err", err)
 			}
-			span.End()
 		case <-txCh:
-			ctx, span := trace.StartSpan(context.Background(), "Service.reportLoop-txCh")
-			if err = s.reportPending(ctx, conn); err != nil {
+			if err = s.reportPending(conn); err != nil {
 				log.Warn("Transaction stats report failed", "err", err)
 			}
-			span.End()
 		}
 	}
 }
@@ -456,10 +450,10 @@ func (s *Service) report(ctx context.Context, conn *websocket.Conn) error {
 	if err := s.reportLatency(ctx, conn); err != nil {
 		return err
 	}
-	if err := s.reportBlock(ctx, conn, nil); err != nil {
+	if err := s.reportBlock(conn, nil); err != nil {
 		return err
 	}
-	if err := s.reportPending(ctx, conn); err != nil {
+	if err := s.reportPending(conn); err != nil {
 		return err
 	}
 	if err := s.reportStats(ctx, conn); err != nil {
@@ -543,12 +537,9 @@ func (s uncleStats) MarshalJSON() ([]byte, error) {
 }
 
 // reportBlock retrieves the current chain head and repors it to the stats server.
-func (s *Service) reportBlock(ctx context.Context, conn *websocket.Conn, block *types.Block) error {
-	ctx, span := trace.StartSpan(ctx, "Service.reportBlock")
-	defer span.End()
-
+func (s *Service) reportBlock(conn *websocket.Conn, block *types.Block) error {
 	// Gather the block details from the header or block chain
-	details := s.assembleBlockStats(ctx, block)
+	details := s.assembleBlockStats(block)
 
 	// Assemble the block report and send it to the server
 	log.Trace("Sending new block to netstats", "number", details.Number, "hash", details.Hash)
@@ -565,10 +556,7 @@ func (s *Service) reportBlock(ctx context.Context, conn *websocket.Conn, block *
 
 // assembleBlockStats retrieves any required metadata to report a single block
 // and assembles the block stats. If block is nil, the current head is processed.
-func (s *Service) assembleBlockStats(ctx context.Context, block *types.Block) *blockStats {
-	ctx, span := trace.StartSpan(ctx, "Service.assembleBlockStats")
-	defer span.End()
-
+func (s *Service) assembleBlockStats(block *types.Block) *blockStats {
 	// Gather the block infos from the local blockchain
 	var (
 		header  *types.Header
@@ -624,10 +612,7 @@ func (s *Service) assembleBlockStats(ctx context.Context, block *types.Block) *b
 
 // reportHistory retrieves the most recent batch of blocks and reports it to the
 // stats server.
-func (s *Service) reportHistory(ctx context.Context, conn *websocket.Conn, list []uint64) error {
-	ctx, span := trace.StartSpan(ctx, "Service.reportHistory")
-	defer span.End()
-
+func (s *Service) reportHistory(conn *websocket.Conn, list []uint64) error {
 	// Figure out the indexes that need reporting
 	indexes := make([]uint64, 0, historyUpdateRange)
 	if len(list) > 0 {
@@ -663,7 +648,7 @@ func (s *Service) reportHistory(ctx context.Context, conn *websocket.Conn, list 
 		}
 		// If we do have the block, add to the history and continue
 		if block != nil {
-			history[len(history)-1-i] = s.assembleBlockStats(ctx, block)
+			history[len(history)-1-i] = s.assembleBlockStats(block)
 			continue
 		}
 		// Ran out of blocks, cut the report short and send
@@ -693,10 +678,7 @@ type pendStats struct {
 
 // reportPending retrieves the current number of pending transactions and reports
 // it to the stats server.
-func (s *Service) reportPending(ctx context.Context, conn *websocket.Conn) error {
-	ctx, span := trace.StartSpan(ctx, "Service.reportPending")
-	defer span.End()
-
+func (s *Service) reportPending(conn *websocket.Conn) error {
 	// Retrieve the pending count from the local blockchain
 	var pending int
 	if s.eth != nil {
@@ -748,7 +730,7 @@ func (s *Service) reportStats(ctx context.Context, conn *websocket.Conn) error {
 		sync := s.eth.Downloader().Progress()
 		syncing = s.eth.BlockChain().CurrentHeader().Number.Uint64() >= sync.HighestBlock
 
-		price, _ := s.eth.ApiBackend.SuggestPrice(context.Background())
+		price, _ := s.eth.APIBackend.SuggestPrice(context.Background())
 		gasprice = int(price.Uint64())
 	} else {
 		sync := s.les.Downloader().Progress()

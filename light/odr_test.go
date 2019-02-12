@@ -55,8 +55,9 @@ var (
 
 type testOdr struct {
 	OdrBackend
-	sdb, ldb common.Database
-	disable  bool
+	indexerConfig *IndexerConfig
+	sdb, ldb      common.Database
+	disable       bool
 }
 
 func (odr *testOdr) Database() common.Database {
@@ -90,6 +91,10 @@ func (odr *testOdr) Retrieve(ctx context.Context, req OdrRequest) error {
 	}
 	req.StoreResult(odr.ldb)
 	return nil
+}
+
+func (odr *testOdr) IndexerConfig() *IndexerConfig {
+	return odr.indexerConfig
 }
 
 type odrTestFn func(ctx context.Context, db common.Database, bc *core.BlockChain, lc *LightChain, bhash common.Hash) ([]byte, error)
@@ -203,7 +208,6 @@ func odrContractCall(ctx context.Context, db common.Database, bc *core.BlockChai
 }
 
 func testChainGen(i int, block *core.BlockGen) {
-
 	signer := types.HomesteadSigner{}
 	switch i {
 	case 0:

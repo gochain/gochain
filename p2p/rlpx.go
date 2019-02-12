@@ -25,7 +25,6 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"hash"
@@ -39,11 +38,10 @@ import (
 	"github.com/golang/snappy"
 	"golang.org/x/crypto/sha3"
 
+	"github.com/gochain-io/gochain/v3/common/bitutil"
 	"github.com/gochain-io/gochain/v3/crypto"
 	"github.com/gochain-io/gochain/v3/crypto/ecies"
 	"github.com/gochain-io/gochain/v3/crypto/secp256k1"
-	"github.com/gochain-io/gochain/v3/log"
-	"github.com/gochain-io/gochain/v3/p2p/discover"
 	"github.com/gochain-io/gochain/v3/rlp"
 )
 
@@ -87,27 +85,21 @@ type rlpx struct {
 }
 
 func newRLPX(fd net.Conn) transport {
-	if err := fd.SetDeadline(time.Now().Add(handshakeTimeout)); err != nil {
-		log.Info("Failed to set rlpx deadline", "err", err)
-	}
+	fd.SetDeadline(time.Now().Add(handshakeTimeout))
 	return &rlpx{fd: fd}
 }
 
 func (t *rlpx) ReadMsg() (Msg, error) {
 	t.rmu.Lock()
 	defer t.rmu.Unlock()
-	if err := t.fd.SetReadDeadline(time.Now().Add(frameReadTimeout)); err != nil {
-		log.Info("Failed to set rlpx read deadline", "err", err)
-	}
+	t.fd.SetReadDeadline(time.Now().Add(frameReadTimeout))
 	return t.rw.ReadMsg()
 }
 
 func (t *rlpx) WriteMsg(msg Msg) error {
 	t.wmu.Lock()
 	defer t.wmu.Unlock()
-	if err := t.fd.SetWriteDeadline(time.Now().Add(frameWriteTimeout)); err != nil {
-		return err
-	}
+	t.fd.SetWriteDeadline(time.Now().Add(frameWriteTimeout))
 	return t.rw.WriteMsg(msg)
 }
 
@@ -117,23 +109,19 @@ func (t *rlpx) close(err error) {
 	// Tell the remote end why we're disconnecting if possible.
 	if t.rw != nil {
 		if r, ok := err.(DiscReason); ok && r != DiscNetworkError {
-			if err := t.fd.SetWriteDeadline(time.Now().Add(discWriteTimeout)); err != nil {
-				log.Info("Failed to set rlpx write deadline while closing", "err", err)
-			}
-			if err := SendItems(t.rw, discMsg, r); err != nil {
-				log.Info("Failed to send rlpx disc msg while closing", "err", err)
+			// rlpx tries to send DiscReason to disconnected peer
+			// if the connection is net.Pipe (in-memory simulation)
+			// it hangs forever, since net.Pipe does not implement
+			// a write deadline. Because of this only try to send
+			// the disconnect reason message if there is no error.
+			if err := t.fd.SetWriteDeadline(time.Now().Add(discWriteTimeout)); err == nil {
+				SendItems(t.rw, discMsg, r)
 			}
 		}
 	}
-	if err := t.fd.Close(); err != nil {
-		log.Error("Failed to close rlpx file descriptor", "err", err)
-	}
+	t.fd.Close()
 }
 
-// doEncHandshake runs the protocol handshake using authenticated
-// messages. the protocol handshake is the first authenticated message
-// and also verifies whether the encryption handshake 'worked' and the
-// remote side actually provided the right public key.
 func (t *rlpx) doProtoHandshake(our *protoHandshake) (their *protoHandshake, err error) {
 	// Writing our handshake happens concurrently, we prefer
 	// returning the handshake read error. If the remote side
@@ -163,19 +151,12 @@ func readProtocolHandshake(rw MsgReader, our *protoHandshake) (*protoHandshake, 
 		return nil, fmt.Errorf("message too big")
 	}
 	if msg.Code == discMsg {
-		buf := bytes.NewBuffer(make([]byte, 0, msg.Size))
-		if _, err := io.Copy(buf, msg.Payload); err != nil {
-			return nil, fmt.Errorf("failed to read disc msg: %s", err)
-		}
 		// Disconnect before protocol handshake is valid according to the
-		// spec and we send it ourself if the posthanshake checks fail.
+		// spec and we send it ourself if the post-handshake checks fail.
 		// We can't return the reason directly, though, because it is echoed
 		// back otherwise. Wrap it in a string instead.
 		var reason [1]DiscReason
-		if err := rlp.Decode(buf, &reason); err != nil {
-			log.Error("Cannot decode rlpx disc msg", "msg", hex.EncodeToString(buf.Bytes()), "err", err)
-			return nil, fmt.Errorf("failed to decode disc msg: %s", err)
-		}
+		rlp.Decode(msg.Payload, &reason)
 		return nil, reason[0]
 	}
 	if msg.Code != handshakeMsg {
@@ -185,37 +166,39 @@ func readProtocolHandshake(rw MsgReader, our *protoHandshake) (*protoHandshake, 
 	if err := msg.Decode(&hs); err != nil {
 		return nil, err
 	}
-	if (hs.ID == discover.NodeID{}) {
+	if len(hs.ID) != 64 || !bitutil.TestBytes(hs.ID) {
 		return nil, DiscInvalidIdentity
 	}
 	return &hs, nil
 }
 
-func (t *rlpx) doEncHandshake(prv *ecdsa.PrivateKey, dial *discover.Node) (discover.NodeID, error) {
+// doEncHandshake runs the protocol handshake using authenticated
+// messages. the protocol handshake is the first authenticated message
+// and also verifies whether the encryption handshake 'worked' and the
+// remote side actually provided the right public key.
+func (t *rlpx) doEncHandshake(prv *ecdsa.PrivateKey, dial *ecdsa.PublicKey) (*ecdsa.PublicKey, error) {
 	var (
 		sec secrets
 		err error
 	)
 	if dial == nil {
-		sec, err = receiverEncHandshake(t.fd, prv, nil)
+		sec, err = receiverEncHandshake(t.fd, prv)
 	} else {
-		sec, err = initiatorEncHandshake(t.fd, prv, dial.ID, nil)
+		sec, err = initiatorEncHandshake(t.fd, prv, dial)
 	}
 	if err != nil {
-		return discover.NodeID{}, err
+		return nil, err
 	}
 	t.wmu.Lock()
 	t.rw = newRLPXFrameRW(t.fd, sec)
 	t.wmu.Unlock()
-	return sec.RemoteID, nil
+	return sec.Remote.ExportECDSA(), nil
 }
 
 // encHandshake contains the state of the encryption handshake.
 type encHandshake struct {
-	initiator bool
-	remoteID  discover.NodeID
-
-	remotePub            *ecies.PublicKey  // remote-pubk
+	initiator            bool
+	remote               *ecies.PublicKey  // remote-pubk
 	initNonce, respNonce []byte            // nonce
 	randomPrivKey        *ecies.PrivateKey // ecdhe-random
 	remoteRandomPub      *ecies.PublicKey  // ecdhe-random-pubk
@@ -224,7 +207,7 @@ type encHandshake struct {
 // secrets represents the connection secrets
 // which are negotiated during the encryption handshake.
 type secrets struct {
-	RemoteID              discover.NodeID
+	Remote                *ecies.PublicKey
 	AES, MAC              []byte
 	EgressMAC, IngressMAC hash.Hash
 	Token                 []byte
@@ -265,9 +248,9 @@ func (h *encHandshake) secrets(auth, authResp []byte) (secrets, error) {
 	sharedSecret := crypto.Keccak256(ecdheSecret, crypto.Keccak256(h.respNonce, h.initNonce))
 	aesSecret := crypto.Keccak256(ecdheSecret, sharedSecret)
 	s := secrets{
-		RemoteID: h.remoteID,
-		AES:      aesSecret,
-		MAC:      crypto.Keccak256(ecdheSecret, aesSecret),
+		Remote: h.remote,
+		AES:    aesSecret,
+		MAC:    crypto.Keccak256(ecdheSecret, aesSecret),
 	}
 
 	// setup sha3 instances for the MACs
@@ -289,16 +272,16 @@ func (h *encHandshake) secrets(auth, authResp []byte) (secrets, error) {
 // staticSharedSecret returns the static shared secret, the result
 // of key agreement between the local and remote static node key.
 func (h *encHandshake) staticSharedSecret(prv *ecdsa.PrivateKey) ([]byte, error) {
-	return ecies.ImportECDSA(prv).GenerateShared(h.remotePub, sskLen, sskLen)
+	return ecies.ImportECDSA(prv).GenerateShared(h.remote, sskLen, sskLen)
 }
 
 // initiatorEncHandshake negotiates a session token on conn.
 // it should be called on the dialing side of the connection.
 //
 // prv is the local client's private key.
-func initiatorEncHandshake(conn io.ReadWriter, prv *ecdsa.PrivateKey, remoteID discover.NodeID, token []byte) (s secrets, err error) {
-	h := &encHandshake{initiator: true, remoteID: remoteID}
-	authMsg, err := h.makeAuthMsg(prv, token)
+func initiatorEncHandshake(conn io.ReadWriter, prv *ecdsa.PrivateKey, remote *ecdsa.PublicKey) (s secrets, err error) {
+	h := &encHandshake{initiator: true, remote: ecies.ImportECDSAPublic(remote)}
+	authMsg, err := h.makeAuthMsg(prv)
 	if err != nil {
 		return s, err
 	}
@@ -322,15 +305,11 @@ func initiatorEncHandshake(conn io.ReadWriter, prv *ecdsa.PrivateKey, remoteID d
 }
 
 // makeAuthMsg creates the initiator handshake message.
-func (h *encHandshake) makeAuthMsg(prv *ecdsa.PrivateKey, token []byte) (*authMsgV4, error) {
-	rpub, err := h.remoteID.Pubkey()
-	if err != nil {
-		return nil, fmt.Errorf("bad remoteID: %v", err)
-	}
-	h.remotePub = ecies.ImportECDSAPublic(rpub)
+func (h *encHandshake) makeAuthMsg(prv *ecdsa.PrivateKey) (*authMsgV4, error) {
 	// Generate random initiator nonce.
 	h.initNonce = make([]byte, shaLen)
-	if _, err := rand.Read(h.initNonce); err != nil {
+	_, err := rand.Read(h.initNonce)
+	if err != nil {
 		return nil, err
 	}
 	// Generate random keypair to for ECDH.
@@ -340,7 +319,7 @@ func (h *encHandshake) makeAuthMsg(prv *ecdsa.PrivateKey, token []byte) (*authMs
 	}
 
 	// Sign known message: static-shared-secret ^ nonce
-	token, err = h.staticSharedSecret(prv)
+	token, err := h.staticSharedSecret(prv)
 	if err != nil {
 		return nil, err
 	}
@@ -368,8 +347,7 @@ func (h *encHandshake) handleAuthResp(msg *authRespV4) (err error) {
 // it should be called on the listening side of the connection.
 //
 // prv is the local client's private key.
-// token is the token from a previous session with this node.
-func receiverEncHandshake(conn io.ReadWriter, prv *ecdsa.PrivateKey, token []byte) (s secrets, err error) {
+func receiverEncHandshake(conn io.ReadWriter, prv *ecdsa.PrivateKey) (s secrets, err error) {
 	authMsg := new(authMsgV4)
 	authPacket, err := readHandshakeMsg(authMsg, encAuthMsgLen, prv, conn)
 	if err != nil {
@@ -401,13 +379,12 @@ func receiverEncHandshake(conn io.ReadWriter, prv *ecdsa.PrivateKey, token []byt
 
 func (h *encHandshake) handleAuthMsg(msg *authMsgV4, prv *ecdsa.PrivateKey) error {
 	// Import the remote identity.
-	h.initNonce = msg.Nonce[:]
-	h.remoteID = msg.InitiatorPubkey
-	rpub, err := h.remoteID.Pubkey()
+	rpub, err := importPublicKey(msg.InitiatorPubkey[:])
 	if err != nil {
-		return fmt.Errorf("bad remoteID: %#v", err)
+		return err
 	}
-	h.remotePub = ecies.ImportECDSAPublic(rpub)
+	h.initNonce = msg.Nonce[:]
+	h.remote = rpub
 
 	// Generate random keypair for ECDH.
 	// If a private key is already set, use it instead of generating one (for testing).
@@ -453,7 +430,7 @@ func (msg *authMsgV4) sealPlain(h *encHandshake) ([]byte, error) {
 	n += copy(buf[n:], msg.InitiatorPubkey[:])
 	n += copy(buf[n:], msg.Nonce[:])
 	buf[n] = 0 // token-flag
-	return ecies.Encrypt(rand.Reader, h.remotePub, buf, nil, nil)
+	return ecies.Encrypt(rand.Reader, h.remote, buf, nil, nil)
 }
 
 func (msg *authMsgV4) decodePlain(input []byte) {
@@ -469,7 +446,7 @@ func (msg *authRespV4) sealPlain(hs *encHandshake) ([]byte, error) {
 	buf := make([]byte, authRespLen)
 	n := copy(buf, msg.RandomPubkey[:])
 	copy(buf[n:], msg.Nonce[:])
-	return ecies.Encrypt(rand.Reader, hs.remotePub, buf, nil, nil)
+	return ecies.Encrypt(rand.Reader, hs.remote, buf, nil, nil)
 }
 
 func (msg *authRespV4) decodePlain(input []byte) {
@@ -492,7 +469,7 @@ func sealEIP8(msg interface{}, h *encHandshake) ([]byte, error) {
 	prefix := make([]byte, 2)
 	binary.BigEndian.PutUint16(prefix, uint16(buf.Len()+eciesOverhead))
 
-	enc, err := ecies.Encrypt(rand.Reader, h.remotePub, buf.Bytes(), nil, prefix)
+	enc, err := ecies.Encrypt(rand.Reader, h.remote, buf.Bytes(), nil, prefix)
 	return append(prefix, enc...), err
 }
 

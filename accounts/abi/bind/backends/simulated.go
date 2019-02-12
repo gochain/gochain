@@ -98,7 +98,14 @@ func (b *SimulatedBackend) Commit() {
 	b.rollback()
 }
 
-// rollback aborts all pending transactions, reverting to the last committed state.
+// Rollback aborts all pending transactions, reverting to the last committed state.
+func (b *SimulatedBackend) Rollback() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.rollback()
+}
+
 func (b *SimulatedBackend) rollback() {
 	blocks, _ := core.GenerateChain(b.config, b.blockchain.CurrentBlock(), clique.NewFaker(), b.database, 1, nil)
 	statedb, err := b.blockchain.State()
@@ -158,8 +165,8 @@ func (b *SimulatedBackend) StorageAt(ctx context.Context, contract common.Addres
 		return nil, errBlockNumberUnsupported
 	}
 	statedb, _ := b.blockchain.State()
-	s := statedb.GetState(contract, key)
-	return s[:], nil
+	val := statedb.GetState(contract, key)
+	return val[:], nil
 }
 
 // TransactionReceipt returns the receipt of a transaction.

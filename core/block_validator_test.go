@@ -101,11 +101,9 @@ func testHeaderConcurrentVerification(t *testing.T, threads int) {
 		blocks, _ = GenerateChain(params.TestChainConfig, genesis, clique.NewFaker(), testdb, 8, nil)
 	)
 	headers := make([]*types.Header, len(blocks))
-	seals := make([]bool, len(blocks))
 
 	for i, block := range blocks {
 		headers[i] = block.Header()
-		seals[i] = true
 	}
 	// Set the number of threads to verify on
 	old := runtime.GOMAXPROCS(threads)
@@ -178,11 +176,9 @@ func testHeaderConcurrentAbortion(t *testing.T, threads int) {
 		blocks, _ = GenerateChain(params.TestChainConfig, genesis, clique.NewFaker(), testdb, 1024, nil)
 	)
 	headers := make([]*types.Header, len(blocks))
-	seals := make([]bool, len(blocks))
 
 	for i, block := range blocks {
 		headers[i] = block.Header()
-		seals[i] = true
 	}
 	// Set the number of threads to verify on
 	old := runtime.GOMAXPROCS(threads)

@@ -20,13 +20,13 @@ package eth
 import (
 	"errors"
 	"fmt"
-	"github.com/gochain-io/gochain/v3/accounts/keystore"
 	"math/big"
 	"runtime"
 	"sync"
 	"sync/atomic"
 
 	"github.com/gochain-io/gochain/v3/accounts"
+	"github.com/gochain-io/gochain/v3/accounts/keystore"
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/consensus"
 	"github.com/gochain-io/gochain/v3/consensus/clique"
@@ -50,6 +50,7 @@ import (
 type LesServer interface {
 	Start(srvr *p2p.Server)
 	Stop()
+	APIs() []rpc.API
 	Protocols() []p2p.Protocol
 	SetBloomBitsIndexer(bbIndexer *core.ChainIndexer)
 }
@@ -60,8 +61,7 @@ type GoChain struct {
 	chainConfig *params.ChainConfig
 
 	// Channel for shutting down the service
-	shutdownChan  chan bool    // Channel for shutting down the ethereum
-	stopDbUpgrade func() error // stop chain db sequential key upgrade
+	shutdownChan chan bool // Channel for shutting down the GoChain
 
 	// Handlers
 	txPool          *core.TxPool
@@ -79,13 +79,13 @@ type GoChain struct {
 	bloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
 	bloomIndexer  *core.ChainIndexer             // Bloom indexer operating during block imports
 
-	ApiBackend *EthApiBackend
+	APIBackend *EthAPIBackend
 
 	miner     *miner.Miner
 	gasPrice  *big.Int
 	etherbase common.Address
 
-	networkId     uint64
+	networkID     uint64
 	netRPCService *ethapi.PublicNetAPI
 
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
@@ -98,20 +98,29 @@ func (gc *GoChain) AddLesServer(ls LesServer) {
 
 // New creates a new GoChain object (including the
 // initialisation of the common GoChain object)
-func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
+func New(ctx *node.ServiceContext, config *Config) (*GoChain, error) {
+	// Ensure configuration values are compatible and sane
 	if config.SyncMode == downloader.LightSync {
 		return nil, errors.New("can't run eth.GoChain in light sync mode, use les.LightGoChain")
 	}
 	if !config.SyncMode.IsValid() {
 		return nil, fmt.Errorf("invalid sync mode %d", config.SyncMode)
 	}
-	chainDb, err := CreateDB(sctx, config, "chaindata")
+	if config.MinerGasPrice == nil || config.MinerGasPrice.Cmp(common.Big0) <= 0 {
+		log.Warn("Sanitizing invalid miner gas price", "provided", config.MinerGasPrice, "updated", DefaultConfig.MinerGasPrice)
+		config.MinerGasPrice = new(big.Int).Set(DefaultConfig.MinerGasPrice)
+	}
+	if config.NoPruning && config.TrieDirtyCache > 0 {
+		config.TrieCleanCache += config.TrieDirtyCache
+		config.TrieDirtyCache = 0
+	}
+	log.Info("Allocated trie memory caches", "clean", common.StorageSize(config.TrieCleanCache)*1024*1024, "dirty", common.StorageSize(config.TrieDirtyCache)*1024*1024)
+
+	// Assemble the Ethereum object
+	chainDb, err := CreateDB(ctx, config, "chaindata")
 	if err != nil {
 		return nil, err
 	}
-
-	stopDbUpgrade := func() error { return nil } // upgradeDeduplicateData(chainDb)
-
 	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlockWithOverride(chainDb, config.Genesis, config.ConstantinopleOverride)
 	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {
 		return nil, genesisErr
@@ -130,30 +139,40 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 		config:         config,
 		chainDb:        chainDb,
 		chainConfig:    chainConfig,
-		eventMux:       sctx.EventMux,
-		accountManager: sctx.AccountManager,
+		eventMux:       ctx.EventMux,
+		accountManager: ctx.AccountManager,
 		engine:         clique.New(chainConfig.Clique, chainDb),
 		shutdownChan:   make(chan bool),
-		stopDbUpgrade:  stopDbUpgrade,
-		networkId:      config.NetworkId,
+		networkID:      config.NetworkId,
 		gasPrice:       config.MinerGasPrice,
 		etherbase:      config.Etherbase,
 		bloomRequests:  make(chan chan *bloombits.Retrieval),
-		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks),
+		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
 	}
 
-	log.Info("Initialising GoChain protocol", "versions", ProtocolVersions, "network", config.NetworkId)
+	bcVersion := rawdb.ReadDatabaseVersion(chainDb.GlobalTable())
+	var dbVer = "<nil>"
+	if bcVersion != nil {
+		dbVer = fmt.Sprintf("%d", *bcVersion)
+	}
+	log.Info("Initialising GoChain protocol", "versions", ProtocolVersions, "network", config.NetworkId, "dbversion", dbVer)
 
 	if !config.SkipBcVersionCheck {
 		bcVersion := rawdb.ReadDatabaseVersion(chainDb.GlobalTable())
-		if bcVersion != core.BlockChainVersion && bcVersion != 0 {
-			return nil, fmt.Errorf("Blockchain DB version mismatch (%d / %d). Run geth upgradedb.\n", bcVersion, core.BlockChainVersion)
+		if bcVersion != nil && *bcVersion > core.BlockChainVersion {
+			return nil, fmt.Errorf("database version is v%d, GoChain %s only supports v%d", *bcVersion, params.Version, core.BlockChainVersion)
+		} else if bcVersion == nil || *bcVersion < core.BlockChainVersion {
+			log.Warn("Upgrade blockchain database version", "from", dbVer, "to", core.BlockChainVersion)
+			rawdb.WriteDatabaseVersion(chainDb.GlobalTable(), core.BlockChainVersion)
 		}
-		rawdb.WriteDatabaseVersion(chainDb.GlobalTable(), core.BlockChainVersion)
 	}
 	var (
-		vmConfig    = vm.Config{EnablePreimageRecording: config.EnablePreimageRecording}
-		cacheConfig = &core.CacheConfig{Disabled: config.NoPruning, TrieNodeLimit: config.TrieCache, TrieTimeLimit: config.TrieTimeout}
+		vmConfig = vm.Config{
+			EnablePreimageRecording: config.EnablePreimageRecording,
+			EWASMInterpreter:        config.EWASMInterpreter,
+			EVMInterpreter:          config.EVMInterpreter,
+		}
+		cacheConfig = &core.CacheConfig{Disabled: config.NoPruning, TrieCleanLimit: config.TrieCleanCache, TrieDirtyLimit: config.TrieDirtyCache, TrieTimeLimit: config.TrieTimeout}
 	)
 	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, eth.chainConfig, eth.engine, vmConfig)
 	if err != nil {
@@ -170,27 +189,26 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 	eth.bloomIndexer.Start(eth.blockchain)
 
 	if config.TxPool.Journal != "" {
-		config.TxPool.Journal = sctx.ResolvePath(config.TxPool.Journal)
+		config.TxPool.Journal = ctx.ResolvePath(config.TxPool.Journal)
 	}
 	eth.txPool = core.NewTxPool(config.TxPool, eth.chainConfig, eth.blockchain)
 
-	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.SyncMode, config.NetworkId, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb); err != nil {
+	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.SyncMode, config.NetworkId, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb, nil); err != nil {
 		return nil, err
 	}
-	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine, config.MinerRecommit, config.MinerGasFloor, config.MinerGasCeil, eth.isLocalBlock)
-	if err := eth.miner.SetExtra(makeExtraData(config.MinerExtraData)); err != nil {
-		log.Error("Cannot set extra chain data", "err", err)
-	}
 
-	eth.ApiBackend = &EthApiBackend{eth: eth}
+	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine, config.MinerRecommit, config.MinerGasFloor, config.MinerGasCeil, eth.isLocalBlock)
+	eth.miner.SetExtra(makeExtraData(config.MinerExtraData))
+
+	eth.APIBackend = &EthAPIBackend{eth: eth}
 	if g := eth.config.Genesis; g != nil {
-		eth.ApiBackend.initialSupply = g.Alloc.Total()
+		eth.APIBackend.initialSupply = g.Alloc.Total()
 	}
 	gpoParams := config.GPO
 	if gpoParams.Default == nil {
 		gpoParams.Default = config.MinerGasPrice
 	}
-	eth.ApiBackend.gpo = gasprice.NewOracle(eth.ApiBackend, gpoParams)
+	eth.APIBackend.gpo = gasprice.NewOracle(eth.APIBackend, gpoParams)
 
 	return eth, nil
 }
@@ -223,11 +241,15 @@ func CreateDB(ctx *node.ServiceContext, config *Config, name string) (common.Dat
 	return db, nil
 }
 
-// APIs returns the collection of RPC services the ethereum package offers.
+// APIs return the collection of RPC services the ethereum package offers.
 // NOTE, some of these services probably need to be moved to somewhere else.
 func (gc *GoChain) APIs() []rpc.API {
-	apis := ethapi.GetAPIs(gc.ApiBackend)
+	apis := ethapi.GetAPIs(gc.APIBackend)
 
+	// Append any APIs exposed explicitly by the les server
+	if gc.lesServer != nil {
+		apis = append(apis, gc.lesServer.APIs()...)
+	}
 	// Append any APIs exposed explicitly by the consensus engine
 	apis = append(apis, gc.engine.APIs(gc.BlockChain())...)
 
@@ -256,7 +278,7 @@ func (gc *GoChain) APIs() []rpc.API {
 		}, {
 			Namespace: "eth",
 			Version:   "1.0",
-			Service:   filters.NewPublicFilterAPI(gc.ApiBackend, false),
+			Service:   filters.NewPublicFilterAPI(gc.APIBackend, false),
 			Public:    true,
 		}, {
 			Namespace: "admin",
@@ -418,7 +440,7 @@ func (gc *GoChain) Engine() consensus.Engine           { return gc.engine }
 func (gc *GoChain) ChainDb() common.Database           { return gc.chainDb }
 func (gc *GoChain) IsListening() bool                  { return true } // Always listening
 func (gc *GoChain) EthVersion() int                    { return int(gc.protocolManager.SubProtocols[0].Version) }
-func (gc *GoChain) NetVersion() uint64                 { return gc.networkId }
+func (gc *GoChain) NetVersion() uint64                 { return gc.networkID }
 func (gc *GoChain) Downloader() *downloader.Downloader { return gc.protocolManager.downloader }
 
 // Protocols implements node.Service, returning all the currently configured
@@ -434,7 +456,7 @@ func (gc *GoChain) Protocols() []p2p.Protocol {
 // GoChain protocol implementation.
 func (gc *GoChain) Start(srvr *p2p.Server) error {
 	// Start the bloom bits servicing goroutines
-	gc.startBloomHandlers()
+	gc.startBloomHandlers(params.BloomBitsBlocks)
 
 	// Start the RPC service
 	gc.netRPCService = ethapi.NewPublicNetAPI(srvr, gc.NetVersion())

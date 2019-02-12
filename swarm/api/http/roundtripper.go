@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/swarm/log"
 )
 
 /*
@@ -51,12 +51,12 @@ type RoundTripper struct {
 	Port string
 }
 
-func (rt *RoundTripper) RoundTrip(req *http.Request) (resp *http.Response, err error) {
-	host := rt.Host
+func (self *RoundTripper) RoundTrip(req *http.Request) (resp *http.Response, err error) {
+	host := self.Host
 	if len(host) == 0 {
 		host = "localhost"
 	}
-	url := fmt.Sprintf("http://%s:%s/%s:/%s/%s", host, rt.Port, req.Proto, req.URL.Host, req.URL.Path)
+	url := fmt.Sprintf("http://%s:%s/%s:/%s/%s", host, self.Port, req.Proto, req.URL.Host, req.URL.Path)
 	log.Info(fmt.Sprintf("roundtripper: proxying request '%s' to '%s'", req.RequestURI, url))
 	reqProxy, err := http.NewRequest(req.Method, url, req.Body)
 	if err != nil {

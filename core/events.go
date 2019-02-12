@@ -25,6 +25,7 @@ import (
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core/types"
 	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/p2p/enode"
 )
 
 const timeout = 500 * time.Millisecond
@@ -57,6 +58,17 @@ type ChainSideEvent struct {
 }
 
 type ChainHeadEvent struct{ Block *types.Block }
+
+// PeerEvent is an event emitted when peers are either added or dropped from
+// a p2p.Server or when a message is sent or received on a peer connection
+type PeerEvent struct {
+	Type     string   `json:"type"`
+	Peer     enode.ID `json:"peer"`
+	Error    string   `json:"error,omitempty"`
+	Protocol string   `json:"protocol,omitempty"`
+	MsgCode  *uint64  `json:"msg_code,omitempty"`
+	MsgSize  *uint32  `json:"msg_size,omitempty"`
+}
 
 type NewTxsFeed struct {
 	mu   sync.RWMutex

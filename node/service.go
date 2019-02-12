@@ -46,7 +46,7 @@ func (ctx *ServiceContext) OpenDatabase(name string, cache int, handles int) (co
 	if ctx.config.DataDir == "" {
 		return ethdb.NewMemDatabase(), nil
 	}
-	db := ethdb.NewDB(ctx.config.resolvePath(name))
+	db := ethdb.NewDB(ctx.config.ResolvePath(name))
 	if err := s3.ConfigureDB(db, ctx.config.Ethdb); err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (ctx *ServiceContext) OpenDatabase(name string, cache int, handles int) (co
 // and if the user actually uses persistent storage. It will return an empty string
 // for emphemeral storage and the user's own input for absolute paths.
 func (ctx *ServiceContext) ResolvePath(path string) string {
-	return ctx.config.resolvePath(path)
+	return ctx.config.ResolvePath(path)
 }
 
 // Service retrieves a currently running service registered of a specific type.

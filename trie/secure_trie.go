@@ -52,7 +52,7 @@ type SecureTrie struct {
 // Loaded nodes are kept around until their 'cache generation' expires.
 // A new cache generation is created by each call to Commit.
 // cachelimit sets the number of past cache generations to keep.
-func NewSecure(root common.Hash, db *Database, cachelimit uint16) (*SecureTrie, error) {
+func NewSecure(root common.Hash, db *Database) (*SecureTrie, error) {
 	if db == nil {
 		panic("trie.NewSecure called without a database")
 	}
@@ -60,7 +60,6 @@ func NewSecure(root common.Hash, db *Database, cachelimit uint16) (*SecureTrie, 
 	if err != nil {
 		return nil, err
 	}
-	trie.SetCacheLimit(cachelimit)
 	return &SecureTrie{
 		trie:         *trie,
 		hashKeyCache: make(map[string][common.HashLength]byte, 1024),
@@ -165,12 +164,6 @@ func (t *SecureTrie) Hash() common.Hash {
 	return t.trie.Hash()
 }
 
-// Root returns the root hash of SecureTrie.
-// Deprecated: use Hash instead.
-func (t *SecureTrie) Root() []byte {
-	return t.trie.Root()
-}
-
 // Copy returns a copy of SecureTrie.
 func (t *SecureTrie) Copy() *SecureTrie {
 	other := *t
@@ -196,7 +189,7 @@ func (t *SecureTrie) hashKey(key []byte) []byte {
 		return buf[:]
 	}
 
-	h := newHasher(0, 0, nil)
+	h := newHasher(nil)
 	h.sha.Reset()
 	h.sha.Write(key)
 	buf := h.sha.Sum(t.hashKeyBuf[:0])

@@ -21,13 +21,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/common/hexutil"
 	"github.com/gochain-io/gochain/v3/contracts/ens"
 	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/node"
+	"github.com/gochain-io/gochain/v3/p2p/enode"
+	"github.com/gochain-io/gochain/v3/swarm/log"
 	"github.com/gochain-io/gochain/v3/swarm/network"
+	"github.com/gochain-io/gochain/v3/swarm/pss"
 	"github.com/gochain-io/gochain/v3/swarm/services/swap"
 	"github.com/gochain-io/gochain/v3/swarm/storage"
 )
@@ -41,47 +45,58 @@ const (
 // allow several bzz nodes running in parallel
 type Config struct {
 	// serialised/persisted fields
-	*storage.StoreParams
-	*storage.ChunkerParams
+	*storage.FileStoreParams
+	*storage.LocalStoreParams
 	*network.HiveParams
-	Swap *swap.SwapParams
-	*network.SyncParams
-	Contract    common.Address
-	EnsRoot     common.Address
-	EnsApi      string
-	Path        string
-	ListenAddr  string
-	Port        string
-	PublicKey   string
-	BzzKey      string
-	NetworkId   uint64
-	SwapEnabled bool
-	SyncEnabled bool
-	SwapApi     string
-	Cors        string
-	BzzAccount  string
-	BootNodes   string
+	Swap                 *swap.LocalProfile
+	Pss                  *pss.PssParams
+	Contract             common.Address
+	EnsRoot              common.Address
+	EnsAPIs              []string
+	Path                 string
+	ListenAddr           string
+	Port                 string
+	PublicKey            string
+	BzzKey               string
+	NodeID               string
+	NetworkID            uint64
+	SwapEnabled          bool
+	SyncEnabled          bool
+	SyncingSkipCheck     bool
+	DeliverySkipCheck    bool
+	MaxStreamPeerServers int
+	LightNodeEnabled     bool
+	BootnodeMode         bool
+	SyncUpdateDelay      time.Duration
+	SwapAPI              string
+	Cors                 string
+	BzzAccount           string
+	GlobalStoreAPI       string
+	privateKey           *ecdsa.PrivateKey
 }
 
 //create a default config with all parameters to set to defaults
-func NewDefaultConfig() (self *Config) {
+func NewConfig() (c *Config) {
 
-	self = &Config{
-		StoreParams:   storage.NewDefaultStoreParams(),
-		ChunkerParams: storage.NewChunkerParams(),
-		HiveParams:    network.NewDefaultHiveParams(),
-		SyncParams:    network.NewDefaultSyncParams(),
-		Swap:          swap.NewDefaultSwapParams(),
-		ListenAddr:    DefaultHTTPListenAddr,
-		Port:          DefaultHTTPPort,
-		Path:          node.DefaultDataDir(),
-		EnsApi:        node.DefaultIPCEndpoint("geth"),
-		EnsRoot:       ens.TestNetAddress,
-		NetworkId:     network.NetworkId,
-		SwapEnabled:   false,
-		SyncEnabled:   true,
-		SwapApi:       "",
-		BootNodes:     "",
+	c = &Config{
+		LocalStoreParams:     storage.NewDefaultLocalStoreParams(),
+		FileStoreParams:      storage.NewFileStoreParams(),
+		HiveParams:           network.NewHiveParams(),
+		Swap:                 swap.NewDefaultSwapParams(),
+		Pss:                  pss.NewPssParams(),
+		ListenAddr:           DefaultHTTPListenAddr,
+		Port:                 DefaultHTTPPort,
+		Path:                 node.DefaultDataDir(),
+		EnsAPIs:              nil,
+		EnsRoot:              ens.TestNetAddress,
+		NetworkID:            network.DefaultNetworkID,
+		SwapEnabled:          false,
+		SyncEnabled:          true,
+		SyncingSkipCheck:     false,
+		MaxStreamPeerServers: 10000,
+		DeliverySkipCheck:    true,
+		SyncUpdateDelay:      15 * time.Second,
+		SwapAPI:              "",
 	}
 
 	return
@@ -101,13 +116,27 @@ func (c *Config) Init(prvKey *ecdsa.PrivateKey) {
 
 	pubkey := crypto.FromECDSAPub(&prvKey.PublicKey)
 	pubkeyhex := common.ToHex(pubkey)
-	keyhex := crypto.Keccak256Hash(pubkey).Hex()
+	keyhex := hexutil.Encode(network.PrivateKeyToBzzKey(prvKey))
 
 	c.PublicKey = pubkeyhex
 	c.BzzKey = keyhex
+	c.NodeID = enode.PubkeyToIDV4(&prvKey.PublicKey).String()
 
-	c.Swap.Init(c.Contract, prvKey)
-	c.SyncParams.Init(c.Path)
-	c.HiveParams.Init(c.Path)
-	c.StoreParams.Init(c.Path)
+	if c.SwapEnabled {
+		c.Swap.Init(c.Contract, prvKey)
+	}
+
+	c.privateKey = prvKey
+	c.LocalStoreParams.Init(c.Path)
+	c.LocalStoreParams.BaseKey = common.FromHex(keyhex)
+
+	c.Pss = c.Pss.WithPrivateKey(c.privateKey)
+}
+
+func (c *Config) ShiftPrivateKey() (privKey *ecdsa.PrivateKey) {
+	if c.privateKey != nil {
+		privKey = c.privateKey
+		c.privateKey = nil
+	}
+	return privKey
 }

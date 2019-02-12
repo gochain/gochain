@@ -589,12 +589,21 @@ func (s *PublicBlockChainAPI) GetProof(ctx context.Context, address common.Addre
 		return nil, proofErr
 	}
 
+	bal, err := state.GetBalanceErr(address)
+	if err != nil {
+		return nil, err
+	}
+	nonce, err := state.GetNonceErr(address)
+	if err != nil {
+		return nil, err
+	}
+
 	return &AccountResult{
 		Address:      address,
 		AccountProof: common.ToHexArray(accountProof),
-		Balance:      (*hexutil.Big)(state.GetBalance(address)),
+		Balance:      (*hexutil.Big)(bal),
 		CodeHash:     codeHash,
-		Nonce:        hexutil.Uint64(state.GetNonce(address)),
+		Nonce:        hexutil.Uint64(nonce),
 		StorageHash:  storageHash,
 		StorageProof: storageProof,
 	}, nil
@@ -735,7 +744,7 @@ func DoCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 	if args.Gas != nil {
 		gas = uint64(*args.Gas)
 	}
-	gasPrice := gasprice.Default
+	gasPrice := new(big.Int).Set(gasprice.Default)
 	if args.GasPrice != nil {
 		gasPrice = args.GasPrice.ToInt()
 	}

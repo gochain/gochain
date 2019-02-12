@@ -18,7 +18,6 @@ package whisperv6
 
 import (
 	"bytes"
-	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"fmt"
@@ -26,8 +25,6 @@ import (
 	"runtime"
 	"sync"
 	"time"
-
-	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/crypto"
@@ -51,12 +48,14 @@ type Statistics struct {
 }
 
 const (
-	maxMsgSizeIdx           = iota // Maximal message length allowed by the whisper node
-	overflowIdx                    // Indicator of message queue overflow
-	minPowIdx                      // Minimal PoW required by the whisper node
-	minPowToleranceIdx             // Minimal PoW tolerated by the whisper node for a limited time
-	bloomFilterIdx                 // Bloom filter for topics of interest for this node
-	bloomFilterToleranceIdx        // Bloom filter tolerated by the whisper node for a limited time
+	maxMsgSizeIdx                            = iota // Maximal message length allowed by the whisper node
+	overflowIdx                                     // Indicator of message queue overflow
+	minPowIdx                                       // Minimal PoW required by the whisper node
+	minPowToleranceIdx                              // Minimal PoW tolerated by the whisper node for a limited time
+	bloomFilterIdx                                  // Bloom filter for topics of interest for this node
+	bloomFilterToleranceIdx                         // Bloom filter tolerated by the whisper node for a limited time
+	lightClientModeIdx                              // Light client mode. (does not forward any messages)
+	restrictConnectionBetweenLightClientsIdx        // Restrict connection between two light clients
 )
 
 // Whisper represents a dark communication interface through the Ethereum
@@ -113,6 +112,7 @@ func New(cfg *Config) *Whisper {
 	whisper.settings.Store(minPowIdx, cfg.MinimumAcceptedPOW)
 	whisper.settings.Store(maxMsgSizeIdx, cfg.MaxMessageSize)
 	whisper.settings.Store(overflowIdx, false)
+	whisper.settings.Store(restrictConnectionBetweenLightClientsIdx, cfg.RestrictConnectionBetweenLightClients)
 
 	// p2p whisper sub protocol handler
 	whisper.protocol = p2p.Protocol{
@@ -231,19 +231,16 @@ func (whisper *Whisper) SetMaxMessageSize(size uint32) error {
 }
 
 // SetBloomFilter sets the new bloom filter
-func (whisper *Whisper) SetBloomFilter(ctx context.Context, bloom []byte) error {
-	ctx, span := trace.StartSpan(ctx, "Whisper.SetBloomFilter")
-	defer span.End()
-
-	if len(bloom) != bloomFilterSize {
+func (whisper *Whisper) SetBloomFilter(bloom []byte) error {
+	if len(bloom) != BloomFilterSize {
 		return fmt.Errorf("invalid bloom filter size: %d", len(bloom))
 	}
 
-	b := make([]byte, bloomFilterSize)
+	b := make([]byte, BloomFilterSize)
 	copy(b, bloom)
 
 	whisper.settings.Store(bloomFilterIdx, b)
-	whisper.notifyPeersAboutBloomFilterChange(ctx, b)
+	whisper.notifyPeersAboutBloomFilterChange(b)
 
 	go func() {
 		// allow some time before all the peers have processed the notification
@@ -255,13 +252,13 @@ func (whisper *Whisper) SetBloomFilter(ctx context.Context, bloom []byte) error 
 }
 
 // SetMinimumPoW sets the minimal PoW required by this node
-func (whisper *Whisper) SetMinimumPoW(ctx context.Context, val float64) error {
+func (whisper *Whisper) SetMinimumPoW(val float64) error {
 	if val < 0.0 {
 		return fmt.Errorf("invalid PoW: %f", val)
 	}
 
 	whisper.settings.Store(minPowIdx, val)
-	whisper.notifyPeersAboutPowRequirementChange(ctx, val)
+	whisper.notifyPeersAboutPowRequirementChange(val)
 
 	go func() {
 		// allow some time before all the peers have processed the notification
@@ -273,24 +270,44 @@ func (whisper *Whisper) SetMinimumPoW(ctx context.Context, val float64) error {
 }
 
 // SetMinimumPowTest sets the minimal PoW in test environment
-func (whisper *Whisper) SetMinimumPowTest(ctx context.Context, val float64) {
-	ctx, span := trace.StartSpan(ctx, "Whisper.SetMinimumPowTest")
-	defer span.End()
+func (whisper *Whisper) SetMinimumPowTest(val float64) {
 	whisper.settings.Store(minPowIdx, val)
-	whisper.notifyPeersAboutPowRequirementChange(ctx, val)
+	whisper.notifyPeersAboutPowRequirementChange(val)
 	whisper.settings.Store(minPowToleranceIdx, val)
 }
 
-func (whisper *Whisper) notifyPeersAboutPowRequirementChange(ctx context.Context, pow float64) {
-	ctx, span := trace.StartSpan(ctx, "whisper.notifyPeersaboutPowRewuirementChange")
-	defer span.End()
+//SetLightClientMode makes node light client (does not forward any messages)
+func (whisper *Whisper) SetLightClientMode(v bool) {
+	whisper.settings.Store(lightClientModeIdx, v)
+}
 
+//LightClientMode indicates is this node is light client (does not forward any messages)
+func (whisper *Whisper) LightClientMode() bool {
+	val, exist := whisper.settings.Load(lightClientModeIdx)
+	if !exist || val == nil {
+		return false
+	}
+	v, ok := val.(bool)
+	return v && ok
+}
+
+//LightClientModeConnectionRestricted indicates that connection to light client in light client mode not allowed
+func (whisper *Whisper) LightClientModeConnectionRestricted() bool {
+	val, exist := whisper.settings.Load(restrictConnectionBetweenLightClientsIdx)
+	if !exist || val == nil {
+		return false
+	}
+	v, ok := val.(bool)
+	return v && ok
+}
+
+func (whisper *Whisper) notifyPeersAboutPowRequirementChange(pow float64) {
 	arr := whisper.getPeers()
 	for _, p := range arr {
-		err := p.notifyAboutPowRequirementChange(ctx, pow)
+		err := p.notifyAboutPowRequirementChange(pow)
 		if err != nil {
 			// allow one retry
-			err = p.notifyAboutPowRequirementChange(ctx, pow)
+			err = p.notifyAboutPowRequirementChange(pow)
 		}
 		if err != nil {
 			log.Warn("failed to notify peer about new pow requirement", "peer", p.ID(), "error", err)
@@ -298,16 +315,13 @@ func (whisper *Whisper) notifyPeersAboutPowRequirementChange(ctx context.Context
 	}
 }
 
-func (whisper *Whisper) notifyPeersAboutBloomFilterChange(ctx context.Context, bloom []byte) {
-	ctx, span := trace.StartSpan(ctx, "Whisper.notifyPeersAboutBloomFilterChange")
-	defer span.End()
-
+func (whisper *Whisper) notifyPeersAboutBloomFilterChange(bloom []byte) {
 	arr := whisper.getPeers()
 	for _, p := range arr {
-		err := p.notifyAboutBloomFilterChange(ctx, bloom)
+		err := p.notifyAboutBloomFilterChange(bloom)
 		if err != nil {
 			// allow one retry
-			err = p.notifyAboutBloomFilterChange(ctx, bloom)
+			err = p.notifyAboutBloomFilterChange(bloom)
 		}
 		if err != nil {
 			log.Warn("failed to notify peer about new bloom filter", "peer", p.ID(), "error", err)
@@ -347,9 +361,7 @@ func (whisper *Whisper) AllowP2PMessagesFromPeer(peerID []byte) error {
 	if err != nil {
 		return err
 	}
-	p.mu.Lock()
 	p.trusted = true
-	p.mu.Unlock()
 	return nil
 }
 
@@ -358,28 +370,26 @@ func (whisper *Whisper) AllowP2PMessagesFromPeer(peerID []byte) error {
 // request and respond with a number of peer-to-peer messages (possibly expired),
 // which are not supposed to be forwarded any further.
 // The whisper protocol is agnostic of the format and contents of envelope.
-func (whisper *Whisper) RequestHistoricMessages(ctx context.Context, peerID []byte, envelope *Envelope) error {
+func (whisper *Whisper) RequestHistoricMessages(peerID []byte, envelope *Envelope) error {
 	p, err := whisper.getPeer(peerID)
 	if err != nil {
 		return err
 	}
-	p.mu.Lock()
 	p.trusted = true
-	p.mu.Unlock()
 	return p2p.Send(p.ws, p2pRequestCode, envelope)
 }
 
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
-func (whisper *Whisper) SendP2PMessage(ctx context.Context, peerID []byte, envelope *Envelope) error {
+func (whisper *Whisper) SendP2PMessage(peerID []byte, envelope *Envelope) error {
 	p, err := whisper.getPeer(peerID)
 	if err != nil {
 		return err
 	}
-	return whisper.SendP2PDirect(ctx, p, envelope)
+	return whisper.SendP2PDirect(p, envelope)
 }
 
 // SendP2PDirect sends a peer-to-peer message to a specific peer.
-func (whisper *Whisper) SendP2PDirect(ctx context.Context, peer *Peer, envelope *Envelope) error {
+func (whisper *Whisper) SendP2PDirect(peer *Peer, envelope *Envelope) error {
 	return p2p.Send(peer.ws, p2pMessageCode, envelope)
 }
 
@@ -438,7 +448,7 @@ func (whisper *Whisper) AddKeyPair(key *ecdsa.PrivateKey) (string, error) {
 	return id, nil
 }
 
-// HasKeyPair checks if the the whisper node is configured with the private key
+// HasKeyPair checks if the whisper node is configured with the private key
 // of the specified public pair.
 func (whisper *Whisper) HasKeyPair(id string) bool {
 	whisper.keyMu.RLock()
@@ -565,27 +575,25 @@ func (whisper *Whisper) GetSymKey(id string) ([]byte, error) {
 func (whisper *Whisper) Subscribe(f *Filter) (string, error) {
 	s, err := whisper.filters.Install(f)
 	if err == nil {
-		whisper.updateBloomFilter(context.Background(), f)
+		whisper.updateBloomFilter(f)
 	}
 	return s, err
 }
 
 // updateBloomFilter recalculates the new value of bloom filter,
 // and informs the peers if necessary.
-func (whisper *Whisper) updateBloomFilter(ctx context.Context, f *Filter) {
-	ctx, span := trace.StartSpan(ctx, "Whisper.updateBloomFilter")
-	defer span.End()
-	aggregate := make([]byte, bloomFilterSize)
+func (whisper *Whisper) updateBloomFilter(f *Filter) {
+	aggregate := make([]byte, BloomFilterSize)
 	for _, t := range f.Topics {
 		top := BytesToTopic(t)
 		b := TopicToBloom(top)
 		aggregate = addBloom(aggregate, b)
 	}
 
-	if !bloomFilterMatch(whisper.BloomFilter(), aggregate) {
+	if !BloomFilterMatch(whisper.BloomFilter(), aggregate) {
 		// existing bloom filter must be updated
 		aggregate = addBloom(whisper.BloomFilter(), aggregate)
-		whisper.SetBloomFilter(ctx, aggregate)
+		whisper.SetBloomFilter(aggregate)
 	}
 }
 
@@ -606,11 +614,8 @@ func (whisper *Whisper) Unsubscribe(id string) error {
 // Send injects a message into the whisper send queue, to be distributed in the
 // network in the coming cycles.
 func (whisper *Whisper) Send(envelope *Envelope) error {
-	ok, err := whisper.add(envelope)
-	if err != nil {
-		return err
-	}
-	if !ok {
+	ok, err := whisper.add(envelope, false)
+	if err == nil && !ok {
 		return fmt.Errorf("failed to add envelope")
 	}
 	return err
@@ -670,7 +675,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 		// fetch the next packet
 		packet, err := rw.ReadMsg()
 		if err != nil {
-			log.Warn("message loop", "peer", p.peer.ID(), "err", err)
+			log.Info("message loop", "peer", p.peer.ID(), "err", err)
 			return err
 		}
 		if packet.Size > whisper.MaxMessageSize() {
@@ -692,7 +697,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 
 			trouble := false
 			for _, env := range envelopes {
-				cached, err := whisper.add(env)
+				cached, err := whisper.add(env, whisper.LightClientMode())
 				if err != nil {
 					trouble = true
 					log.Error("bad envelope received, peer will be disconnected", "peer", p.peer.ID(), "err", err)
@@ -718,13 +723,11 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 				log.Warn("invalid value in powRequirementCode message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
 				return errors.New("invalid value in powRequirementCode message")
 			}
-			p.mu.Lock()
 			p.powRequirement = f
-			p.mu.Unlock()
 		case bloomFilterExCode:
 			var bloom []byte
 			err := packet.Decode(&bloom)
-			if err == nil && len(bloom) != bloomFilterSize {
+			if err == nil && len(bloom) != BloomFilterSize {
 				err = fmt.Errorf("wrong bloom filter size %d", len(bloom))
 			}
 
@@ -738,10 +741,7 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 			// this message is not supposed to be forwarded to other peers, and
 			// therefore might not satisfy the PoW, expiry and other requirements.
 			// these messages are only accepted from the trusted peer.
-			p.mu.RLock()
-			trusted := p.trusted
-			p.mu.RUnlock()
-			if trusted {
+			if p.trusted {
 				var envelope Envelope
 				if err := packet.Decode(&envelope); err != nil {
 					log.Warn("failed to decode direct message, peer will be disconnected", "peer", p.peer.ID(), "err", err)
@@ -771,7 +771,8 @@ func (whisper *Whisper) runMessageLoop(p *Peer, rw p2p.MsgReadWriter) error {
 // add inserts a new envelope into the message pool to be distributed within the
 // whisper network. It also inserts the envelope into the expiration pool at the
 // appropriate time-stamp. In case of error, connection should be dropped.
-func (whisper *Whisper) add(envelope *Envelope) (bool, error) {
+// param isP2P indicates whether the message is peer-to-peer (should not be forwarded).
+func (whisper *Whisper) add(envelope *Envelope, isP2P bool) (bool, error) {
 	now := uint32(time.Now().Unix())
 	sent := envelope.Expiry - envelope.TTL
 
@@ -804,11 +805,11 @@ func (whisper *Whisper) add(envelope *Envelope) (bool, error) {
 		}
 	}
 
-	if !bloomFilterMatch(whisper.BloomFilter(), envelope.Bloom()) {
+	if !BloomFilterMatch(whisper.BloomFilter(), envelope.Bloom()) {
 		// maybe the value was recently changed, and the peers did not adjust yet.
 		// in this case the previous value is retrieved by BloomFilterTolerance()
 		// for a short period of peer synchronization.
-		if !bloomFilterMatch(whisper.BloomFilterTolerance(), envelope.Bloom()) {
+		if !BloomFilterMatch(whisper.BloomFilterTolerance(), envelope.Bloom()) {
 			return false, fmt.Errorf("envelope does not match bloom filter, hash=[%v], bloom: \n%x \n%x \n%x",
 				envelope.Hash().Hex(), whisper.BloomFilter(), envelope.Bloom(), envelope.Topic)
 		}
@@ -836,7 +837,7 @@ func (whisper *Whisper) add(envelope *Envelope) (bool, error) {
 		whisper.statsMu.Lock()
 		whisper.stats.memoryUsed += envelope.size()
 		whisper.statsMu.Unlock()
-		whisper.postEvent(envelope, false) // notify the local node about the new message
+		whisper.postEvent(envelope, isP2P) // notify the local node about the new message
 		if whisper.mailServer != nil {
 			whisper.mailServer.Archive(envelope)
 		}
@@ -951,24 +952,6 @@ func (whisper *Whisper) Envelopes() []*Envelope {
 	return all
 }
 
-// Messages iterates through all currently floating envelopes
-// and retrieves all the messages, that this filter could decrypt.
-func (whisper *Whisper) Messages(id string) []*ReceivedMessage {
-	result := make([]*ReceivedMessage, 0)
-	whisper.poolMu.RLock()
-	defer whisper.poolMu.RUnlock()
-
-	if filter := whisper.filters.Get(id); filter != nil {
-		for _, env := range whisper.envelopes {
-			msg := filter.processEnvelope(env)
-			if msg != nil {
-				result = append(result, msg)
-			}
-		}
-	}
-	return result
-}
-
 // isEnvelopeCached checks if envelope with specific hash has already been received and cached.
 func (whisper *Whisper) isEnvelopeCached(hash common.Hash) bool {
 	whisper.poolMu.Lock()
@@ -1066,12 +1049,12 @@ func isFullNode(bloom []byte) bool {
 	return true
 }
 
-func bloomFilterMatch(filter, sample []byte) bool {
+func BloomFilterMatch(filter, sample []byte) bool {
 	if filter == nil {
 		return true
 	}
 
-	for i := 0; i < bloomFilterSize; i++ {
+	for i := 0; i < BloomFilterSize; i++ {
 		f := filter[i]
 		s := sample[i]
 		if (f | s) != f {
@@ -1083,8 +1066,8 @@ func bloomFilterMatch(filter, sample []byte) bool {
 }
 
 func addBloom(a, b []byte) []byte {
-	c := make([]byte, bloomFilterSize)
-	for i := 0; i < bloomFilterSize; i++ {
+	c := make([]byte, BloomFilterSize)
+	for i := 0; i < BloomFilterSize; i++ {
 		c[i] = a[i] | b[i]
 	}
 	return c

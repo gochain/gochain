@@ -126,6 +126,29 @@ func New(conf *Config) (*Node, error) {
 	}, nil
 }
 
+// Close stops the Node and releases resources acquired in
+// Node constructor New.
+func (n *Node) Close() error {
+	var errs []error
+
+	// Terminate all subsystems and collect any errors
+	if err := n.Stop(); err != nil && err != ErrNodeStopped {
+		errs = append(errs, err)
+	}
+	if err := n.accman.Close(); err != nil {
+		errs = append(errs, err)
+	}
+	// Report any errors that might have occurred
+	switch len(errs) {
+	case 0:
+		return nil
+	case 1:
+		return errs[0]
+	default:
+		return fmt.Errorf("%v", errs)
+	}
+}
+
 // Register injects a new service into the node's stack. The service created by
 // the passed constructor must be unique in its type with regard to sibling ones.
 func (n *Node) Register(constructor ServiceConstructor) error {
@@ -202,14 +225,12 @@ func (n *Node) Start() error {
 		return convertFileLockError(err)
 	}
 	// Start each of the services
-	started := []reflect.Type{}
+	var started []reflect.Type
 	for kind, service := range services {
 		// Start the next service, stopping all previous upon failure
 		if err := service.Start(running); err != nil {
 			for _, kind := range started {
-				if err := services[kind].Stop(); err != nil {
-					log.Error("Cannot stop node service", "err", err)
-				}
+				services[kind].Stop()
 			}
 			running.Stop()
 
@@ -221,9 +242,7 @@ func (n *Node) Start() error {
 	// Lastly start the configured RPC interfaces
 	if err := n.startRPC(services); err != nil {
 		for _, service := range services {
-			if err := service.Stop(); err != nil {
-				log.Error("Cannot stop node service", "err", err)
-			}
+			service.Stop()
 		}
 		running.Stop()
 		return err
@@ -296,7 +315,7 @@ func (n *Node) startInProc(apis []rpc.API) error {
 		if err := handler.RegisterName(api.Namespace, api.Service); err != nil {
 			return err
 		}
-		n.log.Debug("InProc registered", "service", api.Service, "namespace", api.Namespace)
+		n.log.Debug("InProc registered", "namespace", api.Namespace)
 	}
 	n.inprocHandler = handler
 	return nil
@@ -328,12 +347,10 @@ func (n *Node) startIPC(apis []rpc.API) error {
 // stopIPC terminates the IPC RPC endpoint.
 func (n *Node) stopIPC() {
 	if n.ipcListener != nil {
-		if err := n.ipcListener.Close(); err != nil {
-			log.Error("Cannot stop ipc listener", "err", err)
-		}
+		n.ipcListener.Close()
 		n.ipcListener = nil
 
-		n.log.Info("IPC endpoint closed", "endpoint", n.ipcEndpoint)
+		n.log.Info("IPC endpoint closed", "url", n.ipcEndpoint)
 	}
 	if n.ipcHandler != nil {
 		n.ipcHandler.Stop()
@@ -363,9 +380,7 @@ func (n *Node) startHTTP(endpoint string, apis []rpc.API, modules []string, cors
 // stopHTTP terminates the HTTP RPC endpoint.
 func (n *Node) stopHTTP() {
 	if n.httpListener != nil {
-		if err := n.httpListener.Close(); err != nil {
-			log.Error("Cannot stop node http listener", "err", err)
-		}
+		n.httpListener.Close()
 		n.httpListener = nil
 
 		n.log.Info("HTTP endpoint closed", "url", fmt.Sprintf("http://%s", n.httpEndpoint))
@@ -398,9 +413,7 @@ func (n *Node) startWS(endpoint string, apis []rpc.API, modules []string, wsOrig
 // stopWS terminates the websocket RPC endpoint.
 func (n *Node) stopWS() {
 	if n.wsListener != nil {
-		if err := n.wsListener.Close(); err != nil {
-			log.Error("Cannot stop node ws listener", "err", err)
-		}
+		n.wsListener.Close()
 		n.wsListener = nil
 
 		n.log.Info("WebSocket endpoint closed", "url", fmt.Sprintf("ws://%s", n.wsEndpoint))
@@ -564,11 +577,23 @@ func (n *Node) IPCEndpoint() string {
 
 // HTTPEndpoint retrieves the current HTTP endpoint used by the protocol stack.
 func (n *Node) HTTPEndpoint() string {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	if n.httpListener != nil {
+		return n.httpListener.Addr().String()
+	}
 	return n.httpEndpoint
 }
 
 // WSEndpoint retrieves the current WS endpoint used by the protocol stack.
 func (n *Node) WSEndpoint() string {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	if n.wsListener != nil {
+		return n.wsListener.Addr().String()
+	}
 	return n.wsEndpoint
 }
 
@@ -585,7 +610,7 @@ func (n *Node) OpenDatabase(name string, cache, handles int) (common.Database, e
 	if n.config.DataDir == "" {
 		return ethdb.NewMemDatabase(), nil
 	}
-	db := ethdb.NewDB(n.config.resolvePath(name))
+	db := ethdb.NewDB(n.config.ResolvePath(name))
 	if err := s3.ConfigureDB(db, n.config.Ethdb); err != nil {
 		return nil, err
 	} else if err := db.Open(); err != nil {
@@ -597,7 +622,7 @@ func (n *Node) OpenDatabase(name string, cache, handles int) (common.Database, e
 
 // ResolvePath returns the absolute path of a resource in the instance directory.
 func (n *Node) ResolvePath(x string) string {
-	return n.config.resolvePath(x)
+	return n.config.ResolvePath(x)
 }
 
 // apis returns the collection of RPC descriptors this node offers.

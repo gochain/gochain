@@ -33,8 +33,8 @@ var (
 )
 
 // ReadDatabaseVersion retrieves the version number of the database.
-func ReadDatabaseVersion(db DatabaseReader) int {
-	var version int
+func ReadDatabaseVersion(db DatabaseReader) *uint64 {
+	var version uint64
 
 	var enc []byte
 	Must("get", func() (err error) {
@@ -46,17 +46,17 @@ func ReadDatabaseVersion(db DatabaseReader) int {
 	})
 	if err := rlp.DecodeBytes(enc, &version); err != nil {
 		log.Error("Failed to decode database version", "encoded", enc)
-		return 0
+		return nil
 	}
-	return version
+
+	return &version
 }
 
 // WriteDatabaseVersion stores the version number of the database
-func WriteDatabaseVersion(db DatabaseWriter, version int) {
+func WriteDatabaseVersion(db DatabaseWriter, version uint64) {
 	enc, err := rlp.EncodeToBytes(version)
 	if err != nil {
-		log.Error("Failed to encode database version", "version", version)
-		return
+		log.Crit("Failed to encode database version", "err", err)
 	}
 	Must("put database version", func() error {
 		return db.Put(databaseVersionKey, enc)

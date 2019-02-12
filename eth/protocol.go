@@ -21,8 +21,6 @@ import (
 	"io"
 	"math/big"
 
-	"github.com/gochain-io/gochain/v3/p2p"
-
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core"
 	"github.com/gochain-io/gochain/v3/core/types"
@@ -35,13 +33,13 @@ const (
 	eth63 = 63
 )
 
-// Official short name of the protocol used during capability negotiation.
+// ProtocolName is the official short name of the protocol used during capability negotiation.
 var ProtocolName = "eth"
 
-// Supported versions of the eth protocol (first is primary).
+// ProtocolVersions are the supported versions of the eth protocol (first is primary).
 var ProtocolVersions = []uint{eth63, eth62}
 
-// Number of implemented message corresponding to different protocol versions.
+// ProtocolLengths are the number of implemented message corresponding to different protocol versions.
 var ProtocolLengths = []uint64{17, 8}
 
 const ProtocolMaxMsgSize = 10 * 1024 * 1024 // Maximum cap on the size of a protocol message
@@ -49,20 +47,20 @@ const ProtocolMaxMsgSize = 10 * 1024 * 1024 // Maximum cap on the size of a prot
 // eth protocol message codes
 const (
 	// Protocol messages belonging to eth/62
-	StatusMsg          = p2p.StatusMsg
-	NewBlockHashesMsg  = p2p.NewBlockHashesMsg
-	TxMsg              = p2p.TxMsg
-	GetBlockHeadersMsg = p2p.GetBlockHeadersMsg
-	BlockHeadersMsg    = p2p.BlockHeadersMsg
-	GetBlockBodiesMsg  = p2p.GetBlockBodiesMsg
-	BlockBodiesMsg     = p2p.BlockBodiesMsg
-	NewBlockMsg        = p2p.NewBlockMsg
+	StatusMsg          = 0x00
+	NewBlockHashesMsg  = 0x01
+	TxMsg              = 0x02
+	GetBlockHeadersMsg = 0x03
+	BlockHeadersMsg    = 0x04
+	GetBlockBodiesMsg  = 0x05
+	BlockBodiesMsg     = 0x06
+	NewBlockMsg        = 0x07
 
 	// Protocol messages belonging to eth/63
-	GetNodeDataMsg = p2p.GetNodeDataMsg
-	NodeDataMsg    = p2p.NodeDataMsg
-	GetReceiptsMsg = p2p.GetReceiptsMsg
-	ReceiptsMsg    = p2p.ReceiptsMsg
+	GetNodeDataMsg = 0x0d
+	NodeDataMsg    = 0x0e
+	GetReceiptsMsg = 0x0f
+	ReceiptsMsg    = 0x10
 )
 
 type errCode int

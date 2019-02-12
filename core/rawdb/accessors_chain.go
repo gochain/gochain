@@ -339,6 +339,17 @@ func DeleteTd(db DatabaseDeleter, hash common.Hash, number uint64) {
 	})
 }
 
+// HasReceipts verifies the existence of all the transaction receipts belonging
+// to a block.
+func HasReceipts(db DatabaseReader, hash common.Hash, number uint64) bool {
+	var has bool
+	Must("has receipts", func() (err error) {
+		has, err = db.Has(numHashKey(blockReceiptsPrefix, number, hash))
+		return
+	})
+	return has
+}
+
 // ReadReceipts retrieves all the transaction receipts belonging to a block.
 func ReadReceipts(db DatabaseReader, hash common.Hash, number uint64) types.Receipts {
 	// Retrieve the flattened receipt slice

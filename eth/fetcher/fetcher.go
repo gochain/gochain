@@ -109,7 +109,6 @@ type Fetcher struct {
 	notify chan *announce
 	inject chan *inject
 
-	blockFilter  chan chan []*types.Block
 	headerFilter chan chan *headerFilterTask
 	bodyFilter   chan chan *bodyFilterTask
 
@@ -149,7 +148,6 @@ func New(getBlock blockRetrievalFn, verifyHeader headerVerifierFn, broadcastBloc
 	return &Fetcher{
 		notify:         make(chan *announce),
 		inject:         make(chan *inject),
-		blockFilter:    make(chan chan []*types.Block),
 		headerFilter:   make(chan chan *headerFilterTask),
 		bodyFilter:     make(chan chan *bodyFilterTask),
 		done:           make(chan common.Hash),
@@ -455,7 +453,7 @@ func (f *Fetcher) loop() {
 				if announce := f.fetching[hash]; announce != nil && announce.origin == task.peer && f.fetched[hash] == nil && f.completing[hash] == nil && f.queued[hash] == nil {
 					// If the delivered header does not match the promised number, drop the announcer
 					if header.Number.Uint64() != announce.number {
-						log.Error("Invalid block number fetched", "peer", announce.origin, "hash", header.Hash(), "announced", announce.number, "provided", header.Number)
+						log.Trace("Invalid block number fetched", "peer", announce.origin, "hash", header.Hash(), "announced", announce.number, "provided", header.Number)
 						f.dropPeer(announce.origin)
 						f.forgetHash(hash)
 						continue
@@ -639,13 +637,13 @@ func (f *Fetcher) enqueue(peer string, block *types.Block) {
 	}
 }
 
-// insert inserts a block into the chain. It is safe to run in a separate goroutine. If the block's number
-// is at the same height as the current import phase, if updates the phase states accordingly.
+// insert spawns a new goroutine to run a block insertion into the chain. If the
+// block's number is at the same height as the current import phase, it updates
+// the phase states accordingly.
 func (f *Fetcher) insert(peer string, block *types.Block) {
 	hash := block.Hash()
 	defer func() { f.done <- hash }()
-
-	log.Info("Importing propagated block", "peer", peer, "number", block.Number(), "hash", hash)
+	log.Debug("Importing propagated block", "peer", peer, "number", block.Number(), "hash", hash)
 
 	// If the parent's unknown, abort insertion
 	parent := f.getBlock(block.ParentHash())
@@ -665,13 +663,13 @@ func (f *Fetcher) insert(peer string, block *types.Block) {
 
 	default:
 		// Something went very wrong, drop the peer
-		log.Error("Propagated block verification failed", "peer", peer, "number", block.Number(), "hash", hash, "err", err)
+		log.Debug("Propagated block verification failed", "peer", peer, "number", block.Number(), "hash", hash, "err", err)
 		f.dropPeer(peer)
 		return
 	}
 	// Run the actual import and log any issues
 	if _, err := f.insertChain(types.Blocks{block}); err != nil {
-		log.Error("Propagated block import failed", "peer", peer, "number", block.Number(), "hash", hash, "err", err)
+		log.Debug("Propagated block import failed", "peer", peer, "number", block.Number(), "hash", hash, "err", err)
 		return
 	}
 	// If import succeeded, broadcast the block

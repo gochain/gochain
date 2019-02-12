@@ -297,7 +297,6 @@ var bindTests = []struct {
 		`[{"constant":true,"inputs":[],"name":"getter","outputs":[{"name":"","type":"string"},{"name":"","type":"int256"},{"name":"","type":"bytes32"}],"type":"function"}]`,
 		`
 			"math/big"
-			
 
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind"
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind/backends"
@@ -494,7 +493,7 @@ var bindTests = []struct {
 			}
 		`,
 	},
-	// Tests that gas estimation works for contracts with	weird gas mechanics too.
+	// Tests that gas estimation works for contracts with weird gas mechanics too.
 	{
 		`FunkyGasPattern`,
 		`
@@ -605,7 +604,7 @@ var bindTests = []struct {
 			}
 			function LowerUpperCollision() constant returns (int _res, int Res) {
 				return (1, 2);
-		  }
+			}
 			function UpperLowerCollision() constant returns (int _Res, int res) {
 				return (1, 2);
 			}
@@ -661,6 +660,7 @@ var bindTests = []struct {
 			a, b, _ = underscorer.UpperUpperCollision(nil)
 			a, b, _ = underscorer.PurelyUnderscoredOutput(nil)
 			a, b, _ = underscorer.AllPurelyUnderscoredOutput(nil)
+			a, _ = underscorer.UnderScoredFunc(nil)
 
 			fmt.Println(a, b, err)
 		`,
@@ -725,7 +725,7 @@ var bindTests = []struct {
 			key, _ := crypto.GenerateKey()
 			auth := bind.NewKeyedTransactor(key)
 			sim := backends.NewSimulatedBackend(core.GenesisAlloc{auth.From: {Balance: big.NewInt(10000000000)}})
-	
+
 			// Deploy an eventer contract
 			_, _, eventer, err := DeployEventer(auth, sim)
 			if err != nil {
