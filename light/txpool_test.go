@@ -76,7 +76,6 @@ func txPoolTestChainGen(i int, block *core.BlockGen) {
 }
 
 func TestTxPool(t *testing.T) {
-	ctx := context.Background()
 	for i := range testTx {
 		testTx[i], _ = types.SignTx(types.NewTransaction(uint64(i), acc1Addr, big.NewInt(10000), params.TxGas, nil, nil), types.HomesteadSigner{}, testBankKey)
 	}
@@ -95,7 +94,7 @@ func TestTxPool(t *testing.T) {
 		panic(err)
 	}
 
-	odr := &testOdr{sdb: sdb, ldb: ldb}
+	odr := &testOdr{sdb: sdb, ldb: ldb, indexerConfig: TestClientIndexerConfig}
 	relay := &testTxRelay{
 		send:    make(chan int, 1),
 		discard: make(chan int, 1),

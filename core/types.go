@@ -28,11 +28,11 @@ import (
 //
 type Validator interface {
 	// ValidateBody validates the given block's content.
-	ValidateBody(block *types.Block, checkParent bool) error
+	ValidateBody(block *types.Block) error
 
 	// ValidateState validates the given statedb and optionally the receipts and
 	// gas used.
-	ValidateState(block, parent *types.Block, state *state.StateDB, receipts types.Receipts, usedGas uint64) error
+	ValidateState(block *types.Block, state *state.StateDB, receipts types.Receipts, usedGas uint64) error
 }
 
 // Processor is an interface for processing blocks using a given initial state.

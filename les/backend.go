@@ -18,7 +18,6 @@
 package les
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -26,6 +25,7 @@ import (
 	"github.com/gochain-io/gochain/v3/accounts"
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/common/hexutil"
+	"github.com/gochain-io/gochain/v3/common/mclock"
 	"github.com/gochain-io/gochain/v3/consensus"
 	"github.com/gochain-io/gochain/v3/consensus/clique"
 	"github.com/gochain-io/gochain/v3/core"
@@ -47,26 +47,24 @@ import (
 )
 
 type LightGoChain struct {
-	config *eth.Config
+	lesCommons
 
 	odr         *LesOdr
 	relay       *LesTxRelay
 	chainConfig *params.ChainConfig
 	// Channel for shutting down the service
 	shutdownChan chan bool
-	// Handlers
-	peers           *peerSet
-	txPool          *light.TxPool
-	blockchain      *light.LightChain
-	protocolManager *ProtocolManager
-	serverPool      *serverPool
-	reqDist         *requestDistributor
-	retriever       *retrieveManager
-	// DB interfaces
-	chainDb common.Database // Block chain database
 
-	bloomRequests                              chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
-	bloomIndexer, chtIndexer, bloomTrieIndexer *core.ChainIndexer
+	// Handlers
+	peers      *peerSet
+	txPool     *light.TxPool
+	blockchain *light.LightChain
+	serverPool *serverPool
+	reqDist    *requestDistributor
+	retriever  *retrieveManager
+
+	bloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
+	bloomIndexer  *core.ChainIndexer
 
 	ApiBackend *LesApiBackend
 
@@ -80,8 +78,8 @@ type LightGoChain struct {
 	wg sync.WaitGroup
 }
 
-func New(ctx context.Context, sctx *node.ServiceContext, config *eth.Config) (*LightGoChain, error) {
-	chainDb, err := eth.CreateDB(sctx, config, "lightchaindata")
+func New(ctx *node.ServiceContext, config *eth.Config) (*LightGoChain, error) {
+	chainDb, err := ctx.OpenDatabase("lightchaindata", config.DatabaseCache, config.DatabaseHandles)
 	if err != nil {
 		return nil, err
 	}
@@ -106,30 +104,46 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *eth.Config) (*L
 		return nil, fmt.Errorf("invalid configuration, clique is nil: %v", chainConfig)
 	}
 	leth := &LightGoChain{
-		config:           config,
-		chainConfig:      chainConfig,
-		chainDb:          chainDb,
-		eventMux:         sctx.EventMux,
-		peers:            peers,
-		reqDist:          newRequestDistributor(peers, quitSync),
-		accountManager:   sctx.AccountManager,
-		engine:           clique.New(chainConfig.Clique, chainDb),
-		shutdownChan:     make(chan bool),
-		networkId:        config.NetworkId,
-		bloomRequests:    make(chan chan *bloombits.Retrieval),
-		bloomIndexer:     eth.NewBloomIndexer(chainDb, light.BloomTrieFrequency),
-		chtIndexer:       light.NewChtIndexer(chainDb, true),
-		bloomTrieIndexer: light.NewBloomTrieIndexer(chainDb, true),
+		lesCommons: lesCommons{
+			chainDb: chainDb,
+			config:  config,
+			iConfig: light.DefaultClientIndexerConfig,
+		},
+		chainConfig:    chainConfig,
+		eventMux:       ctx.EventMux,
+		peers:          peers,
+		reqDist:        newRequestDistributor(peers, quitSync, &mclock.System{}),
+		accountManager: ctx.AccountManager,
+		engine:         clique.New(chainConfig.Clique, chainDb),
+		shutdownChan:   make(chan bool),
+		networkId:      config.NetworkId,
+		bloomRequests:  make(chan chan *bloombits.Retrieval),
+		bloomIndexer:   eth.NewBloomIndexer(chainDb, params.BloomBitsBlocksClient, params.HelperTrieConfirmations),
 	}
 
+	var trustedNodes []string
+	if leth.config.ULC != nil {
+		trustedNodes = leth.config.ULC.TrustedServers
+	}
 	leth.relay = NewLesTxRelay(peers, leth.reqDist)
-	leth.serverPool = newServerPool(chainDb, quitSync, &leth.wg)
+	leth.serverPool = newServerPool(chainDb, quitSync, &leth.wg, trustedNodes)
 	leth.retriever = newRetrieveManager(peers, leth.reqDist, leth.serverPool)
-	leth.odr = NewLesOdr(chainDb, leth.chtIndexer, leth.bloomTrieIndexer, leth.bloomIndexer, leth.retriever)
+
+	leth.odr = NewLesOdr(chainDb, light.DefaultClientIndexerConfig, leth.retriever)
+	leth.chtIndexer = light.NewChtIndexer(chainDb, leth.odr, params.CHTFrequencyClient, params.HelperTrieConfirmations)
+	leth.bloomTrieIndexer = light.NewBloomTrieIndexer(chainDb, leth.odr, params.BloomBitsBlocksClient, params.BloomTrieFrequency)
+	leth.odr.SetIndexers(leth.chtIndexer, leth.bloomTrieIndexer, leth.bloomIndexer)
+
+	// Note: NewLightChain adds the trusted checkpoint so it needs an ODR with
+	// indexers already set but not started yet
 	if leth.blockchain, err = light.NewLightChain(leth.odr, leth.chainConfig, leth.engine); err != nil {
 		return nil, err
 	}
+	// Note: AddChildIndexer starts the update process for the child
+	leth.bloomIndexer.AddChildIndexer(leth.bloomTrieIndexer)
+	leth.chtIndexer.Start(leth.blockchain)
 	leth.bloomIndexer.Start(leth.blockchain)
+
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
@@ -138,13 +152,33 @@ func New(ctx context.Context, sctx *node.ServiceContext, config *eth.Config) (*L
 	}
 
 	leth.txPool = light.NewTxPool(leth.chainConfig, leth.blockchain, leth.relay)
-	if leth.protocolManager, err = NewProtocolManager(leth.chainConfig, true, ClientProtocolVersions, config.NetworkId, leth.eventMux, leth.peers, leth.blockchain, nil, chainDb, leth.odr, leth.relay, quitSync, &leth.wg); err != nil {
+
+	if leth.protocolManager, err = NewProtocolManager(
+		leth.chainConfig,
+		light.DefaultClientIndexerConfig,
+		true,
+		config.NetworkId,
+		leth.eventMux,
+		leth.engine,
+		leth.peers,
+		leth.blockchain,
+		nil,
+		chainDb,
+		leth.odr,
+		leth.relay,
+		leth.serverPool,
+		quitSync,
+		&leth.wg,
+		config.ULC); err != nil {
 		return nil, err
 	}
-	leth.ApiBackend = &LesApiBackend{
-		eth: leth,
-		gpo: nil,
+
+	if leth.protocolManager.isULCEnabled() {
+		log.Warn("Ultra light client is enabled", "trustedNodes", len(leth.protocolManager.ulc.trustedKeys), "minTrustedFraction", leth.protocolManager.ulc.minTrustedFraction)
+		leth.blockchain.DisableCheckFreq()
 	}
+	leth.ApiBackend = &LesApiBackend{eth: leth}
+
 	if g := leth.config.Genesis; g != nil {
 		leth.ApiBackend.initialSupply = g.Alloc.Total()
 	}
@@ -226,21 +260,21 @@ func (s *LightGoChain) ResetWithGenesisBlock(gb *types.Block) {
 func (s *LightGoChain) BlockChain() *light.LightChain      { return s.blockchain }
 func (s *LightGoChain) TxPool() *light.TxPool              { return s.txPool }
 func (s *LightGoChain) Engine() consensus.Engine           { return s.engine }
-func (s *LightGoChain) LesVersion() int                    { return int(s.protocolManager.SubProtocols[0].Version) }
+func (s *LightGoChain) LesVersion() int                    { return int(ClientProtocolVersions[0]) }
 func (s *LightGoChain) Downloader() *downloader.Downloader { return s.protocolManager.downloader }
 func (s *LightGoChain) EventMux() *core.InterfaceFeed      { return s.eventMux }
 
 // Protocols implements node.Service, returning all the currently configured
 // network protocols to start.
 func (s *LightGoChain) Protocols() []p2p.Protocol {
-	return s.protocolManager.SubProtocols
+	return s.makeProtocols(ClientProtocolVersions)
 }
 
 // Start implements node.Service, starting all internal goroutines needed by the
 // GoChain protocol implementation.
 func (s *LightGoChain) Start(srvr *p2p.Server) error {
-	s.startBloomHandlers()
 	log.Warn("Light client mode is an experimental feature")
+	s.startBloomHandlers(params.BloomBitsBlocksClient)
 	s.netRPCService = ethapi.NewPublicNetAPI(srvr, s.networkId)
 	// clients are searching for the first advertised protocol in the list
 	protocolVersion := AdvertiseProtocolVersions[0]

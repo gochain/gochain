@@ -3,7 +3,6 @@ module github.com/gochain-io/gochain/v3
 go 1.12
 
 require (
-	bazil.org/fuse v0.0.0-20180421153158-65cc252bf669
 	cloud.google.com/go v0.27.0 // indirect
 	contrib.go.opencensus.io/exporter/stackdriver v0.6.0
 	github.com/OneOfOne/xxhash v1.2.2 // indirect
@@ -39,8 +38,8 @@ require (
 	github.com/karalabe/hid v0.0.0-20180420081245-2b4488a37358
 	github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348 // indirect
 	github.com/maruel/panicparse v1.1.1 // indirect
-	github.com/mattn/go-colorable v0.0.9
-	github.com/mattn/go-isatty v0.0.3 // indirect
+	github.com/mattn/go-colorable v0.1.0
+	github.com/mattn/go-isatty v0.0.3
 	github.com/mattn/go-runewidth v0.0.2 // indirect
 	github.com/minio/minio-go v6.0.13+incompatible
 	github.com/mitchellh/go-homedir v0.0.0-20161203194507-b8bc1bf76747 // indirect
@@ -53,11 +52,12 @@ require (
 	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/pborman/uuid v0.0.0-20170612153648-e790cca94e6c
 	github.com/peterh/liner v0.0.0-20180310181206-6106ee4fe3e8
-	github.com/pkg/errors v0.8.0 // indirect
+	github.com/pkg/errors v0.8.0
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rjeczalik/notify v0.9.1
 	github.com/robertkrimen/otto v0.0.0-20180305042045-6c383dd335ef
-	github.com/rs/cors v1.3.0
+	github.com/rs/cors v0.0.0-20160617231935-a62a804a8a00
+	github.com/rs/xhandler v0.0.0-20170707052532-1eb70cf1520d // indirect
 	github.com/smartystreets/assertions v0.0.0-20190116191733-b6c0e53d7304 // indirect
 	github.com/smartystreets/goconvey v0.0.0-20181108003508-044398e4856c // indirect
 	github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72 // indirect

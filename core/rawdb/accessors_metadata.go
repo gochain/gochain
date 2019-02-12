@@ -55,8 +55,7 @@ func ReadDatabaseVersion(db DatabaseReader) *uint64 {
 func WriteDatabaseVersion(db DatabaseWriter, version uint64) {
 	enc, err := rlp.EncodeToBytes(version)
 	if err != nil {
-		log.Error("Failed to encode database version", "version", version)
-		return
+		log.Crit("Failed to encode database version", "err", err)
 	}
 	Must("put database version", func() error {
 		return db.Put(databaseVersionKey, enc)

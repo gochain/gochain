@@ -17,11 +17,11 @@
 package light
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/rlp"
 )
 
@@ -67,7 +67,7 @@ func (db *NodeSet) Get(key []byte) ([]byte, error) {
 	if entry, ok := db.nodes[string(key)]; ok {
 		return entry, nil
 	}
-	return nil, common.ErrNotFound
+	return nil, errors.New("not found")
 }
 
 // Has returns true if the node set contains the given key
@@ -110,9 +110,7 @@ func (db *NodeSet) Store(target common.Putter) {
 	defer db.lock.RUnlock()
 
 	for key, value := range db.nodes {
-		if err := target.Put([]byte(key), value); err != nil {
-			log.Error("Cannot write node set", "err", err)
-		}
+		target.Put([]byte(key), value)
 	}
 }
 
@@ -122,9 +120,7 @@ type NodeList []rlp.RawValue
 // Store writes the contents of the list to the given database
 func (n NodeList) Store(db common.Putter) {
 	for _, node := range n {
-		if err := db.Put(crypto.Keccak256(node), node); err != nil {
-			log.Error("Cannot write node list", "err", err)
-		}
+		db.Put(crypto.Keccak256(node), node)
 	}
 }
 

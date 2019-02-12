@@ -84,7 +84,6 @@ func Sender(signer Signer, tx *Transaction) (common.Address, error) {
 	if err != nil {
 		return common.Address{}, err
 	}
-
 	tx.from.Store(sigCache{signer: signer, from: addr})
 	return addr, nil
 }

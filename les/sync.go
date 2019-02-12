@@ -23,12 +23,6 @@ import (
 	"github.com/gochain-io/gochain/v3/core/rawdb"
 	"github.com/gochain-io/gochain/v3/eth/downloader"
 	"github.com/gochain-io/gochain/v3/light"
-	"github.com/gochain-io/gochain/v3/log"
-)
-
-const (
-	//forceSyncCycle      = 10 * time.Second // Time interval to force syncs, even if few peers are available
-	minDesiredPeerCount = 5 // Amount of peers desired to start syncing
 )
 
 // syncer is responsible for periodically synchronising with the network, both
@@ -81,7 +75,5 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	pm.blockchain.(*light.LightChain).SyncCht(ctx)
-	if err := pm.downloader.Synchronise(peer.id, peer.Head(), peer.Td(), downloader.LightSync); err != nil {
-		log.Error("Cannot synchronise downloader", "id", peer.id, "head", peer.Head(), "err", err)
-	}
+	pm.downloader.Synchronise(peer.id, peer.Head(), peer.Td(), downloader.LightSync)
 }

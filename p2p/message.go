@@ -25,61 +25,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gochain-io/gochain/v3/p2p/discover"
+	"github.com/gochain-io/gochain/v3/p2p/enode"
 	"github.com/gochain-io/gochain/v3/rlp"
 )
-
-// eth protocol message codes
-const (
-	// Protocol messages belonging to eth/62
-	StatusMsg          = 0x00
-	NewBlockHashesMsg  = 0x01
-	TxMsg              = 0x02
-	GetBlockHeadersMsg = 0x03
-	BlockHeadersMsg    = 0x04
-	GetBlockBodiesMsg  = 0x05
-	BlockBodiesMsg     = 0x06
-	NewBlockMsg        = 0x07
-
-	// Protocol messages belonging to eth/63
-	GetNodeDataMsg = 0x0d
-	NodeDataMsg    = 0x0e
-	GetReceiptsMsg = 0x0f
-	ReceiptsMsg    = 0x10
-)
-
-func MsgCodeString(code uint64) string {
-	switch code {
-	case StatusMsg:
-		return "Status"
-	case NewBlockHashesMsg:
-		return "NewBlockHashes"
-	case TxMsg:
-		return "Tx"
-	case GetBlockHeadersMsg:
-		return "GetBlockHeaders"
-	case BlockHeadersMsg:
-		return "BlockHeaders"
-	case GetBlockBodiesMsg:
-		return "GetBlockBodies"
-	case BlockBodiesMsg:
-		return "BlockBodiesMsg"
-	case NewBlockMsg:
-		return "NewBlock"
-
-	case GetNodeDataMsg:
-		return "GetNodeData"
-	case NodeDataMsg:
-		return "NodeData"
-	case GetReceiptsMsg:
-		return "GetReceipts"
-	case ReceiptsMsg:
-		return "Receipts"
-
-	default:
-		return fmt.Sprintf("Unrecognized: %x", code)
-	}
-}
 
 // Msg defines the structure of a p2p message.
 //
@@ -281,21 +229,20 @@ func ExpectMsg(r MsgReader, code uint64, content interface{}) error {
 	}
 	if content == nil {
 		return msg.Discard()
-	} else {
-		contentEnc, err := rlp.EncodeToBytes(content)
-		if err != nil {
-			panic("content encode error: " + err.Error())
-		}
-		if int(msg.Size) != len(contentEnc) {
-			return fmt.Errorf("message size mismatch: got %d, want %d", msg.Size, len(contentEnc))
-		}
-		actualContent, err := ioutil.ReadAll(msg.Payload)
-		if err != nil {
-			return err
-		}
-		if !bytes.Equal(actualContent, contentEnc) {
-			return fmt.Errorf("message payload mismatch:\ngot:  %x\nwant: %x", actualContent, contentEnc)
-		}
+	}
+	contentEnc, err := rlp.EncodeToBytes(content)
+	if err != nil {
+		panic("content encode error: " + err.Error())
+	}
+	if int(msg.Size) != len(contentEnc) {
+		return fmt.Errorf("message size mismatch: got %d, want %d", msg.Size, len(contentEnc))
+	}
+	actualContent, err := ioutil.ReadAll(msg.Payload)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(actualContent, contentEnc) {
+		return fmt.Errorf("message payload mismatch:\ngot:  %x\nwant: %x", actualContent, contentEnc)
 	}
 	return nil
 }
@@ -305,17 +252,17 @@ func ExpectMsg(r MsgReader, code uint64, content interface{}) error {
 type msgEventer struct {
 	MsgReadWriter
 
-	feed     *PeerFeed
-	peerID   discover.NodeID
+	feed     PeerEventSender
+	peerID   enode.ID
 	Protocol string
 }
 
 // newMsgEventer returns a msgEventer which sends message events to the given
 // feed
-func newMsgEventer(rw MsgReadWriter, feed *PeerFeed, peerID discover.NodeID, proto string) *msgEventer {
+func newMsgEventer(rw MsgReadWriter, sender PeerEventSender, peerID enode.ID, proto string) *msgEventer {
 	return &msgEventer{
 		MsgReadWriter: rw,
-		feed:          feed,
+		feed:          sender,
 		peerID:        peerID,
 		Protocol:      proto,
 	}
@@ -323,15 +270,15 @@ func newMsgEventer(rw MsgReadWriter, feed *PeerFeed, peerID discover.NodeID, pro
 
 // ReadMsg reads a message from the underlying MsgReadWriter and emits a
 // "message received" event
-func (self *msgEventer) ReadMsg() (Msg, error) {
-	msg, err := self.MsgReadWriter.ReadMsg()
+func (ev *msgEventer) ReadMsg() (Msg, error) {
+	msg, err := ev.MsgReadWriter.ReadMsg()
 	if err != nil {
 		return msg, err
 	}
-	self.feed.Send(&PeerEvent{
+	ev.feed.Send(&PeerEvent{
 		Type:     PeerEventTypeMsgRecv,
-		Peer:     self.peerID,
-		Protocol: self.Protocol,
+		Peer:     ev.peerID,
+		Protocol: ev.Protocol,
 		MsgCode:  &msg.Code,
 		MsgSize:  &msg.Size,
 	})
@@ -340,15 +287,15 @@ func (self *msgEventer) ReadMsg() (Msg, error) {
 
 // WriteMsg writes a message to the underlying MsgReadWriter and emits a
 // "message sent" event
-func (self *msgEventer) WriteMsg(msg Msg) error {
-	err := self.MsgReadWriter.WriteMsg(msg)
+func (ev *msgEventer) WriteMsg(msg Msg) error {
+	err := ev.MsgReadWriter.WriteMsg(msg)
 	if err != nil {
 		return err
 	}
-	self.feed.Send(&PeerEvent{
+	ev.feed.Send(&PeerEvent{
 		Type:     PeerEventTypeMsgSend,
-		Peer:     self.peerID,
-		Protocol: self.Protocol,
+		Peer:     ev.peerID,
+		Protocol: ev.Protocol,
 		MsgCode:  &msg.Code,
 		MsgSize:  &msg.Size,
 	})
@@ -357,8 +304,8 @@ func (self *msgEventer) WriteMsg(msg Msg) error {
 
 // Close closes the underlying MsgReadWriter if it implements the io.Closer
 // interface
-func (self *msgEventer) Close() error {
-	if v, ok := self.MsgReadWriter.(io.Closer); ok {
+func (ev *msgEventer) Close() error {
+	if v, ok := ev.MsgReadWriter.(io.Closer); ok {
 		return v.Close()
 	}
 	return nil

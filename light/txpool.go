@@ -47,24 +47,21 @@ var txPermanent = uint64(500)
 // always receive all locally signed transactions in the same order as they are
 // created.
 type TxPool struct {
-	config *params.ChainConfig
-	signer types.Signer
-	quit   chan bool
-
-	txFeed core.NewTxsFeed
-
+	config      *params.ChainConfig
+	signer      types.Signer
+	quit        chan bool
+	txFeed      core.NewTxsFeed
 	chainHeadCh chan core.ChainHeadEvent
-
-	mu       sync.RWMutex
-	chain    *LightChain
-	odr      OdrBackend
-	chainDb  common.Database
-	relay    TxRelayBackend
-	head     common.Hash
-	nonce    map[common.Address]uint64            // "pending" nonce
-	pending  map[common.Hash]*types.Transaction   // pending transactions by tx hash
-	mined    map[common.Hash][]*types.Transaction // mined transactions by block hash
-	clearIdx uint64                               // earliest block nr that can contain mined tx info
+	mu          sync.RWMutex
+	chain       *LightChain
+	odr         OdrBackend
+	chainDb     common.Database
+	relay       TxRelayBackend
+	head        common.Hash
+	nonce       map[common.Address]uint64            // "pending" nonce
+	pending     map[common.Hash]*types.Transaction   // pending transactions by tx hash
+	mined       map[common.Hash][]*types.Transaction // mined transactions by block hash
+	clearIdx    uint64                               // earliest block nr that can contain mined tx info
 
 	homestead bool
 }
@@ -183,6 +180,7 @@ func (pool *TxPool) checkMinedTxs(ctx context.Context, hash common.Hash, number 
 			return err
 		}
 		rawdb.WriteTxLookupEntries(pool.chainDb.GlobalTable(), block)
+
 		// Update the transaction pool's state
 		for _, tx := range list {
 			delete(pool.pending, tx.Hash())
@@ -307,7 +305,6 @@ func (pool *TxPool) setNewHead(head *types.Header) {
 func (pool *TxPool) Stop() {
 	// Unsubscribe all subscriptions.
 	pool.txFeed.Close()
-
 	// Unsubscribe subscriptions registered from blockchain
 	pool.chain.UnsubscribeChainHeadEvent(pool.chainHeadCh)
 	close(pool.quit)
@@ -416,22 +413,22 @@ func (pool *TxPool) add(ctx context.Context, tx *types.Transaction) error {
 
 // Add adds a transaction to the pool if valid and passes it to the tx relay
 // backend
-func (self *TxPool) Add(ctx context.Context, tx *types.Transaction) error {
-	self.mu.Lock()
-	defer self.mu.Unlock()
+func (pool *TxPool) Add(ctx context.Context, tx *types.Transaction) error {
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
 
 	data, err := rlp.EncodeToBytes(tx)
 	if err != nil {
 		return err
 	}
 
-	if err := self.add(ctx, tx); err != nil {
+	if err := pool.add(ctx, tx); err != nil {
 		return err
 	}
 	//fmt.Println("Send", tx.Hash())
-	self.relay.Send(types.Transactions{tx})
+	pool.relay.Send(types.Transactions{tx})
 
-	if err := self.chainDb.GlobalTable().Put(tx.Hash().Bytes(), data); err != nil {
+	if err := pool.chainDb.GlobalTable().Put(tx.Hash().Bytes(), data); err != nil {
 		log.Error("Cannot add to tx pool chain db", err)
 	}
 	return nil
@@ -439,26 +436,26 @@ func (self *TxPool) Add(ctx context.Context, tx *types.Transaction) error {
 
 // AddTransactions adds all valid transactions to the pool and passes them to
 // the tx relay backend
-func (self *TxPool) AddBatch(ctx context.Context, txs []*types.Transaction) {
-	self.mu.Lock()
-	defer self.mu.Unlock()
+func (pool *TxPool) AddBatch(ctx context.Context, txs []*types.Transaction) {
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
 	var sendTx types.Transactions
 
 	for _, tx := range txs {
-		if err := self.add(ctx, tx); err == nil {
+		if err := pool.add(ctx, tx); err == nil {
 			sendTx = append(sendTx, tx)
 		}
 	}
 	if len(sendTx) > 0 {
-		self.relay.Send(sendTx)
+		pool.relay.Send(sendTx)
 	}
 }
 
 // GetTransaction returns a transaction if it is contained in the pool
 // and nil otherwise.
-func (tp *TxPool) GetTransaction(hash common.Hash) *types.Transaction {
+func (pool *TxPool) GetTransaction(hash common.Hash) *types.Transaction {
 	// check the txs first
-	if tx, ok := tp.pending[hash]; ok {
+	if tx, ok := pool.pending[hash]; ok {
 		return tx
 	}
 	return nil
@@ -466,13 +463,13 @@ func (tp *TxPool) GetTransaction(hash common.Hash) *types.Transaction {
 
 // GetTransactions returns all currently processable transactions.
 // The returned slice may be modified by the caller.
-func (self *TxPool) GetTransactions() types.Transactions {
-	self.mu.RLock()
-	defer self.mu.RUnlock()
+func (pool *TxPool) GetTransactions() types.Transactions {
+	pool.mu.RLock()
+	defer pool.mu.RUnlock()
 
-	txs := make(types.Transactions, len(self.pending))
+	txs := make(types.Transactions, len(pool.pending))
 	i := 0
-	for _, tx := range self.pending {
+	for _, tx := range pool.pending {
 		txs[i] = tx
 		i++
 	}
@@ -481,14 +478,14 @@ func (self *TxPool) GetTransactions() types.Transactions {
 
 // Content retrieves the data content of the transaction pool, returning all the
 // pending as well as queued transactions, grouped by account and nonce.
-func (self *TxPool) Content(ctx context.Context) (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
-	self.mu.RLock()
-	defer self.mu.RUnlock()
+func (pool *TxPool) Content() (map[common.Address]types.Transactions, map[common.Address]types.Transactions) {
+	pool.mu.RLock()
+	defer pool.mu.RUnlock()
 
 	// Retrieve all the pending transactions and sort by account and by nonce
 	pending := make(map[common.Address]types.Transactions)
-	for _, tx := range self.pending {
-		account, _ := types.Sender(self.signer, tx)
+	for _, tx := range pool.pending {
+		account, _ := types.Sender(pool.signer, tx)
 		pending[account] = append(pending[account], tx)
 	}
 	// There are no queued transactions in a light pool, just return an empty map
@@ -497,22 +494,22 @@ func (self *TxPool) Content(ctx context.Context) (map[common.Address]types.Trans
 }
 
 // RemoveTransactions removes all given transactions from the pool.
-func (self *TxPool) RemoveTransactions(txs types.Transactions) {
-	self.mu.Lock()
-	defer self.mu.Unlock()
+func (pool *TxPool) RemoveTransactions(txs types.Transactions) {
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
+
 	var hashes []common.Hash
-	batch := self.chainDb.GlobalTable().NewBatch()
+	batch := pool.chainDb.GlobalTable().NewBatch()
 	for _, tx := range txs {
-		//self.RemoveTx(tx.Hash())
 		hash := tx.Hash()
-		delete(self.pending, hash)
+		delete(pool.pending, hash)
 		rawdb.Must("add tx delete to batch", func() error {
 			return batch.Delete(hash[:])
 		})
 		hashes = append(hashes, hash)
 	}
 	rawdb.Must("batch delete txs", batch.Write)
-	self.relay.Discard(hashes)
+	pool.relay.Discard(hashes)
 }
 
 // RemoveTx removes the transaction with the given hash from the pool.

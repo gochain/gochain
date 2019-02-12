@@ -27,7 +27,7 @@ import (
 	"github.com/gochain-io/gochain/v3/rlp"
 )
 
-var sha3_nil = crypto.Keccak256Hash(nil)
+var sha3Nil = crypto.Keccak256Hash(nil)
 
 func GetHeaderByNumber(ctx context.Context, odr OdrBackend, number uint64) (*types.Header, error) {
 	db := odr.Database()
@@ -52,16 +52,16 @@ func GetHeaderByNumber(ctx context.Context, odr OdrBackend, number uint64) (*typ
 		for chtCount > 0 && canonicalHash != sectionHead && canonicalHash != (common.Hash{}) {
 			chtCount--
 			if chtCount > 0 {
-				sectionHeadNum = chtCount*CHTFrequencyClient - 1
+				sectionHeadNum = chtCount*odr.IndexerConfig().ChtSize - 1
 				sectionHead = odr.ChtIndexer().SectionHead(chtCount - 1)
 				canonicalHash = rawdb.ReadCanonicalHash(db, sectionHeadNum)
 			}
 		}
 	}
-	if number >= chtCount*CHTFrequencyClient {
+	if number >= chtCount*odr.IndexerConfig().ChtSize {
 		return nil, ErrNoTrustedCht
 	}
-	r := &ChtRequest{ChtRoot: GetChtRoot(db, chtCount-1, sectionHead), ChtNum: chtCount - 1, BlockNum: number}
+	r := &ChtRequest{ChtRoot: GetChtRoot(db, chtCount-1, sectionHead), ChtNum: chtCount - 1, BlockNum: number, Config: odr.IndexerConfig()}
 	if err := odr.Retrieve(ctx, r); err != nil {
 		return nil, err
 	}
@@ -170,9 +170,9 @@ func GetBlockLogs(ctx context.Context, odr OdrBackend, hash common.Hash, number 
 
 // GetBloomBits retrieves a batch of compressed bloomBits vectors belonging to the given bit index and section indexes
 func GetBloomBits(ctx context.Context, odr OdrBackend, bitIdx uint, sectionIdxList []uint64) ([][]byte, error) {
-	db := odr.Database()
-	result := make([][]byte, len(sectionIdxList))
 	var (
+		db      = odr.Database()
+		result  = make([][]byte, len(sectionIdxList))
 		reqList []uint64
 		reqIdx  []int
 	)
@@ -188,7 +188,7 @@ func GetBloomBits(ctx context.Context, odr OdrBackend, bitIdx uint, sectionIdxLi
 		for bloomTrieCount > 0 && canonicalHash != sectionHead && canonicalHash != (common.Hash{}) {
 			bloomTrieCount--
 			if bloomTrieCount > 0 {
-				sectionHeadNum = bloomTrieCount*BloomTrieFrequency - 1
+				sectionHeadNum = bloomTrieCount*odr.IndexerConfig().BloomTrieSize - 1
 				sectionHead = odr.BloomTrieIndexer().SectionHead(bloomTrieCount - 1)
 				canonicalHash = rawdb.ReadCanonicalHash(db, sectionHeadNum)
 			}
@@ -196,18 +196,28 @@ func GetBloomBits(ctx context.Context, odr OdrBackend, bitIdx uint, sectionIdxLi
 	}
 
 	for i, sectionIdx := range sectionIdxList {
-		sectionHead := rawdb.ReadCanonicalHash(db, (sectionIdx+1)*BloomTrieFrequency-1)
+		sectionHead := rawdb.ReadCanonicalHash(db, (sectionIdx+1)*odr.IndexerConfig().BloomSize-1)
 		// if we don't have the canonical hash stored for this section head number, we'll still look for
 		// an entry with a zero sectionHead (we store it with zero section head too if we don't know it
 		// at the time of the retrieval)
-		result[i] = rawdb.ReadBloomBits(db.GlobalTable(), bitIdx, sectionIdx, sectionHead)
-
+		bloomBits := rawdb.ReadBloomBits(db.GlobalTable(), bitIdx, sectionIdx, sectionHead)
+		if len(bloomBits) > 0 {
+			result[i] = bloomBits
+		} else {
+			// TODO(rjl493456442) Convert sectionIndex to BloomTrie relative index
+			if sectionIdx >= bloomTrieCount {
+				return nil, ErrNoTrustedBloomTrie
+			}
+			reqList = append(reqList, sectionIdx)
+			reqIdx = append(reqIdx, i)
+		}
 	}
 	if reqList == nil {
 		return result, nil
 	}
 
-	r := &BloomRequest{BloomTrieRoot: GetBloomTrieRoot(db, bloomTrieCount-1, sectionHead), BloomTrieNum: bloomTrieCount - 1, BitIdx: bitIdx, SectionIdxList: reqList}
+	r := &BloomRequest{BloomTrieRoot: GetBloomTrieRoot(db, bloomTrieCount-1, sectionHead), BloomTrieNum: bloomTrieCount - 1,
+		BitIdx: bitIdx, SectionIndexList: reqList, Config: odr.IndexerConfig()}
 	if err := odr.Retrieve(ctx, r); err != nil {
 		return nil, err
 	} else {

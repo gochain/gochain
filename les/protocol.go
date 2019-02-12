@@ -14,13 +14,10 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package les implements the Light Ethereum Subprotocol.
 package les
 
 import (
-	"bytes"
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"errors"
 	"fmt"
 	"io"
@@ -30,7 +27,7 @@ import (
 	"github.com/gochain-io/gochain/v3/core"
 	"github.com/gochain-io/gochain/v3/core/rawdb"
 	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/crypto/secp256k1"
+	"github.com/gochain-io/gochain/v3/p2p/enode"
 	"github.com/gochain-io/gochain/v3/rlp"
 )
 
@@ -82,6 +79,25 @@ const (
 	GetTxStatusMsg         = 0x14
 	TxStatusMsg            = 0x15
 )
+
+type requestInfo struct {
+	name     string
+	maxCount uint64
+}
+
+var requests = map[uint64]requestInfo{
+	GetBlockHeadersMsg:     {"GetBlockHeaders", MaxHeaderFetch},
+	GetBlockBodiesMsg:      {"GetBlockBodies", MaxBodyFetch},
+	GetReceiptsMsg:         {"GetReceipts", MaxReceiptFetch},
+	GetProofsV1Msg:         {"GetProofsV1", MaxProofsFetch},
+	GetCodeMsg:             {"GetCode", MaxCodeFetch},
+	SendTxMsg:              {"SendTx", MaxTxSend},
+	GetHeaderProofsMsg:     {"GetHeaderProofs", MaxHelperTrieProofsFetch},
+	GetProofsV2Msg:         {"GetProofsV2", MaxProofsFetch},
+	GetHelperTrieProofsMsg: {"GetHelperTrieProofs", MaxHelperTrieProofsFetch},
+	SendTxV2Msg:            {"SendTxV2", MaxTxSend},
+	GetTxStatusMsg:         {"GetTxStatus", MaxTxStatus},
+}
 
 type errCode int
 
@@ -148,22 +164,20 @@ func (a *announceData) sign(privKey *ecdsa.PrivateKey) {
 }
 
 // checkSignature verifies if the block announcement has a valid signature by the given pubKey
-func (a *announceData) checkSignature(pubKey *ecdsa.PublicKey) error {
+func (a *announceData) checkSignature(id enode.ID, update keyValueMap) error {
 	var sig []byte
-	if err := a.Update.decode().get("sign", &sig); err != nil {
+	if err := update.get("sign", &sig); err != nil {
 		return err
 	}
 	rlp, _ := rlp.EncodeToBytes(announceBlock{a.Hash, a.Number, a.Td})
-	recPubkey, err := secp256k1.RecoverPubkey(crypto.Keccak256(rlp), sig)
+	recPubkey, err := crypto.SigToPub(crypto.Keccak256(rlp), sig)
 	if err != nil {
 		return err
 	}
-	pbytes := elliptic.Marshal(pubKey.Curve, pubKey.X, pubKey.Y)
-	if bytes.Equal(pbytes, recPubkey) {
+	if id == enode.PubkeyToIDV4(recPubkey) {
 		return nil
-	} else {
-		return errors.New("Wrong signature")
 	}
+	return errors.New("wrong signature")
 }
 
 type blockInfo struct {

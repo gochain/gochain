@@ -100,7 +100,7 @@ func (s *Sync) AddSubTrie(root common.Hash, depth int, parent common.Hash, callb
 	}
 	key := root.Bytes()
 	blob, _ := s.database.Get(key)
-	if local, err := decodeNode(key, blob, 0); local != nil && err == nil {
+	if local, err := decodeNode(key, blob); local != nil && err == nil {
 		return
 	}
 	// Assemble the new sub-trie sync request
@@ -156,7 +156,7 @@ func (s *Sync) AddRawEntry(hash common.Hash, depth int, parent common.Hash) {
 
 // Missing retrieves the known missing nodes from the trie for retrieval.
 func (s *Sync) Missing(max int) []common.Hash {
-	requests := []common.Hash{}
+	var requests []common.Hash
 	for !s.queue.Empty() && (max == 0 || len(requests) < max) {
 		requests = append(requests, s.queue.PopItem().(common.Hash))
 	}
@@ -186,7 +186,7 @@ func (s *Sync) Process(results []SyncResult) (bool, int, error) {
 			continue
 		}
 		// Decode the node data content and update the request
-		node, err := decodeNode(item.Hash[:], item.Data, 0)
+		node, err := decodeNode(item.Hash[:], item.Data)
 		if err != nil {
 			return committed, i, err
 		}
@@ -253,7 +253,7 @@ func (s *Sync) children(req *request, object node) ([]*request, error) {
 		node  node
 		depth int
 	}
-	children := []child{}
+	var children []child
 
 	switch node := (object).(type) {
 	case *shortNode:

@@ -141,7 +141,7 @@ type cachedNode struct {
 	node node   // Cached collapsed trie node, or raw rlp data
 	size uint16 // Byte size of the useful cached data
 
-	parents  uint16                 // Number of live nodes referencing this one
+	parents  uint32                 // Number of live nodes referencing this one
 	children map[common.Hash]uint16 // External children referenced by this node
 
 	flushPrev common.Hash // Previous node in the flush-list
@@ -163,11 +163,11 @@ func (n *cachedNode) rlp() []byte {
 
 // obj returns the decoded and expanded trie node, either directly from the cache,
 // or by regenerating it from the rlp encoded blob.
-func (n *cachedNode) obj(hash common.Hash, cachegen uint16) node {
+func (n *cachedNode) obj(hash common.Hash) node {
 	if node, ok := n.node.(rawNode); ok {
-		return mustDecodeNode(hash[:], node, cachegen)
+		return mustDecodeNode(hash[:], node)
 	}
-	return expandNode(hash[:], n.node, cachegen)
+	return expandNode(hash[:], n.node)
 }
 
 // childs returns all the tracked children of this node, both the implicit ones
@@ -232,16 +232,15 @@ func simplifyNode(n node) node {
 
 // expandNode traverses the node hierarchy of a collapsed storage node and converts
 // all fields and keys into expanded memory form.
-func expandNode(hash hashNode, n node, cachegen uint16) node {
+func expandNode(hash hashNode, n node) node {
 	switch n := n.(type) {
 	case *rawShortNode:
 		// Short nodes need key and child expansion
 		return &shortNode{
 			Key: compactToHex(n.Key),
-			Val: expandNode(nil, n.Val, cachegen),
+			Val: expandNode(nil, n.Val),
 			flags: nodeFlag{
 				hash: hash,
-				gen:  cachegen,
 			},
 		}
 
@@ -250,12 +249,11 @@ func expandNode(hash hashNode, n node, cachegen uint16) node {
 		node := &fullNode{
 			flags: nodeFlag{
 				hash: hash,
-				gen:  cachegen,
 			},
 		}
 		for i := 0; i < len(node.Children); i++ {
 			if n[i] != nil {
-				node.Children[i] = expandNode(nil, n[i], cachegen)
+				node.Children[i] = expandNode(nil, n[i])
 			}
 		}
 		return node
@@ -358,13 +356,13 @@ func (db *Database) insertPreimage(hash common.Hash, preimage []byte) {
 
 // node retrieves a cached trie node from memory, or returns nil if none can be
 // found in the memory cache.
-func (db *Database) node(hash common.Hash, cachegen uint16) node {
+func (db *Database) node(hash common.Hash) node {
 	// Retrieve the node from the clean cache if available
 	if db.cleans != nil {
 		if enc, err := db.cleans.Get(string(hash[:])); err == nil && enc != nil {
 			memcacheCleanHitMeter.Mark(1)
 			memcacheCleanReadMeter.Mark(int64(len(enc)))
-			return mustDecodeNode(hash[:], enc, cachegen)
+			return mustDecodeNode(hash[:], enc)
 		}
 	}
 	// Retrieve the node from the dirty cache if available
@@ -373,7 +371,7 @@ func (db *Database) node(hash common.Hash, cachegen uint16) node {
 	db.lock.RUnlock()
 
 	if dirty != nil {
-		return dirty.obj(hash, cachegen)
+		return dirty.obj(hash)
 	}
 	// Content unavailable in memory, attempt to retrieve from disk
 	enc, err := db.diskdb.Get(hash[:])
@@ -385,7 +383,7 @@ func (db *Database) node(hash common.Hash, cachegen uint16) node {
 		memcacheCleanMissMeter.Mark(1)
 		memcacheCleanWriteMeter.Mark(int64(len(enc)))
 	}
-	return mustDecodeNode(hash[:], enc, cachegen)
+	return mustDecodeNode(hash[:], enc)
 }
 
 // Node retrieves an encoded cached trie node from memory. If it cannot be found
@@ -679,6 +677,7 @@ func (db *Database) Commit(node common.Hash, report bool) error {
 		}
 		if batch.ValueSize() > ethdb.IdealBatchSize {
 			if err := batch.Write(); err != nil {
+				db.lock.RUnlock()
 				return err
 			}
 			batch.Reset()
@@ -808,7 +807,7 @@ func (db *Database) verifyIntegrity() {
 		db.accumulate(child, reachable)
 	}
 	// Find any unreachable but cached nodes
-	unreachable := []string{}
+	var unreachable []string
 	for hash, node := range db.dirties {
 		if _, ok := reachable[hash]; !ok {
 			unreachable = append(unreachable, fmt.Sprintf("%x: {Node: %v, Parents: %d, Prev: %x, Next: %x}",

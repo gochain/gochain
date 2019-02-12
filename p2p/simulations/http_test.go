@@ -18,6 +18,7 @@ package simulations
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"math/rand"
 	"net/http/httptest"
@@ -29,22 +30,35 @@ import (
 
 	"github.com/gochain-io/gochain/v3/core"
 	"github.com/gochain-io/gochain/v3/event"
+	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/node"
 	"github.com/gochain-io/gochain/v3/p2p"
-	"github.com/gochain-io/gochain/v3/p2p/discover"
+	"github.com/gochain-io/gochain/v3/p2p/enode"
 	"github.com/gochain-io/gochain/v3/p2p/simulations/adapters"
 	"github.com/gochain-io/gochain/v3/rpc"
+	"github.com/mattn/go-colorable"
 )
+
+var (
+	loglevel = flag.Int("loglevel", 2, "verbosity of logs")
+)
+
+func init() {
+	flag.Parse()
+
+	log.PrintOrigins(true)
+	log.Root().SetHandler(log.LvlFilterHandler(log.Lvl(*loglevel), log.StreamHandler(colorable.NewColorableStderr(), log.TerminalFormat(true))))
+}
 
 // testService implements the node.Service interface and provides protocols
 // and APIs which are useful for testing nodes in a simulation network
 type testService struct {
-	id discover.NodeID
+	id enode.ID
 
 	// peerCount is incremented once a peer handshake has been performed
 	peerCount int64
 
-	peers    map[discover.NodeID]*testPeer
+	peers    map[enode.ID]*testPeer
 	peersMtx sync.Mutex
 
 	// state stores []byte which is used to test creating and loading
@@ -55,7 +69,7 @@ type testService struct {
 func newTestService(ctx *adapters.ServiceContext) (node.Service, error) {
 	svc := &testService{
 		id:    ctx.Config.ID,
-		peers: make(map[discover.NodeID]*testPeer),
+		peers: make(map[enode.ID]*testPeer),
 	}
 	svc.state.Store(ctx.Snapshot)
 	return svc, nil
@@ -66,7 +80,7 @@ type testPeer struct {
 	dumReady  chan struct{}
 }
 
-func (t *testService) peer(id discover.NodeID) *testPeer {
+func (t *testService) peer(id enode.ID) *testPeer {
 	t.peersMtx.Lock()
 	defer t.peersMtx.Unlock()
 	if peer, ok := t.peers[id]; ok {
@@ -281,7 +295,8 @@ var testServices = adapters.Services{
 	"test": newTestService,
 }
 
-func testHTTPServer() (*Network, *httptest.Server) {
+func testHTTPServer(t *testing.T) (*Network, *httptest.Server) {
+	t.Helper()
 	adapter := adapters.NewSimAdapter(testServices)
 	network := NewNetwork(adapter, &NetworkConfig{
 		DefaultService: "test",
@@ -293,7 +308,7 @@ func testHTTPServer() (*Network, *httptest.Server) {
 // API
 func TestHTTPNetwork(t *testing.T) {
 	// start the server
-	network, s := testHTTPServer()
+	network, s := testHTTPServer(t)
 	defer s.Close()
 
 	// subscribe to events so we can check them later
@@ -350,7 +365,8 @@ func startTestNetwork(t *testing.T, client *Client) []string {
 	nodeCount := 2
 	nodeIDs := make([]string, nodeCount)
 	for i := 0; i < nodeCount; i++ {
-		node, err := client.CreateNode(nil)
+		config := adapters.RandomNodeConfig()
+		node, err := client.CreateNode(config)
 		if err != nil {
 			t.Fatalf("error creating node: %s", err)
 		}
@@ -407,14 +423,15 @@ type expectEvents struct {
 }
 
 func (t *expectEvents) nodeEvent(id string, up bool) *Event {
+	node := Node{
+		Config: &adapters.NodeConfig{
+			ID: enode.HexID(id),
+		},
+		up: up,
+	}
 	return &Event{
 		Type: EventTypeNode,
-		Node: &Node{
-			Config: &adapters.NodeConfig{
-				ID: discover.MustHexID(id),
-			},
-			Up: up,
-		},
+		Node: &node,
 	}
 }
 
@@ -422,9 +439,9 @@ func (t *expectEvents) connEvent(one, other string, up bool) *Event {
 	return &Event{
 		Type: EventTypeConn,
 		Conn: &Conn{
-			One:   discover.MustHexID(one),
-			Other: discover.MustHexID(other),
-			up:    up,
+			One:   enode.HexID(one),
+			Other: enode.HexID(other),
+			Up:    up,
 		},
 	}
 }
@@ -466,6 +483,7 @@ loop:
 }
 
 func (t *expectEvents) expect(events ...*Event) {
+	t.Helper()
 	timeout := time.After(10 * time.Second)
 	i := 0
 	for {
@@ -487,8 +505,8 @@ func (t *expectEvents) expect(events ...*Event) {
 				if event.Node.ID() != expected.Node.ID() {
 					t.Fatalf("expected node event %d to have id %q, got %q", i, expected.Node.ID().TerminalString(), event.Node.ID().TerminalString())
 				}
-				if event.Node.Up != expected.Node.Up {
-					t.Fatalf("expected node event %d to have up=%t, got up=%t", i, expected.Node.Up, event.Node.Up)
+				if event.Node.Up() != expected.Node.Up() {
+					t.Fatalf("expected node event %d to have up=%t, got up=%t", i, expected.Node.Up(), event.Node.Up())
 				}
 
 			case EventTypeConn:
@@ -501,8 +519,8 @@ func (t *expectEvents) expect(events ...*Event) {
 				if event.Conn.Other != expected.Conn.Other {
 					t.Fatalf("expected conn event %d to have other=%q, got other=%q", i, expected.Conn.Other.TerminalString(), event.Conn.Other.TerminalString())
 				}
-				if event.Conn.Up() != expected.Conn.Up() {
-					t.Fatalf("expected conn event %d to have up=%t, got up=%t", i, expected.Conn.Up(), event.Conn.Up())
+				if event.Conn.Up != expected.Conn.Up {
+					t.Fatalf("expected conn event %d to have up=%t, got up=%t", i, expected.Conn.Up, event.Conn.Up)
 				}
 
 			}
@@ -524,12 +542,14 @@ func (t *expectEvents) expect(events ...*Event) {
 // TestHTTPNodeRPC tests calling RPC methods on nodes via the HTTP API
 func TestHTTPNodeRPC(t *testing.T) {
 	// start the server
-	_, s := testHTTPServer()
+	_, s := testHTTPServer(t)
 	defer s.Close()
 
 	// start a node in the network
 	client := NewClient(s.URL)
-	node, err := client.CreateNode(nil)
+
+	config := adapters.RandomNodeConfig()
+	node, err := client.CreateNode(config)
 	if err != nil {
 		t.Fatalf("error creating node: %s", err)
 	}
@@ -583,15 +603,32 @@ func TestHTTPNodeRPC(t *testing.T) {
 // TestHTTPSnapshot tests creating and loading network snapshots
 func TestHTTPSnapshot(t *testing.T) {
 	// start the server
-	_, s := testHTTPServer()
+	network, s := testHTTPServer(t)
 	defer s.Close()
+
+	var eventsDone = make(chan struct{})
+	count := 1
+	eventsDoneChan := make(chan *Event)
+	network.Events().Subscribe(eventsDoneChan, "simulations-TestHTTPSnapshot")
+	go func() {
+		for event := range eventsDoneChan {
+			if event.Type == EventTypeConn && !event.Control {
+				count--
+				if count == 0 {
+					eventsDone <- struct{}{}
+					return
+				}
+			}
+		}
+	}()
 
 	// create a two-node network
 	client := NewClient(s.URL)
 	nodeCount := 2
 	nodes := make([]*p2p.NodeInfo, nodeCount)
 	for i := 0; i < nodeCount; i++ {
-		node, err := client.CreateNode(nil)
+		config := adapters.RandomNodeConfig()
+		node, err := client.CreateNode(config)
 		if err != nil {
 			t.Fatalf("error creating node: %s", err)
 		}
@@ -618,7 +655,7 @@ func TestHTTPSnapshot(t *testing.T) {
 		}
 		states[i] = state
 	}
-
+	<-eventsDone
 	// create a snapshot
 	snap, err := client.CreateSnapshot()
 	if err != nil {
@@ -632,9 +669,22 @@ func TestHTTPSnapshot(t *testing.T) {
 	}
 
 	// create another network
-	_, s = testHTTPServer()
+	network2, s := testHTTPServer(t)
 	defer s.Close()
 	client = NewClient(s.URL)
+	count = 1
+	network2.Events().Subscribe(eventsDoneChan, "simulations-TestHTTPSnapshot")
+	go func() {
+		for event := range eventsDoneChan {
+			if event.Type == EventTypeConn && !event.Control {
+				count--
+				if count == 0 {
+					eventsDone <- struct{}{}
+					return
+				}
+			}
+		}
+	}()
 
 	// subscribe to events so we can check them later
 	events := make(chan *Event, 100)
@@ -649,6 +699,7 @@ func TestHTTPSnapshot(t *testing.T) {
 	if err := client.LoadSnapshot(snap); err != nil {
 		t.Fatalf("error loading snapshot: %s", err)
 	}
+	<-eventsDone
 
 	// check the nodes and connection exists
 	net, err := client.GetNetwork()
@@ -673,6 +724,9 @@ func TestHTTPSnapshot(t *testing.T) {
 	}
 	if conn.Other.String() != nodes[1].ID {
 		t.Fatalf("expected connection to have other=%q, got other=%q", nodes[1].ID, conn.Other)
+	}
+	if !conn.Up {
+		t.Fatal("should be up")
 	}
 
 	// check the node states were restored
@@ -707,7 +761,7 @@ func TestHTTPSnapshot(t *testing.T) {
 // with multiple protocols
 func TestMsgFilterPassMultiple(t *testing.T) {
 	// start the server
-	_, s := testHTTPServer()
+	_, s := testHTTPServer(t)
 	defer s.Close()
 
 	// subscribe to events with a message filter
@@ -737,7 +791,7 @@ func TestMsgFilterPassMultiple(t *testing.T) {
 // with a code wildcard
 func TestMsgFilterPassWildcard(t *testing.T) {
 	// start the server
-	_, s := testHTTPServer()
+	_, s := testHTTPServer(t)
 	defer s.Close()
 
 	// subscribe to events with a message filter
@@ -769,7 +823,7 @@ func TestMsgFilterPassWildcard(t *testing.T) {
 // with a single protocol and code
 func TestMsgFilterPassSingle(t *testing.T) {
 	// start the server
-	_, s := testHTTPServer()
+	_, s := testHTTPServer(t)
 	defer s.Close()
 
 	// subscribe to events with a message filter
@@ -798,7 +852,7 @@ func TestMsgFilterPassSingle(t *testing.T) {
 // filter
 func TestMsgFilterFailBadParams(t *testing.T) {
 	// start the server
-	_, s := testHTTPServer()
+	_, s := testHTTPServer(t)
 	defer s.Close()
 
 	client := NewClient(s.URL)

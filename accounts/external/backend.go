@@ -26,7 +26,6 @@ import (
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/common/hexutil"
 	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/internal/ethapi"
 	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/rpc"
@@ -51,11 +50,10 @@ func NewExternalBackend(endpoint string) (*ExternalBackend, error) {
 	}, nil
 }
 
-func (eb *ExternalBackend) Subscribe(sink chan<- accounts.WalletEvent) event.Subscription {
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		<-quit
-		return nil
-	})
+func (eb *ExternalBackend) Subscribe(sink chan<- accounts.WalletEvent, name string) {}
+
+func (eb *ExternalBackend) Unsubscribe(sink chan<- accounts.WalletEvent) {
+	close(sink)
 }
 
 // ExternalSigner provides an API to interact with an external signer (clef)

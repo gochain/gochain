@@ -30,16 +30,17 @@ import (
 
 // DefaultConfig contains default settings for use on the GoChain main net.
 var DefaultConfig = Config{
-	SyncMode:      downloader.FastSync,
-	NetworkId:     params.MainnetChainID,
-	LightPeers:    100,
-	DatabaseCache: 768,
-	TrieCache:     256,
-	TrieTimeout:   60 * time.Minute,
-	MinerGasFloor: params.TargetGasLimit,
-	MinerGasCeil:  params.TargetGasLimit,
-	MinerGasPrice: gasprice.Default,
-	MinerRecommit: 1 * time.Second,
+	SyncMode:       downloader.FastSync,
+	NetworkId:      params.MainnetChainID,
+	LightPeers:     100,
+	DatabaseCache:  512,
+	TrieCleanCache: 256,
+	TrieDirtyCache: 256,
+	TrieTimeout:    60 * time.Minute,
+	MinerGasFloor:  params.TargetGasLimit,
+	MinerGasCeil:   params.TargetGasLimit,
+	MinerGasPrice:  gasprice.Default,
+	MinerRecommit:  1 * time.Second,
 
 	TxPool: core.DefaultTxPoolConfig,
 	GPO: gasprice.Config{
@@ -60,16 +61,27 @@ type Config struct {
 	SyncMode  downloader.SyncMode
 	NoPruning bool
 
+	// Whitelist of required block number -> hash values to accept
+	Whitelist map[uint64]common.Hash `toml:"-"`
+
 	// Light client options
-	LightServ  int `toml:",omitempty"` // Maximum percentage of time allowed for serving LES requests
-	LightPeers int `toml:",omitempty"` // Maximum number of LES client peers
+	LightServ         int  `toml:",omitempty"` // Maximum percentage of time allowed for serving LES requests
+	LightBandwidthIn  int  `toml:",omitempty"` // Incoming bandwidth limit for light servers
+	LightBandwidthOut int  `toml:",omitempty"` // Outgoing bandwidth limit for light servers
+	LightPeers        int  `toml:",omitempty"` // Maximum number of LES client peers
+	OnlyAnnounce      bool // Maximum number of LES client peers
+
+	// Ultra Light client options
+	ULC *ULCConfig `toml:",omitempty"`
 
 	// Database options
 	SkipBcVersionCheck bool `toml:"-"`
 	DatabaseHandles    int  `toml:"-"`
 	DatabaseCache      int
-	TrieCache          int
-	TrieTimeout        time.Duration
+
+	TrieCleanCache int
+	TrieDirtyCache int
+	TrieTimeout    time.Duration
 
 	// Mining-related options
 	Etherbase      common.Address `toml:",omitempty"`

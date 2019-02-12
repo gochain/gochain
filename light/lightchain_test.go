@@ -99,9 +99,7 @@ func testFork(t *testing.T, LightChain *LightChain, i, n int, comparator func(td
 		t.Errorf("chain content mismatch at %d: have hash %v, want hash %v", i, hash2, hash1)
 	}
 	// Extend the newly created chain
-	header := LightChain2.CurrentHeader()
-
-	headerChainB := makeHeaderChain(header, n, db, forkSeed)
+	headerChainB := makeHeaderChain(LightChain2.CurrentHeader(), n, db, forkSeed)
 	if _, err := LightChain2.InsertHeaderChain(headerChainB, 1); err != nil {
 		t.Fatalf("failed to insert forking chain: %v", err)
 	}
@@ -126,10 +124,10 @@ func testHeaderChainImport(chain []*types.Header, lightchain *LightChain) error 
 			return err
 		}
 		// Manually insert the header into the database, but don't reorganize (allows subsequent testing)
-		lightchain.mu.Lock()
+		lightchain.chainmu.Lock()
 		rawdb.WriteTd(lightchain.chainDb.GlobalTable(), header.Hash(), header.Number.Uint64(), new(big.Int).Add(header.Difficulty, lightchain.GetTdByHash(header.ParentHash)))
 		rawdb.WriteHeader(lightchain.chainDb.GlobalTable(), lightchain.chainDb.HeaderTable(), header)
-		lightchain.mu.Unlock()
+		lightchain.chainmu.Unlock()
 	}
 	return nil
 }
@@ -240,8 +238,7 @@ func TestBrokenHeaderChain(t *testing.T) {
 		t.Fatalf("failed to make new canonical chain: %v", err)
 	}
 	// Create a forked chain, and try to insert with a missing link
-	header := LightChain.CurrentHeader()
-	chain := makeHeaderChain(header, 5, db, forkSeed)[1:]
+	chain := makeHeaderChain(LightChain.CurrentHeader(), 5, db, forkSeed)[1:]
 	if err := testHeaderChainImport(chain, LightChain); err == nil {
 		t.Errorf("broken header chain not reported")
 	}
@@ -270,7 +267,8 @@ func makeHeaderChainWithDiff(genesis *types.Block, d []int, seed byte) []*types.
 
 type dummyOdr struct {
 	OdrBackend
-	db common.Database
+	db            common.Database
+	indexerConfig *IndexerConfig
 }
 
 func (odr *dummyOdr) Database() common.Database {
@@ -279,6 +277,10 @@ func (odr *dummyOdr) Database() common.Database {
 
 func (odr *dummyOdr) Retrieve(ctx context.Context, req OdrRequest) error {
 	return nil
+}
+
+func (odr *dummyOdr) IndexerConfig() *IndexerConfig {
+	return odr.indexerConfig
 }
 
 // Tests that reorganizing a long difficult chain after a short easy one
@@ -331,7 +333,7 @@ func TestBadHeaderHashes(t *testing.T) {
 func TestReorgBadHeaderHashes(t *testing.T) {
 	bc := newTestLightChain()
 
-	// Create a chain, import and ban aferwards
+	// Create a chain, import and ban afterwards
 	headers := makeHeaderChainWithDiff(bc.genesisBlock, []int{1, 2, 3, 4}, 10)
 
 	if _, err := bc.InsertHeaderChain(headers, 1); err != nil {

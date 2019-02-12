@@ -340,6 +340,17 @@ func DeleteTd(db DatabaseDeleter, hash common.Hash, number uint64) {
 	})
 }
 
+// HasReceipts verifies the existence of all the transaction receipts belonging
+// to a block.
+func HasReceipts(db DatabaseReader, hash common.Hash, number uint64) bool {
+	var has bool
+	Must("has receipts", func() (err error) {
+		has, err = db.Has(numHashKey(blockReceiptsPrefix, number, hash))
+		return
+	})
+	return has
+}
+
 // ReadRawReceipts retrieves all the transaction receipts belonging to a block.
 // The receipt metadata fields are not guaranteed to be populated, so they
 // should not be used. Use ReadReceipts instead if the metadata is needed.

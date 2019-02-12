@@ -285,7 +285,6 @@ func benchReadChain(b *testing.B, full bool, count uint64) {
 				rawdb.ReadReceipts(db, hash, n, chain.Config())
 			}
 		}
-
 		chain.Stop()
 		db.Close()
 	}

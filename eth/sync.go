@@ -18,6 +18,7 @@ package eth
 
 import (
 	"math"
+	"math/rand"
 	"sync/atomic"
 	"time"
 
@@ -25,7 +26,7 @@ import (
 	"github.com/gochain-io/gochain/v3/core/types"
 	"github.com/gochain-io/gochain/v3/eth/downloader"
 	"github.com/gochain-io/gochain/v3/log"
-	"github.com/gochain-io/gochain/v3/p2p/discover"
+	"github.com/gochain-io/gochain/v3/p2p/enode"
 )
 
 const (
@@ -99,7 +100,7 @@ func (pm *ProtocolManager) txResyncLoop() {
 // the transactions in small packs to one peer at a time.
 func (pm *ProtocolManager) txsyncLoop() {
 	var (
-		pending = make(map[discover.NodeID]*txsync)
+		pending = make(map[enode.ID]*txsync)
 		sending = false               // whether a send is active
 		pack    = new(txsync)         // the pack that is being sent
 		done    = make(chan error, 1) // result of the send
@@ -128,8 +129,14 @@ func (pm *ProtocolManager) txsyncLoop() {
 
 	// pick chooses the next pending sync.
 	pick := func() *txsync {
+		if len(pending) == 0 {
+			return nil
+		}
+		n := rand.Intn(len(pending)) + 1
 		for _, s := range pending {
-			return s
+			if n--; n == 0 {
+				return s
+			}
 		}
 		return nil
 	}
@@ -145,7 +152,7 @@ func (pm *ProtocolManager) txsyncLoop() {
 			sending = false
 			// Stop tracking peers that cause send failures.
 			if err != nil {
-				pack.p.Log().Warn("Transaction send failed", "err", err)
+				pack.p.Log().Debug("Transaction send failed", "err", err)
 				delete(pending, pack.p.ID())
 			}
 			// Schedule the next send.

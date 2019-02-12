@@ -24,10 +24,9 @@ import (
 
 	"github.com/gochain-io/gochain/v3/common/hexutil"
 	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/metrics"
 	"github.com/gochain-io/gochain/v3/p2p"
-	"github.com/gochain-io/gochain/v3/p2p/discover"
+	"github.com/gochain-io/gochain/v3/p2p/enode"
 	"github.com/gochain-io/gochain/v3/rpc"
 )
 
@@ -52,7 +51,7 @@ func (api *PrivateAdminAPI) AddPeer(url string) (bool, error) {
 		return false, ErrNodeStopped
 	}
 	// Try to add the url as a static peer and return
-	node, err := discover.ParseNode(url)
+	node, err := enode.ParseV4(url)
 	if err != nil {
 		return false, fmt.Errorf("invalid enode: %v", err)
 	}
@@ -60,7 +59,7 @@ func (api *PrivateAdminAPI) AddPeer(url string) (bool, error) {
 	return true, nil
 }
 
-// RemovePeer disconnects from a a remote node if the connection exists
+// RemovePeer disconnects from a remote node if the connection exists
 func (api *PrivateAdminAPI) RemovePeer(url string) (bool, error) {
 	// Make sure the server is running, fail otherwise
 	server := api.node.Server()
@@ -68,11 +67,42 @@ func (api *PrivateAdminAPI) RemovePeer(url string) (bool, error) {
 		return false, ErrNodeStopped
 	}
 	// Try to remove the url as a static peer and return
-	node, err := discover.ParseNode(url)
+	node, err := enode.ParseV4(url)
 	if err != nil {
 		return false, fmt.Errorf("invalid enode: %v", err)
 	}
 	server.RemovePeer(node)
+	return true, nil
+}
+
+// AddTrustedPeer allows a remote node to always connect, even if slots are full
+func (api *PrivateAdminAPI) AddTrustedPeer(url string) (bool, error) {
+	// Make sure the server is running, fail otherwise
+	server := api.node.Server()
+	if server == nil {
+		return false, ErrNodeStopped
+	}
+	node, err := enode.ParseV4(url)
+	if err != nil {
+		return false, fmt.Errorf("invalid enode: %v", err)
+	}
+	server.AddTrustedPeer(node)
+	return true, nil
+}
+
+// RemoveTrustedPeer removes a remote node from the trusted peer set, but it
+// does not disconnect it automatically.
+func (api *PrivateAdminAPI) RemoveTrustedPeer(url string) (bool, error) {
+	// Make sure the server is running, fail otherwise
+	server := api.node.Server()
+	if server == nil {
+		return false, ErrNodeStopped
+	}
+	node, err := enode.ParseV4(url)
+	if err != nil {
+		return false, fmt.Errorf("invalid enode: %v", err)
+	}
+	server.RemoveTrustedPeer(node)
 	return true, nil
 }
 
@@ -103,9 +133,7 @@ func (api *PrivateAdminAPI) PeerEvents(ctx context.Context) (*rpc.Subscription, 
 				if !ok {
 					return
 				}
-				if err := notifier.Notify(rpcSub.ID, event); err != nil {
-					log.Error("Cannot notify peer event", "id", rpcSub.ID)
-				}
+				notifier.Notify(rpcSub.ID, event)
 			case <-rpcSub.Err():
 				return
 			case <-notifier.Closed():
@@ -221,7 +249,7 @@ func (api *PrivateAdminAPI) StartWS(host *string, port *int, allowedOrigins *str
 	return true, nil
 }
 
-// StopRPC terminates an already running websocket RPC API endpoint.
+// StopWS terminates an already running websocket RPC API endpoint.
 func (api *PrivateAdminAPI) StopWS() (bool, error) {
 	api.node.lock.Lock()
 	defer api.node.lock.Unlock()
@@ -312,6 +340,11 @@ func (api *PublicDebugAPI) Metrics(raw bool) (map[string]interface{}, error) {
 		// Fill the counter with the metric details, formatting if requested
 		if raw {
 			switch metric := metric.(type) {
+			case metrics.Counter:
+				root[name] = map[string]interface{}{
+					"Overall": float64(metric.Count()),
+				}
+
 			case metrics.Meter:
 				root[name] = map[string]interface{}{
 					"AvgRate01Min": metric.Rate1(),
@@ -337,11 +370,31 @@ func (api *PublicDebugAPI) Metrics(raw bool) (map[string]interface{}, error) {
 					},
 				}
 
+			case metrics.ResettingTimer:
+				t := metric.Snapshot()
+				ps := t.Percentiles([]float64{5, 20, 50, 80, 95})
+				root[name] = map[string]interface{}{
+					"Measurements": len(t.Values()),
+					"Mean":         t.Mean(),
+					"Percentiles": map[string]interface{}{
+						"5":  ps[0],
+						"20": ps[1],
+						"50": ps[2],
+						"80": ps[3],
+						"95": ps[4],
+					},
+				}
+
 			default:
 				root[name] = "Unknown metric type"
 			}
 		} else {
 			switch metric := metric.(type) {
+			case metrics.Counter:
+				root[name] = map[string]interface{}{
+					"Overall": float64(metric.Count()),
+				}
+
 			case metrics.Meter:
 				root[name] = map[string]interface{}{
 					"Avg01Min": format(metric.Rate1()*60, metric.Rate1()),
@@ -364,6 +417,21 @@ func (api *PublicDebugAPI) Metrics(raw bool) (map[string]interface{}, error) {
 						"50": time.Duration(metric.Percentile(0.5)).String(),
 						"80": time.Duration(metric.Percentile(0.8)).String(),
 						"95": time.Duration(metric.Percentile(0.95)).String(),
+					},
+				}
+
+			case metrics.ResettingTimer:
+				t := metric.Snapshot()
+				ps := t.Percentiles([]float64{5, 20, 50, 80, 95})
+				root[name] = map[string]interface{}{
+					"Measurements": len(t.Values()),
+					"Mean":         time.Duration(t.Mean()).String(),
+					"Percentiles": map[string]interface{}{
+						"5":  time.Duration(ps[0]).String(),
+						"20": time.Duration(ps[1]).String(),
+						"50": time.Duration(ps[2]).String(),
+						"80": time.Duration(ps[3]).String(),
+						"95": time.Duration(ps[4]).String(),
 					},
 				}
 

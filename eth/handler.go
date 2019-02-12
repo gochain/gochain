@@ -33,7 +33,7 @@ import (
 	"github.com/gochain-io/gochain/v3/eth/fetcher"
 	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/p2p"
-	"github.com/gochain-io/gochain/v3/p2p/discover"
+	"github.com/gochain-io/gochain/v3/p2p/enode"
 	"github.com/gochain-io/gochain/v3/params"
 	"github.com/gochain-io/gochain/v3/rlp"
 )
@@ -59,7 +59,7 @@ func errResp(code errCode, format string, v ...interface{}) error {
 }
 
 type ProtocolManager struct {
-	networkId uint64
+	networkID uint64
 
 	fastSync  uint32 // Flag whether fast sync is enabled (gets disabled if we already have blocks)
 	acceptTxs uint32 // Flag whether we're considered synchronised (enables transaction processing)
@@ -79,6 +79,8 @@ type ProtocolManager struct {
 	txsCh        chan core.NewTxsEvent
 	minedBlockCh chan interface{}
 
+	whitelist map[uint64]common.Hash
+
 	// channels for fetcher, syncer, txsyncLoop
 	newPeerCh   chan *peer
 	txsyncCh    chan *txsync
@@ -92,15 +94,16 @@ type ProtocolManager struct {
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The GoChain sub protocol manages peers capable
 // with the ethereum network.
-func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, networkId uint64, mux *core.InterfaceFeed, txpool txPool, engine consensus.Engine, blockchain *core.BlockChain, chaindb common.Database) (*ProtocolManager, error) {
+func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, networkID uint64, mux *core.InterfaceFeed, txpool txPool, engine consensus.Engine, blockchain *core.BlockChain, chaindb common.Database, whitelist map[uint64]common.Hash) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
-		networkId:    networkId,
+		networkID:    networkID,
 		eventMux:     mux,
 		txpool:       txpool,
 		blockchain:   blockchain,
 		chainconfig:  config,
 		peers:        newPeerSet(),
+		whitelist:    whitelist,
 		newPeerCh:    make(chan *peer),
 		noMorePeers:  make(chan struct{}),
 		txsyncCh:     make(chan *txsync),
@@ -142,7 +145,7 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 			NodeInfo: func() interface{} {
 				return manager.NodeInfo()
 			},
-			PeerInfo: func(id discover.NodeID) interface{} {
+			PeerInfo: func(id enode.ID) interface{} {
 				if p := manager.peers.Peer(fmt.Sprintf("%x", id[:8])); p != nil {
 					return p.Info()
 				}
@@ -261,7 +264,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 		number  = head.Number.Uint64()
 		td      = pm.blockchain.GetTd(hash, number)
 	)
-	if err := p.Handshake(pm.networkId, td, hash, genesis.Hash()); err != nil {
+	if err := p.Handshake(pm.networkID, td, hash, genesis.Hash()); err != nil {
 		p.Log().Debug("GoChain handshake failed", "err", err)
 		return err
 	}
@@ -283,7 +286,13 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	// after this will be sent via broadcasts.
 	pm.syncTransactions(p)
 
-	// main loop. handle incoming messages.
+	// If we have any explicit whitelist block hashes, request them
+	for number := range pm.whitelist {
+		if err := p.RequestHeadersByNumber(number, 1, 0, false); err != nil {
+			return err
+		}
+	}
+	// Handle incoming messages until the connection is torn down
 	for {
 		if err := pm.handleMsg(p); err != nil {
 			p.Log().Error("GoChain message handling failed", "err", err)
@@ -408,6 +417,14 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		// Filter out any explicitly requested headers, deliver the rest to the downloader
 		filter := len(headers) == 1
 		if filter {
+			// Otherwise if it's a whitelisted block, validate against the set
+			if want, ok := pm.whitelist[headers[0].Number.Uint64()]; ok {
+				if hash := headers[0].Hash(); want != hash {
+					p.Log().Info("Whitelist mismatch, dropping peer", "number", headers[0].Number.Uint64(), "hash", hash, "want", want)
+					return errors.New("whitelist block mismatch")
+				}
+				p.Log().Debug("Whitelist block verified", "number", headers[0].Number.Uint64(), "hash", want)
+			}
 			// Irrelevant of the fork checks, send the header to the fetcher just in case
 			headers = pm.fetcher.FilterHeaders(p.id, headers, time.Now())
 		}
@@ -634,7 +651,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			}
 			p.MarkTransaction(tx.Hash())
 		}
-		pm.txpool.AddRemotes(txs)
+		if errs := pm.txpool.AddRemotes(txs); len(errs) > 0 {
+			for _, err := range errs {
+				log.Debug("Remote tx add failed", "error", err)
+			}
+		}
 
 	default:
 		return errResp(ErrInvalidMsgCode, "%v", msg.Code)
@@ -711,7 +732,7 @@ type NodeInfo struct {
 func (pm *ProtocolManager) NodeInfo() *NodeInfo {
 	currentBlock := pm.blockchain.CurrentBlock()
 	return &NodeInfo{
-		Network:    pm.networkId,
+		Network:    pm.networkID,
 		Difficulty: pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64()),
 		Genesis:    pm.blockchain.Genesis().Hash(),
 		Config:     pm.blockchain.Config(),

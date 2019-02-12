@@ -21,7 +21,7 @@ import (
 
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/rlp"
 )
 
 type ltrInfo struct {
@@ -114,25 +114,22 @@ func (self *LesTxRelay) send(txs types.Transactions, count int) {
 	for p, list := range sendTo {
 		pp := p
 		ll := list
+		enc, _ := rlp.EncodeToBytes(ll)
 
 		reqID := genReqID()
 		rq := &distReq{
 			getCost: func(dp distPeer) uint64 {
 				peer := dp.(*peer)
-				return peer.GetRequestCost(SendTxMsg, len(ll))
+				return peer.GetTxRelayCost(len(ll), len(enc))
 			},
 			canSend: func(dp distPeer) bool {
-				return dp.(*peer) == pp
+				return !dp.(*peer).isOnlyAnnounce && dp.(*peer) == pp
 			},
 			request: func(dp distPeer) func() {
 				peer := dp.(*peer)
-				cost := peer.GetRequestCost(SendTxMsg, len(ll))
-				peer.fcServer.QueueRequest(reqID, cost)
-				return func() {
-					if err := peer.SendTxs(reqID, cost, ll); err != nil {
-						log.Error("Cannot send txs in relay", "req_id", reqID, "err", err)
-					}
-				}
+				cost := peer.GetTxRelayCost(len(ll), len(enc))
+				peer.fcServer.QueuedRequest(reqID, cost)
+				return func() { peer.SendTxs(reqID, cost, enc) }
 			},
 		}
 		self.reqDist.queue(rq)

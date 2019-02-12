@@ -127,7 +127,7 @@ func (b *BlockGen) TxNonce(addr common.Address) uint64 {
 // For index -1, PrevBlock returns the parent block given to GenerateChain.
 func (b *BlockGen) PrevBlock(index int) *types.Block {
 	if index >= b.i {
-		panic("block index out of range")
+		panic(fmt.Errorf("block index %d out of range (%d,%d)", index, -1, b.i))
 	}
 	if index == -1 {
 		return b.parent
@@ -156,13 +156,9 @@ func GenerateChain(config *params.ChainConfig, first *types.Block, engine consen
 		config = params.TestChainConfig
 	}
 	blocks, receipts := make(types.Blocks, n), make([]types.Receipts, n)
-
+	chainreader := &fakeChainReader{config: config}
 	genblock := func(i int, parent *types.Block, statedb *state.StateDB) (*types.Block, types.Receipts) {
-		// TODO(karalabe): This is needed for clique, which depends on multiple blocks.
-		// It's nonetheless ugly to spin up a blockchain here. Get rid of this somehow.
-		blockchain, _ := NewBlockChain(db, nil, config, engine, vm.Config{})
-		defer blockchain.Stop()
-		b := &BlockGen{i: i, parent: parent, chain: blocks, chainReader: blockchain, statedb: statedb, config: config, engine: engine}
+		b := &BlockGen{i: i, parent: parent, chain: blocks, chainReader: chainreader, statedb: statedb, config: config, engine: engine}
 
 		b.header = &types.Header{
 			Root:       statedb.IntermediateRoot(b.config.IsEIP158(parent.Number())),
@@ -234,3 +230,19 @@ func makeBlockChain(parent *types.Block, n int, engine consensus.Engine, db comm
 	})
 	return blocks
 }
+
+type fakeChainReader struct {
+	config  *params.ChainConfig
+	genesis *types.Block
+}
+
+// Config returns the chain configuration.
+func (cr *fakeChainReader) Config() *params.ChainConfig {
+	return cr.config
+}
+
+func (cr *fakeChainReader) CurrentHeader() *types.Header                            { return nil }
+func (cr *fakeChainReader) GetHeaderByNumber(number uint64) *types.Header           { return nil }
+func (cr *fakeChainReader) GetHeaderByHash(hash common.Hash) *types.Header          { return nil }
+func (cr *fakeChainReader) GetHeader(hash common.Hash, number uint64) *types.Header { return nil }
+func (cr *fakeChainReader) GetBlock(hash common.Hash, number uint64) *types.Block   { return nil }

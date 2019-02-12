@@ -31,7 +31,7 @@ func newEmptySecure() *SecureTrie {
 	diskdb := ethdb.NewMemDatabase()
 	triedb := NewDatabase(diskdb)
 
-	trie, _ := NewSecure(common.Hash{}, triedb, 0)
+	trie, _ := NewSecure(common.Hash{}, triedb)
 	return trie
 }
 
@@ -41,7 +41,7 @@ func makeTestSecureTrie() (*Database, *SecureTrie, map[string][]byte) {
 	diskdb := ethdb.NewMemDatabase()
 	triedb := NewDatabase(diskdb)
 
-	trie, _ := NewSecure(common.Hash{}, triedb, 0)
+	trie, _ := NewSecure(common.Hash{}, triedb)
 
 	// Fill it with some arbitrary data
 	content := make(map[string][]byte)

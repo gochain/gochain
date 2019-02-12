@@ -19,7 +19,6 @@ package utils
 
 import (
 	"compress/gzip"
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -82,7 +81,7 @@ func StartNode(stack *node.Node) {
 	}()
 }
 
-func ImportChain(ctx context.Context, chain *core.BlockChain, fn string) error {
+func ImportChain(chain *core.BlockChain, fn string) error {
 	// Watch for Ctrl-C while the import is running.
 	// If a signal is received, the import will stop at the next batch.
 	interrupt := make(chan os.Signal, 1)
@@ -106,6 +105,8 @@ func ImportChain(ctx context.Context, chain *core.BlockChain, fn string) error {
 	}
 
 	log.Info("Importing blockchain", "file", fn)
+
+	// Open the file handle and potentially unwrap the gzip stream
 	fh, err := os.Open(fn)
 	if err != nil {
 		return err
@@ -181,8 +182,12 @@ func missingBlocks(chain *core.BlockChain, blocks []*types.Block) []*types.Block
 	return nil
 }
 
+// ExportChain exports a blockchain into the specified file, truncating any data
+// already present in the file.
 func ExportChain(blockchain *core.BlockChain, fn string) error {
 	log.Info("Exporting blockchain", "file", fn)
+
+	// Open the file handle and potentially wrap with a gzip stream
 	fh, err := os.OpenFile(fn, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.ModePerm)
 	if err != nil {
 		return err
@@ -194,7 +199,7 @@ func ExportChain(blockchain *core.BlockChain, fn string) error {
 		writer = gzip.NewWriter(writer)
 		defer writer.(*gzip.Writer).Close()
 	}
-
+	// Iterate over the blocks and export them
 	if err := blockchain.Export(writer); err != nil {
 		return err
 	}
@@ -203,9 +208,12 @@ func ExportChain(blockchain *core.BlockChain, fn string) error {
 	return nil
 }
 
+// ExportAppendChain exports a blockchain into the specified file, appending to
+// the file if data already exists in it.
 func ExportAppendChain(blockchain *core.BlockChain, fn string, first uint64, last uint64) error {
 	log.Info("Exporting blockchain", "file", fn)
-	// TODO verify mode perms
+
+	// Open the file handle and potentially wrap with a gzip stream
 	fh, err := os.OpenFile(fn, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.ModePerm)
 	if err != nil {
 		return err
@@ -217,7 +225,7 @@ func ExportAppendChain(blockchain *core.BlockChain, fn string, first uint64, las
 		writer = gzip.NewWriter(writer)
 		defer writer.(*gzip.Writer).Close()
 	}
-
+	// Iterate over the blocks and export them
 	if err := blockchain.ExportN(writer, first, last); err != nil {
 		return err
 	}

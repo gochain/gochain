@@ -23,6 +23,7 @@ import (
 	"github.com/gochain-io/gochain/v3/common"
 )
 
+// Genesis hashes to enforce below configs on.
 var (
 	MainnetGenesisHash = common.HexToHash("0x5b44a92a842a888b8b7cc1ff7eaac9800edf88a6a5f3d38850deb63d46acd880")
 	TestnetGenesisHash = common.HexToHash("0x84337e882fad5883e2ed6e587ab5bdf711b7107a39abe8e080784bb30c8f047e")
@@ -77,6 +78,18 @@ var (
 	}
 	TestRules = TestChainConfig.Rules(new(big.Int))
 )
+
+// TrustedCheckpoint represents a set of post-processed trie roots (CHT and
+// BloomTrie) associated with the appropriate section index and head hash. It is
+// used to start light syncing from this checkpoint and avoid downloading the
+// entire header chain while still being able to securely access old headers/logs.
+type TrustedCheckpoint struct {
+	Name         string      `json:"-"`
+	SectionIndex uint64      `json:"sectionIndex"`
+	SectionHead  common.Hash `json:"sectionHead"`
+	CHTRoot      common.Hash `json:"chtRoot"`
+	BloomRoot    common.Hash `json:"bloomRoot"`
+}
 
 // ChainConfig is the core config which determines the blockchain settings.
 //
