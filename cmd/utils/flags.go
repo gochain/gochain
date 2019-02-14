@@ -1155,6 +1155,9 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 		}
 		cfg.Genesis = core.DefaultTestnetGenesisBlock()
 	case ctx.GlobalBool(DeveloperFlag.Name):
+		if ctx.GlobalIsSet(NetworkIdFlag.Name) {
+			Fatalf("%q cannot be used with %q", NetworkIdFlag.Name, DeveloperFlag.Name)
+		}
 		// Create new developer account or reuse existing one
 		var (
 			developer accounts.Account
@@ -1174,10 +1177,14 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 		log.Info("Using developer account", "address", developer.Address)
 
 		cfg.Genesis = core.DeveloperGenesisBlock(uint64(ctx.GlobalInt(DeveloperPeriodFlag.Name)), developer.Address)
+		cfg.NetworkId = cfg.Genesis.Config.ChainId.Uint64()
 		if !ctx.GlobalIsSet(MinerGasPriceFlag.Name) && !ctx.GlobalIsSet(MinerLegacyGasPriceFlag.Name) {
 			cfg.MinerGasPrice = big.NewInt(1)
 		}
 	case ctx.GlobalBool(LocalFlag.Name):
+		if ctx.GlobalIsSet(NetworkIdFlag.Name) {
+			Fatalf("%q cannot be used with %q", NetworkIdFlag.Name, LocalFlag.Name)
+		}
 		if GenesisExists(ctx, stack) {
 			accs := ks.Accounts()
 			if len(accs) == 0 {
@@ -1245,6 +1252,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 		}
 
 		cfg.Genesis = core.LocalGenesisBlock(uint64(ctx.GlobalInt(DeveloperPeriodFlag.Name)), signer.Address, seeds)
+		cfg.NetworkId = cfg.Genesis.Config.ChainId.Uint64()
 		if !ctx.GlobalIsSet(MinerGasPriceFlag.Name) && !ctx.GlobalIsSet(MinerLegacyGasPriceFlag.Name) {
 			cfg.MinerGasPrice = big.NewInt(1)
 		}
