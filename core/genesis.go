@@ -393,7 +393,7 @@ func DefaultTestnetGenesisBlock() *Genesis {
 func DeveloperGenesisBlock(period uint64, faucet common.Address) *Genesis {
 	// Override the default period to the user requested one
 	config := *params.AllCliqueProtocolChanges
-	config.ChainId = big.NewInt(rand.Int63())
+	config.ChainId = big.NewInt(int64(rand.Int31()) + 1000)
 	config.Clique.Period = period
 
 	alloc, ok := new(big.Int).SetString("1000000000000000000000000000", 10)
@@ -419,7 +419,7 @@ func DeveloperGenesisBlock(period uint64, faucet common.Address) *Genesis {
 func LocalGenesisBlock(period uint64, signer common.Address, seeds []common.Address) *Genesis {
 	// Override the default period to the user requested one
 	config := *params.AllCliqueProtocolChanges
-	config.ChainId = big.NewInt(rand.Int63())
+	config.ChainId = big.NewInt(int64(rand.Int31()) + 1000)
 	config.Clique.Period = period
 
 	alloc, ok := new(big.Int).SetString("1000000000000000000000", 10)
