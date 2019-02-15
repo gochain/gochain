@@ -154,7 +154,7 @@ var (
 	}
 	LocalFundFlag = cli.StringSliceFlag{
 		Name:  "local.fund",
-		Usage: "Comma separated list of accounts to pre-fund",
+		Usage: "Comma separated list of accounts (and optionally balances) to pre-fund: <addr> or <addr>:<amount>",
 	}
 	IdentityFlag = cli.StringFlag{
 		Name:  "identity",
@@ -1213,23 +1213,47 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 		}
 		log.Info("Signing with account", "address", signer.Address)
 
-		var seeds []common.Address
+		oneGO, ok := new(big.Int).SetString("1000000000000000000", 10)
+		if !ok {
+			panic("failed to parse big.Int string")
+		}
+		oneThousandGO := new(big.Int).Mul(big.NewInt(1000), oneGO)
+
+		alloc := make(core.GenesisAlloc)
 		seedStrs := ctx.GlobalStringSlice(LocalFundFlag.Name)
 		if len(seedStrs) > 0 {
 			for _, seed := range seedStrs {
-				if !common.IsHexAddress(seed) {
-					Fatalf("Failed to parse hex address: %s", seed)
+				parts := strings.Split(seed, ":")
+				if len(parts) > 2 {
+					Fatalf("invalid seed format %q: expected <addr> or <addr>:<amount>")
 				}
-				seeds = append(seeds, common.HexToAddress(seed))
+
+				if !common.IsHexAddress(parts[0]) {
+					Fatalf("Failed to parse hex address: %s", parts[0])
+				}
+				addr := common.HexToAddress(parts[0])
+
+				var amount *big.Int
+				if len(parts) == 2 {
+					a, ok := new(big.Int).SetString(parts[1], 10)
+					if !ok {
+						Fatalf("failed to parse seed amount: %s", parts[1])
+					}
+					amount = a.Mul(a, oneGO)
+				} else {
+					amount = oneThousandGO
+				}
+
+				alloc[addr] = core.GenesisAccount{Balance: amount}
 			}
 		} else {
-			var keys []string
+			keys := make(map[common.Address]string)
 			for i := 0; i < 10; i++ {
 				seed, err := ks.NewAccount("")
 				if err != nil {
 					Fatalf("Failed to create account: %v", err)
 				}
-				seeds = append(seeds, seed.Address)
+				alloc[seed.Address] = core.GenesisAccount{Balance: oneThousandGO}
 				json, err := ks.Export(seed, "", "")
 				if err != nil {
 					Fatalf("Failed to export account: %v", err)
@@ -1238,20 +1262,20 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 				if err != nil {
 					Fatalf("Failed to decrypt key: %v", err)
 				}
-				keys = append(keys, "0x"+common.Bytes2Hex(key.PrivateKey.D.Bytes()))
+				keys[seed.Address] = "0x" + common.Bytes2Hex(key.PrivateKey.D.Bytes())
 			}
 
 			var buf bytes.Buffer
 			fmt.Fprintln(&buf, "Pre-funded accounts:")
 			fmt.Fprintln(&buf)
 			fmt.Fprintln(&buf, "\t\tAddress\t\t\t\t\t\tKey")
-			for i := range seeds {
-				fmt.Fprintf(&buf, "\t%s %s\n", seeds[i].Hex(), keys[i])
+			for addr, key := range keys {
+				fmt.Fprintf(&buf, "\t%s %s\n", addr.Hex(), key)
 			}
 			log.Info(buf.String())
 		}
 
-		cfg.Genesis = core.LocalGenesisBlock(uint64(ctx.GlobalInt(DeveloperPeriodFlag.Name)), signer.Address, seeds)
+		cfg.Genesis = core.LocalGenesisBlock(uint64(ctx.GlobalInt(DeveloperPeriodFlag.Name)), signer.Address, alloc)
 		cfg.NetworkId = cfg.Genesis.Config.ChainId.Uint64()
 		if !ctx.GlobalIsSet(MinerGasPriceFlag.Name) && !ctx.GlobalIsSet(MinerLegacyGasPriceFlag.Name) {
 			cfg.MinerGasPrice = big.NewInt(1)

@@ -416,21 +416,13 @@ func DeveloperGenesisBlock(period uint64, faucet common.Address) *Genesis {
 }
 
 // LocalGenesisBlock returns the 'gochain --local' genesis block.
-func LocalGenesisBlock(period uint64, signer common.Address, seeds []common.Address) *Genesis {
+func LocalGenesisBlock(period uint64, signer common.Address, alloc GenesisAlloc) *Genesis {
 	// Override the default period to the user requested one
 	config := *params.AllCliqueProtocolChanges
 	config.ChainId = big.NewInt(int64(rand.Int31()) + 1000)
 	config.Clique.Period = period
 
-	alloc, ok := new(big.Int).SetString("1000000000000000000000", 10)
-	if !ok {
-		panic("failed to parse big.Int string")
-	}
 	var extra = []byte(signer.Hex())[:32]
-	allocMap := make(GenesisAlloc)
-	for _, seed := range seeds {
-		allocMap[seed] = GenesisAccount{Balance: alloc}
-	}
 	// Assemble and return the genesis with the precompiles and seeds pre-funded
 	return &Genesis{
 		Config:     &config,
@@ -441,6 +433,6 @@ func LocalGenesisBlock(period uint64, signer common.Address, seeds []common.Addr
 		Signers:    []common.Address{signer},
 		Voters:     []common.Address{signer},
 		Signer:     hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
-		Alloc:      allocMap,
+		Alloc:      alloc,
 	}
 }
