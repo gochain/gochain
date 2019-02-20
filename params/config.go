@@ -58,7 +58,7 @@ var (
 		EIP155Block:         big.NewInt(0),
 		EIP158Block:         big.NewInt(0),
 		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: nil,
+		ConstantinopleBlock: big.NewInt(4081350),
 		PetersburgBlock:     nil,
 
 		Clique: DefaultCliqueConfig(),
