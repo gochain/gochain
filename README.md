@@ -21,7 +21,7 @@ If you plan on working on the GoChain core code, then read on.
 
 ## Building the source
 
-Building gochain requires both a Go (version 1.9 or later) and a C compiler.
+Building gochain requires both a Go (version 1.12 or later) and a C compiler.
 You can install them using your favourite package manager.
 Once the dependencies are installed, run:
 
