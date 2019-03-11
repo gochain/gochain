@@ -273,9 +273,10 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 	}
 	// Register wallet event handlers to open and auto-derive wallets
 	events := make(chan accounts.WalletEvent, 16)
-	stack.AccountManager().Subscribe(events)
+	stack.AccountManager().Subscribe(events, "gochain-startNode")
 
 	go func() {
+		defer stack.AccountManager().Unsubscribe(events)
 		// Create an chain state reader for self-derivation
 		rpcClient, err := stack.Attach()
 		if err != nil {

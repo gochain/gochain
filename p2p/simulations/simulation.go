@@ -94,13 +94,16 @@ func (s *Simulation) watchNetwork(result *StepResult) func() {
 	stop := make(chan struct{})
 	done := make(chan struct{})
 	events := make(chan *Event)
-	sub := s.network.Events().Subscribe(events)
+	s.network.Events().Subscribe(events, "simulations.Simulation-watchNetwork")
 	go func() {
 		defer close(done)
-		defer sub.Unsubscribe()
+		defer s.network.Events().Unsubscribe(events)
 		for {
 			select {
-			case event := <-events:
+			case event, ok := <-events:
+				if !ok {
+					return
+				}
 				result.NetworkEvents = append(result.NetworkEvents, event)
 			case <-stop:
 				return

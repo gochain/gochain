@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/log"
 )
 
@@ -351,8 +350,8 @@ func (p *peerConnection) Lacks(hash common.Hash) bool {
 // download procedure.
 type peerSet struct {
 	peers        map[string]*peerConnection
-	newPeerFeed  event.Feed
-	peerDropFeed event.Feed
+	newPeerFeed  peerConnectionFeed
+	peerDropFeed peerConnectionFeed
 	lock         sync.RWMutex
 }
 
@@ -364,13 +363,21 @@ func newPeerSet() *peerSet {
 }
 
 // SubscribeNewPeers subscribes to peer arrival events.
-func (ps *peerSet) SubscribeNewPeers(ch chan<- *peerConnection) event.Subscription {
-	return ps.newPeerFeed.Subscribe(ch)
+func (ps *peerSet) SubscribeNewPeers(ch chan<- *peerConnection, name string) {
+	ps.newPeerFeed.Subscribe(ch, name)
+}
+
+func (ps *peerSet) UnsubscribeNewPeers(ch chan<- *peerConnection) {
+	ps.newPeerFeed.Unsubscribe(ch)
 }
 
 // SubscribePeerDrops subscribes to peer departure events.
-func (ps *peerSet) SubscribePeerDrops(ch chan<- *peerConnection) event.Subscription {
-	return ps.peerDropFeed.Subscribe(ch)
+func (ps *peerSet) SubscribePeerDrops(ch chan<- *peerConnection, name string) {
+	ps.peerDropFeed.Subscribe(ch, name)
+}
+
+func (ps *peerSet) UnsubscribePeerDrops(ch chan<- *peerConnection) {
+	ps.peerDropFeed.Unsubscribe(ch)
 }
 
 // Reset iterates over the current peer set, and resets each of the known peers
@@ -578,4 +585,59 @@ func (ps *peerSet) medianRTT() time.Duration {
 		median = rttMaxEstimate
 	}
 	return median
+}
+
+type peerConnectionFeed struct {
+	mu   sync.RWMutex
+	subs map[chan<- *peerConnection]string
+}
+
+func (f *peerConnectionFeed) Close() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for sub := range f.subs {
+		close(sub)
+	}
+	f.subs = nil
+}
+
+func (f *peerConnectionFeed) Subscribe(ch chan<- *peerConnection, name string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.subs == nil {
+		f.subs = make(map[chan<- *peerConnection]string)
+	}
+	f.subs[ch] = name
+}
+
+func (f *peerConnectionFeed) Unsubscribe(ch chan<- *peerConnection) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.subs[ch]; ok {
+		delete(f.subs, ch)
+		close(ch)
+	}
+}
+
+const timeout = 500 * time.Millisecond
+
+func (f *peerConnectionFeed) Send(e *peerConnection) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	for sub, name := range f.subs {
+		select {
+		case sub <- e:
+		default:
+			start := time.Now()
+			var action string
+			select {
+			case sub <- e:
+				action = "delayed"
+			case <-time.After(timeout):
+				action = "dropped"
+			}
+			dur := time.Since(start)
+			log.Warn(fmt.Sprintf("peerConnectionFeed send %s: channel full", action), "name", name, "cap", cap(sub), "time", dur, "val", e)
+		}
+	}
 }

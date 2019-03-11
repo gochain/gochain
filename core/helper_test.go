@@ -22,13 +22,12 @@ import (
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core/types"
 	"github.com/gochain-io/gochain/v3/ethdb"
-	"github.com/gochain-io/gochain/v3/event"
 )
 
 // Implement our EthTest Manager
 type TestManager struct {
 	// stateManager *StateManager
-	eventMux *event.TypeMux
+	eventMux *InterfaceFeed
 
 	db         common.Database
 	txPool     *TxPool
@@ -64,7 +63,7 @@ func (tm *TestManager) TxPool() *TxPool {
 // 	return tm.stateManager
 // }
 
-func (tm *TestManager) EventMux() *event.TypeMux {
+func (tm *TestManager) EventMux() *InterfaceFeed {
 	return tm.eventMux
 }
 
@@ -80,7 +79,7 @@ func NewTestManager() *TestManager {
 	db := ethdb.NewMemDatabase()
 
 	testManager := &TestManager{}
-	testManager.eventMux = new(event.TypeMux)
+	testManager.eventMux = new(InterfaceFeed)
 	testManager.db = db
 	// testManager.txPool = NewTxPool(testManager)
 	// testManager.blockChain = NewBlockChain(testManager)

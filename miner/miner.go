@@ -31,7 +31,6 @@ import (
 	"github.com/gochain-io/gochain/v3/core/state"
 	"github.com/gochain-io/gochain/v3/core/types"
 	"github.com/gochain-io/gochain/v3/eth/downloader"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/params"
 )
@@ -44,7 +43,7 @@ type Backend interface {
 
 // Miner creates blocks and searches for proof-of-work values.
 type Miner struct {
-	mux      *event.TypeMux
+	mux      *core.InterfaceFeed
 	worker   *worker
 	coinbase common.Address
 	eth      Backend
@@ -55,7 +54,7 @@ type Miner struct {
 	shouldStart int32 // should start indicates whether we should start after sync
 }
 
-func New(eth Backend, config *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, recommit time.Duration, gasFloor, gasCeil uint64, isLocalBlock func(block *types.Block) bool) *Miner {
+func New(eth Backend, config *params.ChainConfig, mux *core.InterfaceFeed, engine consensus.Engine, recommit time.Duration, gasFloor, gasCeil uint64, isLocalBlock func(block *types.Block) bool) *Miner {
 	miner := &Miner{
 		eth:      eth,
 		mux:      mux,
@@ -74,16 +73,17 @@ func New(eth Backend, config *params.ChainConfig, mux *event.TypeMux, engine con
 // the loop is exited. This to prevent a major security vuln where external parties can DOS you with blocks
 // and halt your mining operation for as long as the DOS continues.
 func (self *Miner) update() {
-	events := self.mux.Subscribe(downloader.StartEvent{}, downloader.DoneEvent{}, downloader.FailedEvent{})
-	defer events.Unsubscribe()
+	events := make(chan interface{})
+	self.mux.Subscribe(events, "downloader.PublicDownloaderAPI-eventLoop")
+	defer self.mux.Unsubscribe(events)
 
 	for {
 		select {
-		case ev := <-events.Chan():
-			if ev == nil {
+		case ev, ok := <-events:
+			if !ok || ev == nil {
 				return
 			}
-			switch ev.Data.(type) {
+			switch ev.(type) {
 			case downloader.StartEvent:
 				atomic.StoreInt32(&self.canStart, 0)
 				if self.Mining() {

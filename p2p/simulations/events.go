@@ -18,7 +18,10 @@ package simulations
 
 import (
 	"fmt"
+	"sync"
 	"time"
+
+	"github.com/gochain-io/gochain/v3/log"
 )
 
 // EventType is the type of event emitted by a simulation network
@@ -104,5 +107,60 @@ func (e *Event) String() string {
 		return fmt.Sprintf("<msg-event> nodes: %s->%s proto: %s, code: %d, received: %t", e.Msg.One.TerminalString(), e.Msg.Other.TerminalString(), e.Msg.Protocol, e.Msg.Code, e.Msg.Received)
 	default:
 		return ""
+	}
+}
+
+type EventFeed struct {
+	mu   sync.RWMutex
+	subs map[chan<- *Event]string
+}
+
+func (f *EventFeed) Close() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for sub := range f.subs {
+		close(sub)
+	}
+	f.subs = nil
+}
+
+func (f *EventFeed) Subscribe(ch chan<- *Event, name string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.subs == nil {
+		f.subs = make(map[chan<- *Event]string)
+	}
+	f.subs[ch] = name
+}
+
+func (f *EventFeed) Unsubscribe(ch chan<- *Event) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.subs[ch]; ok {
+		delete(f.subs, ch)
+		close(ch)
+	}
+}
+
+const timeout = 500 * time.Millisecond
+
+func (f *EventFeed) Send(e *Event) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	for sub, name := range f.subs {
+		select {
+		case sub <- e:
+		default:
+			start := time.Now()
+			var action string
+			select {
+			case sub <- e:
+				action = "delayed"
+			case <-time.After(timeout):
+				action = "dropped"
+			}
+			dur := time.Since(start)
+			log.Warn(fmt.Sprintf("EventFeed send %s: channel full", action), "name", name, "cap", cap(sub), "time", dur, "val", e)
+		}
 	}
 }

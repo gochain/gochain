@@ -37,7 +37,6 @@ import (
 	"github.com/gochain-io/gochain/v3/crypto"
 	"github.com/gochain-io/gochain/v3/eth/downloader"
 	"github.com/gochain-io/gochain/v3/ethdb"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/p2p"
 	"github.com/gochain-io/gochain/v3/p2p/discover"
 	"github.com/gochain-io/gochain/v3/params"
@@ -53,7 +52,7 @@ var (
 // channels for different events.
 func newTestProtocolManager(ctx context.Context, mode downloader.SyncMode, blocks int, generator func(context.Context, int, *core.BlockGen), newtx chan<- []*types.Transaction) (*ProtocolManager, *ethdb.MemDatabase, error) {
 	var (
-		evmux  = new(event.TypeMux)
+		evmux  = new(core.InterfaceFeed)
 		db     = ethdb.NewMemDatabase()
 		engine = clique.NewFaker()
 		gspec  = &core.Genesis{
@@ -69,7 +68,7 @@ func newTestProtocolManager(ctx context.Context, mode downloader.SyncMode, block
 		panic(err)
 	}
 
-	pm, err := NewProtocolManager(ctx, gspec.Config, mode, DefaultConfig.NetworkId, evmux, &testTxPool{added: newtx}, engine, blockchain, db)
+	pm, err := NewProtocolManager(gspec.Config, mode, DefaultConfig.NetworkId, evmux, &testTxPool{added: newtx}, engine, blockchain, db)
 	if err != nil {
 		return nil, nil, err
 	}

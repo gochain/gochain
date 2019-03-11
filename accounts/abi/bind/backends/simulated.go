@@ -80,7 +80,7 @@ func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
 		database:   database,
 		blockchain: blockchain,
 		config:     genesis.Config,
-		events:     filters.NewEventSystem(new(event.TypeMux), newFilterBackend(database, blockchain), false),
+		events:     filters.NewEventSystem(newFilterBackend(database, blockchain), false),
 	}
 	backend.rollback()
 	return backend
@@ -420,8 +420,8 @@ func newFilterBackend(db common.Database, bc *core.BlockChain) *filterBackend {
 	return &filterBackend{db: db, bc: bc, txSubs: make(map[chan<- core.NewTxsEvent]event.Subscription)}
 }
 
-func (fb *filterBackend) ChainDb() common.Database { return fb.db }
-func (fb *filterBackend) EventMux() *event.TypeMux { panic("not supported") }
+func (fb *filterBackend) ChainDb() common.Database      { return fb.db }
+func (fb *filterBackend) EventMux() *core.InterfaceFeed { panic("not supported") }
 
 func (fb *filterBackend) HeaderByNumber(ctx context.Context, block rpc.BlockNumber) (*types.Header, error) {
 	if block == rpc.LatestBlockNumber {
@@ -507,6 +507,14 @@ func (fb *filterBackend) SubscribeLogsEvent(ch chan<- []*types.Log, name string)
 
 func (fb *filterBackend) UnsubscribeLogsEvent(ch chan<- []*types.Log) {
 	fb.bc.UnsubscribeLogsEvent(ch)
+}
+
+func (fb *filterBackend) SubscribePendingLogsEvent(ch chan<- core.PendingLogsEvent, name string) {
+	fb.bc.SubscribePendingLogsEvent(ch, name)
+}
+
+func (fb *filterBackend) UnsubscribePendingLogsEvent(ch chan<- core.PendingLogsEvent) {
+	fb.bc.UnsubscribePendingLogsEvent(ch)
 }
 
 func (fb *filterBackend) BloomStatus() (uint64, uint64) { return 4096, 0 }

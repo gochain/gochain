@@ -25,13 +25,11 @@ import (
 	"github.com/gochain-io/gochain/v3/core"
 	"github.com/gochain-io/gochain/v3/core/bloombits"
 	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/rpc"
 )
 
 type Backend interface {
 	ChainDb() common.Database
-	EventMux() *event.TypeMux
 	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error)
 	HeaderByHash(ctx context.Context, blockHash common.Hash) (*types.Header, error)
 	GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error)
@@ -41,10 +39,12 @@ type Backend interface {
 	UnsubscribeNewTxsEvent(ch chan<- core.NewTxsEvent)
 	SubscribeChainEvent(ch chan<- core.ChainEvent, name string)
 	UnsubscribeChainEvent(ch chan<- core.ChainEvent)
-	SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent, name string)
-	UnsubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent)
 	SubscribeLogsEvent(ch chan<- []*types.Log, name string)
 	UnsubscribeLogsEvent(ch chan<- []*types.Log)
+	SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent, name string)
+	UnsubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent)
+	SubscribePendingLogsEvent(ch chan<- core.PendingLogsEvent, name string)
+	UnsubscribePendingLogsEvent(ch chan<- core.PendingLogsEvent)
 
 	BloomStatus() (uint64, uint64)
 	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)

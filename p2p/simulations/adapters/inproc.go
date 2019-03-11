@@ -23,7 +23,6 @@ import (
 	"net"
 	"sync"
 
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/node"
 	"github.com/gochain-io/gochain/v3/p2p"
@@ -295,12 +294,12 @@ func (self *SimNode) Server() *p2p.Server {
 
 // SubscribeEvents subscribes the given channel to peer events from the
 // underlying p2p.Server
-func (self *SimNode) SubscribeEvents(ch chan *p2p.PeerEvent) event.Subscription {
+func (self *SimNode) SubscribeEvents(ch chan *p2p.PeerEvent, name string) {
 	srv := self.Server()
 	if srv == nil {
 		panic("node not running")
 	}
-	return srv.SubscribeEvents(ch)
+	srv.SubscribeEvents(ch, name)
 }
 
 // NodeInfo returns information about the node

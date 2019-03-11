@@ -34,7 +34,6 @@ import (
 	"github.com/gochain-io/gochain/v3/core/types"
 	"github.com/gochain-io/gochain/v3/eth/downloader"
 	"github.com/gochain-io/gochain/v3/ethdb"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/log"
 	"gopkg.in/urfave/cli.v1"
 )
@@ -304,7 +303,7 @@ func copyDb(ctx *cli.Context) error {
 	chain, chainDb := utils.MakeChain(ctx, stack)
 
 	syncmode := *utils.GlobalTextMarshaler(ctx, utils.SyncModeFlag.Name).(*downloader.SyncMode)
-	dl := downloader.New(syncmode, chainDb, new(event.TypeMux), chain, nil, nil)
+	dl := downloader.New(syncmode, chainDb, new(core.InterfaceFeed), chain, nil, nil)
 
 	// Create a source peer to satisfy downloader requests from
 	db := ethdb.NewDB(ctx.Args().First())

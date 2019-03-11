@@ -28,7 +28,6 @@ import (
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/p2p/discover"
 	"github.com/gochain-io/gochain/v3/rlp"
 )
@@ -334,14 +333,14 @@ func ExpectMsg(r MsgReader, code uint64, content interface{}) error {
 type msgEventer struct {
 	MsgReadWriter
 
-	feed     *event.Feed
+	feed     *PeerFeed
 	peerID   discover.NodeID
 	Protocol string
 }
 
 // newMsgEventer returns a msgEventer which sends message events to the given
 // feed
-func newMsgEventer(rw MsgReadWriter, feed *event.Feed, peerID discover.NodeID, proto string) *msgEventer {
+func newMsgEventer(rw MsgReadWriter, feed *PeerFeed, peerID discover.NodeID, proto string) *msgEventer {
 	return &msgEventer{
 		MsgReadWriter: rw,
 		feed:          feed,
@@ -370,14 +369,11 @@ func (self *msgEventer) ReadMsg() (Msg, error) {
 // WriteMsg writes a message to the underlying MsgReadWriter and emits a
 // "message sent" event
 func (self *msgEventer) WriteMsg(ctx context.Context, msg Msg) error {
-	ctx, span := trace.StartSpan(ctx, "msgEventer.WriteMsg")
-	defer span.End()
-
 	err := self.MsgReadWriter.WriteMsg(ctx, msg)
 	if err != nil {
 		return err
 	}
-	self.feed.SendCtx(ctx, &PeerEvent{
+	self.feed.Send(&PeerEvent{
 		Type:     PeerEventTypeMsgSend,
 		Peer:     self.peerID,
 		Protocol: self.Protocol,

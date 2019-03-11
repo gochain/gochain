@@ -30,7 +30,6 @@ import (
 	"github.com/gochain-io/gochain/v3/core/types"
 	"github.com/gochain-io/gochain/v3/crypto"
 	"github.com/gochain-io/gochain/v3/ethdb"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/params"
 )
 
@@ -53,8 +52,7 @@ func BenchmarkFilters(b *testing.B) {
 
 	var (
 		db      = ethdb.NewDB(dir)
-		mux     = new(event.TypeMux)
-		backend = &testBackend{mux: mux, db: db}
+		backend = &testBackend{db: db}
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
 		addr2   = common.BytesToAddress([]byte("jeff"))
@@ -112,8 +110,7 @@ func TestFilters(t *testing.T) {
 
 	var (
 		db      = ethdb.NewDB(dir)
-		mux     = new(event.TypeMux)
-		backend = &testBackend{mux: mux, db: db}
+		backend = &testBackend{db: db}
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		addr    = crypto.PubkeyToAddress(key1.PublicKey)
 

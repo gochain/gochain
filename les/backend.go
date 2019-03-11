@@ -36,7 +36,6 @@ import (
 	"github.com/gochain-io/gochain/v3/eth/downloader"
 	"github.com/gochain-io/gochain/v3/eth/filters"
 	"github.com/gochain-io/gochain/v3/eth/gasprice"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/internal/ethapi"
 	"github.com/gochain-io/gochain/v3/light"
 	"github.com/gochain-io/gochain/v3/log"
@@ -44,7 +43,7 @@ import (
 	"github.com/gochain-io/gochain/v3/p2p"
 	"github.com/gochain-io/gochain/v3/p2p/discv5"
 	"github.com/gochain-io/gochain/v3/params"
-	rpc "github.com/gochain-io/gochain/v3/rpc"
+	"github.com/gochain-io/gochain/v3/rpc"
 )
 
 type LightGoChain struct {
@@ -71,7 +70,7 @@ type LightGoChain struct {
 
 	ApiBackend *LesApiBackend
 
-	eventMux       *event.TypeMux
+	eventMux       *core.InterfaceFeed
 	engine         consensus.Engine
 	accountManager *accounts.Manager
 
@@ -229,7 +228,7 @@ func (s *LightGoChain) TxPool() *light.TxPool              { return s.txPool }
 func (s *LightGoChain) Engine() consensus.Engine           { return s.engine }
 func (s *LightGoChain) LesVersion() int                    { return int(s.protocolManager.SubProtocols[0].Version) }
 func (s *LightGoChain) Downloader() *downloader.Downloader { return s.protocolManager.downloader }
-func (s *LightGoChain) EventMux() *event.TypeMux           { return s.eventMux }
+func (s *LightGoChain) EventMux() *core.InterfaceFeed      { return s.eventMux }
 
 // Protocols implements node.Service, returning all the currently configured
 // network protocols to start.
@@ -273,7 +272,7 @@ func (s *LightGoChain) Stop() error {
 	s.protocolManager.Stop()
 	s.txPool.Stop()
 
-	s.eventMux.Stop()
+	s.eventMux.Close()
 
 	time.Sleep(time.Millisecond * 200)
 	s.chainDb.Close()

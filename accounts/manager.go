@@ -17,25 +17,20 @@
 package accounts
 
 import (
-	"context"
 	"reflect"
 	"sort"
 	"sync"
-
-	"go.opencensus.io/trace"
-
-	"github.com/gochain-io/gochain/v3/event"
 )
 
 // Manager is an overarching account manager that can communicate with various
 // backends for signing transactions.
 type Manager struct {
 	backends map[reflect.Type][]Backend // Index of backends currently registered
-	updaters []event.Subscription       // Wallet update subscriptions for all backends
+	unsubs   []func()                   // Wallet update subscriptions for all backends
 	updates  chan WalletEvent           // Subscription sink for backend wallet changes
 	wallets  []Wallet                   // Cache of all wallets from all registered backends
 
-	feed event.Feed // Wallet feed notifying of arrivals/departures
+	feed WalletFeed // Wallet feed notifying of arrivals/departures
 
 	quit chan chan error
 	lock sync.RWMutex
@@ -52,14 +47,14 @@ func NewManager(backends ...Backend) *Manager {
 	// Subscribe to wallet notifications from all backends
 	updates := make(chan WalletEvent, 4*len(backends))
 
-	subs := make([]event.Subscription, len(backends))
+	unsubs := make([]func(), len(backends))
 	for i, backend := range backends {
-		subs[i] = backend.Subscribe(updates)
+		unsubs[i] = func() { backend.Unsubscribe(updates) }
 	}
 	// Assemble the account manager and return
 	am := &Manager{
 		backends: make(map[reflect.Type][]Backend),
-		updaters: subs,
+		unsubs:   unsubs,
 		updates:  updates,
 		wallets:  wallets,
 		quit:     make(chan chan error),
@@ -86,10 +81,10 @@ func (am *Manager) update() {
 	// Close all subscriptions when the manager terminates
 	defer func() {
 		am.lock.Lock()
-		for _, sub := range am.updaters {
-			sub.Unsubscribe()
+		for _, unsub := range am.unsubs {
+			unsub()
 		}
-		am.updaters = nil
+		am.unsubs = nil
 		am.lock.Unlock()
 	}()
 
@@ -97,7 +92,6 @@ func (am *Manager) update() {
 	for {
 		select {
 		case event := <-am.updates:
-			ctx, span := trace.StartSpan(context.Background(), "Manager.update-updates")
 			// Wallet event arrived, update local cache
 			am.lock.Lock()
 			switch event.Kind {
@@ -109,8 +103,7 @@ func (am *Manager) update() {
 			am.lock.Unlock()
 
 			// Notify any listeners of the event
-			am.feed.SendCtx(ctx, event)
-			span.End()
+			am.feed.Send(event)
 
 		case errc := <-am.quit:
 			// Manager terminating, return
@@ -169,8 +162,12 @@ func (am *Manager) Find(account Account) (Wallet, error) {
 
 // Subscribe creates an async subscription to receive notifications when the
 // manager detects the arrival or departure of a wallet from any of its backends.
-func (am *Manager) Subscribe(sink chan<- WalletEvent) event.Subscription {
-	return am.feed.Subscribe(sink)
+func (am *Manager) Subscribe(sink chan<- WalletEvent, name string) {
+	am.feed.Subscribe(sink, name)
+}
+
+func (am *Manager) Unsubscribe(sink chan<- WalletEvent) {
+	am.feed.Unsubscribe(sink)
 }
 
 // merge is a sorted analogue of append for wallets, where the ordering of the

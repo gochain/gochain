@@ -31,7 +31,6 @@ import (
 	"github.com/gochain-io/gochain/v3/core/vm"
 	"github.com/gochain-io/gochain/v3/eth/downloader"
 	"github.com/gochain-io/gochain/v3/eth/gasprice"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/light"
 	"github.com/gochain-io/gochain/v3/params"
 	"github.com/gochain-io/gochain/v3/rpc"
@@ -199,6 +198,10 @@ func (b *LesApiBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEven
 
 func (b *LesApiBackend) UnsubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) {}
 
+func (b *LesApiBackend) SubscribePendingLogsEvent(ch chan<- core.PendingLogsEvent, name string) {}
+
+func (b *LesApiBackend) UnsubscribePendingLogsEvent(ch chan<- core.PendingLogsEvent) {}
+
 func (b *LesApiBackend) Downloader() *downloader.Downloader {
 	return b.eth.Downloader()
 }
@@ -213,10 +216,6 @@ func (b *LesApiBackend) SuggestPrice(ctx context.Context) (*big.Int, error) {
 
 func (b *LesApiBackend) ChainDb() common.Database {
 	return b.eth.chainDb
-}
-
-func (b *LesApiBackend) EventMux() *event.TypeMux {
-	return b.eth.eventMux
 }
 
 func (b *LesApiBackend) AccountManager() *accounts.Manager {

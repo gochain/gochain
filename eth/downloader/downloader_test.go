@@ -32,7 +32,6 @@ import (
 	"github.com/gochain-io/gochain/v3/core/types"
 	"github.com/gochain-io/gochain/v3/crypto"
 	"github.com/gochain-io/gochain/v3/ethdb"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/params"
 	"github.com/gochain-io/gochain/v3/trie"
 )
@@ -97,7 +96,7 @@ func newTester() *downloadTester {
 	tester.stateDb = ethdb.NewMemDatabase()
 	tester.stateDb.GlobalTable().Put(genesis.Root().Bytes(), []byte{0x00})
 
-	tester.downloader = New(FullSync, tester.stateDb, new(event.TypeMux), tester, nil, tester.dropPeer)
+	tester.downloader = New(FullSync, tester.stateDb, new(core.InterfaceFeed), tester, nil, tester.dropPeer)
 
 	return tester
 }

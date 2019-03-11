@@ -57,7 +57,7 @@ type Network struct {
 	connMap map[string]int
 
 	nodeAdapter adapters.NodeAdapter
-	events      event.Feed
+	events      EventFeed
 	lock        sync.RWMutex
 	quitc       chan struct{}
 }
@@ -74,8 +74,8 @@ func NewNetwork(nodeAdapter adapters.NodeAdapter, conf *NetworkConfig) *Network 
 }
 
 // Events returns the output event feed of the Network.
-func (self *Network) Events() *event.Feed {
-	return &self.events
+func (net *Network) Events() *EventFeed {
+	return &net.events
 }
 
 // NewNode adds a new node to the network with a random ID

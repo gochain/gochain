@@ -30,7 +30,6 @@ import (
 	"github.com/gochain-io/gochain/v3/core"
 	"github.com/gochain-io/gochain/v3/core/rawdb"
 	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/rpc"
 )
 
@@ -66,7 +65,8 @@ const (
 	// logsChanSize is the size of channel listening to LogsEvent.
 	logsChanSize = 32
 	// chainEvChanSize is the size of channel listening to ChainEvent.
-	chainEvChanSize = 32
+	chainEvChanSize     = 32
+	pendingLogsChanSize = 32
 )
 
 var (
@@ -88,21 +88,18 @@ type subscription struct {
 // EventSystem creates subscriptions, processes events and broadcasts them to the
 // subscription which match the subscription criteria.
 type EventSystem struct {
-	mux       *event.TypeMux
 	backend   Backend
 	lightMode bool
 	lastHead  *types.Header
 
-	// Subscriptions
-	pendingLogSub *event.TypeMuxSubscription // Subscription for pending log event
-
 	// Channels
-	install   chan *subscription         // install filter for event notification
-	uninstall chan *subscription         // remove filter for event notification
-	txsCh     chan core.NewTxsEvent      // Channel to receive new transactions event
-	logsCh    chan []*types.Log          // Channel to receive new log event
-	rmLogsCh  chan core.RemovedLogsEvent // Channel to receive removed log event
-	chainCh   chan core.ChainEvent       // Channel to receive new chain event
+	install      chan *subscription         // install filter for event notification
+	uninstall    chan *subscription         // remove filter for event notification
+	txsCh        chan core.NewTxsEvent      // Channel to receive new transactions event
+	logsCh       chan []*types.Log          // Channel to receive new log event
+	rmLogsCh     chan core.RemovedLogsEvent // Channel to receive removed log event
+	chainCh      chan core.ChainEvent       // Channel to receive new chain event
+	pendingLogCh chan core.PendingLogsEvent // Channel to receive pending log events
 }
 
 // NewEventSystem creates a new manager that listens for event on the given mux,
@@ -111,17 +108,17 @@ type EventSystem struct {
 //
 // The returned manager has a loop that needs to be stopped with the Stop function
 // or by stopping the given mux.
-func NewEventSystem(mux *event.TypeMux, backend Backend, lightMode bool) *EventSystem {
+func NewEventSystem(backend Backend, lightMode bool) *EventSystem {
 	m := &EventSystem{
-		mux:       mux,
-		backend:   backend,
-		lightMode: lightMode,
-		install:   make(chan *subscription),
-		uninstall: make(chan *subscription),
-		txsCh:     make(chan core.NewTxsEvent, txChanSize),
-		logsCh:    make(chan []*types.Log, logsChanSize),
-		rmLogsCh:  make(chan core.RemovedLogsEvent, rmLogsChanSize),
-		chainCh:   make(chan core.ChainEvent, chainEvChanSize),
+		backend:      backend,
+		lightMode:    lightMode,
+		install:      make(chan *subscription),
+		uninstall:    make(chan *subscription),
+		txsCh:        make(chan core.NewTxsEvent, txChanSize),
+		logsCh:       make(chan []*types.Log, logsChanSize),
+		rmLogsCh:     make(chan core.RemovedLogsEvent, rmLogsChanSize),
+		chainCh:      make(chan core.ChainEvent, chainEvChanSize),
+		pendingLogCh: make(chan core.PendingLogsEvent, pendingLogsChanSize),
 	}
 
 	// Subscribe events
@@ -130,8 +127,7 @@ func NewEventSystem(mux *event.TypeMux, backend Backend, lightMode bool) *EventS
 	m.backend.SubscribeLogsEvent(m.logsCh, name)
 	m.backend.SubscribeRemovedLogsEvent(m.rmLogsCh, name)
 	m.backend.SubscribeChainEvent(m.chainCh, name)
-	// TODO(rjl493456442): use feed to subscribe pending log event
-	m.pendingLogSub = m.mux.Subscribe(core.PendingLogsEvent{})
+	m.backend.SubscribePendingLogsEvent(m.pendingLogCh, name)
 
 	go m.eventLoop()
 	return m
@@ -328,17 +324,15 @@ func (es *EventSystem) broadcastRemovedLogs(filters filterIndex, ev core.Removed
 	}
 }
 
-func (es *EventSystem) broadcastTypeMux(filters filterIndex, ev *event.TypeMuxEvent) {
+func (es *EventSystem) broadcastTypeMux(filters filterIndex, ev interface{}) {
 	if ev == nil {
 		return
 	}
-	switch muxe := ev.Data.(type) {
+	switch muxe := ev.(type) {
 	case core.PendingLogsEvent:
 		for _, f := range filters[PendingLogsSubscription] {
-			if ev.Time.After(f.created) {
-				if matchedLogs := filterLogs(muxe.Logs, nil, f.logsCrit.ToBlock, f.logsCrit.Addresses, f.logsCrit.Topics); len(matchedLogs) > 0 {
-					f.logs <- matchedLogs
-				}
+			if matchedLogs := filterLogs(muxe.Logs, nil, f.logsCrit.ToBlock, f.logsCrit.Addresses, f.logsCrit.Topics); len(matchedLogs) > 0 {
+				f.logs <- matchedLogs
 			}
 		}
 	}
@@ -446,7 +440,7 @@ func (es *EventSystem) lightFilterLogs(header *types.Header, addresses []common.
 func (es *EventSystem) eventLoop() {
 	// Ensure all subscriptions get cleaned up
 	defer func() {
-		es.pendingLogSub.Unsubscribe()
+		es.backend.UnsubscribePendingLogsEvent(es.pendingLogCh)
 		es.backend.UnsubscribeNewTxsEvent(es.txsCh)
 		es.backend.UnsubscribeLogsEvent(es.logsCh)
 		es.backend.UnsubscribeRemovedLogsEvent(es.rmLogsCh)
@@ -481,7 +475,7 @@ func (es *EventSystem) eventLoop() {
 				return
 			}
 			es.broadcastChain(index, ev)
-		case ev, active := <-es.pendingLogSub.Chan():
+		case ev, active := <-es.pendingLogCh:
 			if !active { // system stopped
 				return
 			}

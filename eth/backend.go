@@ -38,7 +38,6 @@ import (
 	"github.com/gochain-io/gochain/v3/eth/downloader"
 	"github.com/gochain-io/gochain/v3/eth/filters"
 	"github.com/gochain-io/gochain/v3/eth/gasprice"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/internal/ethapi"
 	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/miner"
@@ -73,7 +72,7 @@ type GoChain struct {
 	// DB interfaces
 	chainDb common.Database // Block chain database
 
-	eventMux       *event.TypeMux
+	eventMux       *core.InterfaceFeed
 	engine         consensus.Engine
 	accountManager *accounts.Manager
 
@@ -175,7 +174,7 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 	}
 	eth.txPool = core.NewTxPool(config.TxPool, eth.chainConfig, eth.blockchain)
 
-	if eth.protocolManager, err = NewProtocolManager(context.Background(), eth.chainConfig, config.SyncMode, config.NetworkId, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb); err != nil {
+	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.SyncMode, config.NetworkId, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb); err != nil {
 		return nil, err
 	}
 	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine, config.MinerRecommit, config.MinerGasFloor, config.MinerGasCeil, eth.isLocalBlock)
@@ -413,7 +412,7 @@ func (gc *GoChain) Miner() *miner.Miner { return gc.miner }
 func (gc *GoChain) AccountManager() *accounts.Manager  { return gc.accountManager }
 func (gc *GoChain) BlockChain() *core.BlockChain       { return gc.blockchain }
 func (gc *GoChain) TxPool() *core.TxPool               { return gc.txPool }
-func (gc *GoChain) EventMux() *event.TypeMux           { return gc.eventMux }
+func (gc *GoChain) EventMux() *core.InterfaceFeed      { return gc.eventMux }
 func (gc *GoChain) Engine() consensus.Engine           { return gc.engine }
 func (gc *GoChain) ChainDb() common.Database           { return gc.chainDb }
 func (gc *GoChain) IsListening() bool                  { return true } // Always listening
@@ -466,7 +465,7 @@ func (gc *GoChain) Stop() error {
 	}
 	gc.txPool.Stop()
 	gc.miner.Stop()
-	gc.eventMux.Stop()
+	gc.eventMux.Close()
 
 	gc.chainDb.Close()
 	close(gc.shutdownChan)

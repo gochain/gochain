@@ -28,9 +28,9 @@ import (
 
 	"github.com/gochain-io/gochain/v3/accounts"
 	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core"
 	"github.com/gochain-io/gochain/v3/ethdb"
 	"github.com/gochain-io/gochain/v3/ethdb/s3"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/flock"
 	"github.com/gochain-io/gochain/v3/internal/debug"
 	"github.com/gochain-io/gochain/v3/log"
@@ -40,7 +40,7 @@ import (
 
 // Node is a container on which services can be registered.
 type Node struct {
-	eventmux *event.TypeMux // Event multiplexer used between the services of a stack
+	eventmux *core.InterfaceFeed // Event multiplexer used between the services of a stack
 	config   *Config
 	accman   *accounts.Manager
 
@@ -120,7 +120,7 @@ func New(conf *Config) (*Node, error) {
 		ipcEndpoint:       conf.IPCEndpoint(),
 		httpEndpoint:      conf.HTTPEndpoint(),
 		wsEndpoint:        conf.WSEndpoint(),
-		eventmux:          new(event.TypeMux),
+		eventmux:          new(core.InterfaceFeed),
 		log:               conf.Logger,
 		tracing:           conf.HTTPTracing,
 	}, nil
@@ -574,7 +574,7 @@ func (n *Node) WSEndpoint() string {
 
 // EventMux retrieves the event multiplexer used by all the network services in
 // the current protocol stack.
-func (n *Node) EventMux() *event.TypeMux {
+func (n *Node) EventMux() *core.InterfaceFeed {
 	return n.eventmux
 }
 

@@ -101,11 +101,12 @@ type BlockChain struct {
 
 	hc *HeaderChain
 
-	rmLogsFeed    RemovedLogsFeed
-	chainFeed     ChainFeed
-	chainSideFeed ChainSideFeed
-	chainHeadFeed ChainHeadFeed
-	logsFeed      LogsFeed
+	rmLogsFeed      RemovedLogsFeed
+	chainFeed       ChainFeed
+	chainSideFeed   ChainSideFeed
+	chainHeadFeed   ChainHeadFeed
+	logsFeed        LogsFeed
+	pendingLogsFeed PendingLogsFeed
 
 	genesisBlock *types.Block
 
@@ -1754,6 +1755,15 @@ func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log, name string) {
 
 func (bc *BlockChain) UnsubscribeLogsEvent(ch chan<- []*types.Log) {
 	bc.logsFeed.Unsubscribe(ch)
+}
+
+// SubscribeLogsEvent registers a subscription of []*types.Log.
+func (bc *BlockChain) SubscribePendingLogsEvent(ch chan<- PendingLogsEvent, name string) {
+	bc.pendingLogsFeed.Subscribe(ch, name)
+}
+
+func (bc *BlockChain) UnsubscribePendingLogsEvent(ch chan<- PendingLogsEvent) {
+	bc.pendingLogsFeed.Unsubscribe(ch)
 }
 
 // wgAdd adds 1 to wg while holding the read lock, unless the quit channel has been closed.

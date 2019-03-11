@@ -34,7 +34,6 @@ import (
 	"github.com/gochain-io/gochain/v3/core/vm"
 	"github.com/gochain-io/gochain/v3/crypto"
 	"github.com/gochain-io/gochain/v3/eth"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/les/flowcontrol"
 	"github.com/gochain-io/gochain/v3/light"
 	"github.com/gochain-io/gochain/v3/p2p"
@@ -137,7 +136,7 @@ func testRCL() RequestCostList {
 // channels for different events.
 func newTestProtocolManager(ctx context.Context, lightSync bool, blocks int, generator func(context.Context, int, *core.BlockGen), peers *peerSet, odr *LesOdr, db common.Database) (*ProtocolManager, error) {
 	var (
-		evmux  = new(event.TypeMux)
+		evmux  = new(core.InterfaceFeed)
 		engine = clique.NewFaker()
 		gspec  = core.Genesis{
 			Config:  params.TestChainConfig,
