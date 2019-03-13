@@ -94,17 +94,18 @@ func (api *PrivateAdminAPI) PeerEvents(ctx context.Context) (*rpc.Subscription, 
 
 	go func() {
 		events := make(chan *p2p.PeerEvent)
-		sub := server.SubscribeEvents(events)
-		defer sub.Unsubscribe()
+		server.SubscribeEvents(events, "node.PrivateAdminAPI-PeerEvents")
+		defer server.UnsubscribeEvents(events)
 
 		for {
 			select {
-			case event := <-events:
+			case event, ok := <-events:
+				if !ok {
+					return
+				}
 				if err := notifier.Notify(rpcSub.ID, event); err != nil {
 					log.Error("Cannot notify peer event", "id", rpcSub.ID)
 				}
-			case <-sub.Err():
-				return
 			case <-rpcSub.Err():
 				return
 			case <-notifier.Closed():

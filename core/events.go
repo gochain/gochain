@@ -18,6 +18,7 @@ package core
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -430,6 +431,218 @@ func (f *LogsFeed) Send(logs []*types.Log) {
 			}
 			dur := time.Since(start)
 			log.Warn(fmt.Sprintf("LogsFeed send %s: channel full", action), "name", name, "cap", cap(sub), "time", dur, "len", len(logs))
+		}
+	}
+}
+
+type BlockProcFeed struct {
+	mu   sync.RWMutex
+	subs map[chan<- bool]string
+}
+
+func (f *BlockProcFeed) Close() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for sub := range f.subs {
+		close(sub)
+	}
+	f.subs = nil
+}
+
+func (f *BlockProcFeed) Subscribe(ch chan<- bool, name string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.subs == nil {
+		f.subs = make(map[chan<- bool]string)
+	}
+	f.subs[ch] = name
+}
+
+func (f *BlockProcFeed) Unsubscribe(ch chan<- bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.subs[ch]; ok {
+		delete(f.subs, ch)
+		close(ch)
+	}
+}
+
+func (f *BlockProcFeed) Send(b bool) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	for sub, name := range f.subs {
+		select {
+		case sub <- b:
+		default:
+			start := time.Now()
+			var action string
+			select {
+			case sub <- b:
+				action = "delayed"
+			case <-time.After(timeout):
+				action = "dropped"
+			}
+			dur := time.Since(start)
+			log.Warn(fmt.Sprintf("BlockProcFeed send %s: channel full", action), "name", name, "cap", cap(sub), "time", dur, "val", b)
+		}
+	}
+}
+
+type Int64Feed struct {
+	mu   sync.RWMutex
+	subs map[chan<- int64]string
+}
+
+func (f *Int64Feed) Close() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for sub := range f.subs {
+		close(sub)
+	}
+	f.subs = nil
+}
+
+func (f *Int64Feed) Subscribe(ch chan<- int64, name string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.subs == nil {
+		f.subs = make(map[chan<- int64]string)
+	}
+	f.subs[ch] = name
+}
+
+func (f *Int64Feed) Unsubscribe(ch chan<- int64) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.subs[ch]; ok {
+		delete(f.subs, ch)
+		close(ch)
+	}
+}
+
+func (f *Int64Feed) Send(e int64) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	for sub, name := range f.subs {
+		select {
+		case sub <- e:
+		default:
+			start := time.Now()
+			var action string
+			select {
+			case sub <- e:
+				action = "delayed"
+			case <-time.After(timeout):
+				action = "dropped"
+			}
+			dur := time.Since(start)
+			log.Warn(fmt.Sprintf("Int64Feed send %s: channel full", action), "name", name, "cap", cap(sub), "time", dur, "val", e)
+		}
+	}
+}
+
+type IntFeed struct {
+	mu   sync.RWMutex
+	subs map[chan<- int]string
+}
+
+func (f *IntFeed) Close() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for sub := range f.subs {
+		close(sub)
+	}
+	f.subs = nil
+}
+
+func (f *IntFeed) Subscribe(ch chan<- int, name string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.subs == nil {
+		f.subs = make(map[chan<- int]string)
+	}
+	f.subs[ch] = name
+}
+
+func (f *IntFeed) Unsubscribe(ch chan<- int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.subs[ch]; ok {
+		delete(f.subs, ch)
+		close(ch)
+	}
+}
+
+func (f *IntFeed) Send(e int) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	for sub, name := range f.subs {
+		select {
+		case sub <- e:
+		default:
+			start := time.Now()
+			var action string
+			select {
+			case sub <- e:
+				action = "delayed"
+			case <-time.After(timeout):
+				action = "dropped"
+			}
+			dur := time.Since(start)
+			log.Warn(fmt.Sprintf("IntFeed send %s: channel full", action), "name", name, "cap", cap(sub), "time", dur, "val", e)
+		}
+	}
+}
+
+type InterfaceFeed struct {
+	mu   sync.RWMutex
+	subs map[chan<- interface{}]string
+}
+
+func (f *InterfaceFeed) Close() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for sub := range f.subs {
+		close(sub)
+	}
+	f.subs = nil
+}
+
+func (f *InterfaceFeed) Subscribe(ch chan<- interface{}, name string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.subs == nil {
+		f.subs = make(map[chan<- interface{}]string)
+	}
+	f.subs[ch] = name
+}
+
+func (f *InterfaceFeed) Unsubscribe(ch chan<- interface{}) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.subs[ch]; ok {
+		delete(f.subs, ch)
+		close(ch)
+	}
+}
+
+func (f *InterfaceFeed) Send(e interface{}) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	for sub, name := range f.subs {
+		select {
+		case sub <- e:
+		default:
+			start := time.Now()
+			var action string
+			select {
+			case sub <- e:
+				action = "delayed"
+			case <-time.After(timeout):
+				action = "dropped"
+			}
+			dur := time.Since(start)
+			log.Warn(fmt.Sprintf("InterfaceFeed send %s: channel full", action), "name", name, "cap", cap(sub), "time", dur, "type", reflect.TypeOf(e))
 		}
 	}
 }

@@ -381,8 +381,8 @@ func (s *Server) ResetNetwork(w http.ResponseWriter, req *http.Request) {
 // StreamNetworkEvents streams network events as a server-sent-events stream
 func (s *Server) StreamNetworkEvents(w http.ResponseWriter, req *http.Request) {
 	events := make(chan *Event)
-	sub := s.network.events.Subscribe(events)
-	defer sub.Unsubscribe()
+	s.network.events.Subscribe(events, "simulations.Server-StreamNetworkEvents")
+	defer s.network.events.Unsubscribe(events)
 
 	// stop the stream if the client goes away
 	var clientGone <-chan bool
@@ -457,7 +457,10 @@ func (s *Server) StreamNetworkEvents(w http.ResponseWriter, req *http.Request) {
 
 	for {
 		select {
-		case event := <-events:
+		case event, ok := <-events:
+			if !ok {
+				return
+			}
 			// only send message events which match the filters
 			if event.Msg != nil && !filters.Match(event.Msg) {
 				continue

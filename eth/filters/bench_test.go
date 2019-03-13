@@ -29,7 +29,6 @@ import (
 	"github.com/gochain-io/gochain/v3/core/rawdb"
 	"github.com/gochain-io/gochain/v3/core/types"
 	"github.com/gochain-io/gochain/v3/ethdb"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/node"
 )
 
@@ -123,7 +122,6 @@ func benchmarkBloomBits(b *testing.B, sectionSize uint64) {
 
 	fmt.Println("Running filter benchmarks...")
 	start = time.Now()
-	mux := new(event.TypeMux)
 	var backend *testBackend
 
 	for i := 0; i < benchFilterCnt; i++ {
@@ -133,7 +131,7 @@ func benchmarkBloomBits(b *testing.B, sectionSize uint64) {
 			if err := db.Open(); err != nil {
 				b.Fatal(err)
 			}
-			backend = &testBackend{mux: mux, db: db, sections: cnt}
+			backend = &testBackend{db: db, sections: cnt}
 		}
 		var addr common.Address
 		addr[0] = byte(i)
@@ -194,8 +192,7 @@ func BenchmarkNoBloomBits(b *testing.B) {
 
 	fmt.Println("Running filter benchmarks...")
 	start := time.Now()
-	mux := new(event.TypeMux)
-	backend := &testBackend{mux: mux, db: db}
+	backend := &testBackend{db: db}
 	filter := NewRangeFilter(backend, 0, int64(*headNum), []common.Address{{}}, nil)
 	filter.Logs(context.Background())
 	d := time.Since(start)

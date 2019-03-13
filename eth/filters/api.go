@@ -29,7 +29,6 @@ import (
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/common/hexutil"
 	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/rpc"
 )
 
@@ -52,7 +51,6 @@ type filter struct {
 // information related to the Ethereum protocol such als blocks, transactions and logs.
 type PublicFilterAPI struct {
 	backend   Backend
-	mux       *event.TypeMux
 	quit      chan struct{}
 	chainDb   common.Database
 	events    *EventSystem
@@ -64,9 +62,8 @@ type PublicFilterAPI struct {
 func NewPublicFilterAPI(backend Backend, lightMode bool) *PublicFilterAPI {
 	api := &PublicFilterAPI{
 		backend: backend,
-		mux:     backend.EventMux(),
 		chainDb: backend.ChainDb(),
-		events:  NewEventSystem(backend.EventMux(), backend, lightMode),
+		events:  NewEventSystem(backend, lightMode),
 		filters: make(map[rpc.ID]*filter),
 	}
 	go api.timeoutLoop()

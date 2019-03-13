@@ -33,27 +33,22 @@ import (
 	"github.com/gochain-io/gochain/v3/core/rawdb"
 	"github.com/gochain-io/gochain/v3/core/types"
 	"github.com/gochain-io/gochain/v3/ethdb"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/params"
 	"github.com/gochain-io/gochain/v3/rpc"
 )
 
 type testBackend struct {
-	mux        *event.TypeMux
-	db         common.Database
-	sections   uint64
-	txFeed     core.NewTxsFeed
-	rmLogsFeed core.RemovedLogsFeed
-	logsFeed   core.LogsFeed
-	chainFeed  core.ChainFeed
+	db              common.Database
+	sections        uint64
+	txFeed          core.NewTxsFeed
+	rmLogsFeed      core.RemovedLogsFeed
+	pendingLogsFeed core.PendingLogsFeed
+	logsFeed        core.LogsFeed
+	chainFeed       core.ChainFeed
 }
 
 func (b *testBackend) ChainDb() common.Database {
 	return b.db
-}
-
-func (b *testBackend) EventMux() *event.TypeMux {
-	return b.mux
 }
 
 func (b *testBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error) {
@@ -118,6 +113,14 @@ func (b *testBackend) UnsubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEven
 	b.rmLogsFeed.Unsubscribe(ch)
 }
 
+func (b *testBackend) SubscribePendingLogsEvent(ch chan<- core.PendingLogsEvent, name string) {
+	b.pendingLogsFeed.Subscribe(ch, name)
+}
+
+func (b *testBackend) UnsubscribePendingLogsEvent(ch chan<- core.PendingLogsEvent) {
+	b.pendingLogsFeed.Unsubscribe(ch)
+}
+
 func (b *testBackend) SubscribeLogsEvent(ch chan<- []*types.Log, name string) {
 	b.logsFeed.Subscribe(ch, name)
 }
@@ -175,9 +178,8 @@ func TestBlockSubscription(t *testing.T) {
 	t.Parallel()
 
 	var (
-		mux         = new(event.TypeMux)
 		db          = ethdb.NewMemDatabase()
-		backend     = &testBackend{mux: mux, db: db}
+		backend     = &testBackend{db: db}
 		api         = NewPublicFilterAPI(backend, false)
 		genesis     = core.GenesisBlockForTesting(db, common.Address{1}, common.Big256)
 		chain, _    = core.GenerateChain(ctx, params.TestChainConfig, genesis, clique.NewFaker(), db, 10, nil)
@@ -228,9 +230,8 @@ func TestPendingTxFilter(t *testing.T) {
 	t.Parallel()
 
 	var (
-		mux     = new(event.TypeMux)
 		db      = ethdb.NewMemDatabase()
-		backend = &testBackend{mux: mux, db: db}
+		backend = &testBackend{db: db}
 		api     = NewPublicFilterAPI(backend, false)
 
 		transactions = []*types.Transaction{
@@ -284,9 +285,8 @@ func TestPendingTxFilter(t *testing.T) {
 // If not it must return an error.
 func TestLogFilterCreation(t *testing.T) {
 	var (
-		mux     = new(event.TypeMux)
 		db      = ethdb.NewMemDatabase()
-		backend = &testBackend{mux: mux, db: db}
+		backend = &testBackend{db: db}
 		api     = NewPublicFilterAPI(backend, false)
 
 		testCases = []struct {
@@ -329,9 +329,8 @@ func TestInvalidLogFilterCreation(t *testing.T) {
 	t.Parallel()
 
 	var (
-		mux     = new(event.TypeMux)
 		db      = ethdb.NewMemDatabase()
-		backend = &testBackend{mux: mux, db: db}
+		backend = &testBackend{db: db}
 		api     = NewPublicFilterAPI(backend, false)
 	)
 
@@ -352,9 +351,8 @@ func TestInvalidLogFilterCreation(t *testing.T) {
 
 func TestInvalidGetLogsRequest(t *testing.T) {
 	var (
-		mux       = new(event.TypeMux)
 		db        = ethdb.NewMemDatabase()
-		backend   = &testBackend{mux: mux, db: db}
+		backend   = &testBackend{db: db}
 		api       = NewPublicFilterAPI(backend, false)
 		blockHash = common.HexToHash("0x1111111111111111111111111111111111111111111111111111111111111111")
 	)
@@ -378,9 +376,8 @@ func TestLogFilter(t *testing.T) {
 	t.Parallel()
 
 	var (
-		mux     = new(event.TypeMux)
 		db      = ethdb.NewMemDatabase()
-		backend = &testBackend{mux: mux, db: db}
+		backend = &testBackend{db: db}
 		api     = NewPublicFilterAPI(backend, false)
 
 		firstAddr      = common.HexToAddress("0x1111111111111111111111111111111111111111")
@@ -448,9 +445,7 @@ func TestLogFilter(t *testing.T) {
 	if nsend := backend.logsFeed.Len(); nsend == 0 {
 		t.Fatal("Shoud have at least one subscription")
 	}
-	if err := mux.Post(core.PendingLogsEvent{Logs: allLogs}); err != nil {
-		t.Fatal(err)
-	}
+	backend.pendingLogsFeed.Send(core.PendingLogsEvent{Logs: allLogs})
 
 	for i, tt := range testCases {
 		var fetched []*types.Log
@@ -494,9 +489,8 @@ func TestPendingLogsSubscription(t *testing.T) {
 	t.Parallel()
 
 	var (
-		mux     = new(event.TypeMux)
 		db      = ethdb.NewMemDatabase()
-		backend = &testBackend{mux: mux, db: db}
+		backend = &testBackend{db: db}
 		api     = NewPublicFilterAPI(backend, false)
 
 		firstAddr      = common.HexToAddress("0x1111111111111111111111111111111111111111")
@@ -597,8 +591,6 @@ func TestPendingLogsSubscription(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	// allLogs are type of core.PendingLogsEvent
 	for _, l := range allLogs {
-		if err := mux.Post(l); err != nil {
-			t.Fatal(err)
-		}
+		backend.pendingLogsFeed.Send(l)
 	}
 }

@@ -22,13 +22,13 @@ import (
 	"os"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gochain-io/gochain/v3/accounts"
 	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/event"
 )
 
 var testSigData = make([]byte, 32)
@@ -218,7 +218,7 @@ func TestSignRace(t *testing.T) {
 // Tests that the wallet notifier loop starts and stops correctly based on the
 // addition and removal of wallet event subscriptions.
 func TestWalletNotifierLifecycle(t *testing.T) {
-	// Create a temporary kesytore to test with
+	// Create a temporary keystore to test with
 	dir, ks := tmpKeyStore(t, false)
 	defer os.RemoveAll(dir)
 
@@ -232,12 +232,15 @@ func TestWalletNotifierLifecycle(t *testing.T) {
 		t.Errorf("wallet notifier running without subscribers")
 	}
 	// Subscribe to the wallet feed and ensure the updater boots up
-	updates := make(chan accounts.WalletEvent)
+	updates := []chan accounts.WalletEvent{make(chan accounts.WalletEvent), make(chan accounts.WalletEvent)}
 
-	subs := make([]event.Subscription, 2)
-	for i := 0; i < len(subs); i++ {
-		// Create a new subscription
-		subs[i] = ks.Subscribe(updates)
+	unsubs := make([]func(), len(updates))
+	for i := 0; i < len(updates); i++ {
+		ks.Subscribe(updates[i], "keystore-TestWalletNotifierLifecycle"+strconv.Itoa(i))
+		j := i
+		unsubs[i] = func() {
+			ks.Unsubscribe(updates[j])
+		}
 
 		// Ensure the notifier comes online
 		time.Sleep(250 * time.Millisecond)
@@ -250,9 +253,9 @@ func TestWalletNotifierLifecycle(t *testing.T) {
 		}
 	}
 	// Unsubscribe and ensure the updater terminates eventually
-	for i := 0; i < len(subs); i++ {
+	for i := 0; i < len(unsubs); i++ {
 		// Close an existing subscription
-		subs[i].Unsubscribe()
+		unsubs[i]()
 
 		// Ensure the notifier shuts down at and only at the last close
 		for k := 0; k < int(walletRefreshCycle/(250*time.Millisecond))+2; k++ {
@@ -260,10 +263,10 @@ func TestWalletNotifierLifecycle(t *testing.T) {
 			updating = ks.updating
 			ks.mu.RUnlock()
 
-			if i < len(subs)-1 && !updating {
+			if i < len(unsubs)-1 && !updating {
 				t.Fatalf("sub %d: event notifier stopped prematurely", i)
 			}
-			if i == len(subs)-1 && !updating {
+			if i == len(unsubs)-1 && !updating {
 				return
 			}
 			time.Sleep(250 * time.Millisecond)
@@ -287,17 +290,16 @@ func TestWalletNotifications(t *testing.T) {
 	var (
 		events  []walletEvent
 		updates = make(chan accounts.WalletEvent)
-		sub     = ks.Subscribe(updates)
 	)
-	defer sub.Unsubscribe()
+	ks.Subscribe(updates, "keystore-TestWalletNotifications")
 	go func() {
 		for {
 			select {
-			case ev := <-updates:
+			case ev, ok := <-updates:
+				if !ok {
+					return
+				}
 				events = append(events, walletEvent{ev, ev.Wallet.Accounts()[0]})
-			case <-sub.Err():
-				close(updates)
-				return
 			}
 		}
 	}()
@@ -332,7 +334,7 @@ func TestWalletNotifications(t *testing.T) {
 	}
 
 	// Shut down the event collector and check events.
-	sub.Unsubscribe()
+	ks.Unsubscribe(updates)
 	<-updates
 	checkAccounts(t, live, ks.Wallets())
 	checkEvents(t, wantEvents, events)

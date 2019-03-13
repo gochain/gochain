@@ -30,7 +30,6 @@ import (
 	"github.com/gochain-io/gochain/v3/core/vm"
 	"github.com/gochain-io/gochain/v3/crypto"
 	"github.com/gochain-io/gochain/v3/ethdb"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/params"
 )
 
@@ -71,7 +70,6 @@ type testWorkerBackend struct {
 	db         common.Database
 	txPool     *core.TxPool
 	chain      *core.BlockChain
-	testTxFeed event.Feed
 	uncleBlock *types.Block
 }
 
@@ -128,7 +126,7 @@ func (b *testWorkerBackend) PostChainEvents(events []interface{}) {
 func newTestWorker(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, blocks int) (*worker, *testWorkerBackend) {
 	backend := newTestWorkerBackend(t, chainConfig, engine, blocks)
 	backend.txPool.AddLocals(context.Background(), pendingTxs)
-	w := newWorker(chainConfig, engine, backend, new(event.TypeMux), time.Second, params.GenesisGasLimit, params.GenesisGasLimit, nil)
+	w := newWorker(chainConfig, engine, backend, new(core.InterfaceFeed), time.Second, params.GenesisGasLimit, params.GenesisGasLimit, nil)
 	w.setEtherbase(testBankAddress)
 	return w, backend
 }

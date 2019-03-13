@@ -33,7 +33,6 @@ import (
 	"github.com/gochain-io/gochain/v3/core/state"
 	"github.com/gochain-io/gochain/v3/core/types"
 	"github.com/gochain-io/gochain/v3/core/vm"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/params"
 )
@@ -127,7 +126,7 @@ type worker struct {
 	gasCeil  uint64
 
 	// Subscriptions
-	mux         *event.TypeMux
+	mux         *core.InterfaceFeed
 	txsCh       chan core.NewTxsEvent
 	chainHeadCh chan core.ChainHeadEvent
 
@@ -168,7 +167,7 @@ type worker struct {
 	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
 }
 
-func newWorker(config *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, recommit time.Duration, gasFloor, gasCeil uint64, isLocalBlock func(*types.Block) bool) *worker {
+func newWorker(config *params.ChainConfig, engine consensus.Engine, eth Backend, mux *core.InterfaceFeed, recommit time.Duration, gasFloor, gasCeil uint64, isLocalBlock func(*types.Block) bool) *worker {
 	worker := &worker{
 		config:             config,
 		engine:             engine,
@@ -579,9 +578,7 @@ func (w *worker) resultLoop() {
 				"parent", block.ParentHash(), "elapsed", common.PrettyDuration(time.Since(task.createdAt)))
 
 			// Broadcast the block and announce chain insertion event
-			if err := w.mux.Post(core.NewMinedBlockEvent{Block: block}); err != nil {
-				log.Error("Failed to post new mined block event", "err", err)
-			}
+			w.mux.Send(core.NewMinedBlockEvent{Block: block})
 
 			var events []interface{}
 			switch stat {
@@ -790,7 +787,7 @@ func (w *worker) commitTransactions(ctx context.Context, txs *types.Transactions
 			cpy[i] = new(types.Log)
 			*cpy[i] = *l
 		}
-		go w.mux.Post(core.PendingLogsEvent{Logs: cpy})
+		go w.mux.Send(core.PendingLogsEvent{Logs: cpy})
 	}
 	// Notify resubmit loop to decrease resubmitting interval if current interval is larger
 	// than the user-specified one.

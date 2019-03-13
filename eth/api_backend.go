@@ -32,7 +32,6 @@ import (
 	"github.com/gochain-io/gochain/v3/core/vm"
 	"github.com/gochain-io/gochain/v3/eth/downloader"
 	"github.com/gochain-io/gochain/v3/eth/gasprice"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/params"
 	"github.com/gochain-io/gochain/v3/rpc"
@@ -199,6 +198,14 @@ func (b *EthApiBackend) UnsubscribeLogsEvent(ch chan<- []*types.Log) {
 	b.eth.BlockChain().UnsubscribeLogsEvent(ch)
 }
 
+func (b *EthApiBackend) SubscribePendingLogsEvent(ch chan<- core.PendingLogsEvent, name string) {
+	b.eth.BlockChain().SubscribePendingLogsEvent(ch, name)
+}
+
+func (b *EthApiBackend) UnsubscribePendingLogsEvent(ch chan<- core.PendingLogsEvent) {
+	b.eth.BlockChain().UnsubscribePendingLogsEvent(ch)
+}
+
 func (b *EthApiBackend) SendTx(ctx context.Context, signedTx *types.Transaction) error {
 	return b.eth.txPool.AddLocal(ctx, signedTx)
 }
@@ -250,10 +257,6 @@ func (b *EthApiBackend) SuggestPrice(ctx context.Context) (*big.Int, error) {
 
 func (b *EthApiBackend) ChainDb() common.Database {
 	return b.eth.ChainDb()
-}
-
-func (b *EthApiBackend) EventMux() *event.TypeMux {
-	return b.eth.EventMux()
 }
 
 func (b *EthApiBackend) AccountManager() *accounts.Manager {

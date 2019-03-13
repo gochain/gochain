@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gochain-io/gochain/v3/core"
 	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/node"
 	"github.com/gochain-io/gochain/v3/p2p"
@@ -221,7 +222,7 @@ type TestAPI struct {
 	state     *atomic.Value
 	peerCount *int64
 	counter   int64
-	feed      event.Feed
+	feed      core.Int64Feed
 }
 
 func (t *TestAPI) PeerCount() int64 {
@@ -255,15 +256,16 @@ func (t *TestAPI) Events(ctx context.Context) (*rpc.Subscription, error) {
 
 	go func() {
 		events := make(chan int64)
-		sub := t.feed.Subscribe(events)
-		defer sub.Unsubscribe()
+		t.feed.Subscribe(events, "simulations.TestAPI-Events")
+		defer t.feed.Unsubscribe(events)
 
 		for {
 			select {
-			case event := <-events:
+			case event, ok := <-events:
+				if !ok {
+					return
+				}
 				notifier.Notify(rpcSub.ID, event)
-			case <-sub.Err():
-				return
 			case <-rpcSub.Err():
 				return
 			case <-notifier.Closed():

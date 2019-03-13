@@ -30,9 +30,9 @@ import (
 
 	"github.com/gochain-io/gochain/v3"
 	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core"
 	"github.com/gochain-io/gochain/v3/core/rawdb"
 	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/metrics"
 	"github.com/gochain-io/gochain/v3/params"
@@ -98,9 +98,10 @@ var (
 )
 
 type Downloader struct {
-	mode SyncMode       // Synchronisation mode defining the strategy used (per sync cycle)
-	mux  *event.TypeMux // Event multiplexer to announce sync operation events
+	mode SyncMode            // Synchronisation mode defining the strategy used (per sync cycle)
+	mux  *core.InterfaceFeed // Event multiplexer to announce sync operation events
 
+	genesis uint64   // Genesis block number to limit sync to (e.g. light client CHT)
 	queue   *queue   // Scheduler for selecting the hashes to download
 	peers   *peerSet // Set of active peers from which download can proceed
 	stateDB common.Database
@@ -203,7 +204,7 @@ type BlockChain interface {
 }
 
 // New creates a new downloader to fetch hashes and blocks from remote peers.
-func New(mode SyncMode, stateDb common.Database, mux *event.TypeMux, chain BlockChain, lightchain LightChain, dropPeer peerDropFn) *Downloader {
+func New(mode SyncMode, stateDb common.Database, mux *core.InterfaceFeed, chain BlockChain, lightchain LightChain, dropPeer peerDropFn) *Downloader {
 	if lightchain == nil {
 		lightchain = chain
 	}
@@ -410,13 +411,13 @@ func (d *Downloader) syncWithPeer(ctx context.Context, p *peerConnection, hash c
 	ctx, span := trace.StartSpan(ctx, "Downloader.syncWithPeer")
 	defer span.End()
 
-	d.mux.Post(StartEvent{})
+	d.mux.Send(StartEvent{})
 	defer func() {
 		// reset on error
 		if err != nil {
-			d.mux.Post(FailedEvent{err})
+			d.mux.Send(FailedEvent{err})
 		} else {
-			d.mux.Post(DoneEvent{})
+			d.mux.Send(DoneEvent{})
 		}
 	}()
 	if p.version < 62 {

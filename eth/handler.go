@@ -34,7 +34,6 @@ import (
 	"github.com/gochain-io/gochain/v3/core/types"
 	"github.com/gochain-io/gochain/v3/eth/downloader"
 	"github.com/gochain-io/gochain/v3/eth/fetcher"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/p2p"
 	"github.com/gochain-io/gochain/v3/p2p/discover"
@@ -79,9 +78,9 @@ type ProtocolManager struct {
 
 	SubProtocols []p2p.Protocol
 
-	eventMux      *event.TypeMux
-	txsCh         chan core.NewTxsEvent
-	minedBlockSub *event.TypeMuxSubscription
+	eventMux     *core.InterfaceFeed
+	txsCh        chan core.NewTxsEvent
+	minedBlockCh chan interface{}
 
 	// channels for fetcher, syncer, txsyncLoop
 	newPeerCh   chan *peer
@@ -96,19 +95,20 @@ type ProtocolManager struct {
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The GoChain sub protocol manages peers capable
 // with the ethereum network.
-func NewProtocolManager(ctx context.Context, config *params.ChainConfig, mode downloader.SyncMode, networkId uint64, mux *event.TypeMux, txpool txPool, engine consensus.Engine, blockchain *core.BlockChain, chaindb common.Database) (*ProtocolManager, error) {
+func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, networkId uint64, mux *core.InterfaceFeed, txpool txPool, engine consensus.Engine, blockchain *core.BlockChain, chaindb common.Database) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
-		networkId:   networkId,
-		eventMux:    mux,
-		txpool:      txpool,
-		blockchain:  blockchain,
-		chainconfig: config,
-		peers:       newPeerSet(),
-		newPeerCh:   make(chan *peer),
-		noMorePeers: make(chan struct{}),
-		txsyncCh:    make(chan *txsync),
-		quitSync:    make(chan struct{}),
+		networkId:    networkId,
+		eventMux:     mux,
+		txpool:       txpool,
+		blockchain:   blockchain,
+		chainconfig:  config,
+		peers:        newPeerSet(),
+		newPeerCh:    make(chan *peer),
+		noMorePeers:  make(chan struct{}),
+		txsyncCh:     make(chan *txsync),
+		quitSync:     make(chan struct{}),
+		minedBlockCh: make(chan interface{}, 32),
 	}
 	// Figure out whether to allow fast sync or not
 	if mode == downloader.FastSync && blockchain.CurrentBlock().NumberU64() > 0 {
@@ -214,7 +214,7 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 	go pm.txBroadcastLoop()
 
 	// broadcast mined blocks
-	pm.minedBlockSub = pm.eventMux.Subscribe(core.NewMinedBlockEvent{})
+	pm.eventMux.Subscribe(pm.minedBlockCh, "eth.ProtocolManger")
 	go pm.minedBroadcastLoop()
 
 	// start sync handlers
@@ -227,7 +227,7 @@ func (pm *ProtocolManager) Stop() {
 	log.Info("Stopping GoChain protocol")
 
 	pm.txpool.UnsubscribeNewTxsEvent(pm.txsCh) // quits txBroadcastLoop
-	pm.minedBlockSub.Unsubscribe()             // quits blockBroadcastLoop
+	pm.eventMux.Unsubscribe(pm.minedBlockCh)   // quits blockBroadcastLoop
 
 	// Quit the sync loop.
 	// After this send has completed, no new peers will be accepted.
@@ -728,8 +728,8 @@ func (pm *ProtocolManager) BroadcastTxs(ctx context.Context, txs types.Transacti
 // Mined broadcast loop
 func (pm *ProtocolManager) minedBroadcastLoop() {
 	// automatically stops if unsubscribe
-	for obj := range pm.minedBlockSub.Chan() {
-		switch ev := obj.Data.(type) {
+	for obj := range pm.minedBlockCh {
+		switch ev := obj.(type) {
 		case core.NewMinedBlockEvent:
 			ctx, span := trace.StartSpan(context.Background(), "ProtocolManager.minedBroadcastLoop-NewMinedBlockEvent")
 			pm.BroadcastBlock(ctx, ev.Block, true)  // First propagate block to peers

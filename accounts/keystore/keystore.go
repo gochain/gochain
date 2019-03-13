@@ -21,7 +21,6 @@
 package keystore
 
 import (
-	"context"
 	"crypto/ecdsa"
 	crand "crypto/rand"
 	"errors"
@@ -34,13 +33,10 @@ import (
 	"sync"
 	"time"
 
-	"go.opencensus.io/trace"
-
 	"github.com/gochain-io/gochain/v3/accounts"
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core/types"
 	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/event"
 )
 
 var (
@@ -65,10 +61,9 @@ type KeyStore struct {
 	changes  chan struct{}                // Channel receiving change notifications from the cache
 	unlocked map[common.Address]*unlocked // Currently unlocked account (decrypted private keys)
 
-	wallets     []accounts.Wallet       // Wallet wrappers around the individual key files
-	updateFeed  event.Feed              // Event feed to notify wallet additions/removals
-	updateScope event.SubscriptionScope // Subscription scope tracking current live listeners
-	updating    bool                    // Whether the event notification loop is running
+	wallets    []accounts.Wallet   // Wallet wrappers around the individual key files
+	updateFeed accounts.WalletFeed // Event feed to notify wallet additions/removals
+	updating   bool                // Whether the event notification loop is running
 
 	mu sync.RWMutex
 }
@@ -135,9 +130,6 @@ func (ks *KeyStore) Wallets() []accounts.Wallet {
 // refreshWallets retrieves the current account list and based on that does any
 // necessary wallet refreshes.
 func (ks *KeyStore) refreshWallets() {
-	ctx, span := trace.StartSpan(context.Background(), "KeyStore.refreshWallets")
-	defer span.End()
-
 	// Retrieve the current list of accounts
 	ks.mu.Lock()
 	accs := ks.cache.accounts()
@@ -176,26 +168,29 @@ func (ks *KeyStore) refreshWallets() {
 
 	// Fire all wallet events and return
 	for _, event := range events {
-		ks.updateFeed.SendCtx(ctx, event)
+		ks.updateFeed.Send(event)
 	}
 }
 
 // Subscribe implements accounts.Backend, creating an async subscription to
 // receive notifications on the addition or removal of keystore wallets.
-func (ks *KeyStore) Subscribe(sink chan<- accounts.WalletEvent) event.Subscription {
+func (ks *KeyStore) Subscribe(sink chan<- accounts.WalletEvent, name string) {
 	// We need the mutex to reliably start/stop the update loop
 	ks.mu.Lock()
 	defer ks.mu.Unlock()
 
 	// Subscribe the caller and track the subscriber count
-	sub := ks.updateScope.Track(ks.updateFeed.Subscribe(sink))
+	ks.updateFeed.Subscribe(sink, name)
 
 	// Subscribers require an active notification loop, start it
 	if !ks.updating {
 		ks.updating = true
 		go ks.updater()
 	}
-	return sub
+}
+
+func (ks *KeyStore) Unsubscribe(sink chan<- accounts.WalletEvent) {
+	ks.updateFeed.Unsubscribe(sink)
 }
 
 // updater is responsible for maintaining an up-to-date list of wallets stored in
@@ -215,7 +210,7 @@ func (ks *KeyStore) updater() {
 
 		// If all our subscribers left, stop the updater
 		ks.mu.Lock()
-		if ks.updateScope.Count() == 0 {
+		if ks.updateFeed.Len() == 0 {
 			ks.updating = false
 			ks.mu.Unlock()
 			return

@@ -111,8 +111,8 @@ func (d *Downloader) runStateSync(s *stateSync) *stateSync {
 
 	// Listen for peer departure events to cancel assigned tasks
 	peerDrop := make(chan *peerConnection, 1024)
-	peerSub := s.d.peers.SubscribePeerDrops(peerDrop)
-	defer peerSub.Unsubscribe()
+	s.d.peers.SubscribePeerDrops(peerDrop, "download.Downloader-runStateSync")
+	defer s.d.peers.UnsubscribePeerDrops(peerDrop)
 
 	for {
 		// Enable sending of the first buffered element if there is one.
@@ -280,8 +280,8 @@ func (s *stateSync) Cancel() error {
 func (s *stateSync) loop() (err error) {
 	// Listen for new peer events to assign tasks to them
 	newPeer := make(chan *peerConnection, 1024)
-	peerSub := s.d.peers.SubscribeNewPeers(newPeer)
-	defer peerSub.Unsubscribe()
+	s.d.peers.SubscribeNewPeers(newPeer, "downloader.stateSync-loop")
+	defer s.d.peers.UnsubscribeNewPeers(newPeer)
 	defer func() {
 		cerr := s.commit(true)
 		if err == nil {

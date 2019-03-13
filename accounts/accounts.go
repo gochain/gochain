@@ -19,12 +19,15 @@ package accounts
 
 import (
 	"context"
+	"fmt"
 	"math/big"
+	"sync"
+	"time"
 
 	"github.com/gochain-io/gochain/v3"
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/event"
+	"github.com/gochain-io/gochain/v3/log"
 )
 
 // Account represents an Ethereum account located at a specific location defined
@@ -146,7 +149,8 @@ type Backend interface {
 
 	// Subscribe creates an async subscription to receive notifications when the
 	// backend detects the arrival or departure of a wallet.
-	Subscribe(sink chan<- WalletEvent) event.Subscription
+	Subscribe(sink chan<- WalletEvent, name string)
+	Unsubscribe(sink chan<- WalletEvent)
 }
 
 // WalletEventType represents the different event types that can be fired by
@@ -171,4 +175,65 @@ const (
 type WalletEvent struct {
 	Wallet Wallet          // Wallet instance arrived or departed
 	Kind   WalletEventType // Event type that happened in the system
+}
+
+type WalletFeed struct {
+	mu   sync.RWMutex
+	subs map[chan<- WalletEvent]string
+}
+
+func (f *WalletFeed) Close() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for sub := range f.subs {
+		close(sub)
+	}
+	f.subs = nil
+}
+
+func (f *WalletFeed) Len() int {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	return len(f.subs)
+}
+
+func (f *WalletFeed) Subscribe(ch chan<- WalletEvent, name string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.subs == nil {
+		f.subs = make(map[chan<- WalletEvent]string)
+	}
+	f.subs[ch] = name
+}
+
+func (f *WalletFeed) Unsubscribe(ch chan<- WalletEvent) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.subs[ch]; ok {
+		delete(f.subs, ch)
+		close(ch)
+	}
+}
+
+const timeout = 500 * time.Millisecond
+
+func (f *WalletFeed) Send(e WalletEvent) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	for sub, name := range f.subs {
+		select {
+		case sub <- e:
+		default:
+			start := time.Now()
+			var action string
+			select {
+			case sub <- e:
+				action = "delayed"
+			case <-time.After(timeout):
+				action = "dropped"
+			}
+			dur := time.Since(start)
+			log.Warn(fmt.Sprintf("WalletFeed send %s: channel full", action), "name", name, "cap", cap(sub), "time", dur, "val", e)
+		}
+	}
 }

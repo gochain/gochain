@@ -21,9 +21,9 @@ import (
 
 	"github.com/gochain-io/gochain/v3/accounts"
 	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/core"
 	"github.com/gochain-io/gochain/v3/ethdb"
 	"github.com/gochain-io/gochain/v3/ethdb/s3"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/p2p"
 	"github.com/gochain-io/gochain/v3/rpc"
@@ -35,7 +35,7 @@ import (
 type ServiceContext struct {
 	config         *Config
 	services       map[reflect.Type]Service // Index of the already constructed services
-	EventMux       *event.TypeMux           // Event multiplexer used for decoupled notifications
+	EventMux       *core.InterfaceFeed      // Event multiplexer used for decoupled notifications
 	AccountManager *accounts.Manager        // Account manager created by the node.
 }
 

@@ -31,7 +31,6 @@ import (
 	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/v3/common/mclock"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/p2p/discover"
 	"github.com/gochain-io/gochain/v3/rlp"
@@ -116,7 +115,7 @@ type Peer struct {
 	disc     chan DiscReason
 
 	// events receives message send / receive events if set
-	events *event.Feed
+	events *PeerFeed
 }
 
 // NewPeer returns a peer for testing purposes.
@@ -485,4 +484,59 @@ func (p *Peer) Info() *PeerInfo {
 		info.Protocols[proto.Name] = protoInfo
 	}
 	return info
+}
+
+type PeerFeed struct {
+	mu   sync.RWMutex
+	subs map[chan<- *PeerEvent]string
+}
+
+func (f *PeerFeed) Close() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for sub := range f.subs {
+		close(sub)
+	}
+	f.subs = nil
+}
+
+func (f *PeerFeed) Subscribe(ch chan<- *PeerEvent, name string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.subs == nil {
+		f.subs = make(map[chan<- *PeerEvent]string)
+	}
+	f.subs[ch] = name
+}
+
+func (f *PeerFeed) Unsubscribe(ch chan<- *PeerEvent) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.subs[ch]; ok {
+		delete(f.subs, ch)
+		close(ch)
+	}
+}
+
+const timeout = 500 * time.Millisecond
+
+func (f *PeerFeed) Send(e *PeerEvent) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	for sub, name := range f.subs {
+		select {
+		case sub <- e:
+		default:
+			start := time.Now()
+			var action string
+			select {
+			case sub <- e:
+				action = "delayed"
+			case <-time.After(timeout):
+				action = "dropped"
+			}
+			dur := time.Since(start)
+			log.Warn(fmt.Sprintf("PeerFeed send %s: channel full", action), "name", name, "cap", cap(sub), "time", dur, "val", e)
+		}
+	}
 }

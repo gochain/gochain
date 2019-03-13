@@ -30,7 +30,6 @@ import (
 
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/common/mclock"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/p2p/discover"
 	"github.com/gochain-io/gochain/v3/p2p/discv5"
@@ -176,7 +175,7 @@ type Server struct {
 	addpeer       chan *conn
 	delpeer       chan peerDrop
 	loopWG        sync.WaitGroup // loop, listenLoop
-	peerFeed      event.Feed
+	peerFeed      PeerFeed
 	log           log.Logger
 }
 
@@ -304,8 +303,12 @@ func (srv *Server) RemovePeer(node *discover.Node) {
 }
 
 // SubscribePeers subscribes the given channel to peer events
-func (srv *Server) SubscribeEvents(ch chan *PeerEvent) event.Subscription {
-	return srv.peerFeed.Subscribe(ch)
+func (srv *Server) SubscribeEvents(ch chan *PeerEvent, name string) {
+	srv.peerFeed.Subscribe(ch, name)
+}
+
+func (srv *Server) UnsubscribeEvents(ch chan *PeerEvent) {
+	srv.peerFeed.Unsubscribe(ch)
 }
 
 // Self returns the local node's endpoint information.

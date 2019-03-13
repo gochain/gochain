@@ -28,7 +28,6 @@ import (
 	"github.com/gochain-io/gochain/v3/core/types"
 	"github.com/gochain-io/gochain/v3/core/vm"
 	"github.com/gochain-io/gochain/v3/eth/downloader"
-	"github.com/gochain-io/gochain/v3/event"
 	"github.com/gochain-io/gochain/v3/params"
 	"github.com/gochain-io/gochain/v3/rpc"
 )
@@ -41,7 +40,6 @@ type Backend interface {
 	ProtocolVersion() int
 	SuggestPrice(ctx context.Context) (*big.Int, error)
 	ChainDb() common.Database
-	EventMux() *event.TypeMux
 	AccountManager() *accounts.Manager
 
 	// BlockChain API
