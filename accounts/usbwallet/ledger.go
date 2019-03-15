@@ -21,7 +21,6 @@
 package usbwallet
 
 import (
-	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -54,11 +53,9 @@ const (
 	ledgerOpGetConfiguration ledgerOpcode = 0x06 // Returns specific wallet application configuration
 
 	ledgerP1DirectlyFetchAddress    ledgerParam1 = 0x00 // Return address directly from the wallet
-	ledgerP1ConfirmFetchAddress     ledgerParam1 = 0x01 // Require a user confirmation before returning the address
 	ledgerP1InitTransactionData     ledgerParam1 = 0x00 // First transaction data block for signing
 	ledgerP1ContTransactionData     ledgerParam1 = 0x80 // Subsequent transaction data block for signing
 	ledgerP2DiscardAddressChainCode ledgerParam2 = 0x00 // Do not return the chain code along with the address
-	ledgerP2ReturnAddressChainCode  ledgerParam2 = 0x01 // Require a user confirmation before returning the address
 )
 
 // errLedgerReplyInvalidHeader is the error message returned by a Ledger data exchange
@@ -158,7 +155,7 @@ func (w *ledgerDriver) Derive(path accounts.DerivationPath) (common.Address, err
 // Note, if the version of the Ethereum application running on the Ledger wallet is
 // too old to sign EIP-155 transactions, but such is requested nonetheless, an error
 // will be returned opposed to silently signing in Homestead mode.
-func (w *ledgerDriver) SignTx(ctx context.Context, path accounts.DerivationPath, tx *types.Transaction, chainID *big.Int) (common.Address, *types.Transaction, error) {
+func (w *ledgerDriver) SignTx(path accounts.DerivationPath, tx *types.Transaction, chainID *big.Int) (common.Address, *types.Transaction, error) {
 	// If the Ethereum app doesn't run, abort
 	if w.offline() {
 		return common.Address{}, nil, accounts.ErrWalletClosed
@@ -168,7 +165,7 @@ func (w *ledgerDriver) SignTx(ctx context.Context, path accounts.DerivationPath,
 		return common.Address{}, nil, fmt.Errorf("Ledger v%d.%d.%d doesn't support signing this transaction, please update to v1.0.3 at least", w.version[0], w.version[1], w.version[2])
 	}
 	// All infos gathered and metadata checks out, request signing
-	return w.ledgerSign(ctx, path, tx, chainID)
+	return w.ledgerSign(path, tx, chainID)
 }
 
 // ledgerVersion retrieves the current version of the Ethereum wallet app running
@@ -260,7 +257,9 @@ func (w *ledgerDriver) ledgerDerive(derivationPath []uint32) (common.Address, er
 
 	// Decode the hex sting into an Ethereum address and return
 	var address common.Address
-	hex.Decode(address[:], hexstr)
+	if _, err = hex.Decode(address[:], hexstr); err != nil {
+		return common.Address{}, err
+	}
 	return address, nil
 }
 
@@ -298,14 +297,14 @@ func (w *ledgerDriver) ledgerDerive(derivationPath []uint32) (common.Address, er
 //   signature V | 1 byte
 //   signature R | 32 bytes
 //   signature S | 32 bytes
-func (w *ledgerDriver) ledgerSign(ctx context.Context, derivationPath []uint32, tx *types.Transaction, chainID *big.Int) (common.Address, *types.Transaction, error) {
+func (w *ledgerDriver) ledgerSign(derivationPath []uint32, tx *types.Transaction, chainID *big.Int) (common.Address, *types.Transaction, error) {
 	// Flatten the derivation path into the Ledger request
 	path := make([]byte, 1+4*len(derivationPath))
 	path[0] = byte(len(derivationPath))
 	for i, component := range derivationPath {
 		binary.BigEndian.PutUint32(path[1+4*i:], component)
 	}
-	// Create the transaction RLP based on whether legacy or EIP155 signing was requeste
+	// Create the transaction RLP based on whether legacy or EIP155 signing was requested
 	var (
 		txrlp []byte
 		err   error
@@ -353,7 +352,7 @@ func (w *ledgerDriver) ledgerSign(ctx context.Context, derivationPath []uint32, 
 		signer = new(types.HomesteadSigner)
 	} else {
 		signer = types.NewEIP155Signer(chainID)
-		signature[64] = signature[64] - byte(chainID.Uint64()*2+35)
+		signature[64] -= byte(chainID.Uint64()*2 + 35)
 	}
 	signed, err := tx.WithSignature(signer, signature)
 	if err != nil {

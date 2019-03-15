@@ -391,6 +391,22 @@ func (c *Client) BatchCallContext(ctx context.Context, b []BatchElem) error {
 	return err
 }
 
+// Notify sends a notification, i.e. a method call that doesn't expect a response.
+func (c *Client) Notify(ctx context.Context, method string, args ...interface{}) error {
+	op := new(requestOp)
+	msg, err := c.newMessage(method, args...)
+	if err != nil {
+		return err
+	}
+	msg.ID = nil
+
+	if c.isHTTP {
+		return c.sendHTTP(ctx, op, msg)
+	} else {
+		return c.send(ctx, op, msg)
+	}
+}
+
 // EthSubscribe registers a subscripion under the "eth" namespace.
 func (c *Client) EthSubscribe(ctx context.Context, channel interface{}, args ...interface{}) (*ClientSubscription, error) {
 	return c.Subscribe(ctx, "eth", channel, args...)
