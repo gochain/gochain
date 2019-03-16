@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gochain-io/gochain/v3/accounts/keystore"
 	"math/big"
 	"runtime"
 	"sync"
@@ -294,7 +295,8 @@ func (gc *GoChain) Etherbase() (eb common.Address, err error) {
 	if etherbase != (common.Address{}) {
 		return etherbase, nil
 	}
-	if wallets := gc.AccountManager().Wallets(); len(wallets) > 0 {
+	ks := gc.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+	if wallets := ks.Wallets(); len(wallets) > 0 {
 		if accounts := wallets[0].Accounts(); len(accounts) > 0 {
 			etherbase := accounts[0].Address
 
@@ -381,7 +383,7 @@ func (gc *GoChain) StartMining(threads int) error {
 				log.Error("Etherbase account unavailable locally", "err", err)
 				return fmt.Errorf("signer missing: %v", err)
 			}
-			clique.Authorize(eb, wallet.SignHash)
+			clique.Authorize(eb, wallet.SignData)
 		}
 		// If mining is started, we can disable the transaction rejection mechanism
 		// introduced to speed sync times.

@@ -276,7 +276,6 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 	stack.AccountManager().Subscribe(events, "gochain-startNode")
 
 	go func() {
-		defer stack.AccountManager().Unsubscribe(events)
 		// Create an chain state reader for self-derivation
 		rpcClient, err := stack.Attach()
 		if err != nil {

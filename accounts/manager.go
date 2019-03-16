@@ -26,7 +26,6 @@ import (
 // backends for signing transactions.
 type Manager struct {
 	backends map[reflect.Type][]Backend // Index of backends currently registered
-	unsubs   []func()                   // Wallet update subscriptions for all backends
 	updates  chan WalletEvent           // Subscription sink for backend wallet changes
 	wallets  []Wallet                   // Cache of all wallets from all registered backends
 
@@ -46,15 +45,12 @@ func NewManager(backends ...Backend) *Manager {
 	}
 	// Subscribe to wallet notifications from all backends
 	updates := make(chan WalletEvent, 4*len(backends))
-
-	unsubs := make([]func(), len(backends))
-	for i, backend := range backends {
-		unsubs[i] = func() { backend.Unsubscribe(updates) }
+	for _, backend := range backends {
+		backend.Subscribe(updates, "accounts.Manager")
 	}
 	// Assemble the account manager and return
 	am := &Manager{
 		backends: make(map[reflect.Type][]Backend),
-		unsubs:   unsubs,
 		updates:  updates,
 		wallets:  wallets,
 		quit:     make(chan chan error),
@@ -78,20 +74,13 @@ func (am *Manager) Close() error {
 // update is the wallet event loop listening for notifications from the backends
 // and updating the cache of wallets.
 func (am *Manager) update() {
-	// Close all subscriptions when the manager terminates
-	defer func() {
-		am.lock.Lock()
-		for _, unsub := range am.unsubs {
-			unsub()
-		}
-		am.unsubs = nil
-		am.lock.Unlock()
-	}()
-
 	// Loop until termination
 	for {
 		select {
-		case event := <-am.updates:
+		case event, ok := <-am.updates:
+			if !ok {
+				return
+			}
 			// Wallet event arrived, update local cache
 			am.lock.Lock()
 			switch event.Kind {

@@ -96,4 +96,4 @@ type Engine interface {
 
 // SignerFn is a signer callback function to request a hash to be signed by a
 // backing account.
-type SignerFn func(accounts.Account, []byte) ([]byte, error)
+type SignerFn func(account accounts.Account, mimeType string, data []byte) ([]byte, error)

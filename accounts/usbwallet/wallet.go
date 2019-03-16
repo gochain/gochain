@@ -29,6 +29,7 @@ import (
 	"github.com/gochain-io/gochain/v3/accounts"
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain-io/gochain/v3/crypto"
 	"github.com/gochain-io/gochain/v3/log"
 	"github.com/karalabe/hid"
 )
@@ -65,7 +66,7 @@ type driver interface {
 
 	// SignTx sends the transaction to the USB device and waits for the user to confirm
 	// or deny the transaction.
-	SignTx(ctx context.Context, path accounts.DerivationPath, tx *types.Transaction, chainID *big.Int) (common.Address, *types.Transaction, error)
+	SignTx(path accounts.DerivationPath, tx *types.Transaction, chainID *big.Int) (common.Address, *types.Transaction, error)
 }
 
 // wallet represents the common functionality shared by all USB hardware
@@ -99,7 +100,7 @@ type wallet struct {
 	//
 	// As such, a hardware wallet needs two locks to function correctly. A state
 	// lock can be used to protect the wallet's software-side internal state, which
-	// must not be held exlusively during hardware communication. A communication
+	// must not be held exclusively during hardware communication. A communication
 	// lock can be used to achieve exclusive access to the device itself, this one
 	// however should allow "skipping" waiting for operations that might want to
 	// use the device, but can live without too (e.g. account self-derivation).
@@ -273,9 +274,7 @@ func (w *wallet) close() error {
 	w.device = nil
 
 	w.accounts, w.paths = nil, nil
-	w.driver.Close()
-
-	return nil
+	return w.driver.Close()
 }
 
 // Accounts implements accounts.Wallet, returning the list of accounts pinned to
@@ -495,10 +494,26 @@ func (w *wallet) SelfDerive(base accounts.DerivationPath, chain gochain.ChainSta
 	w.deriveChain = chain
 }
 
-// SignHash implements accounts.Wallet, however signing arbitrary data is not
+// signHash implements accounts.Wallet, however signing arbitrary data is not
 // supported for hardware wallets, so this method will always return an error.
-func (w *wallet) SignHash(account accounts.Account, hash []byte) ([]byte, error) {
+func (w *wallet) signHash(account accounts.Account, hash []byte) ([]byte, error) {
 	return nil, accounts.ErrNotSupported
+}
+
+// SignData signs keccak256(data). The mimetype parameter describes the type of data being signed
+func (w *wallet) SignData(account accounts.Account, mimeType string, data []byte) ([]byte, error) {
+	return w.signHash(account, crypto.Keccak256(data))
+}
+
+// SignDataWithPassphrase implements accounts.Wallet, attempting to sign the given
+// data with the given account using passphrase as extra authentication.
+// Since USB wallets don't rely on passphrases, these are silently ignored.
+func (w *wallet) SignDataWithPassphrase(account accounts.Account, passphrase, mimeType string, data []byte) ([]byte, error) {
+	return w.SignData(account, mimeType, data)
+}
+
+func (w *wallet) SignText(account accounts.Account, text []byte) ([]byte, error) {
+	return w.signHash(account, accounts.TextHash(text))
 }
 
 // SignTx implements accounts.Wallet. It sends the transaction over to the Ledger
@@ -508,7 +523,7 @@ func (w *wallet) SignHash(account accounts.Account, hash []byte) ([]byte, error)
 // Note, if the version of the Ethereum application running on the Ledger wallet is
 // too old to sign EIP-155 transactions, but such is requested nonetheless, an error
 // will be returned opposed to silently signing in Homestead mode.
-func (w *wallet) SignTx(ctx context.Context, account accounts.Account, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
+func (w *wallet) SignTx(account accounts.Account, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
 	w.stateLock.RLock() // Comms have own mutex, this is for the state fields
 	defer w.stateLock.RUnlock()
 
@@ -537,7 +552,7 @@ func (w *wallet) SignTx(ctx context.Context, account accounts.Account, tx *types
 		w.hub.commsLock.Unlock()
 	}()
 	// Sign the transaction and verify the sender to avoid hardware fault surprises
-	sender, signed, err := w.driver.SignTx(ctx, path, tx, chainID)
+	sender, signed, err := w.driver.SignTx(path, tx, chainID)
 	if err != nil {
 		return nil, err
 	}
@@ -550,13 +565,13 @@ func (w *wallet) SignTx(ctx context.Context, account accounts.Account, tx *types
 // SignHashWithPassphrase implements accounts.Wallet, however signing arbitrary
 // data is not supported for Ledger wallets, so this method will always return
 // an error.
-func (w *wallet) SignHashWithPassphrase(ctx context.Context, account accounts.Account, passphrase string, hash []byte) ([]byte, error) {
-	return w.SignHash(account, hash)
+func (w *wallet) SignTextWithPassphrase(account accounts.Account, passphrase string, text []byte) ([]byte, error) {
+	return w.SignText(account, accounts.TextHash(text))
 }
 
 // SignTxWithPassphrase implements accounts.Wallet, attempting to sign the given
 // transaction with the given account using passphrase as extra authentication.
 // Since USB wallets don't rely on passphrases, these are silently ignored.
-func (w *wallet) SignTxWithPassphrase(ctx context.Context, account accounts.Account, passphrase string, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
-	return w.SignTx(ctx, account, tx, chainID)
+func (w *wallet) SignTxWithPassphrase(account accounts.Account, passphrase string, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
+	return w.SignTx(account, tx, chainID)
 }

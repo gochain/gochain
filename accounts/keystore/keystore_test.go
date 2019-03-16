@@ -234,13 +234,8 @@ func TestWalletNotifierLifecycle(t *testing.T) {
 	// Subscribe to the wallet feed and ensure the updater boots up
 	updates := []chan accounts.WalletEvent{make(chan accounts.WalletEvent), make(chan accounts.WalletEvent)}
 
-	unsubs := make([]func(), len(updates))
 	for i := 0; i < len(updates); i++ {
 		ks.Subscribe(updates[i], "keystore-TestWalletNotifierLifecycle"+strconv.Itoa(i))
-		j := i
-		unsubs[i] = func() {
-			ks.Unsubscribe(updates[j])
-		}
 
 		// Ensure the notifier comes online
 		time.Sleep(250 * time.Millisecond)
@@ -253,9 +248,9 @@ func TestWalletNotifierLifecycle(t *testing.T) {
 		}
 	}
 	// Unsubscribe and ensure the updater terminates eventually
-	for i := 0; i < len(unsubs); i++ {
+	for i := 0; i < len(updates); i++ {
 		// Close an existing subscription
-		unsubs[i]()
+		ks.Unsubscribe(updates[i])
 
 		// Ensure the notifier shuts down at and only at the last close
 		for k := 0; k < int(walletRefreshCycle/(250*time.Millisecond))+2; k++ {
@@ -263,10 +258,10 @@ func TestWalletNotifierLifecycle(t *testing.T) {
 			updating = ks.updating
 			ks.mu.RUnlock()
 
-			if i < len(unsubs)-1 && !updating {
+			if i < len(updates)-1 && !updating {
 				t.Fatalf("sub %d: event notifier stopped prematurely", i)
 			}
-			if i == len(unsubs)-1 && !updating {
+			if i == len(updates)-1 && !updating {
 				return
 			}
 			time.Sleep(250 * time.Millisecond)
