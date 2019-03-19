@@ -35,7 +35,7 @@ import (
 	"github.com/gochain-io/gochain/v3/p2p"
 	"github.com/gochain-io/gochain/v3/p2p/nat"
 	"github.com/gochain-io/gochain/v3/params"
-	whisper "github.com/gochain-io/gochain/v3/whisper/whisperv5"
+	whisper "github.com/gochain-io/gochain/v3/whisper/whisperv6"
 )
 
 // NodeConfig represents the collection of configuration values to fine tune the GoChain
