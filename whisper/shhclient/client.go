@@ -22,7 +22,7 @@ import (
 	"github.com/gochain-io/gochain/v3"
 	"github.com/gochain-io/gochain/v3/common/hexutil"
 	"github.com/gochain-io/gochain/v3/rpc"
-	whisper "github.com/gochain-io/gochain/v3/whisper/whisperv5"
+	whisper "github.com/gochain-io/gochain/v3/whisper/whisperv6"
 )
 
 // Client defines typed wrappers for the Whisper v5 RPC API.

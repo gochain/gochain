@@ -35,7 +35,7 @@ import (
 	"github.com/gochain-io/gochain/v3/netstats"
 	"github.com/gochain-io/gochain/v3/node"
 	"github.com/gochain-io/gochain/v3/params"
-	whisper "github.com/gochain-io/gochain/v3/whisper/whisperv5"
+	whisper "github.com/gochain-io/gochain/v3/whisper/whisperv6"
 	"github.com/naoina/toml"
 )
 
