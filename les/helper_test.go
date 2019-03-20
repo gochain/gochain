@@ -20,7 +20,6 @@
 package les
 
 import (
-	"context"
 	"crypto/rand"
 	"math/big"
 	"sync"
@@ -77,14 +76,14 @@ contract test {
 }
 */
 
-func testChainGen(ctx context.Context, i int, block *core.BlockGen) {
+func testChainGen(i int, block *core.BlockGen) {
 	signer := types.HomesteadSigner{}
 
 	switch i {
 	case 0:
 		// In block 1, the test bank sends account #1 some ether.
 		tx, _ := types.SignTx(types.NewTransaction(block.TxNonce(testBankAddress), acc1Addr, big.NewInt(10000), params.TxGas, nil, nil), signer, testBankKey)
-		block.AddTx(ctx, tx)
+		block.AddTx(tx)
 	case 1:
 		// In block 2, the test bank sends some more ether to account #1.
 		// acc1Addr passes it on to account #2.
@@ -98,17 +97,17 @@ func testChainGen(ctx context.Context, i int, block *core.BlockGen) {
 		testContractAddr = crypto.CreateAddress(acc1Addr, nonce+1)
 		tx4, _ := types.SignTx(types.NewContractCreation(nonce+2, big.NewInt(0), 200000, big.NewInt(0), testEventEmitterCode), signer, acc1Key)
 		testEventEmitterAddr = crypto.CreateAddress(acc1Addr, nonce+2)
-		block.AddTx(ctx, tx1)
-		block.AddTx(ctx, tx2)
-		block.AddTx(ctx, tx3)
-		block.AddTx(ctx, tx4)
+		block.AddTx(tx1)
+		block.AddTx(tx2)
+		block.AddTx(tx3)
+		block.AddTx(tx4)
 	case 2:
 		// Block 3 is empty but was mined by account #2.
 		block.SetCoinbase(acc2Addr)
 		block.SetExtra([]byte("yeehaw"))
 		data := common.Hex2Bytes("C16431B900000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001")
 		tx, _ := types.SignTx(types.NewTransaction(block.TxNonce(testBankAddress), testContractAddr, big.NewInt(0), 100000, nil, data), signer, testBankKey)
-		block.AddTx(ctx, tx)
+		block.AddTx(tx)
 	case 3:
 		// Block 4 includes modified extra data.
 		b2 := block.PrevBlock(1).Header()
@@ -117,7 +116,7 @@ func testChainGen(ctx context.Context, i int, block *core.BlockGen) {
 		b3.Extra = []byte("foo")
 		data := common.Hex2Bytes("C16431B900000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002")
 		tx, _ := types.SignTx(types.NewTransaction(block.TxNonce(testBankAddress), testContractAddr, big.NewInt(0), 100000, nil, data), signer, testBankKey)
-		block.AddTx(ctx, tx)
+		block.AddTx(tx)
 	}
 }
 
@@ -134,7 +133,7 @@ func testRCL() RequestCostList {
 // newTestProtocolManager creates a new protocol manager for testing purposes,
 // with the given number of blocks already known, and potential notification
 // channels for different events.
-func newTestProtocolManager(ctx context.Context, lightSync bool, blocks int, generator func(context.Context, int, *core.BlockGen), peers *peerSet, odr *LesOdr, db common.Database) (*ProtocolManager, error) {
+func newTestProtocolManager(lightSync bool, blocks int, generator func(int, *core.BlockGen), peers *peerSet, odr *LesOdr, db common.Database) (*ProtocolManager, error) {
 	var (
 		evmux  = new(core.InterfaceFeed)
 		engine = clique.NewFaker()
@@ -155,7 +154,7 @@ func newTestProtocolManager(ctx context.Context, lightSync bool, blocks int, gen
 	if lightSync {
 		chain, _ = light.NewLightChain(odr, gspec.Config, engine)
 	} else {
-		blockchain, _ := core.NewBlockChain(ctx, db, nil, gspec.Config, engine, vm.Config{})
+		blockchain, _ := core.NewBlockChain(db, nil, gspec.Config, engine, vm.Config{})
 
 		chtIndexer := light.NewChtIndexer(db, false)
 		chtIndexer.Start(blockchain)
@@ -166,8 +165,8 @@ func newTestProtocolManager(ctx context.Context, lightSync bool, blocks int, gen
 		bloomIndexer.AddChildIndexer(bbtIndexer)
 		bloomIndexer.Start(blockchain)
 
-		gchain, _ := core.GenerateChain(ctx, gspec.Config, genesis, clique.NewFaker(), db, blocks, generator)
-		if _, err := blockchain.InsertChain(ctx, gchain); err != nil {
+		gchain, _ := core.GenerateChain(gspec.Config, genesis, clique.NewFaker(), db, blocks, generator)
+		if _, err := blockchain.InsertChain(gchain); err != nil {
 			panic(err)
 		}
 		chain = blockchain
@@ -179,7 +178,7 @@ func newTestProtocolManager(ctx context.Context, lightSync bool, blocks int, gen
 	} else {
 		protocolVersions = ServerProtocolVersions
 	}
-	pm, err := NewProtocolManager(ctx, gspec.Config, lightSync, protocolVersions, NetworkId, evmux, peers, chain, nil, db, odr, nil, make(chan struct{}), new(sync.WaitGroup))
+	pm, err := NewProtocolManager(gspec.Config, lightSync, protocolVersions, NetworkId, evmux, peers, chain, nil, db, odr, nil, make(chan struct{}), new(sync.WaitGroup))
 	if err != nil {
 		return nil, err
 	}
@@ -203,8 +202,8 @@ func newTestProtocolManager(ctx context.Context, lightSync bool, blocks int, gen
 // with the given number of blocks already known, and potential notification
 // channels for different events. In case of an error, the constructor force-
 // fails the test.
-func newTestProtocolManagerMust(ctx context.Context, t *testing.T, lightSync bool, blocks int, generator func(context.Context, int, *core.BlockGen), peers *peerSet, odr *LesOdr, db common.Database) *ProtocolManager {
-	pm, err := newTestProtocolManager(ctx, lightSync, blocks, generator, peers, odr, db)
+func newTestProtocolManagerMust(t *testing.T, lightSync bool, blocks int, generator func(int, *core.BlockGen), peers *peerSet, odr *LesOdr, db common.Database) *ProtocolManager {
+	pm, err := newTestProtocolManager(lightSync, blocks, generator, peers, odr, db)
 	if err != nil {
 		t.Fatalf("Failed to create protocol manager: %v", err)
 	}
@@ -219,7 +218,7 @@ type testPeer struct {
 }
 
 // newTestPeer creates a new peer registered at the given protocol manager.
-func newTestPeer(ctx context.Context, t *testing.T, name string, version int, pm *ProtocolManager, shake bool) (*testPeer, <-chan error) {
+func newTestPeer(t *testing.T, name string, version int, pm *ProtocolManager, shake bool) (*testPeer, <-chan error) {
 	// Create a message pipe to communicate through
 	app, net := p2p.MsgPipe()
 
@@ -234,7 +233,7 @@ func newTestPeer(ctx context.Context, t *testing.T, name string, version int, pm
 	go func() {
 		select {
 		case pm.newPeerCh <- peer:
-			errc <- pm.handle(ctx, peer)
+			errc <- pm.handle(peer)
 		case <-pm.quitSync:
 			errc <- p2p.DiscQuitting
 		}
@@ -256,7 +255,7 @@ func newTestPeer(ctx context.Context, t *testing.T, name string, version int, pm
 	return tp, errc
 }
 
-func newTestPeerPair(ctx context.Context, name string, version int, pm, pm2 *ProtocolManager) (*peer, <-chan error, *peer, <-chan error) {
+func newTestPeerPair(name string, version int, pm, pm2 *ProtocolManager) (*peer, <-chan error, *peer, <-chan error) {
 	// Create a message pipe to communicate through
 	app, net := p2p.MsgPipe()
 
@@ -273,7 +272,7 @@ func newTestPeerPair(ctx context.Context, name string, version int, pm, pm2 *Pro
 	go func() {
 		select {
 		case pm.newPeerCh <- peer:
-			errc <- pm.handle(ctx, peer)
+			errc <- pm.handle(peer)
 		case <-pm.quitSync:
 			errc <- p2p.DiscQuitting
 		}
@@ -281,7 +280,7 @@ func newTestPeerPair(ctx context.Context, name string, version int, pm, pm2 *Pro
 	go func() {
 		select {
 		case pm2.newPeerCh <- peer2:
-			errc2 <- pm2.handle(ctx, peer2)
+			errc2 <- pm2.handle(peer2)
 		case <-pm2.quitSync:
 			errc2 <- p2p.DiscQuitting
 		}

@@ -148,7 +148,7 @@ func (rm *retrieveManager) sendReq(reqID uint64, req *distReq, val validatorFunc
 	}
 
 	request := req.request
-	req.request = func(p distPeer) func(context.Context) {
+	req.request = func(p distPeer) func() {
 		// before actually sending the request, put an entry into the sentTo map
 		r.lock.Lock()
 		r.sentTo[p] = sentReqToPeer{false, make(chan bool, 1)}

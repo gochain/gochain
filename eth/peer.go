@@ -18,14 +18,11 @@ package eth
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"math/big"
 	"sync"
 	"time"
-
-	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core/types"
@@ -185,8 +182,6 @@ func (p *peer) broadcast() {
 	for {
 		select {
 		case txs := <-p.queuedTxs:
-			ctx, span := trace.StartSpan(context.Background(), "peer.broadcast-queuedTxs")
-
 			const batchSize = 1000
 		batchLoop:
 			for len(txs) < batchSize {
@@ -197,48 +192,27 @@ func (p *peer) broadcast() {
 					break batchLoop
 				}
 			}
-			span.AddAttributes(trace.Int64Attribute("txs", int64(len(txs))))
-			if err := p.SendTransactions(ctx, txs); err != nil {
+			if err := p.SendTransactions(txs); err != nil {
 				if err != p2p.ErrShuttingDown {
 					p.Log().Error("Failed to broadcast txs", "len", len(txs), "err", err)
 				}
-				span.SetStatus(trace.Status{
-					Code:    trace.StatusCodeInternal,
-					Message: err.Error(),
-				})
 			} else {
 				p.Log().Trace("Broadcast txs", "len", len(txs))
 			}
 
-			span.End()
-
 		case prop := <-p.queuedProps:
-			ctx, span := trace.StartSpan(context.Background(), "peer.broadcast-queuedProps")
-			span.AddAttributes(trace.Int64Attribute("num", int64(prop.block.NumberU64())))
-			if err := p.SendNewBlock(ctx, prop.block, prop.td); err != nil {
+			if err := p.SendNewBlock(prop.block, prop.td); err != nil {
 				p.Log().Error("Failed to propagate block", "number", prop.block.Number(), "hash", prop.block.Hash(), "td", prop.td, "err", err)
-				span.SetStatus(trace.Status{
-					Code:    trace.StatusCodeInternal,
-					Message: err.Error(),
-				})
 			} else {
 				p.Log().Trace("Propagated block", "number", prop.block.Number(), "hash", prop.block.Hash(), "td", prop.td)
 			}
-			span.End()
 
 		case block := <-p.queuedAnns:
-			ctx, span := trace.StartSpan(context.Background(), "peer.broadcast-queuedAnns")
-			span.AddAttributes(trace.Int64Attribute("num", int64(block.NumberU64())))
-			if err := p.SendNewBlockHash(ctx, block.Hash(), block.NumberU64()); err != nil {
+			if err := p.SendNewBlockHash(block.Hash(), block.NumberU64()); err != nil {
 				p.Log().Error("Failed to announce block", "number", block.Number(), "hash", block.Hash(), "err", err)
-				span.SetStatus(trace.Status{
-					Code:    trace.StatusCodeInternal,
-					Message: err.Error(),
-				})
 			} else {
 				p.Log().Trace("Announced block", "number", block.Number(), "hash", block.Hash())
 			}
-			span.End()
 
 		case <-p.term:
 			return
@@ -283,27 +257,20 @@ func (p *peer) SetHead(hash common.Hash, td *big.Int) {
 
 // MarkBlock marks a block as known for the peer, ensuring that the block will
 // never be propagated to this particular peer.
-func (p *peer) MarkBlock(ctx context.Context, hash common.Hash) {
+func (p *peer) MarkBlock(hash common.Hash) {
 	p.knownBlocks.AddCapped(hash)
 }
 
 // MarkTransaction marks a transaction as known for the peer, ensuring that it
 // will never be propagated to this particular peer.
-func (p *peer) MarkTransaction(ctx context.Context, hash common.Hash) {
+func (p *peer) MarkTransaction(hash common.Hash) {
 	p.knownTxs.AddCapped(hash)
 }
 
 // SendTransactions sends transactions to the peer and includes the hashes
 // in its transaction hash set for future reference.
-func (p *peer) SendTransactions(ctx context.Context, txs types.Transactions) error {
-	ctx, span := trace.StartSpan(ctx, "peer.Transactions")
-	defer span.End()
-
-	if err := p2p.SendCtx(ctx, p.rw, TxMsg, txs); err != nil {
-		span.SetStatus(trace.Status{
-			Code:    trace.StatusCodeInternal,
-			Message: err.Error(),
-		})
+func (p *peer) SendTransactions(txs types.Transactions) error {
+	if err := p2p.Send(p.rw, TxMsg, txs); err != nil {
 		return err
 	}
 	p.knownTxs.AddAll(txs)
@@ -338,17 +305,14 @@ func (p *peer) SendNewBlockHashAsync(block *types.Block) {
 }
 
 // SendNewBlockHash announces the availability of a block.
-func (p *peer) SendNewBlockHash(ctx context.Context, hash common.Hash, number uint64) error {
-	ctx, span := trace.StartSpan(ctx, "peer.SendNewBlockHash")
-	defer span.End()
-
+func (p *peer) SendNewBlockHash(hash common.Hash, number uint64) error {
 	b, err := rlp.EncodeToBytes(newBlockHashesData{{Hash: hash, Number: number}})
 	if err != nil {
 		return err
 	}
 	msg := p2p.Msg{Code: NewBlockHashesMsg, Size: uint32(len(b)), Payload: bytes.NewReader(b)}
 
-	if err := p.rw.WriteMsg(ctx, msg); err != nil {
+	if err := p.rw.WriteMsg(msg); err != nil {
 		return err
 	}
 	p.knownBlocks.Add(hash)
@@ -356,109 +320,96 @@ func (p *peer) SendNewBlockHash(ctx context.Context, hash common.Hash, number ui
 }
 
 // SendNewBlock propagates an entire block.
-func (p *peer) SendNewBlock(ctx context.Context, block *types.Block, td *big.Int) error {
-	ctx, span := trace.StartSpan(ctx, "peer.SendNewBlock")
-	defer span.End()
-
+func (p *peer) SendNewBlock(block *types.Block, td *big.Int) error {
 	b, err := rlp.EncodeToBytes([]interface{}{block, td})
 	if err != nil {
 		return err
 	}
 	msg := p2p.Msg{Code: NewBlockMsg, Size: uint32(len(b)), Payload: bytes.NewReader(b)}
 
-	_, ws := trace.StartSpan(ctx, "MsgWriter.WriteMsg")
-	if err := p.rw.WriteMsg(ctx, msg); err != nil {
-		ws.SetStatus(trace.Status{
-			Code:    trace.StatusCodeInternal,
-			Message: err.Error(),
-		})
-		ws.End()
+	if err := p.rw.WriteMsg(msg); err != nil {
 		return err
 	}
-	ws.End()
 	p.knownBlocks.Add(block.Hash())
 	return nil
 }
 
 // SendBlockHeaders sends a batch of block headers to the remote peer.
-func (p *peer) SendBlockHeaders(ctx context.Context, headers []*types.Header) error {
-	return p2p.SendCtx(ctx, p.rw, BlockHeadersMsg, headers)
+func (p *peer) SendBlockHeaders(headers []*types.Header) error {
+	return p2p.Send(p.rw, BlockHeadersMsg, headers)
 }
 
 // SendBlockBodiesRLP sends a batch of block contents to the remote peer from
 // an already RLP encoded format.
-func (p *peer) SendBlockBodiesRLP(ctx context.Context, bodies []rlp.RawValue) error {
-	return p2p.SendCtx(ctx, p.rw, BlockBodiesMsg, bodies)
+func (p *peer) SendBlockBodiesRLP(bodies []rlp.RawValue) error {
+	return p2p.Send(p.rw, BlockBodiesMsg, bodies)
 }
 
 // SendNodeDataRLP sends a batch of arbitrary internal data, corresponding to the
 // hashes requested.
-func (p *peer) SendNodeData(ctx context.Context, data [][]byte) error {
-	return p2p.SendCtx(ctx, p.rw, NodeDataMsg, data)
+func (p *peer) SendNodeData(data [][]byte) error {
+	return p2p.Send(p.rw, NodeDataMsg, data)
 }
 
 // SendReceiptsRLP sends a batch of transaction receipts, corresponding to the
 // ones requested from an already RLP encoded format.
-func (p *peer) SendReceiptsRLP(ctx context.Context, receipts []rlp.RawValue) error {
-	return p2p.SendCtx(ctx, p.rw, ReceiptsMsg, receipts)
+func (p *peer) SendReceiptsRLP(receipts []rlp.RawValue) error {
+	return p2p.Send(p.rw, ReceiptsMsg, receipts)
 }
 
 // RequestOneHeader is a wrapper around the header query functions to fetch a
 // single header. It is used solely by the fetcher.
-func (p *peer) RequestOneHeader(ctx context.Context, hash common.Hash) error {
+func (p *peer) RequestOneHeader(hash common.Hash) error {
 	p.Log().Debug("Fetching single header", "hash", hash)
-	return p2p.SendCtx(ctx, p.rw, GetBlockHeadersMsg,
+	return p2p.Send(p.rw, GetBlockHeadersMsg,
 		&getBlockHeadersData{Origin: hashOrNumber{Hash: hash}, Amount: uint64(1), Skip: uint64(0), Reverse: false})
 }
 
 // RequestHeadersByHash fetches a batch of blocks' headers corresponding to the
 // specified header query, based on the hash of an origin block.
-func (p *peer) RequestHeadersByHash(ctx context.Context, origin common.Hash, amount int, skip int, reverse bool) error {
+func (p *peer) RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool) error {
 	p.Log().Debug("Fetching batch of headers", "count", amount, "fromhash", origin, "skip", skip, "reverse", reverse)
-	return p2p.SendCtx(ctx, p.rw, GetBlockHeadersMsg,
+	return p2p.Send(p.rw, GetBlockHeadersMsg,
 		&getBlockHeadersData{Origin: hashOrNumber{Hash: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
 }
 
 // RequestHeadersByNumber fetches a batch of blocks' headers corresponding to the
 // specified header query, based on the number of an origin block.
-func (p *peer) RequestHeadersByNumber(ctx context.Context, origin uint64, amount int, skip int, reverse bool) error {
+func (p *peer) RequestHeadersByNumber(origin uint64, amount int, skip int, reverse bool) error {
 	p.Log().Debug("Fetching batch of headers", "count", amount, "fromnum", origin, "skip", skip, "reverse", reverse)
-	return p2p.SendCtx(ctx, p.rw, GetBlockHeadersMsg,
+	return p2p.Send(p.rw, GetBlockHeadersMsg,
 		&getBlockHeadersData{Origin: hashOrNumber{Number: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
 }
 
 // RequestBodies fetches a batch of blocks' bodies corresponding to the hashes
 // specified.
-func (p *peer) RequestBodies(ctx context.Context, hashes []common.Hash) error {
+func (p *peer) RequestBodies(hashes []common.Hash) error {
 	p.Log().Debug("Fetching batch of block bodies", "count", len(hashes))
-	return p2p.SendCtx(ctx, p.rw, GetBlockBodiesMsg, hashes)
+	return p2p.Send(p.rw, GetBlockBodiesMsg, hashes)
 }
 
 // RequestNodeData fetches a batch of arbitrary data from a node's known state
 // data, corresponding to the specified hashes.
-func (p *peer) RequestNodeData(ctx context.Context, hashes []common.Hash) error {
+func (p *peer) RequestNodeData(hashes []common.Hash) error {
 	p.Log().Debug("Fetching batch of state data", "count", len(hashes))
-	return p2p.SendCtx(ctx, p.rw, GetNodeDataMsg, hashes)
+	return p2p.Send(p.rw, GetNodeDataMsg, hashes)
 }
 
 // RequestReceipts fetches a batch of transaction receipts from a remote node.
-func (p *peer) RequestReceipts(ctx context.Context, hashes []common.Hash) error {
+func (p *peer) RequestReceipts(hashes []common.Hash) error {
 	p.Log().Debug("Fetching batch of receipts", "count", len(hashes))
-	return p2p.SendCtx(ctx, p.rw, GetReceiptsMsg, hashes)
+	return p2p.Send(p.rw, GetReceiptsMsg, hashes)
 }
 
 // Handshake executes the eth protocol handshake, negotiating version number,
 // network IDs, difficulties, head and genesis blocks.
 func (p *peer) Handshake(network uint64, td *big.Int, head common.Hash, genesis common.Hash) error {
-	ctx, span := trace.StartSpan(context.Background(), "peer.Handshake-send-StatusMsg")
-	defer span.End()
-
 	// Send out own handshake in a new thread
 	errc := make(chan error, 2)
 	var status statusData // safe to read after two values have been received from errc
 
 	go func() {
-		errc <- p2p.SendCtx(ctx, p.rw, StatusMsg, &statusData{
+		errc <- p2p.Send(p.rw, StatusMsg, &statusData{
 			ProtocolVersion: uint32(p.version),
 			NetworkId:       network,
 			TD:              td,
@@ -478,10 +429,6 @@ func (p *peer) Handshake(network uint64, td *big.Int, head common.Hash, genesis 
 				return err
 			}
 		case <-timeout.C:
-			span.SetStatus(trace.Status{
-				Code:    trace.StatusCodeDeadlineExceeded,
-				Message: p2p.DiscReadTimeout.Error(),
-			})
 			return p2p.DiscReadTimeout
 		}
 	}
@@ -600,17 +547,11 @@ func (ps *peerSet) All() []*peer {
 
 // PeersWithoutBlock retrieves a list of peers that do not have a given block in
 // their set of known hashes. cap is the total number of peers.
-func (ps *peerSet) PeersWithoutBlock(ctx context.Context, hash common.Hash) []*peer {
-	ctx, span := trace.StartSpan(ctx, "peerSet.PeersWithoutBlock")
-	defer span.End()
-
+func (ps *peerSet) PeersWithoutBlock(hash common.Hash) []*peer {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
 	l := len(ps.peers)
-
-	span.AddAttributes(trace.Int64Attribute("peers", int64(l)))
-
 	list := make([]*peer, 0, l)
 	for _, p := range ps.peers {
 		if !p.knownBlocks.Has(hash) {
@@ -622,18 +563,12 @@ func (ps *peerSet) PeersWithoutBlock(ctx context.Context, hash common.Hash) []*p
 
 // PeersWithoutTxs retrieves a map of peers to transactions from txs which are not in their set of known hashes.
 // Each transaction will be included in the lists of, at most, square root of total peers.
-func (ps *peerSet) PeersWithoutTxs(ctx context.Context, txs types.Transactions) map[*peer]types.Transactions {
-	ctx, span := trace.StartSpan(ctx, "peerSet.PeersWithoutTxs")
-	defer span.End()
-	span.AddAttributes(trace.Int64Attribute("txs", int64(len(txs))))
-
+func (ps *peerSet) PeersWithoutTxs(txs types.Transactions) map[*peer]types.Transactions {
 	peerTxs := make(map[*peer]types.Transactions)
 	tracing := log.Tracing()
 
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
-
-	span.AddAttributes(trace.Int64Attribute("peers", int64(len(ps.peers))))
 
 	for _, tx := range txs {
 		hash := tx.Hash()
@@ -654,9 +589,7 @@ func (ps *peerSet) PeersWithoutTxs(ctx context.Context, txs types.Transactions) 
 }
 
 // BestPeer retrieves the known peer with the currently highest total difficulty.
-func (ps *peerSet) BestPeer(ctx context.Context) *peer {
-	ctx, span := trace.StartSpan(ctx, "peerSet.BestPeer")
-	defer span.End()
+func (ps *peerSet) BestPeer() *peer {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 

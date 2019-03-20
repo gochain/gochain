@@ -1,7 +1,6 @@
 package clique
 
 import (
-	"context"
 	"math/big"
 
 	"github.com/gochain-io/gochain/v3/consensus"
@@ -13,7 +12,7 @@ import (
 var BlockReward = big.NewInt(7e+18)
 
 // Finalize implements consensus.Engine, ensuring no uncles are set, but this does give rewards.
-func (c *Clique) Finalize(ctx context.Context, chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt, block bool) *types.Block {
+func (c *Clique) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt, block bool) *types.Block {
 	// Reward the signer.
 	state.AddBalance(header.Coinbase, BlockReward)
 

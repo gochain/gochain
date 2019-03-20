@@ -248,7 +248,6 @@ var bindTests = []struct {
 		`[{"constant":true,"inputs":[],"name":"transactString","outputs":[{"name":"","type":"string"}],"type":"function"},{"constant":true,"inputs":[],"name":"deployString","outputs":[{"name":"","type":"string"}],"type":"function"},{"constant":false,"inputs":[{"name":"str","type":"string"}],"name":"transact","outputs":[],"type":"function"},{"inputs":[{"name":"str","type":"string"}],"type":"constructor"}]`,
 		`
 			"math/big"
-			"context"
 
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind"
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind/backends"
@@ -270,7 +269,7 @@ var bindTests = []struct {
 				t.Fatalf("Failed to transact with interactor contract: %v", err)
 			}
 			// Commit all pending transactions in the simulator and check the contract state
-			sim.Commit(context.Background())
+			sim.Commit()
 
 			if str, err := interactor.DeployString(nil); err != nil {
 				t.Fatalf("Failed to retrieve deploy string: %v", err)
@@ -298,7 +297,7 @@ var bindTests = []struct {
 		`[{"constant":true,"inputs":[],"name":"getter","outputs":[{"name":"","type":"string"},{"name":"","type":"int256"},{"name":"","type":"bytes32"}],"type":"function"}]`,
 		`
 			"math/big"
-			"context"
+			
 
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind"
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind/backends"
@@ -316,7 +315,7 @@ var bindTests = []struct {
 			if err != nil {
 				t.Fatalf("Failed to deploy getter contract: %v", err)
 			}
-			sim.Commit(context.Background())
+			sim.Commit()
 
 			if str, num, _, err := getter.Getter(nil); err != nil {
 				t.Fatalf("Failed to call anonymous field retriever: %v", err)
@@ -339,7 +338,6 @@ var bindTests = []struct {
 		`[{"constant":true,"inputs":[],"name":"tuple","outputs":[{"name":"a","type":"string"},{"name":"b","type":"int256"},{"name":"c","type":"bytes32"}],"type":"function"}]`,
 		`
 			"math/big"
-			"context"
 
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind"
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind/backends"
@@ -357,7 +355,7 @@ var bindTests = []struct {
 			if err != nil {
 				t.Fatalf("Failed to deploy tupler contract: %v", err)
 			}
-			sim.Commit(context.Background())
+			sim.Commit()
 
 			if res, err := tupler.Tuple(nil); err != nil {
 				t.Fatalf("Failed to call structure retriever: %v", err)
@@ -391,7 +389,6 @@ var bindTests = []struct {
 		`
 			"math/big"
 			"reflect"
-			"context"
 
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind"
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind/backends"
@@ -410,7 +407,7 @@ var bindTests = []struct {
 			if err != nil {
 					t.Fatalf("Failed to deploy slicer contract: %v", err)
 			}
-			sim.Commit(context.Background())
+			sim.Commit()
 
 			if out, err := slicer.EchoAddresses(nil, []common.Address{auth.From, common.Address{}}); err != nil {
 					t.Fatalf("Failed to call slice echoer: %v", err)
@@ -435,7 +432,6 @@ var bindTests = []struct {
 		`[{"constant":true,"inputs":[],"name":"caller","outputs":[{"name":"","type":"address"}],"type":"function"}]`,
 		`
 			"math/big"
-			"context"
 
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind"
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind/backends"
@@ -456,7 +452,7 @@ var bindTests = []struct {
 			if _, err := (&DefaulterRaw{defaulter}).Transfer(auth); err != nil {
 				t.Fatalf("Failed to invoke default method: %v", err)
 			}
-			sim.Commit(context.Background())
+			sim.Commit()
 
 			if caller, err := defaulter.Caller(nil); err != nil {
 				t.Fatalf("Failed to call address retriever: %v", err)
@@ -518,7 +514,6 @@ var bindTests = []struct {
 		`[{"constant":false,"inputs":[{"name":"value","type":"string"}],"name":"SetField","outputs":[],"type":"function"},{"constant":true,"inputs":[],"name":"field","outputs":[{"name":"","type":"string"}],"type":"function"}]`,
 		`
 			"math/big"
-			"context"
 
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind"
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind/backends"
@@ -536,13 +531,13 @@ var bindTests = []struct {
 			if err != nil {
 				t.Fatalf("Failed to deploy funky contract: %v", err)
 			}
-			sim.Commit(context.Background())
+			sim.Commit()
 
 			// Set the field with automatic estimation and check that it succeeds
 			if _, err := limiter.SetField(auth, "automatic"); err != nil {
 				t.Fatalf("Failed to call automatically gased transaction: %v", err)
 			}
-			sim.Commit(context.Background())
+			sim.Commit()
 
 			if field, _ := limiter.Field(nil); field != "automatic" {
 				t.Fatalf("Field mismatch: have %v, want %v", field, "automatic")
@@ -562,7 +557,6 @@ var bindTests = []struct {
 		`[{"constant":true,"inputs":[],"name":"callFrom","outputs":[{"name":"","type":"address"}],"payable":false,"type":"function"}]`,
 		`
 			"math/big"
-			"context"
 
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind"
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind/backends"
@@ -581,7 +575,7 @@ var bindTests = []struct {
 			if err != nil {
 				t.Fatalf("Failed to deploy sender contract: %v", err)
 			}
-			sim.Commit(context.Background())
+			sim.Commit()
 
 			if res, err := callfrom.CallFrom(nil); err != nil {
 				t.Errorf("Failed to call constant function: %v", err)
@@ -633,7 +627,6 @@ var bindTests = []struct {
 		`
 			"fmt"
 			"math/big"
-			"context"
 
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind"
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind/backends"
@@ -651,7 +644,7 @@ var bindTests = []struct {
 			if err != nil {
 				t.Fatalf("Failed to deploy underscorer contract: %v", err)
 			}
-			sim.Commit(context.Background())
+			sim.Commit()
 
 			// Verify that underscored return values correctly parse into structs
 			if res, err := underscorer.UnderscoredOutput(nil); err != nil {
@@ -720,7 +713,6 @@ var bindTests = []struct {
 		`
 			"math/big"
 			"time"
-			"context"
 
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind"
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind/backends"
@@ -739,7 +731,7 @@ var bindTests = []struct {
 			if err != nil {
 				t.Fatalf("Failed to deploy eventer contract: %v", err)
 			}
-			sim.Commit(context.Background())
+			sim.Commit()
 	
 			// Inject a few events into the contract, gradually more in each block
 			for i := 1; i <= 3; i++ {
@@ -748,7 +740,7 @@ var bindTests = []struct {
 						t.Fatalf("block %d, event %d: raise failed: %v", i, j, err)
 					}
 				}
-				sim.Commit(context.Background())
+				sim.Commit()
 			}
 			// Test filtering for certain events and ensure they can be found
 			sit, err := eventer.FilterSimpleEvent(nil, []common.Address{common.Address{1}, common.Address{3}}, [][32]byte{{byte(1)}, {byte(2)}, {byte(3)}}, []bool{true})
@@ -784,7 +776,7 @@ var bindTests = []struct {
 			if _, err := eventer.RaiseNodataEvent(auth, big.NewInt(314), 141, 271); err != nil {
 				t.Fatalf("failed to raise nodata event: %v", err)
 			}
-			sim.Commit(context.Background())
+			sim.Commit()
 
 			nit, err := eventer.FilterNodataEvent(nil, []*big.Int{big.NewInt(314)}, []int16{140, 141, 142}, []uint32{271})
 			if err != nil {
@@ -808,7 +800,7 @@ var bindTests = []struct {
 			if _, err := eventer.RaiseDynamicEvent(auth, "Hello", []byte("World")); err != nil {
 				t.Fatalf("failed to raise dynamic event: %v", err)
 			}
-			sim.Commit(context.Background())
+			sim.Commit()
 	
 			dit, err := eventer.FilterDynamicEvent(nil, []string{"Hi", "Hello", "Bye"}, [][]byte{[]byte("World")})
 			if err != nil {
@@ -835,7 +827,7 @@ var bindTests = []struct {
 			if _, err := eventer.RaiseFixedBytesEvent(auth, fblob); err != nil {
 				t.Fatalf("failed to raise fixed bytes event: %v", err)
 			}
-			sim.Commit(context.Background())
+			sim.Commit()
 
 			fit, err := eventer.FilterFixedBytesEvent(nil, [][24]byte{fblob})
 			if err != nil {
@@ -864,7 +856,7 @@ var bindTests = []struct {
 			if _, err := eventer.RaiseSimpleEvent(auth, common.Address{255}, [32]byte{255}, true, big.NewInt(255)); err != nil {
 				t.Fatalf("failed to raise subscribed simple event: %v", err)
 			}
-			sim.Commit(context.Background())
+			sim.Commit()
 
 			select {
 			case event := <-ch:
@@ -880,7 +872,7 @@ var bindTests = []struct {
 			if _, err := eventer.RaiseSimpleEvent(auth, common.Address{254}, [32]byte{254}, true, big.NewInt(254)); err != nil {
 				t.Fatalf("failed to raise subscribed simple event: %v", err)
 			}
-			sim.Commit(context.Background())
+			sim.Commit()
 
 			select {
 			case event := <-ch:
@@ -906,7 +898,6 @@ var bindTests = []struct {
 		`[{"constant":false,"inputs":[{"name":"arr","type":"uint64[3][4][5]"}],"name":"storeDeepUintArray","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"retrieveDeepArray","outputs":[{"name":"","type":"uint64[3][4][5]"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"","type":"uint256"},{"name":"","type":"uint256"},{"name":"","type":"uint256"}],"name":"deepUint64Array","outputs":[{"name":"","type":"uint64"}],"payable":false,"stateMutability":"view","type":"function"}]`,
 		`
 			"math/big"
-			"context"
 
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind"
 			"github.com/gochain-io/gochain/v3/accounts/abi/bind/backends"
@@ -926,7 +917,7 @@ var bindTests = []struct {
 			}
 
 			// Finish deploy.
-			sim.Commit(context.Background())
+			sim.Commit()
 
 			//Create coordinate-filled array, for testing purposes.
 			testArr := [5][4][3]uint64{}
@@ -948,7 +939,7 @@ var bindTests = []struct {
 				t.Fatalf("Failed to store nested array in test contract: %v", err)
 			}
 
-			sim.Commit(context.Background())
+			sim.Commit()
 
 			retrievedArr, err := testContract.RetrieveDeepArray(&bind.CallOpts{
 				From: auth.From,

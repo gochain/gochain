@@ -18,7 +18,6 @@
 package les
 
 import (
-	"context"
 	"math/big"
 	"sync"
 	"time"
@@ -126,7 +125,6 @@ func newLightFetcher(pm *ProtocolManager) *lightFetcher {
 
 // syncLoop is the main event loop of the light fetcher
 func (f *lightFetcher) syncLoop() {
-	ctx := context.TODO()
 	requesting := false
 	defer f.pm.wg.Done()
 	for {
@@ -197,7 +195,7 @@ func (f *lightFetcher) syncLoop() {
 				f.pm.serverPool.adjustResponseTime(req.peer.poolEntry, time.Duration(mclock.Now()-req.sent), req.timeout)
 			}
 			f.lock.Lock()
-			if !ok || !(f.syncing || f.processResponse(ctx, req, resp)) {
+			if !ok || !(f.syncing || f.processResponse(req, resp)) {
 				resp.peer.Log().Debug("Failed processing response")
 				go f.pm.removePeer(resp.peer.id)
 			}
@@ -433,7 +431,7 @@ func (f *lightFetcher) nextRequest() (*distReq, uint64) {
 				fp := f.peers[p]
 				return fp != nil && fp.nodeByHash[bestHash] != nil
 			},
-			request: func(dp distPeer) func(context.Context) {
+			request: func(dp distPeer) func() {
 				go func() {
 					p := dp.(*peer)
 					p.Log().Debug("Synchronisation started")
@@ -461,7 +459,7 @@ func (f *lightFetcher) nextRequest() (*distReq, uint64) {
 				n := fp.nodeByHash[bestHash]
 				return n != nil && !n.requested
 			},
-			request: func(dp distPeer) func(context.Context) {
+			request: func(dp distPeer) func() {
 				p := dp.(*peer)
 				f.lock.Lock()
 				fp := f.peers[p]
@@ -482,8 +480,8 @@ func (f *lightFetcher) nextRequest() (*distReq, uint64) {
 					time.Sleep(hardRequestTimeout)
 					f.timeoutChn <- reqID
 				}()
-				return func(ctx context.Context) {
-					if err := p.RequestHeadersByHash(ctx, reqID, cost, bestHash, int(bestAmount), 0, true); err != nil {
+				return func() {
+					if err := p.RequestHeadersByHash(reqID, cost, bestHash, int(bestAmount), 0, true); err != nil {
 						log.Error("Cannot request headers by hash", "req_id", reqID, "err", err)
 					}
 				}
@@ -499,7 +497,7 @@ func (f *lightFetcher) deliverHeaders(peer *peer, reqID uint64, headers []*types
 }
 
 // processResponse processes header download request responses, returns true if successful
-func (f *lightFetcher) processResponse(ctx context.Context, req fetchRequest, resp fetchResponse) bool {
+func (f *lightFetcher) processResponse(req fetchRequest, resp fetchResponse) bool {
 	if uint64(len(resp.headers)) != req.amount || resp.headers[0].Hash() != req.hash {
 		req.peer.Log().Debug("Response content mismatch", "requested", len(resp.headers), "reqfrom", resp.headers[0], "delivered", req.amount, "delfrom", req.hash)
 		return false
@@ -508,7 +506,7 @@ func (f *lightFetcher) processResponse(ctx context.Context, req fetchRequest, re
 	for i, header := range resp.headers {
 		headers[int(req.amount)-1-i] = header
 	}
-	if _, err := f.chain.InsertHeaderChain(ctx, headers, 1); err != nil {
+	if _, err := f.chain.InsertHeaderChain(headers, 1); err != nil {
 		if err == consensus.ErrFutureBlock {
 			return true
 		}

@@ -100,12 +100,12 @@ func (odr *LesOdr) Retrieve(ctx context.Context, req light.OdrRequest) (err erro
 			p := dp.(*peer)
 			return lreq.CanSend(p)
 		},
-		request: func(dp distPeer) func(context.Context) {
+		request: func(dp distPeer) func() {
 			p := dp.(*peer)
 			cost := lreq.GetCost(p)
 			p.fcServer.QueueRequest(reqID, cost)
-			return func(ctx context.Context) {
-				if err := lreq.Request(ctx, reqID, p); err != nil {
+			return func() {
+				if err := lreq.Request(reqID, p); err != nil {
 					log.Error("Cannot request (les odr)", "req_id", reqID, "err", err)
 				}
 			}

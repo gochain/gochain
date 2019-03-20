@@ -1,7 +1,6 @@
 package clique
 
 import (
-	"context"
 	"errors"
 	"time"
 
@@ -73,7 +72,7 @@ func (e *fakeEngine) Author(header *types.Header) (common.Address, error) {
 	return header.Coinbase, nil
 }
 
-func (e *fakeEngine) VerifyHeader(ctx context.Context, chain consensus.ChainReader, header *types.Header) error {
+func (e *fakeEngine) VerifyHeader(chain consensus.ChainReader, header *types.Header) error {
 	if e.Full {
 		return nil
 	}
@@ -89,21 +88,21 @@ func (e *fakeEngine) VerifyHeader(ctx context.Context, chain consensus.ChainRead
 		}
 	}
 	// Subset of real method - skip cascading field and seal verification.
-	if err := e.real.verifyHeader(ctx, chain, header, nil); err != nil {
+	if err := e.real.verifyHeader(chain, header, nil); err != nil {
 		return err
 	}
-	return e.delayOrFail(ctx, chain, header, nil)
+	return e.delayOrFail(chain, header, nil)
 }
 
-func (e *fakeEngine) VerifyHeaders(ctx context.Context, chain consensus.ChainReader, headers []*types.Header) (chan<- struct{}, <-chan error) {
+func (e *fakeEngine) VerifyHeaders(chain consensus.ChainReader, headers []*types.Header) (chan<- struct{}, <-chan error) {
 	if e.Full || len(headers) == 0 {
-		return e.real.verifyHeaders(ctx, chain, headers, nil)
+		return e.real.verifyHeaders(chain, headers, nil)
 	}
 	// Subset of real method - skip cascading field and seal verification.
-	return e.real.verifyHeaders(ctx, chain, headers, []verifyFn{e.real.verifyHeader, e.delayOrFail})
+	return e.real.verifyHeaders(chain, headers, []verifyFn{e.real.verifyHeader, e.delayOrFail})
 }
 
-func (e *fakeEngine) delayOrFail(_ context.Context, _ consensus.ChainReader, header *types.Header, _ []*types.Header) error {
+func (e *fakeEngine) delayOrFail(_ consensus.ChainReader, header *types.Header, _ []*types.Header) error {
 	time.Sleep(e.Delay)
 	if e.Fail > 0 && e.Fail == header.Number.Uint64() {
 		return errors.New("fake failure")
@@ -111,7 +110,7 @@ func (e *fakeEngine) delayOrFail(_ context.Context, _ consensus.ChainReader, hea
 	return nil
 }
 
-func (e *fakeEngine) Prepare(ctx context.Context, chain consensus.ChainReader, header *types.Header) error {
+func (e *fakeEngine) Prepare(chain consensus.ChainReader, header *types.Header) error {
 	header.Extra = ExtraEnsureVanity(header.Extra)
 	if header.Difficulty == nil {
 		header.Difficulty = header.Coinbase.Big()
@@ -122,12 +121,12 @@ func (e *fakeEngine) Prepare(ctx context.Context, chain consensus.ChainReader, h
 	return nil
 }
 
-func (e *fakeEngine) Finalize(ctx context.Context, chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
+func (e *fakeEngine) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
 	receipts []*types.Receipt, block bool) *types.Block {
-	return e.real.Finalize(ctx, chain, header, state, txs, receipts, block)
+	return e.real.Finalize(chain, header, state, txs, receipts, block)
 }
 
-func (e *fakeEngine) Seal(ctx context.Context, chain consensus.ChainReader, block *types.Block, stop <-chan struct{}) (*types.Block, *time.Time, error) {
+func (e *fakeEngine) Seal(chain consensus.ChainReader, block *types.Block, stop <-chan struct{}) (*types.Block, *time.Time, error) {
 	header := block.Header()
 	header.Nonce, header.MixDigest = types.BlockNonce{}, common.Hash{}
 	header.Signer = hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")

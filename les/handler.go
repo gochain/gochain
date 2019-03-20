@@ -18,7 +18,6 @@
 package les
 
 import (
-	"context"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -27,8 +26,6 @@ import (
 	"net"
 	"sync"
 	"time"
-
-	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core"
@@ -80,7 +77,7 @@ type BlockChain interface {
 	CurrentHeader() *types.Header
 	GetTd(hash common.Hash, number uint64) *big.Int
 	State() (*state.StateDB, error)
-	InsertHeaderChain(ctx context.Context, chain []*types.Header, checkFreq int) (int, error)
+	InsertHeaderChain(chain []*types.Header, checkFreq int) (int, error)
 	Rollback(chain []common.Hash)
 	GetHeaderByNumber(number uint64) *types.Header
 	GetAncestor(hash common.Hash, number, ancestor uint64, maxNonCanonical *uint64) (common.Hash, uint64)
@@ -90,8 +87,8 @@ type BlockChain interface {
 }
 
 type txPool interface {
-	AddRemotes(ctx context.Context, txs []*types.Transaction) []error
-	Status(ctx context.Context, hashes []common.Hash) []core.TxStatus
+	AddRemotes(txs []*types.Transaction) []error
+	Status(hashes []common.Hash) []core.TxStatus
 }
 
 type ProtocolManager struct {
@@ -130,7 +127,7 @@ type ProtocolManager struct {
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
 // with the ethereum network.
-func NewProtocolManager(ctx context.Context, chainConfig *params.ChainConfig, lightSync bool, protocolVersions []uint, networkId uint64, mux *core.InterfaceFeed, peers *peerSet, blockchain BlockChain, txpool txPool, chainDb common.Database, odr *LesOdr, txrelay *LesTxRelay, quitSync chan struct{}, wg *sync.WaitGroup) (*ProtocolManager, error) {
+func NewProtocolManager(chainConfig *params.ChainConfig, lightSync bool, protocolVersions []uint, networkId uint64, mux *core.InterfaceFeed, peers *peerSet, blockchain BlockChain, txpool txPool, chainDb common.Database, odr *LesOdr, txrelay *LesTxRelay, quitSync chan struct{}, wg *sync.WaitGroup) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		lightSync:   lightSync,
@@ -174,7 +171,7 @@ func NewProtocolManager(ctx context.Context, chainConfig *params.ChainConfig, li
 				case manager.newPeerCh <- peer:
 					manager.wg.Add(1)
 					defer manager.wg.Done()
-					err := manager.handle(ctx, peer)
+					err := manager.handle(peer)
 					if entry != nil {
 						manager.serverPool.disconnect(entry)
 					}
@@ -264,10 +261,7 @@ func (pm *ProtocolManager) newPeer(pv int, nv uint64, p *p2p.Peer, rw p2p.MsgRea
 
 // handle is the callback invoked to manage the life cycle of a les peer. When
 // this function terminates, the peer is disconnected.
-func (pm *ProtocolManager) handle(ctx context.Context, p *peer) error {
-	ctx, span := trace.StartSpan(ctx, "ProtocolManager.handle")
-	defer span.End()
-
+func (pm *ProtocolManager) handle(p *peer) error {
 	// Ignore maxPeers if this is a trusted peer
 	if pm.peers.Len() >= pm.maxPeers && !p.Peer.Info().Network.Trusted {
 		return p2p.DiscTooManyPeers
@@ -283,7 +277,7 @@ func (pm *ProtocolManager) handle(ctx context.Context, p *peer) error {
 		number  = head.Number.Uint64()
 		td      = pm.blockchain.GetTd(hash, number)
 	)
-	if err := p.Handshake(ctx, td, hash, number, genesis.Hash(), pm.server); err != nil {
+	if err := p.Handshake(td, hash, number, genesis.Hash(), pm.server); err != nil {
 		p.Log().Debug("Light Ethereum handshake failed", "err", err)
 		return err
 	}
@@ -322,11 +316,9 @@ func (pm *ProtocolManager) handle(ctx context.Context, p *peer) error {
 		for {
 			select {
 			case announce := <-p.announceChn:
-				ctx, span := trace.StartSpan(context.Background(), "ProtocolManager.handle-announceCh")
-				if err := p.SendAnnounce(ctx, announce); err != nil {
+				if err := p.SendAnnounce(announce); err != nil {
 					log.Error("Cannot send announce", "id", p.id, "err", err)
 				}
-				span.End()
 			case <-stop:
 				return
 			}
@@ -335,7 +327,7 @@ func (pm *ProtocolManager) handle(ctx context.Context, p *peer) error {
 
 	// main loop. handle incoming messages.
 	for {
-		if err := pm.handleMsg(ctx, p); err != nil {
+		if err := pm.handleMsg(p); err != nil {
 			p.Log().Debug("Light Ethereum message handling failed", "err", err)
 			return err
 		}
@@ -346,7 +338,7 @@ var reqList = []uint64{GetBlockHeadersMsg, GetBlockBodiesMsg, GetCodeMsg, GetRec
 
 // handleMsg is invoked whenever an inbound message is received from a remote
 // peer. The remote connection is torn down upon returning any error.
-func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
+func (pm *ProtocolManager) handleMsg(p *peer) error {
 	// Read the next message from the remote peer, and ensure it's fully consumed
 	msg, err := p.rw.ReadMsg()
 	if err != nil {
@@ -1043,7 +1035,7 @@ func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 		if reject(uint64(reqCnt), MaxTxSend) {
 			return errResp(ErrRequestRejected, "")
 		}
-		pm.txpool.AddRemotes(ctx, txs)
+		pm.txpool.AddRemotes(txs)
 
 		_, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
 		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
@@ -1069,14 +1061,14 @@ func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 		for i, tx := range req.Txs {
 			hashes[i] = tx.Hash()
 		}
-		stats := pm.txStatus(ctx, hashes)
+		stats := pm.txStatus(hashes)
 		for i, stat := range stats {
 			if stat.Status == core.TxStatusUnknown {
-				if errs := pm.txpool.AddRemotes(ctx, []*types.Transaction{req.Txs[i]}); len(errs) > 0 {
+				if errs := pm.txpool.AddRemotes([]*types.Transaction{req.Txs[i]}); len(errs) > 0 {
 					stats[i].Error = errs[0].Error()
 					continue
 				}
-				stats[i] = pm.txStatus(ctx, []common.Hash{hashes[i]})[0]
+				stats[i] = pm.txStatus([]common.Hash{hashes[i]})[0]
 			}
 		}
 
@@ -1104,7 +1096,7 @@ func (pm *ProtocolManager) handleMsg(ctx context.Context, p *peer) error {
 		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
 		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
 
-		return p.SendTxStatus(req.ReqID, bv, pm.txStatus(ctx, req.Hashes))
+		return p.SendTxStatus(req.ReqID, bv, pm.txStatus(req.Hashes))
 
 	case TxStatusMsg:
 		if pm.odr == nil {
@@ -1180,9 +1172,9 @@ func (pm *ProtocolManager) getHelperTrieAuxData(req HelperTrieReq) []byte {
 	return nil
 }
 
-func (pm *ProtocolManager) txStatus(ctx context.Context, hashes []common.Hash) []txStatus {
+func (pm *ProtocolManager) txStatus(hashes []common.Hash) []txStatus {
 	stats := make([]txStatus, len(hashes))
-	for i, stat := range pm.txpool.Status(ctx, hashes) {
+	for i, stat := range pm.txpool.Status(hashes) {
 		// Save the status we've got from the transaction pool
 		stats[i].Status = stat
 
@@ -1233,7 +1225,7 @@ func (pc *peerConnection) Head() (common.Hash, *big.Int) {
 	return pc.peer.HeadAndTd()
 }
 
-func (pc *peerConnection) RequestHeadersByHash(ctx context.Context, origin common.Hash, amount int, skip int, reverse bool) error {
+func (pc *peerConnection) RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool) error {
 	reqID := genReqID()
 	rq := &distReq{
 		getCost: func(dp distPeer) uint64 {
@@ -1243,12 +1235,12 @@ func (pc *peerConnection) RequestHeadersByHash(ctx context.Context, origin commo
 		canSend: func(dp distPeer) bool {
 			return dp.(*peer) == pc.peer
 		},
-		request: func(dp distPeer) func(context.Context) {
+		request: func(dp distPeer) func() {
 			peer := dp.(*peer)
 			cost := peer.GetRequestCost(GetBlockHeadersMsg, amount)
 			peer.fcServer.QueueRequest(reqID, cost)
-			return func(ctx context.Context) {
-				if err := peer.RequestHeadersByHash(ctx, reqID, cost, origin, amount, skip, reverse); err != nil {
+			return func() {
+				if err := peer.RequestHeadersByHash(reqID, cost, origin, amount, skip, reverse); err != nil {
 					log.Error("Cannot recursively request headers by hash", "req_id", reqID, "err", err)
 				}
 			}
@@ -1261,7 +1253,7 @@ func (pc *peerConnection) RequestHeadersByHash(ctx context.Context, origin commo
 	return nil
 }
 
-func (pc *peerConnection) RequestHeadersByNumber(ctx context.Context, origin uint64, amount int, skip int, reverse bool) error {
+func (pc *peerConnection) RequestHeadersByNumber(origin uint64, amount int, skip int, reverse bool) error {
 	reqID := genReqID()
 	rq := &distReq{
 		getCost: func(dp distPeer) uint64 {
@@ -1271,12 +1263,12 @@ func (pc *peerConnection) RequestHeadersByNumber(ctx context.Context, origin uin
 		canSend: func(dp distPeer) bool {
 			return dp.(*peer) == pc.peer
 		},
-		request: func(dp distPeer) func(context.Context) {
+		request: func(dp distPeer) func() {
 			peer := dp.(*peer)
 			cost := peer.GetRequestCost(GetBlockHeadersMsg, amount)
 			peer.fcServer.QueueRequest(reqID, cost)
-			return func(ctx context.Context) {
-				if err := peer.RequestHeadersByNumber(ctx, reqID, cost, origin, amount, skip, reverse); err != nil {
+			return func() {
+				if err := peer.RequestHeadersByNumber(reqID, cost, origin, amount, skip, reverse); err != nil {
 					log.Error("Cannot recursively request headers by number", "req_id", reqID, "err", err)
 				}
 			}

@@ -77,7 +77,7 @@ func TestWaitDeployed(t *testing.T) {
 
 		// Send and mine the transaction.
 		backend.SendTransaction(ctx, tx)
-		backend.Commit(ctx)
+		backend.Commit()
 
 		select {
 		case <-mined:

@@ -17,7 +17,6 @@
 package p2p
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"errors"
 	"math/rand"
@@ -55,11 +54,11 @@ func newTestTransport(id discover.NodeID, fd net.Conn) transport {
 	return &testTransport{id: id, rlpx: wrapped}
 }
 
-func (c *testTransport) doEncHandshake(ctx context.Context, prv *ecdsa.PrivateKey, dialDest *discover.Node) (discover.NodeID, error) {
+func (c *testTransport) doEncHandshake(prv *ecdsa.PrivateKey, dialDest *discover.Node) (discover.NodeID, error) {
 	return c.id, nil
 }
 
-func (c *testTransport) doProtoHandshake(ctx context.Context, our *protoHandshake) (*protoHandshake, error) {
+func (c *testTransport) doProtoHandshake(our *protoHandshake) (*protoHandshake, error) {
 	return &protoHandshake{ID: c.id, Name: "test"}, nil
 }
 
@@ -345,22 +344,21 @@ func TestServerAtCap(t *testing.T) {
 		return &conn{fd: fd, transport: tx, flags: inboundConn, id: id, cont: make(chan error)}
 	}
 
-	ctx := context.Background()
 	// Inject a few connections to fill up the peer set.
 	for i := 0; i < 10; i++ {
 		c := newconn(randomID())
-		if err := srv.checkpoint(ctx, c, srv.addpeer); err != nil {
+		if err := srv.checkpoint(c, srv.addpeer); err != nil {
 			t.Fatalf("could not add conn %d: %v", i, err)
 		}
 	}
 	// Try inserting a non-trusted connection.
 	c := newconn(randomID())
-	if err := srv.checkpoint(ctx, c, srv.posthandshake); err != DiscTooManyPeers {
+	if err := srv.checkpoint(c, srv.posthandshake); err != DiscTooManyPeers {
 		t.Error("wrong error for insert:", err)
 	}
 	// Try inserting a trusted connection.
 	c = newconn(trustedID)
-	if err := srv.checkpoint(ctx, c, srv.posthandshake); err != nil {
+	if err := srv.checkpoint(c, srv.posthandshake); err != nil {
 		t.Error("unexpected error for trusted conn @posthandshake:", err)
 	}
 	if !c.is(trustedConn) {
@@ -467,11 +465,11 @@ type setupTransport struct {
 	closeErr error
 }
 
-func (c *setupTransport) doEncHandshake(ctx context.Context, prv *ecdsa.PrivateKey, dialDest *discover.Node) (discover.NodeID, error) {
+func (c *setupTransport) doEncHandshake(prv *ecdsa.PrivateKey, dialDest *discover.Node) (discover.NodeID, error) {
 	c.calls += "doEncHandshake,"
 	return c.id, c.encHandshakeErr
 }
-func (c *setupTransport) doProtoHandshake(ctx context.Context, our *protoHandshake) (*protoHandshake, error) {
+func (c *setupTransport) doProtoHandshake(our *protoHandshake) (*protoHandshake, error) {
 	c.calls += "doProtoHandshake,"
 	if c.protoHandshakeErr != nil {
 		return nil, c.protoHandshakeErr
@@ -484,7 +482,7 @@ func (c *setupTransport) close(err error) {
 }
 
 // setupConn shouldn't write to/read from the connection.
-func (c *setupTransport) WriteMsg(context.Context, Msg) error {
+func (c *setupTransport) WriteMsg(Msg) error {
 	panic("WriteMsg called on setupTransport")
 }
 func (c *setupTransport) ReadMsg() (Msg, error) {

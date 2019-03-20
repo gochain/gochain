@@ -17,12 +17,9 @@
 package eth
 
 import (
-	"context"
 	"math"
 	"sync/atomic"
 	"time"
-
-	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core/types"
@@ -47,10 +44,8 @@ type txsync struct {
 }
 
 // syncTransactions starts sending all currently pending transactions to the given peer.
-func (pm *ProtocolManager) syncTransactions(ctx context.Context, p *peer) {
-	ctx, span := trace.StartSpan(context.Background(), "ProtocolManager.syncTransactions")
-	defer span.End()
-	txs := pm.txpool.PendingList(ctx)
+func (pm *ProtocolManager) syncTransactions(p *peer) {
+	txs := pm.txpool.PendingList()
 	if len(txs) == 0 {
 		return
 	}
@@ -62,8 +57,7 @@ func (pm *ProtocolManager) syncTransactions(ctx context.Context, p *peer) {
 
 // syncTransactionsAllPeers syncs pending txs to all peers.
 func (pm *ProtocolManager) syncTransactionsAllPeers() {
-	ctx := context.TODO()
-	txs := pm.txpool.PendingList(ctx)
+	txs := pm.txpool.PendingList()
 	if len(txs) == 0 {
 		return
 	}
@@ -113,9 +107,6 @@ func (pm *ProtocolManager) txsyncLoop() {
 
 	// send starts a sending a pack of transactions from the sync.
 	send := func(s *txsync) {
-		_, span := trace.StartSpan(context.Background(), "ProtocolManager.txsyncLoop-send")
-		defer span.End()
-
 		// Fill pack with transactions up to the target size.
 		size := common.StorageSize(0)
 		pack.p = s.p
@@ -132,17 +123,7 @@ func (pm *ProtocolManager) txsyncLoop() {
 		// Send the pack in the background.
 		s.p.Log().Trace("Sending batch of transactions", "count", len(pack.txs), "bytes", size)
 		sending = true
-		go func() {
-			ctx, ss := trace.StartSpan(context.Background(), "ProtocolManager.txSyncLoop-send-txs")
-			defer ss.End()
-			parent := span.SpanContext()
-			ss.AddLink(trace.Link{
-				Type:    trace.LinkTypeParent,
-				TraceID: parent.TraceID,
-				SpanID:  parent.SpanID,
-			})
-			done <- pack.p.SendTransactions(ctx, pack.txs)
-		}()
+		go func() { done <- pack.p.SendTransactions(pack.txs) }()
 	}
 
 	// pick chooses the next pending sync.
@@ -196,20 +177,11 @@ func (pm *ProtocolManager) syncer() {
 			if pm.peers.Len() < minDesiredPeerCount {
 				break
 			}
-
-			go func() {
-				ctx, span := trace.StartSpan(context.Background(), "protocolManager.syncer-newPeerCh")
-				defer span.End()
-				pm.synchronise(ctx, pm.peers.BestPeer(ctx))
-			}()
+			go pm.synchronise(pm.peers.BestPeer())
 
 		case <-forceSync.C:
 			// Force a sync even if not enough peers are present
-			go func() {
-				ctx, span := trace.StartSpan(context.Background(), "protocolManager.syncer-forceSync")
-				defer span.End()
-				pm.synchronise(ctx, pm.peers.BestPeer(ctx))
-			}()
+			go pm.synchronise(pm.peers.BestPeer())
 
 		case <-pm.noMorePeers:
 			return
@@ -218,10 +190,7 @@ func (pm *ProtocolManager) syncer() {
 }
 
 // synchronise tries to sync up our local block chain with a remote peer.
-func (pm *ProtocolManager) synchronise(ctx context.Context, peer *peer) {
-	ctx, span := trace.StartSpan(ctx, "ProtocolManager.synchronise")
-	defer span.End()
-
+func (pm *ProtocolManager) synchronise(peer *peer) {
 	// Short circuit if no peers are available
 	if peer == nil {
 		return
@@ -261,7 +230,7 @@ func (pm *ProtocolManager) synchronise(ctx context.Context, peer *peer) {
 	}
 
 	// Run the sync cycle, and disable fast sync if we've went past the pivot block
-	if err := pm.downloader.Synchronise(ctx, peer.id, pHead, pTd, mode); err != nil {
+	if err := pm.downloader.Synchronise(peer.id, pHead, pTd, mode); err != nil {
 		return
 	}
 	if atomic.LoadUint32(&pm.fastSync) == 1 {
@@ -276,16 +245,6 @@ func (pm *ProtocolManager) synchronise(ctx context.Context, peer *peer) {
 		// scenario will most often crop up in private and hackathon networks with
 		// degenerate connectivity, but it should be healthy for the mainnet too to
 		// more reliably update peers or the local TD state.
-		go func() {
-			ctx, bs := trace.StartSpan(context.Background(), "ProtocolManager.syncronise-announce")
-			defer bs.End()
-			parent := span.SpanContext()
-			bs.AddLink(trace.Link{
-				Type:    trace.LinkTypeParent,
-				TraceID: parent.TraceID,
-				SpanID:  parent.SpanID,
-			})
-			pm.BroadcastBlock(ctx, head, false)
-		}()
+		go pm.BroadcastBlock(head, false)
 	}
 }

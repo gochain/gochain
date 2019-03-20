@@ -18,7 +18,6 @@
 package eth
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"github.com/gochain-io/gochain/v3/accounts/keystore"
@@ -156,7 +155,7 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 		vmConfig    = vm.Config{EnablePreimageRecording: config.EnablePreimageRecording}
 		cacheConfig = &core.CacheConfig{Disabled: config.NoPruning, TrieNodeLimit: config.TrieCache, TrieTimeLimit: config.TrieTimeout}
 	)
-	eth.blockchain, err = core.NewBlockChain(context.Background(), chainDb, cacheConfig, eth.chainConfig, eth.engine, vmConfig)
+	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, eth.chainConfig, eth.engine, vmConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -369,7 +368,7 @@ func (gc *GoChain) StartMining(threads int) error {
 		gc.lock.RLock()
 		price := gc.gasPrice
 		gc.lock.RUnlock()
-		gc.txPool.SetGasPrice(context.Background(), price)
+		gc.txPool.SetGasPrice(price)
 
 		// Configure the local mining address
 		eb, err := gc.Etherbase()

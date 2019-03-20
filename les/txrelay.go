@@ -17,7 +17,6 @@
 package les
 
 import (
-	"context"
 	"sync"
 
 	"github.com/gochain-io/gochain/v3/common"
@@ -125,12 +124,12 @@ func (self *LesTxRelay) send(txs types.Transactions, count int) {
 			canSend: func(dp distPeer) bool {
 				return dp.(*peer) == pp
 			},
-			request: func(dp distPeer) func(context.Context) {
+			request: func(dp distPeer) func() {
 				peer := dp.(*peer)
 				cost := peer.GetRequestCost(SendTxMsg, len(ll))
 				peer.fcServer.QueueRequest(reqID, cost)
-				return func(ctx context.Context) {
-					if err := peer.SendTxs(ctx, reqID, cost, ll); err != nil {
+				return func() {
+					if err := peer.SendTxs(reqID, cost, ll); err != nil {
 						log.Error("Cannot send txs in relay", "req_id", reqID, "err", err)
 					}
 				}

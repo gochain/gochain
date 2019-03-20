@@ -16,25 +16,20 @@
 
 package les
 
-import (
-	"context"
-	"sync"
-
-	"go.opencensus.io/trace"
-)
+import "sync"
 
 // execQueue implements a queue that executes function calls in a single thread,
 // in the same order as they have been queued.
 type execQueue struct {
 	mu        sync.Mutex
 	cond      *sync.Cond
-	funcs     []func(context.Context)
+	funcs     []func()
 	closeWait chan struct{}
 }
 
 // newExecQueue creates a new execution queue.
 func newExecQueue(capacity int) *execQueue {
-	q := &execQueue{funcs: make([]func(context.Context), 0, capacity)}
+	q := &execQueue{funcs: make([]func(), 0, capacity)}
 	q.cond = sync.NewCond(&q.mu)
 	go q.loop()
 	return q
@@ -42,14 +37,12 @@ func newExecQueue(capacity int) *execQueue {
 
 func (q *execQueue) loop() {
 	for f := q.waitNext(false); f != nil; f = q.waitNext(true) {
-		ctx, span := trace.StartSpan(context.Background(), "execQueue.loop")
-		f(ctx)
-		span.End()
+		f()
 	}
 	close(q.closeWait)
 }
 
-func (q *execQueue) waitNext(drop bool) (f func(context.Context)) {
+func (q *execQueue) waitNext(drop bool) (f func()) {
 	q.mu.Lock()
 	if drop {
 		// Remove the function that just executed. We do this here instead of when
@@ -80,7 +73,7 @@ func (q *execQueue) canQueue() bool {
 }
 
 // queue adds a function call to the execution queue. Returns true if successful.
-func (q *execQueue) queue(f func(context.Context)) bool {
+func (q *execQueue) queue(f func()) bool {
 	q.mu.Lock()
 	ok := !q.isClosed() && len(q.funcs) < cap(q.funcs)
 	if ok {

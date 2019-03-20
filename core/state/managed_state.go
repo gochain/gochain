@@ -17,7 +17,6 @@
 package state
 
 import (
-	"context"
 	"sync"
 
 	"github.com/gochain-io/gochain/v3/common"
@@ -39,9 +38,9 @@ type ManagedState struct {
 }
 
 // ManagedState returns a new managed state with the statedb as it's backing layer
-func ManageState(ctx context.Context, statedb *StateDB) *ManagedState {
+func ManageState(statedb *StateDB) *ManagedState {
 	return &ManagedState{
-		StateDB:  statedb.Copy(ctx),
+		StateDB:  statedb.Copy(),
 		accounts: make(map[common.Address]*account),
 	}
 }

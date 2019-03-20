@@ -366,7 +366,7 @@ func (whisper *Whisper) RequestHistoricMessages(ctx context.Context, peerID []by
 	p.mu.Lock()
 	p.trusted = true
 	p.mu.Unlock()
-	return p2p.SendCtx(ctx, p.ws, p2pRequestCode, envelope)
+	return p2p.Send(p.ws, p2pRequestCode, envelope)
 }
 
 // SendP2PMessage sends a peer-to-peer message to a specific peer.
@@ -380,7 +380,7 @@ func (whisper *Whisper) SendP2PMessage(ctx context.Context, peerID []byte, envel
 
 // SendP2PDirect sends a peer-to-peer message to a specific peer.
 func (whisper *Whisper) SendP2PDirect(ctx context.Context, peer *Peer, envelope *Envelope) error {
-	return p2p.SendCtx(ctx, peer.ws, p2pMessageCode, envelope)
+	return p2p.Send(peer.ws, p2pMessageCode, envelope)
 }
 
 // NewKeyPair generates a new cryptographic identity for the client, and injects

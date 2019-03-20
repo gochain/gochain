@@ -17,7 +17,6 @@
 package state
 
 import (
-	"context"
 	"testing"
 
 	"github.com/gochain-io/gochain/v3/common"
@@ -29,7 +28,7 @@ var addr = common.BytesToAddress([]byte("test"))
 func create(t *testing.T) (*ManagedState, *account) {
 	db := ethdb.NewMemDatabase()
 	statedb, _ := New(common.Hash{}, NewDatabase(db))
-	ms := ManageState(context.Background(), statedb)
+	ms := ManageState(statedb)
 	ms.StateDB.SetNonce(addr, 100)
 	so, err := ms.StateDB.getStateObject(addr)
 	if err != nil {

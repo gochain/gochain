@@ -17,7 +17,6 @@
 package core
 
 import (
-	"context"
 	crand "crypto/rand"
 	"errors"
 	"fmt"
@@ -209,7 +208,7 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 // header writes should be protected by the parent chain mutex individually.
 type WhCallback func(*types.Header) error
 
-func (hc *HeaderChain) ValidateHeaderChain(ctx context.Context, chain []*types.Header, checkFreq int) (int, error) {
+func (hc *HeaderChain) ValidateHeaderChain(chain []*types.Header, checkFreq int) (int, error) {
 	// Do a sanity check that the provided chain is actually ordered and linked
 	for i := 1; i < len(chain); i++ {
 		if chain[i].Number.Uint64() != chain[i-1].Number.Uint64()+1 || chain[i].ParentHash != chain[i-1].Hash() {
@@ -233,7 +232,7 @@ func (hc *HeaderChain) ValidateHeaderChain(ctx context.Context, chain []*types.H
 	}
 	seals[len(seals)-1] = true // Last should always be verified to avoid junk
 
-	abort, results := hc.engine.VerifyHeaders(ctx, hc, chain)
+	abort, results := hc.engine.VerifyHeaders(hc, chain)
 	defer close(abort)
 
 	// Iterate over the headers and ensure they all check out

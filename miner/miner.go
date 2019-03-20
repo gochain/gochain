@@ -18,12 +18,9 @@
 package miner
 
 import (
-	"context"
 	"fmt"
 	"sync/atomic"
 	"time"
-
-	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/consensus"
@@ -147,10 +144,8 @@ func (self *Miner) SetRecommitInterval(interval time.Duration) {
 }
 
 // Pending returns the currently pending block and associated state.
-func (self *Miner) Pending(ctx context.Context) (*types.Block, *state.StateDB) {
-	ctx, span := trace.StartSpan(ctx, "Miner.Pending")
-	defer span.End()
-	return self.worker.pending(ctx)
+func (self *Miner) Pending() (*types.Block, *state.StateDB) {
+	return self.worker.pending()
 }
 
 // PendingBlock returns the currently pending block.
@@ -158,9 +153,7 @@ func (self *Miner) Pending(ctx context.Context) (*types.Block, *state.StateDB) {
 // Note, to access both the pending block and the pending state
 // simultaneously, please use Pending(), as the pending state can
 // change between multiple method calls
-func (self *Miner) PendingBlock(ctx context.Context) *types.Block {
-	ctx, span := trace.StartSpan(ctx, "Miner.PendingBlock")
-	defer span.End()
+func (self *Miner) PendingBlock() *types.Block {
 	return self.worker.pendingBlock()
 }
 

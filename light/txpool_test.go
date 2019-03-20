@@ -67,11 +67,11 @@ func minedTx(i int) int {
 	return int(math.Pow(float64(i)/float64(poolTestBlocks), 1.1) * poolTestTxs)
 }
 
-func txPoolTestChainGen(ctx context.Context, i int, block *core.BlockGen) {
+func txPoolTestChainGen(i int, block *core.BlockGen) {
 	s := minedTx(i)
 	e := minedTx(i + 1)
 	for i := s; i < e; i++ {
-		block.AddTx(ctx, testTx[i])
+		block.AddTx(testTx[i])
 	}
 }
 
@@ -89,9 +89,9 @@ func TestTxPool(t *testing.T) {
 	)
 	gspec.MustCommit(ldb)
 	// Assemble the test environment
-	blockchain, _ := core.NewBlockChain(ctx, sdb, nil, params.TestChainConfig, clique.NewFullFaker(), vm.Config{})
-	gchain, _ := core.GenerateChain(ctx, params.TestChainConfig, genesis, clique.NewFaker(), sdb, poolTestBlocks, txPoolTestChainGen)
-	if _, err := blockchain.InsertChain(ctx, gchain); err != nil {
+	blockchain, _ := core.NewBlockChain(sdb, nil, params.TestChainConfig, clique.NewFullFaker(), vm.Config{})
+	gchain, _ := core.GenerateChain(params.TestChainConfig, genesis, clique.NewFaker(), sdb, poolTestBlocks, txPoolTestChainGen)
+	if _, err := blockchain.InsertChain(gchain); err != nil {
 		panic(err)
 	}
 
@@ -120,7 +120,7 @@ func TestTxPool(t *testing.T) {
 			}
 		}
 
-		if _, err := lightchain.InsertHeaderChain(ctx, []*types.Header{block.Header()}, 1); err != nil {
+		if _, err := lightchain.InsertHeaderChain([]*types.Header{block.Header()}, 1); err != nil {
 			panic(err)
 		}
 
