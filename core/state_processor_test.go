@@ -1,7 +1,6 @@
 package core
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 	"testing"
@@ -22,7 +21,6 @@ func BenchmarkStateProcessor_Process(b *testing.B) {
 }
 
 func benchmarkStateProcessor_Process(cnt int) func(b *testing.B) {
-	ctx := context.Background()
 	key, _ := crypto.GenerateKey()
 	address := crypto.PubkeyToAddress(key.PublicKey)
 	funds := big.NewInt(1000000000)
@@ -60,7 +58,7 @@ func benchmarkStateProcessor_Process(cnt int) func(b *testing.B) {
 			}
 			b.StartTimer()
 
-			_, _, _, err = bc.Processor().Process(ctx, block, statedb, cfg)
+			_, _, _, err = bc.Processor().Process(block, statedb, cfg)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -71,7 +69,6 @@ func benchmarkStateProcessor_Process(cnt int) func(b *testing.B) {
 func TestStateProcessor(t *testing.T) {
 	numTxs := 10000
 
-	ctx := context.Background()
 	start := time.Now()
 	key, _ := crypto.GenerateKey()
 	address := crypto.PubkeyToAddress(key.PublicKey)
@@ -111,7 +108,7 @@ func TestStateProcessor(t *testing.T) {
 		t.Fatal(err)
 	}
 	start = time.Now()
-	_, _, _, err = bc.Processor().Process(ctx, block, statedb, cfg)
+	_, _, _, err = bc.Processor().Process(block, statedb, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

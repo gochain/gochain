@@ -20,7 +20,6 @@
 package eth
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"math/big"
@@ -50,7 +49,7 @@ var (
 // newTestProtocolManager creates a new protocol manager for testing purposes,
 // with the given number of blocks already known, and potential notification
 // channels for different events.
-func newTestProtocolManager(ctx context.Context, mode downloader.SyncMode, blocks int, generator func(context.Context, int, *core.BlockGen), newtx chan<- []*types.Transaction) (*ProtocolManager, *ethdb.MemDatabase, error) {
+func newTestProtocolManager(mode downloader.SyncMode, blocks int, generator func(int, *core.BlockGen), newtx chan<- []*types.Transaction) (*ProtocolManager, *ethdb.MemDatabase, error) {
 	var (
 		evmux  = new(core.InterfaceFeed)
 		db     = ethdb.NewMemDatabase()
@@ -61,10 +60,10 @@ func newTestProtocolManager(ctx context.Context, mode downloader.SyncMode, block
 			Signer: hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
 		}
 		genesis       = gspec.MustCommit(db)
-		blockchain, _ = core.NewBlockChain(ctx, db, nil, gspec.Config, engine, vm.Config{})
+		blockchain, _ = core.NewBlockChain(db, nil, gspec.Config, engine, vm.Config{})
 	)
-	chain, _ := core.GenerateChain(ctx, gspec.Config, genesis, engine, db, blocks, generator)
-	if _, err := blockchain.InsertChain(ctx, chain); err != nil {
+	chain, _ := core.GenerateChain(gspec.Config, genesis, engine, db, blocks, generator)
+	if _, err := blockchain.InsertChain(chain); err != nil {
 		panic(err)
 	}
 
@@ -80,8 +79,8 @@ func newTestProtocolManager(ctx context.Context, mode downloader.SyncMode, block
 // with the given number of blocks already known, and potential notification
 // channels for different events. In case of an error, the constructor force-
 // fails the test.
-func newTestProtocolManagerMust(ctx context.Context, t *testing.T, mode downloader.SyncMode, blocks int, generator func(context.Context, int, *core.BlockGen), newtx chan<- []*types.Transaction) (*ProtocolManager, *ethdb.MemDatabase) {
-	pm, db, err := newTestProtocolManager(ctx, mode, blocks, generator, newtx)
+func newTestProtocolManagerMust(t *testing.T, mode downloader.SyncMode, blocks int, generator func(int, *core.BlockGen), newtx chan<- []*types.Transaction) (*ProtocolManager, *ethdb.MemDatabase) {
+	pm, db, err := newTestProtocolManager(mode, blocks, generator, newtx)
 	if err != nil {
 		t.Fatalf("Failed to create protocol manager: %v", err)
 	}
@@ -99,7 +98,7 @@ type testTxPool struct {
 
 // AddRemotes appends a batch of transactions to the pool, and notifies any
 // listeners if the addition channel is non nil
-func (p *testTxPool) AddRemotes(ctx context.Context, txs []*types.Transaction) []error {
+func (p *testTxPool) AddRemotes(txs []*types.Transaction) []error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -111,7 +110,7 @@ func (p *testTxPool) AddRemotes(ctx context.Context, txs []*types.Transaction) [
 }
 
 // Pending returns all the transactions known to the pool
-func (p *testTxPool) Pending(ctx context.Context) map[common.Address]types.Transactions {
+func (p *testTxPool) Pending() map[common.Address]types.Transactions {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -126,9 +125,9 @@ func (p *testTxPool) Pending(ctx context.Context) map[common.Address]types.Trans
 	return batches
 }
 
-func (p *testTxPool) PendingList(ctx context.Context) types.Transactions {
+func (p *testTxPool) PendingList() types.Transactions {
 	var pending types.Transactions
-	for _, txs := range p.Pending(ctx) {
+	for _, txs := range p.Pending() {
 		pending = append(pending, txs...)
 	}
 	return pending
@@ -157,7 +156,7 @@ type testPeer struct {
 }
 
 // newTestPeer creates a new peer registered at the given protocol manager.
-func newTestPeer(ctx context.Context, name string, version int, pm *ProtocolManager, shake bool) (*testPeer, <-chan error) {
+func newTestPeer(name string, version int, pm *ProtocolManager, shake bool) (*testPeer, <-chan error) {
 	// Create a message pipe to communicate through
 	app, net := p2p.MsgPipe()
 

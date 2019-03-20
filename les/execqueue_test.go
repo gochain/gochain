@@ -17,7 +17,6 @@
 package les
 
 import (
-	"context"
 	"testing"
 )
 
@@ -35,7 +34,7 @@ func TestExecQueue(t *testing.T) {
 	check := func(state string, wantOK bool) {
 		c := counter
 		counter++
-		qf := func(context.Context) {
+		qf := func() {
 			select {
 			case execd <- c:
 			case <-testexit:

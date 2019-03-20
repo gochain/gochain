@@ -17,7 +17,6 @@
 package downloader
 
 import (
-	"context"
 	"math/big"
 
 	"github.com/gochain-io/gochain/v3/common"
@@ -50,7 +49,7 @@ func (p *FakePeer) Head() (common.Hash, *big.Int) {
 
 // RequestHeadersByHash implements downloader.Peer, returning a batch of headers
 // defined by the origin hash and the associated query parameters.
-func (p *FakePeer) RequestHeadersByHash(ctx context.Context, hash common.Hash, amount int, skip int, reverse bool) error {
+func (p *FakePeer) RequestHeadersByHash(hash common.Hash, amount int, skip int, reverse bool) error {
 	var (
 		headers []*types.Header
 		unknown bool
@@ -94,7 +93,7 @@ func (p *FakePeer) RequestHeadersByHash(ctx context.Context, hash common.Hash, a
 
 // RequestHeadersByNumber implements downloader.Peer, returning a batch of headers
 // defined by the origin number and the associated query parameters.
-func (p *FakePeer) RequestHeadersByNumber(ctx context.Context, number uint64, amount int, skip int, reverse bool) error {
+func (p *FakePeer) RequestHeadersByNumber(number uint64, amount int, skip int, reverse bool) error {
 	var (
 		headers []*types.Header
 		unknown bool
@@ -121,7 +120,7 @@ func (p *FakePeer) RequestHeadersByNumber(ctx context.Context, number uint64, am
 
 // RequestBodies implements downloader.Peer, returning a batch of block bodies
 // corresponding to the specified block hashes.
-func (p *FakePeer) RequestBodies(ctx context.Context, hashes []common.Hash) error {
+func (p *FakePeer) RequestBodies(hashes []common.Hash) error {
 	var txs [][]*types.Transaction
 	for _, hash := range hashes {
 		block := rawdb.ReadBlock(p.db, hash, *p.hc.GetBlockNumber(hash))
@@ -134,7 +133,7 @@ func (p *FakePeer) RequestBodies(ctx context.Context, hashes []common.Hash) erro
 
 // RequestReceipts implements downloader.Peer, returning a batch of transaction
 // receipts corresponding to the specified block hashes.
-func (p *FakePeer) RequestReceipts(ctx context.Context, hashes []common.Hash) error {
+func (p *FakePeer) RequestReceipts(hashes []common.Hash) error {
 	var receipts [][]*types.Receipt
 	for _, hash := range hashes {
 		receipts = append(receipts, rawdb.ReadReceipts(p.db.ReceiptTable(), hash, *p.hc.GetBlockNumber(hash)))
@@ -145,7 +144,7 @@ func (p *FakePeer) RequestReceipts(ctx context.Context, hashes []common.Hash) er
 
 // RequestNodeData implements downloader.Peer, returning a batch of state trie
 // nodes corresponding to the specified trie hashes.
-func (p *FakePeer) RequestNodeData(ctx context.Context, hashes []common.Hash) error {
+func (p *FakePeer) RequestNodeData(hashes []common.Hash) error {
 	var data [][]byte
 	for _, hash := range hashes {
 		if entry, err := p.db.GlobalTable().Get(hash.Bytes()); err == nil {

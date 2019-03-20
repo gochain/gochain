@@ -71,7 +71,7 @@ func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
 		Signer: hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
 	}
 	genesis.MustCommit(database)
-	blockchain, err := core.NewBlockChain(context.Background(), database, nil, genesis.Config, clique.NewFaker(), vm.Config{})
+	blockchain, err := core.NewBlockChain(database, nil, genesis.Config, clique.NewFaker(), vm.Config{})
 	if err != nil {
 		panic(err)
 	}
@@ -88,11 +88,11 @@ func NewSimulatedBackend(alloc core.GenesisAlloc) *SimulatedBackend {
 
 // Commit imports all the pending transactions as a single block and starts a
 // fresh new state.
-func (b *SimulatedBackend) Commit(ctx context.Context) {
+func (b *SimulatedBackend) Commit() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if _, err := b.blockchain.InsertChain(ctx, []*types.Block{b.pendingBlock}); err != nil {
+	if _, err := b.blockchain.InsertChain([]*types.Block{b.pendingBlock}); err != nil {
 		panic(err) // This cannot happen unless the simulator is wrong, fail in that case
 	}
 	b.rollback()
@@ -100,8 +100,7 @@ func (b *SimulatedBackend) Commit(ctx context.Context) {
 
 // rollback aborts all pending transactions, reverting to the last committed state.
 func (b *SimulatedBackend) rollback() {
-	ctx := context.TODO()
-	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlock(), clique.NewFaker(), b.database, 1, nil)
+	blocks, _ := core.GenerateChain(b.config, b.blockchain.CurrentBlock(), clique.NewFaker(), b.database, 1, nil)
 	statedb, err := b.blockchain.State()
 	if err != nil {
 		panic(err)
@@ -330,11 +329,11 @@ func (b *SimulatedBackend) SendTransaction(ctx context.Context, tx *types.Transa
 		panic(fmt.Errorf("invalid transaction nonce: got %d, want %d", tx.Nonce(), nonce))
 	}
 
-	blocks, _ := core.GenerateChain(ctx, b.config, b.blockchain.CurrentBlock(), clique.NewFaker(), b.database, 1, func(ctx context.Context, number int, block *core.BlockGen) {
+	blocks, _ := core.GenerateChain(b.config, b.blockchain.CurrentBlock(), clique.NewFaker(), b.database, 1, func(number int, block *core.BlockGen) {
 		for _, tx := range b.pendingBlock.Transactions() {
-			block.AddTx(ctx, tx)
+			block.AddTx(tx)
 		}
-		block.AddTx(ctx, tx)
+		block.AddTx(tx)
 	})
 	statedb, _ := b.blockchain.State()
 

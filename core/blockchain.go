@@ -18,7 +18,6 @@
 package core
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -30,7 +29,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/golang-lru"
-	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/common/mclock"
@@ -144,7 +142,7 @@ type BlockChain struct {
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum Validator and
 // Processor.
-func NewBlockChain(ctx context.Context, db common.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config) (*BlockChain, error) {
+func NewBlockChain(db common.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
 			TrieNodeLimit: 256 * 1024 * 1024,
@@ -709,7 +707,7 @@ func (bc *BlockChain) Stop() {
 	log.Info("Blockchain manager stopped")
 }
 
-func (bc *BlockChain) procFutureBlocks(ctx context.Context) {
+func (bc *BlockChain) procFutureBlocks() {
 	blocks := make([]*types.Block, 0, bc.futureBlocks.Len())
 	for _, hash := range bc.futureBlocks.Keys() {
 		if block, exist := bc.futureBlocks.Peek(hash); exist {
@@ -721,7 +719,7 @@ func (bc *BlockChain) procFutureBlocks(ctx context.Context) {
 
 		// Insert one by one as chain insertion needs contiguous ancestry between blocks
 		for i := range blocks {
-			if n, err := bc.InsertChain(ctx, blocks[i:i+1]); err != nil {
+			if n, err := bc.InsertChain(blocks[i : i+1]); err != nil {
 				log.Error("Cannot insert future blocks into chain", "n", n, "err", err)
 			}
 		}
@@ -777,7 +775,7 @@ func (bc *BlockChain) Rollback(chain []common.Hash) {
 }
 
 // SetReceiptsData computes all the non-consensus fields of the receipts
-func SetReceiptsData(ctx context.Context, config *params.ChainConfig, block *types.Block, receipts types.Receipts) error {
+func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts types.Receipts) error {
 	signer := types.MakeSigner(config, block.Number())
 
 	transactions, logIndex := block.Transactions(), uint(0)
@@ -816,7 +814,7 @@ func SetReceiptsData(ctx context.Context, config *params.ChainConfig, block *typ
 
 // InsertReceiptChain attempts to complete an already existing header chain with
 // transaction and receipt data.
-func (bc *BlockChain) InsertReceiptChain(ctx context.Context, blockChain types.Blocks, receiptChain []types.Receipts) (int, error) {
+func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain []types.Receipts) (int, error) {
 	if !bc.wgAdd() {
 		return 0, ErrStopping
 	}
@@ -856,7 +854,7 @@ func (bc *BlockChain) InsertReceiptChain(ctx context.Context, blockChain types.B
 			continue
 		}
 		// Compute all the non-consensus fields of the receipts
-		if err := SetReceiptsData(ctx, bc.chainConfig, block, receipts); err != nil {
+		if err := SetReceiptsData(bc.chainConfig, block, receipts); err != nil {
 			return i, fmt.Errorf("failed to set receipts data: %v", err)
 		}
 		// Write all the data out into the database
@@ -929,9 +927,7 @@ func (bc *BlockChain) WriteBlockWithoutState(block *types.Block, td *big.Int) (e
 }
 
 // WriteBlockWithState writes the block and all associated state to the database.
-func (bc *BlockChain) WriteBlockWithState(ctx context.Context, block *types.Block, receipts []*types.Receipt, state *state.StateDB) (status WriteStatus, err error) {
-	ctx, span := trace.StartSpan(ctx, "BlockChain.WriteBlockWithState")
-	defer span.End()
+func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.Receipt, state *state.StateDB) (status WriteStatus, err error) {
 
 	if !bc.wgAdd() {
 		return 0, ErrStopping
@@ -1018,7 +1014,7 @@ func (bc *BlockChain) WriteBlockWithState(ctx context.Context, block *types.Bloc
 		if block.ParentHash() != currentBlock.Hash() {
 			log.Info("Reorganizing block chain", "oldnum", currentBlock.NumberU64(), "newnum", block.NumberU64(), "oldtd", localTd, "newtd", externTd, "oldhash", currentHash, "newhash", hash)
 			start := time.Now()
-			if err := bc.reorg(ctx, currentBlock, block); err != nil {
+			if err := bc.reorg(currentBlock, block); err != nil {
 				return NonStatTy, err
 			}
 			dur := time.Since(start)
@@ -1079,23 +1075,16 @@ func reorg(local, external chainHead) bool {
 // wrong.
 //
 // After insertion is done, all accumulated events will be fired.
-func (bc *BlockChain) InsertChain(ctx context.Context, chain types.Blocks) (int, error) {
-	ctx, span := trace.StartSpan(ctx, "BlockChain.InsertChain", trace.WithSampler(trace.AlwaysSample()))
-	defer span.End()
-	span.AddAttributes(trace.Int64Attribute("len", int64(len(chain))))
-
-	n, events, logs, err := bc.insertChain(ctx, chain)
-	bc.PostChainEvents(ctx, events, logs)
+func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
+	n, events, logs, err := bc.insertChain(chain)
+	bc.PostChainEvents(events, logs)
 	return n, err
 }
 
 // insertChain will execute the actual chain insertion and event aggregation. The
 // only reason this method exists as a separate one is to make locking cleaner
 // with deferred statements.
-func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int, []interface{}, []*types.Log, error) {
-	ctx, span := trace.StartSpan(ctx, "BlockChain.insertChain")
-	defer span.End()
-
+func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*types.Log, error) {
 	// Sanity check that we have something meaningful to import.
 	if len(chain) == 0 {
 		return 0, nil, nil, nil
@@ -1132,18 +1121,16 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 	for i, block := range chain {
 		headers[i] = block.Header()
 	}
-	abortHeaders, verHeaders := bc.engine.VerifyHeaders(ctx, bc, headers)
+	abortHeaders, verHeaders := bc.engine.VerifyHeaders(bc, headers)
 	defer close(abortHeaders)
 
 	abortBodies := make(chan struct{})
 	defer close(abortBodies)
 	valBodies := make(chan error, len(chain))
 	go func() {
-		ctx, span := trace.StartSpan(context.Background(), "BlockChain.insertChain-validate-bodies")
-		defer span.End()
 		defer close(valBodies)
 		for i, block := range chain {
-			err := bc.Validator().ValidateBody(ctx, block, i == 0)
+			err := bc.Validator().ValidateBody(block, i == 0)
 
 			select {
 			case <-abortBodies:
@@ -1155,8 +1142,6 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 
 	// Pre-compute and cache sender ecrecover for each transaction.
 	go func() {
-		ctx, span := trace.StartSpan(ctx, "parWorkers")
-		defer span.End()
 
 		for _, block := range chain {
 			signer := types.MakeSigner(bc.Config(), block.Number())
@@ -1168,8 +1153,6 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 			for s := 0; s < bc.parWorkers; s++ {
 				go func() {
 					defer wg.Done()
-					_, span := trace.StartSpan(ctx, "parWorker")
-					defer span.End()
 					for i := atomic.AddInt32(&wi, 1); i < l32; i = atomic.AddInt32(&wi, 1) {
 						txs[i].Hash()
 						if _, err := types.Sender(signer, txs[i]); err != nil {
@@ -1179,10 +1162,6 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 				}()
 			}
 			wg.Wait()
-			span.Annotate([]trace.Attribute{
-				trace.Int64Attribute("num", int64(block.NumberU64())),
-				trace.Int64Attribute("txs", int64(l32)),
-			}, "finished block")
 		}
 	}()
 
@@ -1260,7 +1239,7 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 			}
 			// Import all the pruned blocks to make the state available
 			bc.chainmu.Unlock()
-			_, evs, logs, err := bc.insertChain(ctx, winner)
+			_, evs, logs, err := bc.insertChain(winner)
 			bc.chainmu.Lock()
 			events, coalescedLogs = evs, logs
 
@@ -1286,13 +1265,13 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 			return i, events, coalescedLogs, err
 		}
 		// Process block using the parent state as reference point.
-		receipts, logs, usedGas, err := bc.processor.Process(ctx, block, state, bc.vmConfig)
+		receipts, logs, usedGas, err := bc.processor.Process(block, state, bc.vmConfig)
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
 		}
 		// Validate the state using the default validator
-		err = bc.Validator().ValidateState(ctx, block, parent, state, receipts, usedGas)
+		err = bc.Validator().ValidateState(block, parent, state, receipts, usedGas)
 		if err != nil {
 			bc.reportBlock(block, receipts, err)
 			return i, events, coalescedLogs, err
@@ -1300,7 +1279,7 @@ func (bc *BlockChain) insertChain(ctx context.Context, chain types.Blocks) (int,
 		proctime := time.Since(bstart)
 
 		// Write the block to the chain and get the status.
-		status, err := bc.WriteBlockWithState(ctx, block, receipts, state)
+		status, err := bc.WriteBlockWithState(block, receipts, state)
 		if err != nil {
 			return i, events, coalescedLogs, err
 		}
@@ -1391,10 +1370,7 @@ func countTransactions(chain []*types.Block) (c int) {
 // reorgs takes two blocks, an old chain and a new chain and will reconstruct the blocks and inserts them
 // to be part of the new canonical chain and accumulates potential missing transactions and post an
 // event about them
-func (bc *BlockChain) reorg(ctx context.Context, oldBlock, newBlock *types.Block) error {
-	ctx, span := trace.StartSpan(ctx, "BlockChain.reorg")
-	defer span.End()
-
+func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	var (
 		newChain    types.Blocks
 		oldChain    types.Blocks
@@ -1513,10 +1489,7 @@ func (bc *BlockChain) reorg(ctx context.Context, oldBlock, newBlock *types.Block
 // PostChainEvents iterates over the events generated by a chain insertion and
 // posts them into the event feed.
 // TODO: Should not expose PostChainEvents. The chain events should be posted in WriteBlock.
-func (bc *BlockChain) PostChainEvents(ctx context.Context, events []interface{}, logs []*types.Log) {
-	ctx, span := trace.StartSpan(ctx, "BlockChain.PostChainEvents")
-	defer span.End()
-
+func (bc *BlockChain) PostChainEvents(events []interface{}, logs []*types.Log) {
 	// post event logs for further processing
 	if logs != nil {
 		bc.logsFeed.Send(logs)
@@ -1541,9 +1514,7 @@ func (bc *BlockChain) update() {
 	for {
 		select {
 		case <-futureTimer.C:
-			ctx, span := trace.StartSpan(context.Background(), "BlockChain.update-futureTimer")
-			bc.procFutureBlocks(ctx)
-			span.End()
+			bc.procFutureBlocks()
 		case <-bc.quit:
 			return
 		}
@@ -1596,9 +1567,9 @@ Error: %v
 // should be done or not. The reason behind the optional check is because some
 // of the header retrieval mechanisms already need to verify nonces, as well as
 // because nonces can be verified sparsely, not needing to check each.
-func (bc *BlockChain) InsertHeaderChain(ctx context.Context, chain []*types.Header, checkFreq int) (int, error) {
+func (bc *BlockChain) InsertHeaderChain(chain []*types.Header, checkFreq int) (int, error) {
 	start := time.Now()
-	if i, err := bc.hc.ValidateHeaderChain(ctx, chain, checkFreq); err != nil {
+	if i, err := bc.hc.ValidateHeaderChain(chain, checkFreq); err != nil {
 		return i, err
 	}
 

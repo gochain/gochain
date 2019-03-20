@@ -98,7 +98,7 @@ func (api *PrivateDebugAPI) TraceChain(ctx context.Context, start, end rpc.Block
 
 	switch start {
 	case rpc.PendingBlockNumber:
-		from = api.eth.miner.PendingBlock(ctx)
+		from = api.eth.miner.PendingBlock()
 	case rpc.LatestBlockNumber:
 		from = api.eth.blockchain.CurrentBlock()
 	default:
@@ -106,7 +106,7 @@ func (api *PrivateDebugAPI) TraceChain(ctx context.Context, start, end rpc.Block
 	}
 	switch end {
 	case rpc.PendingBlockNumber:
-		to = api.eth.miner.PendingBlock(ctx)
+		to = api.eth.miner.PendingBlock()
 	case rpc.LatestBlockNumber:
 		to = api.eth.blockchain.CurrentBlock()
 	default:
@@ -269,14 +269,14 @@ func (api *PrivateDebugAPI) traceChain(ctx context.Context, start, end *types.Bl
 				txs := block.Transactions()
 
 				select {
-				case tasks <- &blockTraceTask{statedb: statedb.Copy(ctx), block: block, rootref: proot, results: make([]*txTraceResult, len(txs))}:
+				case tasks <- &blockTraceTask{statedb: statedb.Copy(), block: block, rootref: proot, results: make([]*txTraceResult, len(txs))}:
 				case <-notifier.Closed():
 					return
 				}
 				traced += uint64(len(txs))
 			}
 			// Generate the next state snapshot fast without tracing
-			_, _, _, err := api.eth.blockchain.Processor().Process(ctx, block, statedb, vm.Config{})
+			_, _, _, err := api.eth.blockchain.Processor().Process(block, statedb, vm.Config{})
 			if err != nil {
 				failed = err
 				break
@@ -291,7 +291,7 @@ func (api *PrivateDebugAPI) traceChain(ctx context.Context, start, end *types.Bl
 				failed = err
 				break
 			}
-			// Reference the trie twice, once for us, once for the trancer
+			// Reference the trie twice, once for us, once for the tracer
 			database.TrieDB().Reference(root, common.Hash{})
 			if number >= origin {
 				database.TrieDB().Reference(root, common.Hash{})
@@ -345,7 +345,7 @@ func (api *PrivateDebugAPI) TraceBlockByNumber(ctx context.Context, number rpc.B
 
 	switch number {
 	case rpc.PendingBlockNumber:
-		block = api.eth.miner.PendingBlock(ctx)
+		block = api.eth.miner.PendingBlock()
 	case rpc.LatestBlockNumber:
 		block = api.eth.blockchain.CurrentBlock()
 	default:
@@ -393,12 +393,12 @@ func (api *PrivateDebugAPI) TraceBlockFromFile(ctx context.Context, file string,
 // per transaction, dependent on the requestd tracer.
 func (api *PrivateDebugAPI) traceBlock(ctx context.Context, block *types.Block, config *TraceConfig) ([]*txTraceResult, error) {
 	// Create the parent state database
-	if err := api.eth.engine.VerifyHeader(ctx, api.eth.blockchain, block.Header()); err != nil {
+	if err := api.eth.engine.VerifyHeader(api.eth.blockchain, block.Header()); err != nil {
 		return nil, err
 	}
 	parent := api.eth.blockchain.GetBlock(block.ParentHash(), block.NumberU64()-1)
 	if parent == nil {
-		return nil, fmt.Errorf("parent %x not found", block.ParentHash())
+		return nil, fmt.Errorf("parent %#x not found", block.ParentHash())
 	}
 	reexec := defaultTraceReexec
 	if config != nil && config.Reexec != nil {
@@ -445,7 +445,7 @@ func (api *PrivateDebugAPI) traceBlock(ctx context.Context, block *types.Block, 
 	var failed error
 	for i, tx := range txs {
 		// Send the trace task over for execution
-		jobs <- &txTraceTask{statedb: statedb.Copy(ctx), index: i}
+		jobs <- &txTraceTask{statedb: statedb.Copy(), index: i}
 
 		// Generate the next state snapshot fast without tracing
 		msg, _ := tx.AsMessage(signer)
@@ -515,7 +515,7 @@ func (api *PrivateDebugAPI) computeStateDB(ctx context.Context, block *types.Blo
 		if block = api.eth.blockchain.GetBlockByNumber(block.NumberU64() + 1); block == nil {
 			return nil, fmt.Errorf("block #%d not found", block.NumberU64()+1)
 		}
-		_, _, _, err := api.eth.blockchain.Processor().Process(ctx, block, statedb, vm.Config{})
+		_, _, _, err := api.eth.blockchain.Processor().Process(block, statedb, vm.Config{})
 		if err != nil {
 			return nil, err
 		}
@@ -645,10 +645,10 @@ func (api *PrivateDebugAPI) computeTxEnv(ctx context.Context, blockHash common.H
 		// Not yet the searched for transaction, execute on top of the current state
 		vmenv := vm.NewEVM(context, statedb, api.config, vm.Config{})
 		if _, _, _, err := core.ApplyMessage(vmenv, msg, new(core.GasPool).AddGas(tx.Gas())); err != nil {
-			return nil, vm.Context{}, nil, fmt.Errorf("tx %x failed: %v", tx.Hash(), err)
+			return nil, vm.Context{}, nil, fmt.Errorf("tx %#x failed: %v", tx.Hash(), err)
 		}
 		// Ensure any modifications are committed to the state
 		statedb.Finalise(true)
 	}
-	return nil, vm.Context{}, nil, fmt.Errorf("tx index %d out of range for block %x", txIndex, blockHash)
+	return nil, vm.Context{}, nil, fmt.Errorf("tx index %d out of range for block %#x", txIndex, blockHash)
 }

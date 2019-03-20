@@ -81,7 +81,7 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	pm.blockchain.(*light.LightChain).SyncCht(ctx)
-	if err := pm.downloader.Synchronise(ctx, peer.id, peer.Head(), peer.Td(), downloader.LightSync); err != nil {
+	if err := pm.downloader.Synchronise(peer.id, peer.Head(), peer.Td(), downloader.LightSync); err != nil {
 		log.Error("Cannot synchronise downloader", "id", peer.id, "head", peer.Head(), "err", err)
 	}
 }

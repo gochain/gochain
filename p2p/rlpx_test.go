@@ -18,7 +18,6 @@ package p2p
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"errors"
 	"fmt"
@@ -99,7 +98,7 @@ func testEncHandshake(token []byte) error {
 		defer fd0.Close()
 
 		dest := &discover.Node{ID: discover.PubkeyID(&prv1.PublicKey)}
-		r.id, r.err = c0.doEncHandshake(context.Background(), prv0, dest)
+		r.id, r.err = c0.doEncHandshake(prv0, dest)
 		if r.err != nil {
 			return
 		}
@@ -113,7 +112,7 @@ func testEncHandshake(token []byte) error {
 		defer func() { output <- r }()
 		defer fd1.Close()
 
-		r.id, r.err = c1.doEncHandshake(context.Background(), prv1, nil)
+		r.id, r.err = c1.doEncHandshake(prv1, nil)
 		if r.err != nil {
 			return
 		}
@@ -167,7 +166,7 @@ func TestProtocolHandshake(t *testing.T) {
 		defer wg.Done()
 		defer fd1.Close()
 		rlpx := newRLPX(fd0)
-		remid, err := rlpx.doEncHandshake(context.Background(), prv0, node1)
+		remid, err := rlpx.doEncHandshake(prv0, node1)
 		if err != nil {
 			t.Errorf("dial side enc handshake failed: %v", err)
 			return
@@ -177,7 +176,7 @@ func TestProtocolHandshake(t *testing.T) {
 			return
 		}
 
-		phs, err := rlpx.doProtoHandshake(context.Background(), hs0)
+		phs, err := rlpx.doProtoHandshake(hs0)
 		if err != nil {
 			t.Errorf("dial side proto handshake error: %v", err)
 			return
@@ -193,7 +192,7 @@ func TestProtocolHandshake(t *testing.T) {
 		defer wg.Done()
 		defer fd1.Close()
 		rlpx := newRLPX(fd1)
-		remid, err := rlpx.doEncHandshake(context.Background(), prv1, nil)
+		remid, err := rlpx.doEncHandshake(prv1, nil)
 		if err != nil {
 			t.Errorf("listen side enc handshake failed: %v", err)
 			return
@@ -203,7 +202,7 @@ func TestProtocolHandshake(t *testing.T) {
 			return
 		}
 
-		phs, err := rlpx.doProtoHandshake(context.Background(), hs1)
+		phs, err := rlpx.doProtoHandshake(hs1)
 		if err != nil {
 			t.Errorf("listen side proto handshake error: %v", err)
 			return

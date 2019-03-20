@@ -17,14 +17,11 @@
 package miner
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/consensus"
@@ -231,14 +228,14 @@ func (w *worker) setRecommitInterval(interval time.Duration) {
 }
 
 // pending returns the pending state and corresponding block.
-func (w *worker) pending(ctx context.Context) (*types.Block, *state.StateDB) {
+func (w *worker) pending() (*types.Block, *state.StateDB) {
 	// return a snapshot to avoid contention on currentMu mutex
 	w.snapshotMu.RLock()
 	defer w.snapshotMu.RUnlock()
 	if w.snapshotState == nil {
 		return nil, nil
 	}
-	return w.snapshotBlock, w.snapshotState.Copy(ctx)
+	return w.snapshotBlock, w.snapshotState.Copy()
 }
 
 // pendingBlock returns pending block.
@@ -394,11 +391,7 @@ func (w *worker) mainLoop() {
 	for {
 		select {
 		case req := <-w.newWorkCh:
-			ctx, span := trace.StartSpan(context.Background(),
-				"worker.mainLoop-newWork",
-				trace.WithSampler(trace.AlwaysSample()))
-			w.commitNewWork(ctx, req.interrupt, req.noempty, req.timestamp)
-			span.End()
+			w.commitNewWork(req.interrupt, req.noempty, req.timestamp)
 
 		case first, ok := <-w.txsCh:
 			if !ok {
@@ -420,7 +413,6 @@ func (w *worker) mainLoop() {
 					break batchloop
 				}
 			}
-			ctx, span := trace.StartSpan(context.Background(), "worker.mainLoop-txs")
 			// Apply transactions to the pending state if we're not mining.
 			//
 			// Note all transactions received may not be continuous with transactions
@@ -439,16 +431,15 @@ func (w *worker) mainLoop() {
 					}
 				}
 				txset := types.NewTransactionsByPriceAndNonce(w.current.signer, txs)
-				w.commitTransactions(ctx, txset, coinbase, nil)
-				w.updateSnapshot(ctx)
+				w.commitTransactions(txset, coinbase, nil)
+				w.updateSnapshot()
 			} else {
 				// If we're mining, but nothing is being processed, wake on new transactions
 				if w.config.Clique != nil && w.config.Clique.Period == 0 {
-					w.commitNewWork(ctx, nil, false, time.Now().Unix())
+					w.commitNewWork(nil, false, time.Now().Unix())
 				}
 			}
 			atomic.AddInt32(&w.newTxs, int32(cnt))
-			span.End()
 
 		// System stopped
 		case <-w.exitCh:
@@ -494,7 +485,7 @@ func (w *worker) taskLoop() {
 			w.pendingTasks[w.engine.SealHash(task.block.Header())] = task
 			w.pendingMu.Unlock()
 
-			if b, until, err := w.engine.Seal(context.Background(), w.chain, task.block, stopCh); err != nil {
+			if b, until, err := w.engine.Seal(w.chain, task.block, stopCh); err != nil {
 				log.Warn("Block sealing failed", "err", err)
 			} else if b != nil {
 				go func() {
@@ -539,7 +530,6 @@ func (w *worker) resultLoop() {
 				continue
 			}
 
-			ctx, span := trace.StartSpan(context.Background(), "worker.resultLoop-resultCh", trace.WithSampler(trace.AlwaysSample()))
 			var (
 				sealhash = w.engine.SealHash(block.Header())
 				hash     = block.Hash()
@@ -549,7 +539,6 @@ func (w *worker) resultLoop() {
 			w.pendingMu.RUnlock()
 			if !exist {
 				log.Error("Block found but no relative pending task", "number", block.Number(), "sealhash", sealhash, "hash", hash)
-				span.End()
 				continue
 			}
 			// Different block could share same sealhash, deep copy here to prevent write-write conflict.
@@ -568,10 +557,9 @@ func (w *worker) resultLoop() {
 				logs = append(logs, receipt.Logs...)
 			}
 			// Commit block and state to database.
-			stat, err := w.chain.WriteBlockWithState(ctx, block, receipts, task.state)
+			stat, err := w.chain.WriteBlockWithState(block, receipts, task.state)
 			if err != nil {
 				log.Error("Failed writing block to chain", "err", err)
-				span.End()
 				continue
 			}
 			log.Info("Successfully sealed new block", "number", block.Number(), "sealhash", sealhash, "hash", hash,
@@ -588,11 +576,10 @@ func (w *worker) resultLoop() {
 			case core.SideStatTy:
 				events = append(events, core.ChainSideEvent{Block: block})
 			}
-			w.chain.PostChainEvents(ctx, events, logs)
+			w.chain.PostChainEvents(events, logs)
 
 			// Insert the block into the set of pending ones to resultLoop for confirmations
 			w.unconfirmed.Insert(block.NumberU64(), block.Hash())
-			span.End()
 
 		case <-w.exitCh:
 			return
@@ -620,10 +607,7 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 
 // updateSnapshot updates pending snapshot block and state.
 // Note this function assumes the current variable is thread safe.
-func (w *worker) updateSnapshot(ctx context.Context) {
-	ctx, span := trace.StartSpan(ctx, "worker.updateSnapshot")
-	defer span.End()
-
+func (w *worker) updateSnapshot() {
 	w.snapshotMu.Lock()
 	defer w.snapshotMu.Unlock()
 
@@ -633,13 +617,13 @@ func (w *worker) updateSnapshot(ctx context.Context) {
 		nil,
 		w.current.receipts,
 	)
-	w.snapshotState = w.current.state.Copy(ctx)
+	w.snapshotState = w.current.state.Copy()
 }
 
-func (w *worker) commitTransaction(ctx context.Context, vmenv *vm.EVM, tx *types.Transaction) ([]*types.Log, error) {
+func (w *worker) commitTransaction(vmenv *vm.EVM, tx *types.Transaction) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 
-	receipt, _, err := core.ApplyTransaction(ctx, vmenv, w.config, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, w.current.signer)
+	receipt, _, err := core.ApplyTransaction(vmenv, w.config, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, w.current.signer)
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
@@ -652,18 +636,11 @@ func (w *worker) commitTransaction(ctx context.Context, vmenv *vm.EVM, tx *types
 
 const maxCommitTransactionsDur = time.Second
 
-func (w *worker) commitTransactions(ctx context.Context, txs *types.TransactionsByPriceAndNonce, coinbase common.Address, interrupt *int32) bool {
+func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coinbase common.Address, interrupt *int32) bool {
 	// Short circuit if current is nil
 	if w.current == nil {
 		return true
 	}
-
-	ctx, span := trace.StartSpan(ctx, "worker.commitTransactions")
-	defer span.End()
-	defer func() {
-		span.AddAttributes(
-			trace.Int64Attribute("gas", int64(w.current.gasPool.Gas())))
-	}()
 
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
@@ -737,7 +714,7 @@ func (w *worker) commitTransactions(ctx context.Context, txs *types.Transactions
 		// Start executing the transaction
 		w.current.state.Prepare(tx.Hash(), common.Hash{}, w.current.tcount)
 
-		logs, err := w.commitTransaction(ctx, vmenv, tx)
+		logs, err := w.commitTransaction(vmenv, tx)
 		switch err {
 		case core.ErrGasLimitReached:
 			// Pop the current out-of-gas transaction without shifting in the next from the account
@@ -798,10 +775,7 @@ func (w *worker) commitTransactions(ctx context.Context, txs *types.Transactions
 }
 
 // commitNewWork generates several new sealing tasks based on the parent block.
-func (w *worker) commitNewWork(ctx context.Context, interrupt *int32, noempty bool, timestamp int64) {
-	ctx, span := trace.StartSpan(ctx, "worker.commitNewWork")
-	defer span.End()
-
+func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
@@ -833,7 +807,7 @@ func (w *worker) commitNewWork(ctx context.Context, interrupt *int32, noempty bo
 		}
 		header.Coinbase = w.coinbase
 	}
-	if err := w.engine.Prepare(ctx, w.chain, header); err != nil {
+	if err := w.engine.Prepare(w.chain, header); err != nil {
 		if err == clique.ErrIneligibleSigner {
 			log.Info("Not eligible to sign block", "number", header.Number)
 			return
@@ -852,14 +826,14 @@ func (w *worker) commitNewWork(ctx context.Context, interrupt *int32, noempty bo
 	if !noempty {
 		// Create an empty block based on temporary copied state for sealing in advance without waiting block
 		// execution finished.
-		w.commit(ctx, nil, false, tstart)
+		w.commit(nil, false, tstart)
 	}
 
 	// Fill the block with all available pending transactions.
-	pending := w.eth.TxPool().Pending(ctx)
+	pending := w.eth.TxPool().Pending()
 	// Short circuit if there is no available pending transactions
 	if len(pending) == 0 {
-		w.updateSnapshot(ctx)
+		w.updateSnapshot()
 		return
 	}
 	// Split the pending transactions into locals and remotes
@@ -872,33 +846,30 @@ func (w *worker) commitNewWork(ctx context.Context, interrupt *int32, noempty bo
 	}
 	if len(localTxs) > 0 {
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, localTxs)
-		if w.commitTransactions(ctx, txs, w.coinbase, interrupt) {
+		if w.commitTransactions(txs, w.coinbase, interrupt) {
 			return
 		}
 	}
 	if len(remoteTxs) > 0 {
 		txs := types.NewTransactionsByPriceAndNonce(w.current.signer, remoteTxs)
-		if w.commitTransactions(ctx, txs, w.coinbase, interrupt) {
+		if w.commitTransactions(txs, w.coinbase, interrupt) {
 			return
 		}
 	}
-	w.commit(ctx, w.fullTaskHook, true, tstart)
+	w.commit(w.fullTaskHook, true, tstart)
 }
 
 // commit runs any post-transaction state modifications, assembles the final block
 // and commits new work if consensus engine is running.
-func (w *worker) commit(ctx context.Context, interval func(), update bool, start time.Time) error {
-	ctx, span := trace.StartSpan(ctx, "worker.commit")
-	defer span.End()
-
+func (w *worker) commit(interval func(), update bool, start time.Time) error {
 	// Deep copy receipts here to avoid interaction between different tasks.
 	receipts := make([]*types.Receipt, len(w.current.receipts))
 	for i, l := range w.current.receipts {
 		receipts[i] = new(types.Receipt)
 		*receipts[i] = *l
 	}
-	s := w.current.state.Copy(ctx)
-	block := w.engine.Finalize(ctx, w.chain, w.current.header, s, w.current.txs, w.current.receipts, true)
+	s := w.current.state.Copy()
+	block := w.engine.Finalize(w.chain, w.current.header, s, w.current.txs, w.current.receipts, true)
 	if w.isRunning() {
 		if interval != nil {
 			interval()
@@ -921,7 +892,7 @@ func (w *worker) commit(ctx context.Context, interval func(), update bool, start
 		}
 	}
 	if update {
-		w.updateSnapshot(ctx)
+		w.updateSnapshot()
 	}
 	return nil
 }

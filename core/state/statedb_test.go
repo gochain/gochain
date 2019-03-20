@@ -18,7 +18,6 @@ package state
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -29,7 +28,7 @@ import (
 	"testing"
 	"testing/quick"
 
-	check "gopkg.in/check.v1"
+	"gopkg.in/check.v1"
 
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core/types"
@@ -134,7 +133,7 @@ func TestCopy(t *testing.T) {
 	orig.Finalise(false)
 
 	// Copy the state, modify both in-memory
-	copy := orig.Copy(context.Background())
+	copy := orig.Copy()
 
 	for i := byte(0); i < 255; i++ {
 		origObj := orig.GetOrNewStateObject(common.BytesToAddress([]byte{i}))
@@ -432,11 +431,10 @@ func TestCopyOfCopy(t *testing.T) {
 	sdb, _ := New(common.Hash{}, NewDatabase(ethdb.NewMemDatabase()))
 	addr := common.HexToAddress("aaaa")
 	sdb.SetBalance(addr, big.NewInt(42))
-	ctx := context.Background()
-	if got := sdb.Copy(ctx).GetBalance(addr).Uint64(); got != 42 {
+	if got := sdb.Copy().GetBalance(addr).Uint64(); got != 42 {
 		t.Fatalf("1st copy fail, expected 42, got %v", got)
 	}
-	if got := sdb.Copy(ctx).Copy(ctx).GetBalance(addr).Uint64(); got != 42 {
+	if got := sdb.Copy().Copy().GetBalance(addr).Uint64(); got != 42 {
 		t.Fatalf("2nd copy fail, expected 42, got %v", got)
 	}
 }

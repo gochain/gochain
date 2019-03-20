@@ -18,7 +18,6 @@
 package les
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"encoding/binary"
 	"math"
@@ -50,9 +49,9 @@ type LesServer struct {
 	chtIndexer, bloomTrieIndexer *core.ChainIndexer
 }
 
-func NewLesServer(ctx context.Context, eth *eth.GoChain, config *eth.Config) (*LesServer, error) {
+func NewLesServer(eth *eth.GoChain, config *eth.Config) (*LesServer, error) {
 	quitSync := make(chan struct{})
-	pm, err := NewProtocolManager(ctx, eth.BlockChain().Config(), false, ServerProtocolVersions, config.NetworkId, eth.EventMux(), newPeerSet(), eth.BlockChain(), eth.TxPool(), eth.ChainDb(), nil, nil, quitSync, new(sync.WaitGroup))
+	pm, err := NewProtocolManager(eth.BlockChain().Config(), false, ServerProtocolVersions, config.NetworkId, eth.EventMux(), newPeerSet(), eth.BlockChain(), eth.TxPool(), eth.ChainDb(), nil, nil, quitSync, new(sync.WaitGroup))
 	if err != nil {
 		return nil, err
 	}

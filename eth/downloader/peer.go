@@ -20,7 +20,6 @@
 package downloader
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -78,16 +77,16 @@ type peerConnection struct {
 // LightPeer encapsulates the methods required to synchronise with a remote light peer.
 type LightPeer interface {
 	Head() (common.Hash, *big.Int)
-	RequestHeadersByHash(context.Context, common.Hash, int, int, bool) error
-	RequestHeadersByNumber(context.Context, uint64, int, int, bool) error
+	RequestHeadersByHash(common.Hash, int, int, bool) error
+	RequestHeadersByNumber(uint64, int, int, bool) error
 }
 
 // Peer encapsulates the methods required to synchronise with a remote full peer.
 type Peer interface {
 	LightPeer
-	RequestBodies(context.Context, []common.Hash) error
-	RequestReceipts(context.Context, []common.Hash) error
-	RequestNodeData(context.Context, []common.Hash) error
+	RequestBodies([]common.Hash) error
+	RequestReceipts([]common.Hash) error
+	RequestNodeData([]common.Hash) error
 }
 
 // lightPeerWrapper wraps a LightPeer struct, stubbing out the Peer-only methods.
@@ -96,19 +95,19 @@ type lightPeerWrapper struct {
 }
 
 func (w *lightPeerWrapper) Head() (common.Hash, *big.Int) { return w.peer.Head() }
-func (w *lightPeerWrapper) RequestHeadersByHash(ctx context.Context, h common.Hash, amount int, skip int, reverse bool) error {
-	return w.peer.RequestHeadersByHash(ctx, h, amount, skip, reverse)
+func (w *lightPeerWrapper) RequestHeadersByHash(h common.Hash, amount int, skip int, reverse bool) error {
+	return w.peer.RequestHeadersByHash(h, amount, skip, reverse)
 }
-func (w *lightPeerWrapper) RequestHeadersByNumber(ctx context.Context, i uint64, amount int, skip int, reverse bool) error {
-	return w.peer.RequestHeadersByNumber(ctx, i, amount, skip, reverse)
+func (w *lightPeerWrapper) RequestHeadersByNumber(i uint64, amount int, skip int, reverse bool) error {
+	return w.peer.RequestHeadersByNumber(i, amount, skip, reverse)
 }
-func (w *lightPeerWrapper) RequestBodies(context.Context, []common.Hash) error {
+func (w *lightPeerWrapper) RequestBodies([]common.Hash) error {
 	panic("RequestBodies not supported in light client mode sync")
 }
-func (w *lightPeerWrapper) RequestReceipts(context.Context, []common.Hash) error {
+func (w *lightPeerWrapper) RequestReceipts([]common.Hash) error {
 	panic("RequestReceipts not supported in light client mode sync")
 }
-func (w *lightPeerWrapper) RequestNodeData(context.Context, []common.Hash) error {
+func (w *lightPeerWrapper) RequestNodeData([]common.Hash) error {
 	panic("RequestNodeData not supported in light client mode sync")
 }
 
@@ -144,7 +143,7 @@ func (p *peerConnection) Reset() {
 }
 
 // FetchHeaders sends a header retrieval request to the remote peer.
-func (p *peerConnection) FetchHeaders(ctx context.Context, from uint64, count int) error {
+func (p *peerConnection) FetchHeaders(from uint64, count int) error {
 	// Sanity check the protocol version
 	if p.version < 62 {
 		panic(fmt.Sprintf("header fetch [eth/62+] requested on eth/%d", p.version))
@@ -156,13 +155,13 @@ func (p *peerConnection) FetchHeaders(ctx context.Context, from uint64, count in
 	p.headerStarted = time.Now()
 
 	// Issue the header retrieval request (absolut upwards without gaps)
-	go p.peer.RequestHeadersByNumber(context.Background(), from, count, 0, false)
+	go p.peer.RequestHeadersByNumber(from, count, 0, false)
 
 	return nil
 }
 
 // FetchBodies sends a block body retrieval request to the remote peer.
-func (p *peerConnection) FetchBodies(ctx context.Context, request *fetchRequest) error {
+func (p *peerConnection) FetchBodies(request *fetchRequest) error {
 	// Sanity check the protocol version
 	if p.version < 62 {
 		panic(fmt.Sprintf("body fetch [eth/62+] requested on eth/%d", p.version))
@@ -178,13 +177,13 @@ func (p *peerConnection) FetchBodies(ctx context.Context, request *fetchRequest)
 	for _, header := range request.Headers {
 		hashes = append(hashes, header.Hash())
 	}
-	go p.peer.RequestBodies(context.Background(), hashes)
+	go p.peer.RequestBodies(hashes)
 
 	return nil
 }
 
 // FetchReceipts sends a receipt retrieval request to the remote peer.
-func (p *peerConnection) FetchReceipts(ctx context.Context, request *fetchRequest) error {
+func (p *peerConnection) FetchReceipts(request *fetchRequest) error {
 	// Sanity check the protocol version
 	if p.version < 63 {
 		panic(fmt.Sprintf("body fetch [eth/63+] requested on eth/%d", p.version))
@@ -200,13 +199,13 @@ func (p *peerConnection) FetchReceipts(ctx context.Context, request *fetchReques
 	for _, header := range request.Headers {
 		hashes = append(hashes, header.Hash())
 	}
-	go p.peer.RequestReceipts(context.Background(), hashes)
+	go p.peer.RequestReceipts(hashes)
 
 	return nil
 }
 
 // FetchNodeData sends a node state data retrieval request to the remote peer.
-func (p *peerConnection) FetchNodeData(ctx context.Context, hashes []common.Hash) error {
+func (p *peerConnection) FetchNodeData(hashes []common.Hash) error {
 	// Sanity check the protocol version
 	if p.version < 63 {
 		panic(fmt.Sprintf("node data fetch [eth/63+] requested on eth/%d", p.version))
@@ -217,7 +216,7 @@ func (p *peerConnection) FetchNodeData(ctx context.Context, hashes []common.Hash
 	}
 	p.stateStarted = time.Now()
 
-	go p.peer.RequestNodeData(context.Background(), hashes)
+	go p.peer.RequestNodeData(hashes)
 
 	return nil
 }

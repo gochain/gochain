@@ -18,14 +18,11 @@
 package state
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math/big"
 	"sort"
 	"sync"
-
-	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core/types"
@@ -560,10 +557,7 @@ func (db *StateDB) ForEachStorage(addr common.Address, cb func(key, value common
 
 // Copy creates a deep, independent copy of the state.
 // Snapshots of the copied state cannot be applied to the copy.
-func (db *StateDB) Copy(ctx context.Context) *StateDB {
-	ctx, span := trace.StartSpan(ctx, "StateDB.Copy")
-	defer span.End()
-
+func (db *StateDB) Copy() *StateDB {
 	// Copy all the basic fields, initialize the memory ones
 	state := &StateDB{
 		db:                db.db,

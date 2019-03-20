@@ -18,7 +18,6 @@ package core
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"io/ioutil"
 	"math/big"
@@ -50,7 +49,6 @@ func TestDefaultGenesisBlockHash(t *testing.T) {
 }
 
 func TestSetupGenesis(t *testing.T) {
-	ctx := context.Background()
 	var (
 		customghash = common.HexToHash("0x2ba5deb4ad470a1b170475fe5004f0e0cefffa8e18469e6510937e74db11094a")
 		customg     = Genesis{
@@ -135,11 +133,11 @@ func TestSetupGenesis(t *testing.T) {
 				// Advance to block #4, past the homestead transition block of customg.
 				genesis := oldcustomg.MustCommit(db)
 
-				bc, _ := NewBlockChain(ctx, db, nil, oldcustomg.Config, clique.NewFullFaker(), vm.Config{})
+				bc, _ := NewBlockChain(db, nil, oldcustomg.Config, clique.NewFullFaker(), vm.Config{})
 				defer bc.Stop()
 
-				blocks, _ := GenerateChain(ctx, oldcustomg.Config, genesis, clique.NewFaker(), db, 4, nil)
-				_, err := bc.InsertChain(ctx, blocks)
+				blocks, _ := GenerateChain(oldcustomg.Config, genesis, clique.NewFaker(), db, 4, nil)
+				_, err := bc.InsertChain(blocks)
 				if err != nil {
 					return nil, common.Hash{}, err
 				}

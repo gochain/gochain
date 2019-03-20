@@ -17,7 +17,6 @@
 package core
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 
@@ -74,7 +73,7 @@ func (b *BlockGen) SetExtra(data []byte) {
 // further limitations on the content of transactions that can be
 // added. Notably, contract code relying on the BLOCKHASH instruction
 // will panic during execution.
-func (b *BlockGen) AddTx(ctx context.Context, tx *types.Transaction) {
+func (b *BlockGen) AddTx(tx *types.Transaction) {
 	if b.gasPool == nil {
 		b.SetCoinbase(common.Address{})
 	}
@@ -83,7 +82,7 @@ func (b *BlockGen) AddTx(ctx context.Context, tx *types.Transaction) {
 	// Create a new emv context and environment.
 	evmContext := NewEVMContextLite(b.header, nil, &b.header.Coinbase)
 	vmenv := vm.NewEVM(evmContext, b.statedb, b.config, vm.Config{})
-	receipt, _, err := ApplyTransaction(ctx, vmenv, b.config, b.gasPool, b.statedb, b.header, tx, &b.header.GasUsed, signer)
+	receipt, _, err := ApplyTransaction(vmenv, b.config, b.gasPool, b.statedb, b.header, tx, &b.header.GasUsed, signer)
 	if err != nil {
 		panic(err)
 	}
@@ -143,7 +142,7 @@ func (b *BlockGen) SetDifficulty(amt uint64) {
 // Blocks created by GenerateChain do not contain valid proof of work
 // values. Inserting them into BlockChain requires use of FakePow or
 // a similar non-validating proof of work implementation.
-func GenerateChain(ctx context.Context, config *params.ChainConfig, first *types.Block, engine consensus.Engine, db common.Database, n int, gen func(context.Context, int, *BlockGen)) ([]*types.Block, []types.Receipts) {
+func GenerateChain(config *params.ChainConfig, first *types.Block, engine consensus.Engine, db common.Database, n int, gen func(int, *BlockGen)) ([]*types.Block, []types.Receipts) {
 	if config == nil {
 		config = params.TestChainConfig
 	}
@@ -152,7 +151,7 @@ func GenerateChain(ctx context.Context, config *params.ChainConfig, first *types
 	genblock := func(i int, parent *types.Block, statedb *state.StateDB) (*types.Block, types.Receipts) {
 		// TODO(karalabe): This is needed for clique, which depends on multiple blocks.
 		// It's nonetheless ugly to spin up a blockchain here. Get rid of this somehow.
-		blockchain, _ := NewBlockChain(ctx, db, nil, config, engine, vm.Config{})
+		blockchain, _ := NewBlockChain(db, nil, config, engine, vm.Config{})
 		defer blockchain.Stop()
 		b := &BlockGen{i: i, parent: parent, chain: blocks, chainReader: blockchain, statedb: statedb, config: config, engine: engine}
 
@@ -168,17 +167,17 @@ func GenerateChain(ctx context.Context, config *params.ChainConfig, first *types
 
 		// Execute any user modifications to the block and finalize it
 		if gen != nil {
-			gen(ctx, i, b)
+			gen(i, b)
 		}
 
 		if b.engine != nil {
-			if err := b.engine.Prepare(ctx, b.chainReader, b.header); err != nil {
+			if err := b.engine.Prepare(b.chainReader, b.header); err != nil {
 				panic(fmt.Sprintf("failed to prepare %d: %v", b.header.Number.Uint64(), err))
 			}
-			block := b.engine.Finalize(ctx, b.chainReader, b.header, statedb, b.txs, b.receipts, true)
+			block := b.engine.Finalize(b.chainReader, b.header, statedb, b.txs, b.receipts, true)
 
 			stop := make(chan struct{})
-			block, _, err := b.engine.Seal(ctx, b.chainReader, block, stop)
+			block, _, err := b.engine.Seal(b.chainReader, block, stop)
 			close(stop)
 			if err != nil {
 				panic(fmt.Sprintf("block seal error: %v", err))
@@ -210,8 +209,8 @@ func GenerateChain(ctx context.Context, config *params.ChainConfig, first *types
 }
 
 // makeHeaderChain creates a deterministic chain of headers rooted at parent.
-func makeHeaderChain(ctx context.Context, parent *types.Header, n int, engine consensus.Engine, db common.Database, seed int) []*types.Header {
-	blocks := makeBlockChain(ctx, types.NewBlockWithHeader(parent), n, engine, db, seed)
+func makeHeaderChain(parent *types.Header, n int, engine consensus.Engine, db common.Database, seed int) []*types.Header {
+	blocks := makeBlockChain(types.NewBlockWithHeader(parent), n, engine, db, seed)
 	headers := make([]*types.Header, len(blocks))
 	for i, block := range blocks {
 		headers[i] = block.Header()
@@ -220,8 +219,8 @@ func makeHeaderChain(ctx context.Context, parent *types.Header, n int, engine co
 }
 
 // makeBlockChain creates a deterministic chain of blocks rooted at parent.
-func makeBlockChain(ctx context.Context, parent *types.Block, n int, engine consensus.Engine, db common.Database, seed int) []*types.Block {
-	blocks, _ := GenerateChain(ctx, params.TestChainConfig, parent, engine, db, n, func(ctx context.Context, i int, b *BlockGen) {
+func makeBlockChain(parent *types.Block, n int, engine consensus.Engine, db common.Database, seed int) []*types.Block {
+	blocks, _ := GenerateChain(params.TestChainConfig, parent, engine, db, n, func(i int, b *BlockGen) {
 		b.SetExtra([]byte{0: byte(seed)})
 	})
 	return blocks

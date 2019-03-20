@@ -17,7 +17,6 @@
 package miner
 
 import (
-	"context"
 	"math/big"
 	"testing"
 	"time"
@@ -75,7 +74,6 @@ type testWorkerBackend struct {
 
 func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, n int) *testWorkerBackend {
 	var (
-		ctx   = context.Background()
 		db    = ethdb.NewMemDatabase()
 		gspec = core.Genesis{
 			Config:    chainConfig,
@@ -89,15 +87,15 @@ func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine 
 
 	genesis := gspec.MustCommit(db)
 
-	chain, _ := core.NewBlockChain(ctx, db, nil, gspec.Config, engine, vm.Config{})
+	chain, _ := core.NewBlockChain(db, nil, gspec.Config, engine, vm.Config{})
 	txpool := core.NewTxPool(testTxPoolConfig, chainConfig, chain)
 
 	// Generate a small n-block chain and an uncle block for it
 	if n > 0 {
-		blocks, _ := core.GenerateChain(ctx, chainConfig, genesis, engine, db, n, func(_ context.Context, _ int, gen *core.BlockGen) {
+		blocks, _ := core.GenerateChain(chainConfig, genesis, engine, db, n, func(_ int, gen *core.BlockGen) {
 			gen.SetCoinbase(testBankAddress)
 		})
-		if _, err := chain.InsertChain(ctx, blocks); err != nil {
+		if _, err := chain.InsertChain(blocks); err != nil {
 			t.Fatalf("failed to insert origin chain: %v", err)
 		}
 	}
@@ -105,7 +103,7 @@ func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine 
 	if n > 0 {
 		parent = chain.GetBlockByHash(chain.CurrentBlock().ParentHash())
 	}
-	blocks, _ := core.GenerateChain(ctx, chainConfig, parent, engine, db, 1, func(_ context.Context, _ int, gen *core.BlockGen) {
+	blocks, _ := core.GenerateChain(chainConfig, parent, engine, db, 1, func(_ int, gen *core.BlockGen) {
 		gen.SetCoinbase(testUserAddress)
 	})
 
@@ -120,12 +118,12 @@ func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine 
 func (b *testWorkerBackend) BlockChain() *core.BlockChain { return b.chain }
 func (b *testWorkerBackend) TxPool() *core.TxPool         { return b.txPool }
 func (b *testWorkerBackend) PostChainEvents(events []interface{}) {
-	b.chain.PostChainEvents(context.Background(), events, nil)
+	b.chain.PostChainEvents(events, nil)
 }
 
 func newTestWorker(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, blocks int) (*worker, *testWorkerBackend) {
 	backend := newTestWorkerBackend(t, chainConfig, engine, blocks)
-	backend.txPool.AddLocals(context.Background(), pendingTxs)
+	backend.txPool.AddLocals(pendingTxs)
 	w := newWorker(chainConfig, engine, backend, new(core.InterfaceFeed), time.Second, params.GenesisGasLimit, params.GenesisGasLimit, nil)
 	w.setEtherbase(testBankAddress)
 	return w, backend
@@ -141,18 +139,18 @@ func testPendingStateAndBlock(t *testing.T, chainConfig *params.ChainConfig, eng
 
 	// Ensure snapshot has been updated.
 	time.Sleep(100 * time.Millisecond)
-	block, state := w.pending(context.Background())
+	block, state := w.pending()
 	if block.NumberU64() != 1 {
 		t.Errorf("block number mismatch: have %d, want %d", block.NumberU64(), 1)
 	}
 	if balance := state.GetBalance(testUserAddress); balance.Cmp(big.NewInt(1000)) != 0 {
 		t.Errorf("account balance mismatch: have %d, want %d", balance, 1000)
 	}
-	b.txPool.AddLocals(context.Background(), newTxs)
+	b.txPool.AddLocals(newTxs)
 
 	// Ensure the new tx events has been processed
 	time.Sleep(100 * time.Millisecond)
-	block, state = w.pending(context.Background())
+	block, state = w.pending()
 	if balance := state.GetBalance(testUserAddress); balance.Cmp(big.NewInt(2000)) != 0 {
 		t.Errorf("account balance mismatch: have %d, want %d", balance, 2000)
 	}
@@ -262,7 +260,7 @@ func testRegenerateMiningBlock(t *testing.T, chainConfig *params.ChainConfig, en
 			t.Error("new task timeout")
 		}
 	}
-	b.txPool.AddLocals(context.Background(), newTxs)
+	b.txPool.AddLocals(newTxs)
 	time.Sleep(time.Second)
 
 	select {

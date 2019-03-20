@@ -21,7 +21,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -49,7 +48,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	backend.Commit(context.Background())
+	backend.Commit()
 	code, err := backend.CodeAt(nil, addr, nil)
 	if err != nil {
 		panic(err)

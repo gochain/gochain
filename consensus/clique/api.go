@@ -45,7 +45,7 @@ func (api *API) GetSnapshot(ctx context.Context, number *rpc.BlockNumber) (*Snap
 	if header == nil {
 		return nil, errUnknownBlock
 	}
-	return api.clique.snapshot(ctx, api.chain, header.Number.Uint64(), header.Hash(), nil)
+	return api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
 }
 
 // GetSnapshotAtHash retrieves the state snapshot at a given block.
@@ -54,7 +54,7 @@ func (api *API) GetSnapshotAtHash(ctx context.Context, hash common.Hash) (*Snaps
 	if header == nil {
 		return nil, errUnknownBlock
 	}
-	return api.clique.snapshot(ctx, api.chain, header.Number.Uint64(), header.Hash(), nil)
+	return api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
 }
 
 // GetSigners retrieves the list of authorized signers at the specified block.
@@ -70,7 +70,7 @@ func (api *API) GetSigners(ctx context.Context, number *rpc.BlockNumber) ([]comm
 	if header == nil {
 		return nil, errUnknownBlock
 	}
-	snap, err := api.clique.snapshot(ctx, api.chain, header.Number.Uint64(), header.Hash(), nil)
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func (api *API) GetVoters(ctx context.Context, number *rpc.BlockNumber) ([]commo
 	if header == nil {
 		return nil, errUnknownBlock
 	}
-	snap, err := api.clique.snapshot(ctx, api.chain, header.Number.Uint64(), header.Hash(), nil)
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func (api *API) GetSignersAtHash(ctx context.Context, hash common.Hash) ([]commo
 	if header == nil {
 		return nil, errUnknownBlock
 	}
-	snap, err := api.clique.snapshot(ctx, api.chain, header.Number.Uint64(), header.Hash(), nil)
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
 	if err != nil {
 		return nil, err
 	}

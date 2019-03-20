@@ -17,7 +17,6 @@
 package eth
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -42,8 +41,7 @@ func TestStatusMsgErrors62(t *testing.T) { testStatusMsgErrors(t, 62) }
 func TestStatusMsgErrors63(t *testing.T) { testStatusMsgErrors(t, 63) }
 
 func testStatusMsgErrors(t *testing.T, protocol int) {
-	ctx := context.Background()
-	pm, _ := newTestProtocolManagerMust(ctx, t, downloader.FullSync, 0, nil, nil)
+	pm, _ := newTestProtocolManagerMust(t, downloader.FullSync, 0, nil, nil)
 	var (
 		genesis = pm.blockchain.Genesis()
 		head    = pm.blockchain.CurrentHeader()
@@ -75,7 +73,7 @@ func testStatusMsgErrors(t *testing.T, protocol int) {
 	}
 
 	for i, test := range tests {
-		p, errc := newTestPeer(ctx, "peer", protocol, pm, false)
+		p, errc := newTestPeer("peer", protocol, pm, false)
 		// The send call might hang until reset because
 		// the protocol might not read the payload.
 		go p2p.Send(p.app, test.code, test.data)
@@ -99,11 +97,10 @@ func TestRecvTransactions62(t *testing.T) { testRecvTransactions(t, 62) }
 func TestRecvTransactions63(t *testing.T) { testRecvTransactions(t, 63) }
 
 func testRecvTransactions(t *testing.T, protocol int) {
-	ctx := context.Background()
 	txAdded := make(chan []*types.Transaction)
-	pm, _ := newTestProtocolManagerMust(ctx, t, downloader.FullSync, 0, nil, txAdded)
+	pm, _ := newTestProtocolManagerMust(t, downloader.FullSync, 0, nil, txAdded)
 	pm.acceptTxs = 1 // mark synced to accept transactions
-	p, _ := newTestPeer(ctx, "peer", protocol, pm, true)
+	p, _ := newTestPeer("peer", protocol, pm, true)
 	defer pm.Stop()
 	defer p.close()
 
@@ -128,8 +125,7 @@ func TestSendTransactions62(t *testing.T) { testSendTransactions(t, 62) }
 func TestSendTransactions63(t *testing.T) { testSendTransactions(t, 63) }
 
 func testSendTransactions(t *testing.T, protocol int) {
-	ctx := context.Background()
-	pm, _ := newTestProtocolManagerMust(ctx, t, downloader.FullSync, 0, nil, nil)
+	pm, _ := newTestProtocolManagerMust(t, downloader.FullSync, 0, nil, nil)
 	defer pm.Stop()
 
 	// Fill the pool with big transactions.
@@ -138,7 +134,7 @@ func testSendTransactions(t *testing.T, protocol int) {
 	for nonce := range alltxs {
 		alltxs[nonce] = newTestTransaction(testAccount, uint64(nonce), txsize)
 	}
-	pm.txpool.AddRemotes(ctx, alltxs)
+	pm.txpool.AddRemotes(alltxs)
 
 	// Connect several peers. They should all receive the pending transactions.
 	var wg sync.WaitGroup
@@ -175,7 +171,7 @@ func testSendTransactions(t *testing.T, protocol int) {
 		}
 	}
 	for i := 0; i < 3; i++ {
-		p, _ := newTestPeer(ctx, fmt.Sprintf("peer #%d", i), protocol, pm, true)
+		p, _ := newTestPeer(fmt.Sprintf("peer #%d", i), protocol, pm, true)
 		wg.Add(1)
 		go checktxs(p)
 	}

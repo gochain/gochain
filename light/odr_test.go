@@ -202,14 +202,14 @@ func odrContractCall(ctx context.Context, db common.Database, bc *core.BlockChai
 	return res, nil
 }
 
-func testChainGen(ctx context.Context, i int, block *core.BlockGen) {
+func testChainGen(i int, block *core.BlockGen) {
 
 	signer := types.HomesteadSigner{}
 	switch i {
 	case 0:
 		// In block 1, the test bank sends account #1 some ether.
 		tx, _ := types.SignTx(types.NewTransaction(block.TxNonce(testBankAddress), acc1Addr, big.NewInt(10000), params.TxGas, nil, nil), signer, testBankKey)
-		block.AddTx(ctx, tx)
+		block.AddTx(tx)
 	case 1:
 		// In block 2, the test bank sends some more ether to account #1.
 		// acc1Addr passes it on to account #2.
@@ -220,16 +220,16 @@ func testChainGen(ctx context.Context, i int, block *core.BlockGen) {
 		nonce++
 		tx3, _ := types.SignTx(types.NewContractCreation(nonce, big.NewInt(0), 1000000, big.NewInt(0), testContractCode), signer, acc1Key)
 		testContractAddr = crypto.CreateAddress(acc1Addr, nonce)
-		block.AddTx(ctx, tx1)
-		block.AddTx(ctx, tx2)
-		block.AddTx(ctx, tx3)
+		block.AddTx(tx1)
+		block.AddTx(tx2)
+		block.AddTx(tx3)
 	case 2:
 		// Block 3 is empty but was mined by account #2.
 		block.SetCoinbase(acc2Addr)
 		block.SetExtra([]byte("yeehaw"))
 		data := common.Hex2Bytes("C16431B900000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001")
 		tx, _ := types.SignTx(types.NewTransaction(block.TxNonce(testBankAddress), testContractAddr, big.NewInt(0), 100000, nil, data), signer, testBankKey)
-		block.AddTx(ctx, tx)
+		block.AddTx(tx)
 	case 3:
 		// Block 4 includes modified extra data.
 		b2 := block.PrevBlock(1).Header()
@@ -238,12 +238,11 @@ func testChainGen(ctx context.Context, i int, block *core.BlockGen) {
 		b3.Extra = []byte("foo")
 		data := common.Hex2Bytes("C16431B900000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002")
 		tx, _ := types.SignTx(types.NewTransaction(block.TxNonce(testBankAddress), testContractAddr, big.NewInt(0), 100000, nil, data), signer, testBankKey)
-		block.AddTx(ctx, tx)
+		block.AddTx(tx)
 	}
 }
 
 func testChainOdr(t *testing.T, protocol int, fn odrTestFn) {
-	ctx := context.Background()
 	var (
 		sdb     = ethdb.NewMemDatabase()
 		ldb     = ethdb.NewMemDatabase()
@@ -252,9 +251,9 @@ func testChainOdr(t *testing.T, protocol int, fn odrTestFn) {
 	)
 	gspec.MustCommit(ldb)
 	// Assemble the test environment
-	blockchain, _ := core.NewBlockChain(ctx, sdb, nil, params.TestChainConfig, clique.NewFullFaker(), vm.Config{})
-	gchain, _ := core.GenerateChain(ctx, params.TestChainConfig, genesis, clique.NewFaker(), sdb, 4, testChainGen)
-	if _, err := blockchain.InsertChain(ctx, gchain); err != nil {
+	blockchain, _ := core.NewBlockChain(sdb, nil, params.TestChainConfig, clique.NewFullFaker(), vm.Config{})
+	gchain, _ := core.GenerateChain(params.TestChainConfig, genesis, clique.NewFaker(), sdb, 4, testChainGen)
+	if _, err := blockchain.InsertChain(gchain); err != nil {
 		t.Fatal(err)
 	}
 
@@ -267,7 +266,7 @@ func testChainOdr(t *testing.T, protocol int, fn odrTestFn) {
 	for i, block := range gchain {
 		headers[i] = block.Header()
 	}
-	if _, err := lightchain.InsertHeaderChain(ctx, headers, 1); err != nil {
+	if _, err := lightchain.InsertHeaderChain(headers, 1); err != nil {
 		t.Fatal(err)
 	}
 

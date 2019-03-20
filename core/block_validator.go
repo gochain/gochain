@@ -17,11 +17,8 @@
 package core
 
 import (
-	"context"
 	"errors"
 	"fmt"
-
-	"go.opencensus.io/trace"
 
 	"github.com/gochain-io/gochain/v3/consensus"
 	"github.com/gochain-io/gochain/v3/core/state"
@@ -52,10 +49,7 @@ func NewBlockValidator(config *params.ChainConfig, blockchain *BlockChain, engin
 // ValidateBody validates the given block's uncles and verifies the block
 // header's transaction and uncle roots. The headers are assumed to be already
 // validated at this point.
-func (v *BlockValidator) ValidateBody(ctx context.Context, block *types.Block, checkParent bool) error {
-	ctx, span := trace.StartSpan(ctx, "BlockValidator.ValidateBody")
-	defer span.End()
-
+func (v *BlockValidator) ValidateBody(block *types.Block, checkParent bool) error {
 	// Check whether the block's known, and if not, that it's linkable
 	if v.bc.HasBlockAndState(block.Hash(), block.NumberU64()) {
 		return ErrKnownBlock
@@ -73,7 +67,7 @@ func (v *BlockValidator) ValidateBody(ctx context.Context, block *types.Block, c
 	}
 	// Header validity is known at this point, check the transactions
 	header := block.Header()
-	if hash := types.DeriveShaCtx(ctx, block.Transactions()); hash != header.TxHash {
+	if hash := types.DeriveSha(block.Transactions()); hash != header.TxHash {
 		return fmt.Errorf("transaction root hash mismatch: have %x, want %x", hash, header.TxHash)
 	}
 	return nil
@@ -83,10 +77,7 @@ func (v *BlockValidator) ValidateBody(ctx context.Context, block *types.Block, c
 // transition, such as amount of used gas, the receipt roots and the state root
 // itself. ValidateState returns a database batch if the validation was a success
 // otherwise nil and an error is returned.
-func (v *BlockValidator) ValidateState(ctx context.Context, block, parent *types.Block, statedb *state.StateDB, receipts types.Receipts, usedGas uint64) error {
-	ctx, span := trace.StartSpan(ctx, "BlockValidator.ValidateState")
-	defer span.End()
-
+func (v *BlockValidator) ValidateState(block, parent *types.Block, statedb *state.StateDB, receipts types.Receipts, usedGas uint64) error {
 	header := block.Header()
 	if block.GasUsed() != usedGas {
 		return fmt.Errorf("invalid gas used (remote: %d local: %d)", block.GasUsed(), usedGas)

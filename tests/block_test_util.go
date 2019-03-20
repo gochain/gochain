@@ -19,7 +19,6 @@ package tests
 
 import (
 	"bytes"
-	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -93,7 +92,6 @@ type btHeaderMarshaling struct {
 }
 
 func (t *BlockTest) Run() error {
-	ctx := context.Background()
 	config, ok := Forks[t.json.Network]
 	if !ok {
 		return UnsupportedForkError{t.json.Network}
@@ -112,13 +110,13 @@ func (t *BlockTest) Run() error {
 		return fmt.Errorf("genesis block state root does not match test: computed=%x, test=%x", gblock.Root().Bytes()[:6], t.json.Genesis.StateRoot[:6])
 	}
 
-	chain, err := core.NewBlockChain(ctx, db, nil, config, clique.New(params.DefaultCliqueConfig(), db), vm.Config{})
+	chain, err := core.NewBlockChain(db, nil, config, clique.New(params.DefaultCliqueConfig(), db), vm.Config{})
 	if err != nil {
 		return err
 	}
 	defer chain.Stop()
 
-	validBlocks, err := t.insertBlocks(ctx, chain)
+	validBlocks, err := t.insertBlocks(chain)
 	if err != nil {
 		return err
 	}
@@ -164,7 +162,7 @@ func (t *BlockTest) genesis(config *params.ChainConfig) *core.Genesis {
    expected we are expected to ignore it and continue processing and then validate the
    post state.
 */
-func (t *BlockTest) insertBlocks(ctx context.Context, blockchain *core.BlockChain) ([]btBlock, error) {
+func (t *BlockTest) insertBlocks(blockchain *core.BlockChain) ([]btBlock, error) {
 	validBlocks := make([]btBlock, 0)
 	// insert the test blocks, which will execute all transactions
 	for _, b := range t.json.Blocks {
@@ -178,7 +176,7 @@ func (t *BlockTest) insertBlocks(ctx context.Context, blockchain *core.BlockChai
 		}
 		// RLP decoding worked, try to insert into chain:
 		blocks := types.Blocks{cb}
-		i, err := blockchain.InsertChain(ctx, blocks)
+		i, err := blockchain.InsertChain(blocks)
 		if err != nil {
 			if b.BlockHeader == nil {
 				continue // OK - block is supposed to be invalid, continue with next block

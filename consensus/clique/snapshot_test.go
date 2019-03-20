@@ -18,7 +18,6 @@ package clique
 
 import (
 	"bytes"
-	"context"
 	"crypto/ecdsa"
 	"math/big"
 	"testing"
@@ -483,7 +482,7 @@ func (tt *votingTest) run(t *testing.T) {
 	head := headers[len(headers)-1]
 
 	snap, err := New(&params.CliqueConfig{Epoch: tt.epoch}, db).
-		snapshot(context.Background(), &testerChainReader{db: db}, head.Number.Uint64(), head.Hash(), headers)
+		snapshot(&testerChainReader{db: db}, head.Number.Uint64(), head.Hash(), headers)
 	if err != nil {
 		t.Errorf("failed to create voting snapshot: %v", err)
 		return

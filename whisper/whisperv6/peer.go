@@ -81,16 +81,13 @@ func (peer *Peer) stop() {
 // handshake sends the protocol initiation status message to the remote peer and
 // verifies the remote status too.
 func (peer *Peer) handshake() error {
-	ctx, span := trace.StartSpan(context.Background(), "Peer.handshake")
-	defer span.End()
-
 	// Send the handshake status message asynchronously
 	errc := make(chan error, 1)
 	go func() {
 		pow := peer.host.MinPow()
 		powConverted := math.Float64bits(pow)
 		bloom := peer.host.BloomFilter()
-		errc <- p2p.SendItemsCtx(ctx, peer.ws, statusCode, ProtocolVersion, powConverted, bloom)
+		errc <- p2p.SendItems(peer.ws, statusCode, ProtocolVersion, powConverted, bloom)
 	}()
 
 	// Fetch the remote status packet and verify protocol match
@@ -225,7 +222,7 @@ func (peer *Peer) broadcast(ctx context.Context) error {
 
 	if len(bundle) > 0 {
 		// transmit the batch of envelopes
-		if err := p2p.SendCtx(ctx, peer.ws, messagesCode, bundle); err != nil {
+		if err := p2p.Send(peer.ws, messagesCode, bundle); err != nil {
 			return err
 		}
 
@@ -247,11 +244,11 @@ func (peer *Peer) ID() []byte {
 
 func (peer *Peer) notifyAboutPowRequirementChange(ctx context.Context, pow float64) error {
 	i := math.Float64bits(pow)
-	return p2p.SendCtx(ctx, peer.ws, powRequirementCode, i)
+	return p2p.Send(peer.ws, powRequirementCode, i)
 }
 
 func (peer *Peer) notifyAboutBloomFilterChange(ctx context.Context, bloom []byte) error {
-	return p2p.SendCtx(ctx, peer.ws, bloomFilterExCode, bloom)
+	return p2p.Send(peer.ws, bloomFilterExCode, bloom)
 }
 
 func (peer *Peer) bloomMatch(env *Envelope) bool {
