@@ -159,7 +159,9 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 	verifyHeader := func(header *types.Header) error {
 		return engine.VerifyHeader(blockchain, header)
 	}
-	heighter := blockchain.CurrentBlock().NumberU64
+	heighter := func() uint64 {
+		return blockchain.CurrentBlock().NumberU64()
+	}
 	inserter := func(blocks types.Blocks) (int, error) {
 		// If fast sync is running, deny importing weird blocks
 		if atomic.LoadUint32(&manager.fastSync) == 1 {
