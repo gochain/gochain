@@ -20,13 +20,13 @@ package eth
 import (
 	"errors"
 	"fmt"
-	"github.com/gochain-io/gochain/v3/accounts/keystore"
 	"math/big"
 	"runtime"
 	"sync"
 	"sync/atomic"
 
 	"github.com/gochain-io/gochain/v3/accounts"
+	"github.com/gochain-io/gochain/v3/accounts/keystore"
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/consensus"
 	"github.com/gochain-io/gochain/v3/consensus/clique"
@@ -142,12 +142,19 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks),
 	}
 
-	log.Info("Initialising GoChain protocol", "versions", ProtocolVersions, "network", config.NetworkId)
+	bcVersion := rawdb.ReadDatabaseVersion(chainDb.GlobalTable())
+	var dbVer = "<nil>"
+	if bcVersion != nil {
+		dbVer = fmt.Sprintf("%d", *bcVersion)
+	}
+	log.Info("Initialising GoChain protocol", "versions", ProtocolVersions, "network", config.NetworkId, "dbversion", dbVer)
 
 	if !config.SkipBcVersionCheck {
-		bcVersion := rawdb.ReadDatabaseVersion(chainDb.GlobalTable())
-		if bcVersion != core.BlockChainVersion && bcVersion != 0 {
-			return nil, fmt.Errorf("Blockchain DB version mismatch (%d / %d). Run geth upgradedb.\n", bcVersion, core.BlockChainVersion)
+		if bcVersion != nil && *bcVersion > core.BlockChainVersion {
+			return nil, fmt.Errorf("database version is v%d, GoChain %s only supports v%d", *bcVersion, params.Version, core.BlockChainVersion)
+		} else if bcVersion == nil || *bcVersion < core.BlockChainVersion {
+			log.Warn("Upgrade blockchain database version", "from", dbVer, "to", core.BlockChainVersion)
+			rawdb.WriteDatabaseVersion(chainDb.GlobalTable(), core.BlockChainVersion)
 		}
 		rawdb.WriteDatabaseVersion(chainDb.GlobalTable(), core.BlockChainVersion)
 	}
