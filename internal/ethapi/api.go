@@ -1307,9 +1307,13 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 			return common.Hash{}, err
 		}
 		addr := crypto.CreateAddress(from, tx.Nonce())
-		log.Info("Submitted contract creation", "fullhash", tx.Hash().Hex(), "contract", addr.Hex())
+		if log.Tracing() {
+			log.Trace("Submitted contract creation", "fullhash", tx.Hash().Hex(), "contract", addr.Hex())
+		}
 	} else {
-		log.Info("Submitted transaction", "fullhash", tx.Hash().Hex(), "recipient", tx.To())
+		if log.Tracing() {
+			log.Trace("Submitted transaction", "fullhash", tx.Hash().Hex(), "recipient", tx.To())
+		}
 	}
 	return tx.Hash(), nil
 }

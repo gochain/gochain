@@ -359,6 +359,20 @@ func ReadReceipts(db DatabaseReader, hash common.Hash, number uint64) types.Rece
 		log.Error("Invalid receipt array RLP", "hash", hash, "err", err)
 		return nil
 	}
+	logIndex := uint(0)
+	for i, receipt := range receipts {
+		for _, log := range receipt.Logs {
+			log.TxHash = receipt.TxHash
+			log.BlockHash = hash
+			log.BlockNumber = number
+			log.TxIndex = uint(i)
+			log.Index = logIndex
+			logIndex += 1
+		}
+		receipt.BlockHash = hash
+		receipt.BlockNumber = big.NewInt(0).SetUint64(number)
+		receipt.TransactionIndex = uint(i)
+	}
 	return types.Receipts(receipts)
 }
 

@@ -238,6 +238,16 @@ func (db *StateDB) GetNonceErr(addr common.Address) (uint64, error) {
 	return 0, nil
 }
 
+// TxIndex returns the current transaction index set by Prepare.
+func (db *StateDB) TxIndex() int {
+	return db.txIndex
+}
+
+// BlockHash returns the current block hash set by Prepare.
+func (db *StateDB) BlockHash() common.Hash {
+	return db.bhash
+}
+
 func (db *StateDB) GetCode(addr common.Address) []byte {
 	code, err := db.GetCodeErr(addr)
 	if err != nil {
