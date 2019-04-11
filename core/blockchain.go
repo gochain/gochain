@@ -64,7 +64,13 @@ const (
 	triesInMemory       = 128
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
-	BlockChainVersion = 3
+	//
+	// During the process of upgrading the database version from 3 to 4,
+	// the following incompatible database changes were added.
+	// * the `BlockNumber`, `TxHash`, `TxIndex`, `BlockHash` and `Index` fields of log are deleted
+	// * the `Bloom` field of receipt is deleted
+	// * the `BlockIndex` and `TxIndex` fields of txlookup are deleted
+	BlockChainVersion uint64 = 4
 )
 
 // CacheConfig contains the configuration values for the trie caching/pruning
@@ -786,6 +792,11 @@ func SetReceiptsData(config *params.ChainConfig, block *types.Block, receipts ty
 	for j := 0; j < len(receipts); j++ {
 		// The transaction hash can be retrieved from the transaction itself
 		receipts[j].TxHash = transactions[j].Hash()
+
+		// block location fields
+		receipts[j].BlockHash = block.Hash()
+		receipts[j].BlockNumber = block.Number()
+		receipts[j].TransactionIndex = uint(j)
 
 		// The contract address can be derived from the transaction itself
 		if transactions[j].To() == nil {
