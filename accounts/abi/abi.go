@@ -32,6 +32,16 @@ type ABI struct {
 	Events      map[string]Event
 }
 
+// ABI field form output
+type Field struct {
+	Type      string
+	Name      string
+	Constant  bool
+	Anonymous bool
+	Inputs    []Argument
+	Outputs   []Argument
+}
+
 // JSON returns a parsed ABI interface and error if it failed.
 func JSON(reader io.Reader) (ABI, error) {
 	dec := json.NewDecoder(reader)
@@ -91,14 +101,7 @@ func (abi ABI) Unpack(v interface{}, name string, output []byte) (err error) {
 
 // UnmarshalJSON implements json.Unmarshaler interface
 func (abi *ABI) UnmarshalJSON(data []byte) error {
-	var fields []struct {
-		Type      string
-		Name      string
-		Constant  bool
-		Anonymous bool
-		Inputs    []Argument
-		Outputs   []Argument
-	}
+	var fields []Field
 
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return err
