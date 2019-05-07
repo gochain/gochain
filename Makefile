@@ -8,6 +8,19 @@
 GOBIN = $(shell pwd)/build/bin
 GO ?= latest
 
+# Compare current go version to minimum required version. Exit with \
+# error message if current version is older than required version.
+ver = $(shell go version)
+ver2 = $(word 3, ,$(ver))
+cur_ver = $(subst go,,$(ver2))
+#Set min_ver to the mininum required Go version such as "1.12.1"
+min_ver := 1.12.1
+ver_check := $(filter $(min_ver),$(firstword $(sort $(cur_ver) \
+$(min_ver))))
+ifeq ($(ver_check),)
+$(error Running go version $(cur_ver). Need $(min_ver) or higher. Please upgrade go version)
+endif
+
 gochain:
 	cd cmd/gochain; go build -o ../../bin/gochain
 	@echo "Done building."
