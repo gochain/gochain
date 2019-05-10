@@ -674,7 +674,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			// Retrieve the requested block's receipts, skipping if unknown to us
 			var results types.Receipts
 			if number := rawdb.ReadHeaderNumber(pm.chainDb.GlobalTable(), hash); number != nil {
-				results = rawdb.ReadReceipts(pm.chainDb.ReceiptTable(), hash, *number)
+				results = rawdb.ReadRawReceipts(pm.chainDb.ReceiptTable(), hash, *number)
 			}
 			if results == nil {
 				if header := pm.blockchain.GetHeaderByHash(hash); header == nil || header.ReceiptHash != types.EmptyRootHash {

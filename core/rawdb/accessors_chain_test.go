@@ -18,6 +18,9 @@ package rawdb
 
 import (
 	"bytes"
+	"encoding/hex"
+	"fmt"
+	"github.com/gochain-io/gochain/v3/params"
 	"math/big"
 	"testing"
 
@@ -35,17 +38,17 @@ func TestHeaderStorage(t *testing.T) {
 
 	// Create a test header to move around the database and make sure it's really new
 	header := &types.Header{Number: big.NewInt(42), Extra: []byte("test header")}
-	if entry := ReadHeader(db, header.Hash(), header.Number.Uint64()); entry != nil {
+	if entry := ReadHeader(db.HeaderTable(), header.Hash(), header.Number.Uint64()); entry != nil {
 		t.Fatalf("Non existent header returned: %v", entry)
 	}
 	// Write and verify the header in the database
 	WriteHeader(db.GlobalTable(), db.HeaderTable(), header)
-	if entry := ReadHeader(db, header.Hash(), header.Number.Uint64()); entry == nil {
+	if entry := ReadHeader(db.HeaderTable(), header.Hash(), header.Number.Uint64()); entry == nil {
 		t.Fatalf("Stored header not found")
 	} else if entry.Hash() != header.Hash() {
 		t.Fatalf("Retrieved header mismatch: have %v, want %v", entry, header)
 	}
-	if entry := ReadHeaderRLP(db, header.Hash(), header.Number.Uint64()); entry == nil {
+	if entry := ReadHeaderRLP(db.HeaderTable(), header.Hash(), header.Number.Uint64()); entry == nil {
 		t.Fatalf("Stored header RLP not found")
 	} else {
 		hasher := sha3.NewLegacyKeccak256()
@@ -56,8 +59,8 @@ func TestHeaderStorage(t *testing.T) {
 		}
 	}
 	// Delete the header and verify the execution
-	DeleteHeader(db, header.Hash(), header.Number.Uint64())
-	if entry := ReadHeader(db, header.Hash(), header.Number.Uint64()); entry != nil {
+	DeleteHeader(db.GlobalTable(), db.HeaderTable(), header.Hash(), header.Number.Uint64())
+	if entry := ReadHeader(db.HeaderTable(), header.Hash(), header.Number.Uint64()); entry != nil {
 		t.Fatalf("Deleted header returned: %v", entry)
 	}
 }
@@ -73,17 +76,17 @@ func TestBodyStorage(t *testing.T) {
 	rlp.Encode(hasher, body)
 	hash := common.BytesToHash(hasher.Sum(nil))
 
-	if entry := ReadBody(db, hash, 0); entry != nil {
+	if entry := ReadBody(db.BodyTable(), hash, 0); entry != nil {
 		t.Fatalf("Non existent body returned: %v", entry)
 	}
 	// Write and verify the body in the database
-	WriteBody(db, hash, 0, body)
-	if entry := ReadBody(db, hash, 0); entry == nil {
+	WriteBody(db.BodyTable(), hash, 0, body)
+	if entry := ReadBody(db.BodyTable(), hash, 0); entry == nil {
 		t.Fatalf("Stored body not found")
 	} else if types.DeriveSha(types.Transactions(entry.Transactions)) != types.DeriveSha(types.Transactions(body.Transactions)) || types.CalcUncleHash(entry.Uncles) != types.CalcUncleHash(body.Uncles) {
 		t.Fatalf("Retrieved body mismatch: have %v, want %v", entry, body)
 	}
-	if entry := ReadBodyRLP(db, hash, 0); entry == nil {
+	if entry := ReadBodyRLP(db.BodyTable(), hash, 0); entry == nil {
 		t.Fatalf("Stored body RLP not found")
 	} else {
 		hasher := sha3.NewLegacyKeccak256()
@@ -94,8 +97,8 @@ func TestBodyStorage(t *testing.T) {
 		}
 	}
 	// Delete the body and verify the execution
-	DeleteBody(db, hash, 0)
-	if entry := ReadBody(db, hash, 0); entry != nil {
+	DeleteBody(db.BodyTable(), hash, 0)
+	if entry := ReadBody(db.BodyTable(), hash, 0); entry != nil {
 		t.Fatalf("Deleted body returned: %v", entry)
 	}
 }
@@ -114,10 +117,10 @@ func TestBlockStorage(t *testing.T) {
 	if entry := ReadBlock(db, block.Hash(), block.NumberU64()); entry != nil {
 		t.Fatalf("Non existent block returned: %v", entry)
 	}
-	if entry := ReadHeader(db, block.Hash(), block.NumberU64()); entry != nil {
+	if entry := ReadHeader(db.HeaderTable(), block.Hash(), block.NumberU64()); entry != nil {
 		t.Fatalf("Non existent header returned: %v", entry)
 	}
-	if entry := ReadBody(db, block.Hash(), block.NumberU64()); entry != nil {
+	if entry := ReadBody(db.BodyTable(), block.Hash(), block.NumberU64()); entry != nil {
 		t.Fatalf("Non existent body returned: %v", entry)
 	}
 	// Write and verify the block in the database
@@ -127,12 +130,12 @@ func TestBlockStorage(t *testing.T) {
 	} else if entry.Hash() != block.Hash() {
 		t.Fatalf("Retrieved block mismatch: have %v, want %v", entry, block)
 	}
-	if entry := ReadHeader(db, block.Hash(), block.NumberU64()); entry == nil {
+	if entry := ReadHeader(db.HeaderTable(), block.Hash(), block.NumberU64()); entry == nil {
 		t.Fatalf("Stored header not found")
 	} else if entry.Hash() != block.Header().Hash() {
 		t.Fatalf("Retrieved header mismatch: have %v, want %v", entry, block.Header())
 	}
-	if entry := ReadBody(db, block.Hash(), block.NumberU64()); entry == nil {
+	if entry := ReadBody(db.BodyTable(), block.Hash(), block.NumberU64()); entry == nil {
 		t.Fatalf("Stored body not found")
 	} else if types.DeriveSha(types.Transactions(entry.Transactions)) != types.DeriveSha(block.Transactions()) || types.CalcUncleHash(entry.Uncles) != types.CalcUncleHash(block.Uncles()) {
 		t.Fatalf("Retrieved body mismatch: have %v, want %v", entry, block.Body())
@@ -142,10 +145,10 @@ func TestBlockStorage(t *testing.T) {
 	if entry := ReadBlock(db, block.Hash(), block.NumberU64()); entry != nil {
 		t.Fatalf("Deleted block returned: %v", entry)
 	}
-	if entry := ReadHeader(db, block.Hash(), block.NumberU64()); entry != nil {
+	if entry := ReadHeader(db.HeaderTable(), block.Hash(), block.NumberU64()); entry != nil {
 		t.Fatalf("Deleted header returned: %v", entry)
 	}
-	if entry := ReadBody(db, block.Hash(), block.NumberU64()); entry != nil {
+	if entry := ReadBody(db.BodyTable(), block.Hash(), block.NumberU64()); entry != nil {
 		t.Fatalf("Deleted body returned: %v", entry)
 	}
 }
@@ -164,18 +167,18 @@ func TestPartialBlockStorage(t *testing.T) {
 	if entry := ReadBlock(db, block.Hash(), block.NumberU64()); entry != nil {
 		t.Fatalf("Non existent block returned: %v", entry)
 	}
-	DeleteHeader(db, block.Hash(), block.NumberU64())
+	DeleteHeader(db.GlobalTable(), db.HeaderTable(), block.Hash(), block.NumberU64())
 
 	// Store a body and check that it's not recognized as a block
-	WriteBody(db, block.Hash(), block.NumberU64(), block.Body())
+	WriteBody(db.BodyTable(), block.Hash(), block.NumberU64(), block.Body())
 	if entry := ReadBlock(db, block.Hash(), block.NumberU64()); entry != nil {
 		t.Fatalf("Non existent block returned: %v", entry)
 	}
-	DeleteBody(db, block.Hash(), block.NumberU64())
+	DeleteBody(db.BodyTable(), block.Hash(), block.NumberU64())
 
 	// Store a header and a body separately and check reassembly
 	WriteHeader(db.GlobalTable(), db.HeaderTable(), block.Header())
-	WriteBody(db, block.Hash(), block.NumberU64(), block.Body())
+	WriteBody(db.GlobalTable(), block.Hash(), block.NumberU64(), block.Body())
 	if entry := ReadBlock(db, block.Hash(), block.NumberU64()); entry == nil {
 		t.Fatalf("Stored block not found")
 	} else if entry.Hash() != block.Hash() {
@@ -189,19 +192,19 @@ func TestTdStorage(t *testing.T) {
 
 	// Create a test TD to move around the database and make sure it's really new
 	hash, td := common.Hash{}, big.NewInt(314)
-	if entry := ReadTd(db, hash, 0); entry != nil {
+	if entry := ReadTd(db.GlobalTable(), hash, 0); entry != nil {
 		t.Fatalf("Non existent TD returned: %v", entry)
 	}
 	// Write and verify the TD in the database
-	WriteTd(db, hash, 0, td)
-	if entry := ReadTd(db, hash, 0); entry == nil {
+	WriteTd(db.GlobalTable(), hash, 0, td)
+	if entry := ReadTd(db.GlobalTable(), hash, 0); entry == nil {
 		t.Fatalf("Stored TD not found")
 	} else if entry.Cmp(td) != 0 {
 		t.Fatalf("Retrieved TD mismatch: have %v, want %v", entry, td)
 	}
 	// Delete the TD and verify the execution
-	DeleteTd(db, hash, 0)
-	if entry := ReadTd(db, hash, 0); entry != nil {
+	DeleteTd(db.GlobalTable(), hash, 0)
+	if entry := ReadTd(db.GlobalTable(), hash, 0); entry != nil {
 		t.Fatalf("Deleted TD returned: %v", entry)
 	}
 }
@@ -250,7 +253,7 @@ func TestHeadStorage(t *testing.T) {
 	// Assign separate entries for the head header and block
 	WriteHeadHeaderHash(db.GlobalTable(), blockHead.Hash())
 	WriteHeadBlockHash(db.GlobalTable(), blockFull.Hash())
-	WriteHeadFastBlockHash(db, blockFast.Hash())
+	WriteHeadFastBlockHash(db.GlobalTable(), blockFast.Hash())
 
 	// Check that both heads are present, and different (i.e. two heads maintained)
 	if entry := ReadHeadHeaderHash(db.GlobalTable()); entry != blockHead.Hash() {
@@ -268,6 +271,13 @@ func TestHeadStorage(t *testing.T) {
 func TestBlockReceiptStorage(t *testing.T) {
 	db := ethdb.NewMemDatabase()
 
+	// Create a live block since we need metadata to reconstruct the receipt
+	tx1 := types.NewTransaction(1, common.HexToAddress("0x1"), big.NewInt(1), 1, big.NewInt(1), nil)
+	tx2 := types.NewTransaction(2, common.HexToAddress("0x2"), big.NewInt(2), 2, big.NewInt(2), nil)
+
+	body := &types.Body{Transactions: types.Transactions{tx1, tx2}}
+
+	// Create the two receipts to manage afterwards
 	receipt1 := &types.Receipt{
 		Status:            types.ReceiptStatusFailed,
 		CumulativeGasUsed: 1,
@@ -275,11 +285,12 @@ func TestBlockReceiptStorage(t *testing.T) {
 			{Address: common.BytesToAddress([]byte{0x11})},
 			{Address: common.BytesToAddress([]byte{0x01, 0x11})},
 		},
-		TxHash:          common.BytesToHash([]byte{0x11, 0x11}),
+		TxHash:          tx1.Hash(),
 		ContractAddress: common.BytesToAddress([]byte{0x01, 0x11, 0x11}),
 		GasUsed:         111111,
 	}
 	receipt1.Bloom = types.CreateBloom(types.Receipts{receipt1})
+
 	receipt2 := &types.Receipt{
 		PostState:         common.Hash{2}.Bytes(),
 		CumulativeGasUsed: 2,
@@ -287,7 +298,7 @@ func TestBlockReceiptStorage(t *testing.T) {
 			{Address: common.BytesToAddress([]byte{0x22})},
 			{Address: common.BytesToAddress([]byte{0x02, 0x22})},
 		},
-		TxHash:          common.BytesToHash([]byte{0x22, 0x22}),
+		TxHash:          tx2.Hash(),
 		ContractAddress: common.BytesToAddress([]byte{0x02, 0x22, 0x22}),
 		GasUsed:         222222,
 	}
@@ -296,26 +307,55 @@ func TestBlockReceiptStorage(t *testing.T) {
 
 	// Check that no receipt entries are in a pristine database
 	hash := common.BytesToHash([]byte{0x03, 0x14})
-	if rs := ReadReceipts(db, hash, 0); len(rs) != 0 {
+	if rs := ReadReceipts(db, hash, 0, params.TestChainConfig); len(rs) != 0 {
 		t.Fatalf("non existent receipts returned: %v", rs)
 	}
+	// Insert the body that corresponds to the receipts
+	WriteBody(db.BodyTable(), hash, 0, body)
+
 	// Insert the receipt slice into the database and check presence
-	WriteReceipts(db, hash, 0, receipts)
-	if rs := ReadReceipts(db, hash, 0); len(rs) == 0 {
+	WriteReceipts(db.ReceiptTable(), hash, 0, receipts)
+	if rs := ReadReceipts(db, hash, 0, params.TestChainConfig); len(rs) == 0 {
 		t.Fatalf("no receipts returned")
 	} else {
-		for i := 0; i < len(receipts); i++ {
-			rlpHave, _ := rlp.EncodeToBytes(rs[i])
-			rlpWant, _ := rlp.EncodeToBytes(receipts[i])
-
-			if !bytes.Equal(rlpHave, rlpWant) {
-				t.Fatalf("receipt #%d: receipt mismatch: have %v, want %v", i, rs[i], receipts[i])
-			}
+		if err := checkReceiptsRLP(rs, receipts); err != nil {
+			t.Fatal(err.Error())
 		}
 	}
-	// Delete the receipt slice and check purge
-	DeleteReceipts(db, hash, 0)
-	if rs := ReadReceipts(db, hash, 0); len(rs) != 0 {
+	// Delete the body and ensure that the receipts are no longer returned (metadata can't be recomputed)
+	DeleteBody(db.BodyTable(), hash, 0)
+	if rs := ReadReceipts(db, hash, 0, params.TestChainConfig); rs != nil {
+		t.Fatalf("receipts returned when body was deleted: %v", rs)
+	}
+	// Ensure that receipts without metadata can be returned without the block body too
+	if err := checkReceiptsRLP(ReadRawReceipts(db.ReceiptTable(), hash, 0), receipts); err != nil {
+		t.Fatal(err.Error())
+	}
+	// Sanity check that body alone without the receipt is a full purge
+	WriteBody(db.BodyTable(), hash, 0, body)
+
+	DeleteReceipts(db.ReceiptTable(), hash, 0)
+	if rs := ReadReceipts(db, hash, 0, params.TestChainConfig); len(rs) != 0 {
 		t.Fatalf("deleted receipts returned: %v", rs)
 	}
+}
+
+func checkReceiptsRLP(have, want types.Receipts) error {
+	if len(have) != len(want) {
+		return fmt.Errorf("receipts sizes mismatch: have %d, want %d", len(have), len(want))
+	}
+	for i := 0; i < len(want); i++ {
+		rlpHave, err := rlp.EncodeToBytes(have[i])
+		if err != nil {
+			return err
+		}
+		rlpWant, err := rlp.EncodeToBytes(want[i])
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(rlpHave, rlpWant) {
+			return fmt.Errorf("receipt #%d: receipt mismatch: have %s, want %s", i, hex.EncodeToString(rlpHave), hex.EncodeToString(rlpWant))
+		}
+	}
+	return nil
 }

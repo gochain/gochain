@@ -93,7 +93,7 @@ func benchmarkBloomBits(b *testing.B, sectionSize uint64) {
 		var header *types.Header
 		for i := sectionIdx * sectionSize; i < (sectionIdx+1)*sectionSize; i++ {
 			hash := rawdb.ReadCanonicalHash(db, i)
-			header = rawdb.ReadHeader(db.GlobalTable(), hash, i)
+			header = rawdb.ReadHeader(db.HeaderTable(), hash, i)
 			if header == nil {
 				b.Fatalf("Error creating bloomBits data")
 			}

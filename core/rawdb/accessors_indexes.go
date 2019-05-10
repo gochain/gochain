@@ -18,6 +18,7 @@ package rawdb
 
 import (
 	"encoding/binary"
+	"github.com/gochain-io/gochain/v3/params"
 
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core/types"
@@ -96,7 +97,7 @@ func ReadTransaction(db common.Database, hash common.Hash) (*types.Transaction, 
 
 // ReadReceipt retrieves a specific transaction receipt from the database, along with
 // its added positional metadata.
-func ReadReceipt(db common.Database, hash common.Hash) (*types.Receipt, common.Hash, uint64, uint64) {
+func ReadReceipt(db common.Database, hash common.Hash, config *params.ChainConfig) (*types.Receipt, common.Hash, uint64, uint64) {
 	blockHash := ReadTxLookupEntry(db.GlobalTable(), hash)
 	if blockHash == (common.Hash{}) {
 		return nil, common.Hash{}, 0, 0
@@ -105,7 +106,7 @@ func ReadReceipt(db common.Database, hash common.Hash) (*types.Receipt, common.H
 	if blockNumber == nil {
 		return nil, common.Hash{}, 0, 0
 	}
-	receipts := ReadReceipts(db.ReceiptTable(), blockHash, *blockNumber)
+	receipts := ReadReceipts(db, blockHash, *blockNumber, config)
 	for receiptIndex, receipt := range receipts {
 		if receipt.TxHash == hash {
 			return receipt, blockHash, *blockNumber, uint64(receiptIndex)
