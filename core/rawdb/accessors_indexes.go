@@ -19,6 +19,7 @@ package rawdb
 import (
 	"encoding/binary"
 	"github.com/gochain-io/gochain/v3/params"
+	"math/big"
 
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core/types"
@@ -28,7 +29,7 @@ import (
 
 // ReadTxLookupEntry retrieves the positional metadata associated with a transaction
 // hash to allow retrieving the transaction or receipt by hash.
-func ReadTxLookupEntry(db DatabaseReader, hash common.Hash) common.Hash {
+func ReadTxLookupEntry(db DatabaseReader, hash common.Hash) *uint64 {
 	var data []byte
 	Must("get tx lookup entry", func() (err error) {
 		data, err = db.Get(hashKey(lookupPrefix, hash))
@@ -38,25 +39,31 @@ func ReadTxLookupEntry(db DatabaseReader, hash common.Hash) common.Hash {
 		return
 	})
 	if len(data) == 0 {
-		return common.Hash{}
+		return nil
 	}
+	// Database v6 lookup just stores the block number
+	if len(data) < common.HashLength {
+		number := new(big.Int).SetBytes(data).Uint64()
+		return &number
+	}
+	// Database v4-v5 tx lookup format just stores the hash
 	if len(data) == common.HashLength {
-		return common.BytesToHash(data)
+		return ReadHeaderNumber(db, common.BytesToHash(data))
 	}
-	// Probably it's legacy txlookup entry data, try to decode it.
+	// Finally try database v3 tx lookup format
 	var entry LegacyTxLookupEntry
 	if err := rlp.DecodeBytes(data, &entry); err != nil {
 		log.Error("Invalid transaction lookup entry RLP", "hash", hash, "blob", data, "err", err)
-		return common.Hash{}
+		return nil
 	}
-	return entry.BlockHash
+	return &entry.BlockIndex
 }
 
 // WriteTxLookupEntries stores a positional metadata for every transaction from
 // a block, enabling hash based transaction and receipt lookups.
 func WriteTxLookupEntries(db DatabaseWriter, block *types.Block) {
 	for _, tx := range block.Transactions() {
-		data := block.Hash().Bytes()
+		data := block.Number().Bytes()
 		Must("put tx lookup entry", func() (err error) {
 			return db.Put(hashKey(lookupPrefix, tx.Hash()), data)
 		})
@@ -73,12 +80,12 @@ func DeleteTxLookupEntry(db DatabaseDeleter, hash common.Hash) {
 // ReadTransaction retrieves a specific transaction from the database, along with
 // its added positional metadata.
 func ReadTransaction(db common.Database, hash common.Hash) (*types.Transaction, common.Hash, uint64, uint64) {
-	blockHash := ReadTxLookupEntry(db.GlobalTable(), hash)
-	if blockHash == (common.Hash{}) {
+	blockNumber := ReadTxLookupEntry(db.GlobalTable(), hash)
+	if blockNumber == nil {
 		return nil, common.Hash{}, 0, 0
 	}
-	blockNumber := ReadHeaderNumber(db.GlobalTable(), blockHash)
-	if blockNumber == nil {
+	blockHash := ReadCanonicalHash(db, *blockNumber)
+	if blockHash == (common.Hash{}) {
 		return nil, common.Hash{}, 0, 0
 	}
 	body := ReadBody(db.BodyTable(), blockHash, *blockNumber)
@@ -98,12 +105,12 @@ func ReadTransaction(db common.Database, hash common.Hash) (*types.Transaction, 
 // ReadReceipt retrieves a specific transaction receipt from the database, along with
 // its added positional metadata.
 func ReadReceipt(db common.Database, hash common.Hash, config *params.ChainConfig) (*types.Receipt, common.Hash, uint64, uint64) {
-	blockHash := ReadTxLookupEntry(db.GlobalTable(), hash)
-	if blockHash == (common.Hash{}) {
+	blockNumber := ReadTxLookupEntry(db.GlobalTable(), hash)
+	if blockNumber == nil {
 		return nil, common.Hash{}, 0, 0
 	}
-	blockNumber := ReadHeaderNumber(db.GlobalTable(), blockHash)
-	if blockNumber == nil {
+	blockHash := ReadCanonicalHash(db, *blockNumber)
+	if blockHash == (common.Hash{}) {
 		return nil, common.Hash{}, 0, 0
 	}
 	receipts := ReadReceipts(db, blockHash, *blockNumber, config)
