@@ -65,7 +65,7 @@ func odrGetReceipts(ctx context.Context, db common.Database, config *params.Chai
 	var receipts types.Receipts
 	if bc != nil {
 		if number := rawdb.ReadHeaderNumber(db.GlobalTable(), bhash); number != nil {
-			receipts = rawdb.ReadReceipts(db.ReceiptTable(), bhash, *number)
+			receipts = rawdb.ReadReceipts(db, bhash, *number, config)
 		}
 	} else {
 		if number := rawdb.ReadHeaderNumber(db.GlobalTable(), bhash); number != nil {
@@ -182,6 +182,9 @@ func testOdr(t *testing.T, protocol int, expFail uint64, fn odrTestFn) {
 	lpm.synchronise(lpeer)
 
 	test := func(expFail uint64) {
+		// Mark this helper to put the failures at the correct lines
+		t.Helper()
+
 		for i := uint64(0); i <= pm.blockchain.CurrentHeader().Number.Uint64(); i++ {
 			bhash := rawdb.ReadCanonicalHash(db, i)
 			b1 := fn(light.NoOdr, db, pm.chainConfig, pm.blockchain.(*core.BlockChain), nil, bhash)
@@ -193,10 +196,10 @@ func testOdr(t *testing.T, protocol int, expFail uint64, fn odrTestFn) {
 			eq := bytes.Equal(b1, b2)
 			exp := i < expFail
 			if exp && !eq {
-				t.Errorf("odr mismatch:\n\twant: %X\n\thave: %X", b1, b2)
+				t.Fatalf("odr mismatch:\n\twant: %X\n\thave: %X", b1, b2)
 			}
 			if !exp && eq {
-				t.Errorf("unexpected odr match")
+				t.Fatal("unexpected odr match")
 			}
 		}
 	}
@@ -206,6 +209,7 @@ func testOdr(t *testing.T, protocol int, expFail uint64, fn odrTestFn) {
 	peers.Unregister(lpeer.id)
 	time.Sleep(time.Millisecond * 10) // ensure that all peerSetNotify callbacks are executed
 	test(expFail)
+
 	// expect all retrievals to pass
 	peers.Register(lpeer)
 	time.Sleep(time.Millisecond * 10) // ensure that all peerSetNotify callbacks are executed
@@ -213,6 +217,7 @@ func testOdr(t *testing.T, protocol int, expFail uint64, fn odrTestFn) {
 	lpeer.hasBlock = func(common.Hash, uint64) bool { return true }
 	lpeer.lock.Unlock()
 	test(5)
+
 	// still expect all retrievals to pass, now data should be cached locally
 	peers.Unregister(lpeer.id)
 	time.Sleep(time.Millisecond * 10) // ensure that all peerSetNotify callbacks are executed

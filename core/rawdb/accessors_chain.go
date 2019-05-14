@@ -24,6 +24,7 @@ import (
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core/types"
 	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/params"
 	"github.com/gochain-io/gochain/v3/rlp"
 )
 
@@ -228,12 +229,12 @@ func WriteHeader(global, headerTable common.Putter, header *types.Header) {
 }
 
 // DeleteHeader removes all block header data associated with a hash.
-func DeleteHeader(db DatabaseDeleter, hash common.Hash, number uint64) {
+func DeleteHeader(global, headerTable common.Deleter, hash common.Hash, number uint64) {
 	Must("delete header", func() error {
-		return db.Delete(hashKey(blockHashPrefix, hash))
+		return global.Delete(hashKey(blockHashPrefix, hash))
 	})
 	Must("delete header hash to number mapping", func() error {
-		return db.Delete(numHashKey(headerPrefix, number, hash))
+		return headerTable.Delete(numHashKey(headerPrefix, number, hash))
 	})
 }
 
@@ -339,8 +340,10 @@ func DeleteTd(db DatabaseDeleter, hash common.Hash, number uint64) {
 	})
 }
 
-// ReadReceipts retrieves all the transaction receipts belonging to a block.
-func ReadReceipts(db DatabaseReader, hash common.Hash, number uint64) types.Receipts {
+// ReadRawReceipts retrieves all the transaction receipts belonging to a block.
+// The receipt metadata fields are not guaranteed to be populated, so they
+// should not be used. Use ReadReceipts instead if the metadata is needed.
+func ReadRawReceipts(db DatabaseReader, hash common.Hash, number uint64) types.Receipts {
 	// Retrieve the flattened receipt slice
 	var data []byte
 	Must("get receipts", func() (err error) {
@@ -353,27 +356,38 @@ func ReadReceipts(db DatabaseReader, hash common.Hash, number uint64) types.Rece
 	if len(data) == 0 {
 		return nil
 	}
-	// Convert the revceipts from their storage form to their internal representation
+	// Convert the receipts from their storage form to their internal representation
 	var receipts types.ReceiptsForStorage
 	if err := rlp.DecodeBytes(data, &receipts); err != nil {
 		log.Error("Invalid receipt array RLP", "hash", hash, "err", err)
 		return nil
 	}
-	logIndex := uint(0)
-	for i, receipt := range receipts {
-		for _, log := range receipt.Logs {
-			log.TxHash = receipt.TxHash
-			log.BlockHash = hash
-			log.BlockNumber = number
-			log.TxIndex = uint(i)
-			log.Index = logIndex
-			logIndex += 1
-		}
-		receipt.BlockHash = hash
-		receipt.BlockNumber = big.NewInt(0).SetUint64(number)
-		receipt.TransactionIndex = uint(i)
-	}
 	return types.Receipts(receipts)
+}
+
+// ReadReceipts retrieves all the transaction receipts belonging to a block, including
+// its corresponding metadata fields. If it is unable to populate these metadata
+// fields then nil is returned.
+//
+// The current implementation populates these metadata fields by reading the receipts'
+// corresponding block body, so if the block body is not found it will return nil even
+// if the receipt itself is stored.
+func ReadReceipts(db common.Database, hash common.Hash, number uint64, config *params.ChainConfig) types.Receipts {
+	// We're deriving many fields from the block body, retrieve beside the receipt
+	receipts := ReadRawReceipts(db.ReceiptTable(), hash, number)
+	if receipts == nil {
+		return nil
+	}
+	body := ReadBody(db.BodyTable(), hash, number)
+	if body == nil {
+		log.Error("Missing body but have receipt", "hash", hash, "number", number)
+		return nil
+	}
+	if err := receipts.DeriveFields(config, hash, number, body.Transactions); err != nil {
+		log.Error("Failed to derive block receipts fields", "hash", hash, "number", number, "err", err)
+		return nil
+	}
+	return receipts
 }
 
 // WriteReceipts stores all the transaction receipts belonging to a block.
@@ -421,11 +435,11 @@ func WriteBlock(db common.Database, block *types.Block) {
 }
 
 // DeleteBlock removes all block data associated with a hash.
-func DeleteBlock(db DatabaseDeleter, hash common.Hash, number uint64) {
-	DeleteReceipts(db, hash, number)
-	DeleteHeader(db, hash, number)
-	DeleteBody(db, hash, number)
-	DeleteTd(db, hash, number)
+func DeleteBlock(db common.Database, hash common.Hash, number uint64) {
+	DeleteReceipts(db.ReceiptTable(), hash, number)
+	DeleteHeader(db.GlobalTable(), db.HeaderTable(), hash, number)
+	DeleteBody(db.BodyTable(), hash, number)
+	DeleteTd(db.GlobalTable(), hash, number)
 }
 
 // FindCommonAncestor returns the last common ancestor of two block headers

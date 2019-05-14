@@ -463,7 +463,7 @@ func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) {
 		if delFn != nil {
 			delFn(bbatch, hash, num)
 		}
-		rawdb.DeleteHeader(hbatch, hash, num)
+		rawdb.DeleteHeader(gbatch, hbatch, hash, num)
 		rawdb.DeleteTd(gbatch, hash, num)
 
 		hdr = hc.GetHeader(hdr.ParentHash, hdr.Number.Uint64()-1)

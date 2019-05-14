@@ -78,7 +78,7 @@ func (odr *testOdr) Retrieve(ctx context.Context, req OdrRequest) error {
 	case *ReceiptsRequest:
 		number := rawdb.ReadHeaderNumber(odr.sdb.GlobalTable(), req.Hash)
 		if number != nil {
-			req.Receipts = rawdb.ReadReceipts(odr.sdb.ReceiptTable(), req.Hash, *number)
+			req.Receipts = rawdb.ReadRawReceipts(odr.sdb.ReceiptTable(), req.Hash, *number)
 		}
 	case *TrieRequest:
 		t, _ := trie.New(req.Id.Root, trie.NewDatabase(odr.sdb.GlobalTable()))
@@ -117,7 +117,7 @@ func odrGetReceipts(ctx context.Context, db common.Database, bc *core.BlockChain
 	if bc != nil {
 		number := rawdb.ReadHeaderNumber(db.GlobalTable(), bhash)
 		if number != nil {
-			receipts = rawdb.ReadReceipts(db.ReceiptTable(), bhash, *number)
+			receipts = rawdb.ReadReceipts(db, bhash, *number, bc.Config())
 		}
 	} else {
 		number := rawdb.ReadHeaderNumber(db.GlobalTable(), bhash)
