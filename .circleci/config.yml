@@ -65,43 +65,44 @@ jobs:
               - /tmp/go/cache
 
   # Separate since fuse is not supported via containers.
-  test-fuse:
-    machine: true
-    working_directory: ~/go/src/github.com/gochain-io/gochain
-    environment: # apparently expansion doesn't work here yet: https://discuss.circleci.com/t/environment-variable-expansion-in-working-directory/11322
-      - GOPATH=/home/circleci/go
-      - GOCACHE=/tmp/go/cache
-      - GOVERSION=1.12
-      - GO111MODULE=on
-      - OS=linux
-      - ARCH=amd64
-    steps:
-      - restore_cache:
-          keys:
-              - test-fuse-cache-{{ .Branch }}-{{ .Environment.CIRCLE_PREVIOUS_BUILD_NUM }}
-              - test-fuse-cache-{{ .Branch }}-
-              - test-fuse-cache-
-          paths:
-              - /tmp/go/cache
-      - checkout
-      - run:
-          name: update Go
-          command: |
-            go version
-            go env GOROOT
-            mkdir tmp
-            cd tmp
-            sudo rm -rf /usr/local/go
-            wget https://storage.googleapis.com/golang/go$GOVERSION.$OS-$ARCH.tar.gz
-            sudo tar -C /usr/local -xzf go$GOVERSION.$OS-$ARCH.tar.gz
-            export PATH=$PATH:$HOME/go/bin
-      - run: go version
-      - run: make all
-      - run: go test ./swarm/fuse
-      - save_cache:
-          key: test-fuse-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
-          paths:
-              - /tmp/go/cache
+# Temporarily disabled until swarm package restored
+#  test-fuse:
+#    machine: true
+#    working_directory: ~/go/src/github.com/gochain-io/gochain
+#    environment: # apparently expansion doesn't work here yet: https://discuss.circleci.com/t/environment-variable-expansion-in-working-directory/11322
+#      - GOPATH=/home/circleci/go
+#      - GOCACHE=/tmp/go/cache
+#      - GOVERSION=1.12
+#      - GO111MODULE=on
+#      - OS=linux
+#      - ARCH=amd64
+#    steps:
+#      - restore_cache:
+#          keys:
+#              - test-fuse-cache-{{ .Branch }}-{{ .Environment.CIRCLE_PREVIOUS_BUILD_NUM }}
+#              - test-fuse-cache-{{ .Branch }}-
+#              - test-fuse-cache-
+#          paths:
+#              - /tmp/go/cache
+#      - checkout
+#      - run:
+#          name: update Go
+#          command: |
+#            go version
+#            go env GOROOT
+#            mkdir tmp
+#            cd tmp
+#            sudo rm -rf /usr/local/go
+#            wget https://storage.googleapis.com/golang/go$GOVERSION.$OS-$ARCH.tar.gz
+#            sudo tar -C /usr/local -xzf go$GOVERSION.$OS-$ARCH.tar.gz
+#            export PATH=$PATH:$HOME/go/bin
+#      - run: go version
+#      - run: make all
+#      - run: go test ./swarm/fuse
+#      - save_cache:
+#          key: test-fuse-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
+#          paths:
+#              - /tmp/go/cache
 
   race:
     <<: *defaults
@@ -188,9 +189,9 @@ workflows:
       - test:
           requires:
             - prepare
-      - test-fuse:
-          requires:
-            - prepare
+#      - test-fuse:
+#          requires:
+#            - prepare
       - race:
           requires:
             - prepare
@@ -202,7 +203,7 @@ workflows:
           requires:
             - build
             - test
-            - test-fuse
+#            - test-fuse
             - race
 
       - approve-docker:
@@ -217,7 +218,7 @@ workflows:
           requires:
             - test
             - build
-            - test-fuse
+#            - test-fuse
             - race
 
       - docker:

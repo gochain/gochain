@@ -43,7 +43,6 @@ import (
 	"github.com/gochain-io/gochain/v3/core/types"
 	"github.com/gochain-io/gochain/v3/crypto"
 	"github.com/gochain-io/gochain/v3/log"
-	"github.com/gochain-io/gochain/v3/swarm/services/swap/swap"
 )
 
 // TODO(zelig): watch peer solvency and notify of bouncing cheques
@@ -409,7 +408,7 @@ func NewOutbox(chbook *Chequebook, beneficiary common.Address) *Outbox {
 }
 
 // Issue creates cheque.
-func (self *Outbox) Issue(amount *big.Int) (swap.Promise, error) {
+func (self *Outbox) Issue(amount *big.Int) (*Cheque, error) {
 	return self.chequeBook.Issue(self.beneficiary, amount)
 }
 
@@ -545,9 +544,7 @@ func (self *Inbox) autoCash(cashInterval time.Duration) {
 
 // Receive is called to deposit the latest cheque to the incoming Inbox.
 // The given promise must be a *Cheque.
-func (self *Inbox) Receive(promise swap.Promise) (*big.Int, error) {
-	ch := promise.(*Cheque)
-
+func (self *Inbox) Receive(ch *Cheque) (*big.Int, error) {
 	defer self.lock.Unlock()
 	self.lock.Lock()
 
