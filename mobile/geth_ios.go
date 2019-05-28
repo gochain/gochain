@@ -16,7 +16,7 @@
 
 // +build ios
 
-package geth
+package gochain
 
 // clientIdentifier is a hard coded identifier to report into the network.
 var clientIdentifier = "iGoChain"

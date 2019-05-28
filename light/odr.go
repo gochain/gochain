@@ -151,7 +151,7 @@ func (req *ChtRequest) StoreResult(db common.Database) {
 
 	rawdb.WriteHeader(db.GlobalTable(), db.HeaderTable(), req.Header)
 	rawdb.WriteTd(db.GlobalTable(), hash, num, req.Td)
-	rawdb.WriteCanonicalHash(db, hash, num)
+	rawdb.WriteCanonicalHash(db.HeaderTable(), hash, num)
 }
 
 // BloomRequest is the ODR request type for retrieving bloom filters from a CHT structure
@@ -169,7 +169,7 @@ type BloomRequest struct {
 // StoreResult stores the retrieved data in local database
 func (req *BloomRequest) StoreResult(db common.Database) {
 	for i, sectionIdx := range req.SectionIndexList {
-		sectionHead := rawdb.ReadCanonicalHash(db, (sectionIdx+1)*req.Config.BloomTrieSize-1)
+		sectionHead := rawdb.ReadCanonicalHash(db.HeaderTable(), (sectionIdx+1)*req.Config.BloomTrieSize-1)
 		// if we don't have the canonical hash stored for this section head number, we'll still store it under
 		// a key with a zero sectionHead. GetBloomBits will look there too if we still don't have the canonical
 		// hash. In the unlikely case we've retrieved the section head hash since then, we'll just retrieve the
@@ -177,3 +177,20 @@ func (req *BloomRequest) StoreResult(db common.Database) {
 		rawdb.WriteBloomBits(db.GlobalTable(), req.BitIdx, sectionIdx, sectionHead, req.BloomBits[i])
 	}
 }
+
+// TxStatus describes the status of a transaction
+type TxStatus struct {
+	Status core.TxStatus
+	Lookup *rawdb.LegacyTxLookupEntry `rlp:"nil"`
+	Error  string
+}
+
+// TxStatusRequest is the ODR request type for retrieving transaction status
+type TxStatusRequest struct {
+	OdrRequest
+	Hashes []common.Hash
+	Status []TxStatus
+}
+
+// StoreResult stores the retrieved data in local database
+func (req *TxStatusRequest) StoreResult(db common.Database) {}

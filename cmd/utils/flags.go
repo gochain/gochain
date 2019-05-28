@@ -1470,7 +1470,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 func GenesisExists(ctx *cli.Context, stack *node.Node) bool {
 	db := MakeChainDatabase(ctx, stack)
 	defer db.Close()
-	stored := rawdb.ReadCanonicalHash(db, 0)
+	stored := rawdb.ReadCanonicalHash(db.HeaderTable(), 0)
 	return stored != common.Hash{}
 }
 

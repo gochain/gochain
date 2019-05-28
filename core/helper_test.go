@@ -76,7 +76,7 @@ func (tm *TestManager) Db() common.Database {
 }
 
 func NewTestManager() *TestManager {
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 
 	testManager := &TestManager{}
 	testManager.eventMux = new(InterfaceFeed)

@@ -159,11 +159,11 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 
 		// Delete any canonical number assignments above the new head
 		for i := number + 1; ; i++ {
-			hash := rawdb.ReadCanonicalHash(hc.chainDb, i)
+			hash := rawdb.ReadCanonicalHash(hc.chainDb.HeaderTable(), i)
 			if hash == (common.Hash{}) {
 				break
 			}
-			rawdb.DeleteCanonicalHash(hc.chainDb, i)
+			rawdb.DeleteCanonicalHash(hc.chainDb.HeaderTable(), i)
 		}
 
 		// Overwrite any stale canonical number assignments
@@ -172,15 +172,15 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 			headNumber = header.Number.Uint64() - 1
 			headHeader = hc.GetHeader(headHash, headNumber)
 		)
-		for rawdb.ReadCanonicalHash(hc.chainDb, headNumber) != headHash {
-			rawdb.WriteCanonicalHash(hc.chainDb, headHash, headNumber)
+		for rawdb.ReadCanonicalHash(hc.chainDb.HeaderTable(), headNumber) != headHash {
+			rawdb.WriteCanonicalHash(hc.chainDb.HeaderTable(), headHash, headNumber)
 
 			headHash = headHeader.ParentHash
 			headNumber = headHeader.Number.Uint64() - 1
 			headHeader = hc.GetHeader(headHash, headNumber)
 		}
 		// Extend the canonical chain with the new header
-		rawdb.WriteCanonicalHash(hc.chainDb, hash, number)
+		rawdb.WriteCanonicalHash(hc.chainDb.HeaderTable(), hash, number)
 		rawdb.WriteHeadHeaderHash(hc.chainDb.GlobalTable(), hash)
 
 		hc.currentHeaderHash = hash
@@ -337,9 +337,9 @@ func (hc *HeaderChain) GetAncestor(hash common.Hash, number, ancestor uint64, ma
 		}
 	}
 	for ancestor != 0 {
-		if rawdb.ReadCanonicalHash(hc.chainDb, number) == hash {
+		if rawdb.ReadCanonicalHash(hc.chainDb.HeaderTable(), number) == hash {
 			number -= ancestor
-			return rawdb.ReadCanonicalHash(hc.chainDb, number), number
+			return rawdb.ReadCanonicalHash(hc.chainDb.HeaderTable(), number), number
 		}
 		if *maxNonCanonical == 0 {
 			return common.Hash{}, 0
@@ -426,7 +426,7 @@ func (hc *HeaderChain) HasHeader(hash common.Hash, number uint64) bool {
 // GetHeaderByNumber retrieves a block header from the database by number,
 // caching it (associated with its hash) if found.
 func (hc *HeaderChain) GetHeaderByNumber(number uint64) *types.Header {
-	hash := rawdb.ReadCanonicalHash(hc.chainDb, number)
+	hash := rawdb.ReadCanonicalHash(hc.chainDb.HeaderTable(), number)
 	if hash == (common.Hash{}) {
 		return nil
 	}
@@ -447,54 +447,68 @@ func (hc *HeaderChain) SetCurrentHeader(head *types.Header) {
 	hc.currentHeaderHash = head.Hash()
 }
 
-// DeleteCallback is a callback function that is called by SetHead before
-// each header is deleted.
-type DeleteCallback func(rawdb.DatabaseDeleter, common.Hash, uint64)
+type (
+	// UpdateHeadBlocksCallback is a callback function that is called by SetHead
+	// before head header is updated.
+	UpdateHeadBlocksCallback func(global common.KeyValueWriter, header *types.Header)
+
+	// DeleteBlockContentCallback is a callback function that is called by SetHead
+	// before each header is deleted.
+	DeleteBlockContentCallback func(body, receipts common.KeyValueWriter, hash common.Hash, num uint64)
+)
 
 // SetHead rewinds the local chain to a new head. Everything above the new head
 // will be deleted and the new one set.
-func (hc *HeaderChain) SetHead(head uint64, delFn DeleteCallback) {
-	height := uint64(0)
+func (hc *HeaderChain) SetHead(head uint64, updateFn UpdateHeadBlocksCallback, delFn DeleteBlockContentCallback) {
+	var parentHash common.Hash
 
-	hdr := hc.CurrentHeader()
-	if hdr != nil {
-		height = hdr.Number.Uint64()
-	}
 	hbatch := hc.chainDb.HeaderTable().NewBatch()
 	bbatch := hc.chainDb.BodyTable().NewBatch()
 	gbatch := hc.chainDb.GlobalTable().NewBatch()
-	for hdr != nil && hdr.Number.Uint64() > head {
-		hash := hdr.Hash()
-		num := hdr.Number.Uint64()
-		if delFn != nil {
-			delFn(bbatch, hash, num)
+	rbatch := hc.chainDb.ReceiptTable().NewBatch()
+	for hdr := hc.CurrentHeader(); hdr != nil && hdr.Number.Uint64() > head; hdr = hc.CurrentHeader() {
+		hash, num := hdr.Hash(), hdr.Number.Uint64()
+
+		// Rewind block chain to new head.
+		parent := hc.GetHeader(hdr.ParentHash, num-1)
+		if parent == nil {
+			parent = hc.genesisHeader
 		}
+		parentHash = hdr.ParentHash
+		// Notably, since geth has the possibility for setting the head to a low
+		// height which is even lower than ancient head.
+		// In order to ensure that the head is always no higher than the data in
+		// the database(ancient store or active store), we need to update head
+		// first then remove the relative data from the database.
+		//
+		// Update head first(head fast block, head full block) before deleting the data.
+		if updateFn != nil {
+			updateFn(hc.chainDb.GlobalTable(), parent) //TODO
+		}
+		// Update head header then.
+		rawdb.WriteHeadHeaderHash(hc.chainDb.GlobalTable(), parentHash)
+
+		// Remove the relative data from the database.
+		if delFn != nil {
+			delFn(bbatch, rbatch, hash, num)
+		}
+		// Rewind header chain to new head.
 		rawdb.DeleteHeader(gbatch, hbatch, hash, num)
 		rawdb.DeleteTd(gbatch, hash, num)
+		rawdb.DeleteCanonicalHash(hbatch, num)
 
-		hdr = hc.GetHeader(hdr.ParentHash, hdr.Number.Uint64()-1)
-		hc.currentHeader.Store(hdr)
-	}
-	// Roll back the canonical chain numbering
-	for i := height; i > head; i-- {
-		rawdb.DeleteCanonicalHash(hc.chainDb, i)
+		hc.currentHeader.Store(parent)
+		hc.currentHeaderHash = parentHash
 	}
 	rawdb.Must("write header batch", hbatch.Write)
 	rawdb.Must("write body batch", bbatch.Write)
 	rawdb.Must("write global batch", gbatch.Write)
+	rawdb.Must("write receipts batch", rbatch.Write)
 
 	// Clear out any stale content from the caches
 	hc.headerCache.Purge()
 	hc.tdCache.Purge()
 	hc.numberCache.Purge()
-
-	if hdr == nil {
-		hdr = hc.genesisHeader
-		hc.currentHeader.Store(hdr)
-	}
-	hc.currentHeaderHash = hdr.Hash()
-
-	rawdb.WriteHeadHeaderHash(hc.chainDb.GlobalTable(), hc.currentHeaderHash)
 }
 
 // SetGenesis sets a new genesis block header for the chain

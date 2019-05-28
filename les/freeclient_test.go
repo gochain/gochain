@@ -44,7 +44,7 @@ const testFreeClientPoolTicks = 500000
 func testFreeClientPool(t *testing.T, connLimit, clientCount int) {
 	var (
 		clock       mclock.Simulated
-		db          = ethdb.NewMemDatabase()
+		db          = memorydb.New()
 		connected   = make([]bool, clientCount)
 		connTicks   = make([]int, clientCount)
 		disconnCh   = make(chan int, clientCount)

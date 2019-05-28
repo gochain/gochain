@@ -32,6 +32,7 @@ import (
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/crypto"
 	"github.com/gochain-io/gochain/v3/ethdb"
+	"github.com/gochain-io/gochain/v3/ethdb/memorydb"
 	"github.com/gochain-io/gochain/v3/rlp"
 )
 
@@ -42,8 +43,7 @@ func init() {
 
 // Used for testing
 func newEmpty() *Trie {
-	diskdb := ethdb.NewMemDatabase()
-	trie, _ := New(common.Hash{}, NewDatabase(diskdb))
+	trie, _ := New(common.Hash{}, NewDatabase(memorydb.New()))
 	return trie
 }
 
@@ -67,8 +67,7 @@ func TestNull(t *testing.T) {
 }
 
 func TestMissingRoot(t *testing.T) {
-	diskdb := ethdb.NewMemDatabase()
-	trie, err := New(common.HexToHash("0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"), NewDatabase(diskdb))
+	trie, err := New(common.HexToHash("0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"), NewDatabase(memorydb.New()))
 	if trie != nil {
 		t.Error("New returned non-nil trie for invalid root")
 	}
@@ -81,7 +80,7 @@ func TestMissingNodeDisk(t *testing.T)    { testMissingNode(t, false) }
 func TestMissingNodeMemonly(t *testing.T) { testMissingNode(t, true) }
 
 func testMissingNode(t *testing.T, memonly bool) {
-	diskdb := ethdb.NewMemDatabase()
+	diskdb := memorydb.New()
 	triedb := NewDatabase(diskdb)
 
 	trie, _ := New(common.Hash{}, triedb)
@@ -318,13 +317,13 @@ func TestLargeValue(t *testing.T) {
 }
 
 type countingDB struct {
-	common.Table
+	common.KeyValueStore
 	gets map[string]int
 }
 
 func (db *countingDB) Get(key []byte) ([]byte, error) {
 	db.gets[string(key)]++
-	return db.Table.Get(key)
+	return db.KeyValueStore.Get(key)
 }
 
 // randTest performs random trie operations.
@@ -380,8 +379,7 @@ func (randTest) Generate(r *rand.Rand, size int) reflect.Value {
 }
 
 func runRandTest(rt randTest) bool {
-	diskdb := ethdb.NewMemDatabase()
-	triedb := NewDatabase(diskdb)
+	triedb := NewDatabase(memorydb.New())
 
 	tr, _ := New(common.Hash{}, triedb)
 	values := make(map[string]string) // tracks content of the trie
@@ -533,7 +531,7 @@ func tempDB() (string, *Database) {
 	if err := diskDB.Open(); err != nil {
 		panic(fmt.Sprintf("can't create temporary database: %v", err))
 	}
-	return dir, NewDatabase(diskDB.GlobalTable())
+	return dir, NewDatabase(diskDB)
 }
 
 func getString(trie *Trie, k string) []byte {

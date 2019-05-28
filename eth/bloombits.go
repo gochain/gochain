@@ -60,7 +60,7 @@ func (gc *GoChain) startBloomHandlers(sectionSize uint64) {
 					task := <-request
 					task.Bitsets = make([][]byte, len(task.Sections))
 					for i, section := range task.Sections {
-						head := rawdb.ReadCanonicalHash(gc.chainDb, (section+1)*sectionSize-1)
+						head := rawdb.ReadCanonicalHash(gc.chainDb.HeaderTable(), (section+1)*sectionSize-1)
 						compVector := rawdb.ReadBloomBits(gc.chainDb.GlobalTable(), task.Bit, section, head)
 						if blob, err := bitutil.DecompressBytes(compVector, int(sectionSize)/8); err == nil {
 							task.Bitsets[i] = blob

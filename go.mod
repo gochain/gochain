@@ -5,15 +5,14 @@ go 1.12
 require (
 	cloud.google.com/go v0.27.0 // indirect
 	contrib.go.opencensus.io/exporter/stackdriver v0.6.0
-	github.com/OneOfOne/xxhash v1.2.2 // indirect
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
 	github.com/allegro/bigcache v1.1.0
 	github.com/aristanetworks/goarista v0.0.0-20180424004133-70dca2f27708
 	github.com/aws/aws-sdk-go v1.16.26 // indirect
 	github.com/btcsuite/btcd v0.0.0-20180418030112-675abc5df3c5
 	github.com/cespare/cp v1.0.0
-	github.com/cespare/xxhash v1.0.0
-	github.com/davecgh/go-spew v1.1.0
+	github.com/cespare/xxhash v1.1.0
+	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/docker v1.13.1
 	github.com/edsrzf/mmap-go v0.0.0-20170320065105-0bce6a688712
 	github.com/elastic/gosigar v0.0.0-20180330100440-37f05ff46ffa
@@ -22,7 +21,7 @@ require (
 	github.com/gizak/termui v2.2.0+incompatible
 	github.com/go-ini/ini v1.36.0 // indirect
 	github.com/go-ole/go-ole v1.2.1 // indirect
-	github.com/go-stack/stack v1.7.0
+	github.com/go-stack/stack v1.8.0
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/golang/protobuf v1.2.0
 	github.com/golang/snappy v0.0.0-20170215233205-553a64147049
@@ -53,22 +52,23 @@ require (
 	github.com/pborman/uuid v0.0.0-20170612153648-e790cca94e6c
 	github.com/peterh/liner v0.0.0-20180310181206-6106ee4fe3e8
 	github.com/pkg/errors v0.8.0
-	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/prometheus/tsdb v0.8.0
 	github.com/rjeczalik/notify v0.9.1
 	github.com/robertkrimen/otto v0.0.0-20180305042045-6c383dd335ef
 	github.com/rs/cors v0.0.0-20160617231935-a62a804a8a00
 	github.com/rs/xhandler v0.0.0-20170707052532-1eb70cf1520d // indirect
 	github.com/smartystreets/assertions v0.0.0-20190116191733-b6c0e53d7304 // indirect
 	github.com/smartystreets/goconvey v0.0.0-20181108003508-044398e4856c // indirect
-	github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72 // indirect
-	github.com/stretchr/testify v1.2.1
+	github.com/steakknife/bloomfilter v0.0.0-20180922174646-6819c0d2a570
+	github.com/steakknife/hamming v0.0.0-20180906055917-c99c65617cd3 // indirect
+	github.com/stretchr/testify v1.2.2
 	github.com/syndtr/goleveldb v0.0.0-20180502072349-ae970a0732be
 	go.opencensus.io v0.14.0
 	golang.org/x/crypto v0.0.0-20190123085648-057139ce5d2b
 	golang.org/x/net v0.0.0-20180906233101-161cd47e91fd
 	golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be // indirect
-	golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f
-	golang.org/x/sys v0.0.0-20180909124046-d0be0721c37e
+	golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
+	golang.org/x/sys v0.0.0-20181107165924-66b7b1311ac8
 	google.golang.org/api v0.0.0-20180904000447-0ad5a633fea1 // indirect
 	google.golang.org/appengine v1.1.0 // indirect
 	google.golang.org/genproto v0.0.0-20180831171423-11092d34479b // indirect

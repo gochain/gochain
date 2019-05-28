@@ -16,7 +16,7 @@
 
 // Contains a wrapper for the Ethereum client.
 
-package geth
+package gochain
 
 import (
 	"math/big"
@@ -138,7 +138,9 @@ func (ec *GoClient) SubscribeNewHead(ctx *Context, handler NewHeadHandler, buffe
 				handler.OnNewHead(&Header{header})
 
 			case err := <-rawSub.Err():
-				handler.OnError(err.Error())
+				if err != nil {
+					handler.OnError(err.Error())
+				}
 				return
 			}
 		}
@@ -227,7 +229,9 @@ func (ec *GoClient) SubscribeFilterLogs(ctx *Context, query *FilterQuery, handle
 				handler.OnFilterLogs(&Log{&log})
 
 			case err := <-rawSub.Err():
-				handler.OnError(err.Error())
+				if err != nil {
+					handler.OnError(err.Error())
+				}
 				return
 			}
 		}

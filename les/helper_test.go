@@ -148,6 +148,7 @@ func newTestProtocolManager(lightSync bool, blocks int, generator func(int, *cor
 		}
 		genesis = gspec.MustCommit(db)
 		chain   BlockChain
+		pool    txPool
 	)
 	if peers == nil {
 		peers = newPeerSet()
@@ -162,13 +163,14 @@ func newTestProtocolManager(lightSync bool, blocks int, generator func(int, *cor
 			panic(err)
 		}
 		chain = blockchain
+		pool = core.NewTxPool(core.DefaultTxPoolConfig, gspec.Config, blockchain)
 	}
 
 	indexConfig := light.TestServerIndexerConfig
 	if lightSync {
 		indexConfig = light.TestClientIndexerConfig
 	}
-	pm, err := NewProtocolManager(gspec.Config, indexConfig, lightSync, NetworkId, evmux, engine, peers, chain, nil, db, odr, nil, nil, make(chan struct{}), new(sync.WaitGroup), ulcConfig)
+	pm, err := NewProtocolManager(gspec.Config, indexConfig, lightSync, NetworkId, evmux, engine, peers, chain, pool, db, odr, nil, nil, make(chan struct{}), new(sync.WaitGroup), ulcConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +334,7 @@ type TestEntity struct {
 
 // newServerEnv creates a server testing environment with a connected test peer for testing purpose.
 func newServerEnv(t *testing.T, blocks int, protocol int, waitIndexers func(*core.ChainIndexer, *core.ChainIndexer, *core.ChainIndexer)) (*TestEntity, func()) {
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	cIndexer, bIndexer, btIndexer := testIndexers(db, nil, light.TestServerIndexerConfig)
 
 	pm := newTestProtocolManagerMust(t, false, blocks, testChainGen, nil, nil, db, nil)
@@ -364,7 +366,7 @@ func newServerEnv(t *testing.T, blocks int, protocol int, waitIndexers func(*cor
 // newClientServerEnv creates a client/server arch environment with a connected les server and light client pair
 // for testing purpose.
 func newClientServerEnv(t *testing.T, blocks int, protocol int, waitIndexers func(*core.ChainIndexer, *core.ChainIndexer, *core.ChainIndexer), newPeer bool) (*TestEntity, *TestEntity, func()) {
-	db, ldb := ethdb.NewMemDatabase(), ethdb.NewMemDatabase()
+	db, ldb := memorydb.New(), memorydb.New()
 	peers, lPeers := newPeerSet(), newPeerSet()
 
 	dist := newRequestDistributor(lPeers, make(chan struct{}), &mclock.System{})

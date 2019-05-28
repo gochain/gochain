@@ -457,7 +457,7 @@ func (tt *votingTest) run(t *testing.T) {
 		Signer:    make([]byte, signatureLength),
 	}
 	// Create a pristine blockchain with the genesis injected
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	genesis.Commit(db)
 
 	// Assemble a chain of headers from the cast votes

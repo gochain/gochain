@@ -196,7 +196,7 @@ func connectPeers(full, light pairPeer, version int) (*peer, *peer, error) {
 
 // newFullPeerPair creates node with full sync mode
 func newFullPeerPair(t *testing.T, index int, numberOfblocks int, chainGen func(int, *core.BlockGen)) pairPeer {
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 
 	pmFull := newTestProtocolManagerMust(t, false, numberOfblocks, chainGen, nil, nil, db, nil)
 
@@ -218,7 +218,7 @@ func newLightPeer(t *testing.T, ulcConfig *eth.ULCConfig) pairPeer {
 	peers := newPeerSet()
 	dist := newRequestDistributor(peers, make(chan struct{}), &mclock.System{})
 	rm := newRetrieveManager(peers, dist, nil)
-	ldb := ethdb.NewMemDatabase()
+	ldb := memorydb.New()
 
 	odr := NewLesOdr(ldb, light.DefaultClientIndexerConfig, rm)
 

@@ -52,7 +52,7 @@ var (
 func newTestProtocolManager(mode downloader.SyncMode, blocks int, generator func(int, *core.BlockGen), newtx chan<- []*types.Transaction) (*ProtocolManager, *ethdb.MemDatabase, error) {
 	var (
 		evmux  = new(core.InterfaceFeed)
-		db     = ethdb.NewMemDatabase()
+		db     = memorydb.New()
 		engine = clique.NewFaker()
 		gspec  = &core.Genesis{
 			Config: params.TestChainConfig,

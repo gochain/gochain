@@ -18,6 +18,7 @@ package core
 
 import (
 	"crypto/ecdsa"
+	"github.com/gochain-io/gochain/v3/ethdb/memorydb"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -133,7 +134,7 @@ func benchInsertChain(b *testing.B, disk bool, gen func(int, *BlockGen)) {
 	// Create the database in memory or in a temporary directory.
 	var db common.Database
 	if !disk {
-		db = ethdb.NewMemDatabase()
+		db = memorydb.New()
 	} else {
 		dir, err := ioutil.TempDir("", "eth-core-bench")
 		if err != nil {
@@ -224,7 +225,7 @@ func makeChainForBench(db common.Database, full bool, count uint64) {
 		}
 		hash = header.Hash()
 		rawdb.WriteHeader(db.GlobalTable(), db.HeaderTable(), header)
-		rawdb.WriteCanonicalHash(db, hash, n)
+		rawdb.WriteCanonicalHash(db.HeaderTable(), hash, n)
 		rawdb.WriteTd(db.GlobalTable(), hash, n, big.NewInt(int64(n+1)))
 		if full || n == 0 {
 			block := types.NewBlockWithHeader(header)

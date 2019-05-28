@@ -40,9 +40,6 @@ type IndexerConfig struct {
 	// The block frequency for creating CHTs.
 	ChtSize uint64
 
-	// A special auxiliary field represents client's chtsize for server config, otherwise represents server's chtsize.
-	PairChtSize uint64
-
 	// The number of confirmations needed to generate/accept a canonical hash help trie.
 	ChtConfirms uint64
 
@@ -63,8 +60,7 @@ type IndexerConfig struct {
 var (
 	// DefaultServerIndexerConfig wraps a set of configs as a default indexer config for server side.
 	DefaultServerIndexerConfig = &IndexerConfig{
-		ChtSize:           params.CHTFrequencyServer,
-		PairChtSize:       params.CHTFrequencyClient,
+		ChtSize:           params.CHTFrequency,
 		ChtConfirms:       params.HelperTrieProcessConfirmations,
 		BloomSize:         params.BloomBitsBlocks,
 		BloomConfirms:     params.BloomConfirms,
@@ -73,8 +69,7 @@ var (
 	}
 	// DefaultClientIndexerConfig wraps a set of configs as a default indexer config for client side.
 	DefaultClientIndexerConfig = &IndexerConfig{
-		ChtSize:           params.CHTFrequencyClient,
-		PairChtSize:       params.CHTFrequencyServer,
+		ChtSize:           params.CHTFrequency,
 		ChtConfirms:       params.HelperTrieConfirmations,
 		BloomSize:         params.BloomBitsBlocksClient,
 		BloomConfirms:     params.HelperTrieConfirmations,
@@ -83,8 +78,7 @@ var (
 	}
 	// TestServerIndexerConfig wraps a set of configs as a test indexer config for server side.
 	TestServerIndexerConfig = &IndexerConfig{
-		ChtSize:           64,
-		PairChtSize:       512,
+		ChtSize:           512,
 		ChtConfirms:       4,
 		BloomSize:         64,
 		BloomConfirms:     4,
@@ -94,7 +88,6 @@ var (
 	// TestClientIndexerConfig wraps a set of configs as a test indexer config for client side.
 	TestClientIndexerConfig = &IndexerConfig{
 		ChtSize:           512,
-		PairChtSize:       64,
 		ChtConfirms:       32,
 		BloomSize:         512,
 		BloomConfirms:     32,
@@ -103,17 +96,11 @@ var (
 	}
 )
 
-// trustedCheckpoints associates each known checkpoint with the genesis hash of the chain it belongs to
-var trustedCheckpoints = map[common.Hash]*params.TrustedCheckpoint{
-	params.MainnetGenesisHash: nil,
-	params.TestnetGenesisHash: nil,
-}
-
 var (
 	ErrNoTrustedCht       = errors.New("no trusted canonical hash trie")
 	ErrNoTrustedBloomTrie = errors.New("no trusted bloom trie")
 	ErrNoHeader           = errors.New("header not found")
-	chtPrefix             = []byte("chtRoot-") // chtPrefix + chtNum (uint64 big endian) -> trie root hash
+	chtPrefix             = []byte("chtRootV2-") // chtPrefix + chtNum (uint64 big endian) -> trie root hash
 	ChtTablePrefix        = "cht-"
 )
 
@@ -124,7 +111,6 @@ type ChtNode struct {
 }
 
 // GetChtRoot reads the CHT root associated to the given section from the database
-// Note that sectionIdx is specified according to LES/1 CHT section size.
 func GetChtRoot(db common.Database, sectionIdx uint64, sectionHead common.Hash) common.Hash {
 	var encNumber [8]byte
 	binary.BigEndian.PutUint64(encNumber[:], sectionIdx)
@@ -133,13 +119,10 @@ func GetChtRoot(db common.Database, sectionIdx uint64, sectionHead common.Hash) 
 }
 
 // StoreChtRoot writes the CHT root associated to the given section into the database
-// Note that sectionIdx is specified according to LES/1 CHT section size.
 func StoreChtRoot(db common.Database, sectionIdx uint64, sectionHead, root common.Hash) {
 	var encNumber [8]byte
 	binary.BigEndian.PutUint64(encNumber[:], sectionIdx)
-	if err := db.GlobalTable().Put(append(append(chtPrefix, encNumber[:]...), sectionHead.Bytes()...), root.Bytes()); err != nil {
-		log.Error("Cannot store cht root", "err", err)
-	}
+	db.GlobalTable().Put(append(append(chtPrefix, encNumber[:]...), sectionHead.Bytes()...), root.Bytes())
 }
 
 // ChtIndexerBackend implements core.ChainIndexerBackend.
@@ -163,7 +146,7 @@ func NewChtIndexer(db common.Database, odr OdrBackend, size, confirms uint64) *c
 		triedb:      trie.NewDatabaseWithCache(trieTable, 1), // Use a tiny cache only to keep memory down
 		sectionSize: size,
 	}
-	idb := common.NewTablePrefixer(db.GlobalTable(), "chtIndex-")
+	idb := common.NewTablePrefixer(db.GlobalTable(), "chtIndexV2-")
 	return core.NewChainIndexer(db, idb, backend, size, confirms, time.Millisecond*100, "cht")
 }
 
@@ -234,13 +217,9 @@ func (c *ChtIndexerBackend) Commit() error {
 	if err != nil {
 		return err
 	}
-	if err := c.triedb.Commit(root, false); err != nil {
-		log.Error("Cannot commit cht indexer backend", "err", err)
-	}
+	c.triedb.Commit(root, false)
 
-	if ((c.section+1)*c.sectionSize)%params.CHTFrequencyClient == 0 {
-		log.Info("Storing CHT", "section", c.section*c.sectionSize/params.CHTFrequencyClient, "head", fmt.Sprintf("%064x", c.lastHash), "root", fmt.Sprintf("%064x", root))
-	}
+	log.Info("Storing CHT", "section", c.section, "head", fmt.Sprintf("%064x", c.lastHash), "root", fmt.Sprintf("%064x", root))
 	StoreChtRoot(c.diskdb, c.section, c.lastHash, root)
 	return nil
 }
@@ -262,9 +241,7 @@ func GetBloomTrieRoot(db common.Database, sectionIdx uint64, sectionHead common.
 func StoreBloomTrieRoot(db common.Database, sectionIdx uint64, sectionHead, root common.Hash) {
 	var encNumber [8]byte
 	binary.BigEndian.PutUint64(encNumber[:], sectionIdx)
-	if err := db.GlobalTable().Put(append(append(bloomTriePrefix, encNumber[:]...), sectionHead.Bytes()...), root.Bytes()); err != nil {
-		log.Error("Cannot store bloom trie root", "err", err)
-	}
+	db.GlobalTable().Put(append(append(bloomTriePrefix, encNumber[:]...), sectionHead.Bytes()...), root.Bytes())
 }
 
 // BloomTrieIndexerBackend implements core.ChainIndexerBackend
@@ -383,6 +360,9 @@ func (b *BloomTrieIndexerBackend) Commit() error {
 		var decomp []byte
 		for j := uint64(0); j < b.bloomTrieRatio; j++ {
 			data := rawdb.ReadBloomBits(b.diskdb.GlobalTable(), i, b.section*b.bloomTrieRatio+j, b.sectionHeads[j])
+			if len(data) == 0 {
+				return errors.New("bloom bits not found")
+			}
 			decompData, err2 := bitutil.DecompressBytes(data, int(b.parentSize/8))
 			if err2 != nil {
 				return err2
@@ -403,9 +383,7 @@ func (b *BloomTrieIndexerBackend) Commit() error {
 	if err != nil {
 		return err
 	}
-	if err := b.triedb.Commit(root, false); err != nil {
-		log.Error("Cannot store bloom trie indexer trie db", "err", err)
-	}
+	b.triedb.Commit(root, false)
 
 	sectionHead := b.sectionHeads[b.bloomTrieRatio-1]
 	log.Info("Storing bloom trie", "section", b.section, "head", fmt.Sprintf("%064x", sectionHead), "root", fmt.Sprintf("%064x", root), "compression", float64(compSize)/float64(decompSize))

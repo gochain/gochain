@@ -325,14 +325,63 @@ func (t *Table) NewBatch() common.Batch {
 	return &tableBatch{table: t, batches: make(map[string]*ldbSegmentBatch)}
 }
 
+func (t *Table) HasAncient(kind string, number uint64) (bool, error) {
+	panic("implement me")
+}
+
+func (t *Table) Ancient(kind string, number uint64) ([]byte, error) {
+	panic("implement me")
+}
+
+func (t *Table) Ancients() (uint64, error) {
+	panic("implement me")
+}
+
+func (t *Table) AncientSize(kind string) (uint64, error) {
+	panic("implement me")
+}
+
+func (t *Table) AppendAncient(number uint64, hash, header, body, receipt, td []byte) error {
+	panic("implement me")
+}
+
+func (t *Table) TruncateAncients(n uint64) error {
+	panic("implement me")
+}
+
+func (t *Table) Sync() error {
+	panic("implement me")
+}
+
+func (t *Table) Stat(property string) (string, error) {
+	panic("implement me")
+}
+
+func (t *Table) Compact(start, limit []byte) error {
+	panic("implement me")
+}
+
+func (t *Table) NewIterator() common.Iterator {
+	panic("implement me")
+}
+
+func (t *Table) NewIteratorWithStart(start []byte) common.Iterator {
+	panic("implement me")
+}
+
+func (t *Table) NewIteratorWithPrefix(prefix []byte) common.Iterator {
+	panic("implement me")
+}
+
 // Compact converts LDB segments into immutable file segments.
-func (t *Table) Compact(ctx context.Context) error {
+func (t *Table) CompactAll(ctx context.Context) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.compact(ctx)
 }
 
 func (t *Table) compact(ctx context.Context) error {
+	//TODO use start and limit
 	// Retrieve LDB segments. Exit if too few mutable segments.
 	ldbSegmentSlice := t.ldbSegmentSlice()
 	if len(ldbSegmentSlice) < t.MinMutableSegmentCount {
@@ -460,4 +509,37 @@ func (b *tableBatch) Reset() {
 		sb.Reset()
 	}
 	b.size = 0
+}
+
+func (b *tableBatch) Replay(w common.KeyValueWriter) error {
+	for _, batch := range b.batches {
+		if err := batch.batch.Replay(&replayer{writer: w}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// replayer is a small wrapper to implement the correct replay methods.
+type replayer struct {
+	writer  common.KeyValueWriter
+	failure error
+}
+
+// Put inserts the given value into the key-value data store.
+func (r *replayer) Put(key, value []byte) {
+	// If the replay already failed, stop executing ops
+	if r.failure != nil {
+		return
+	}
+	r.failure = r.writer.Put(key, value)
+}
+
+// Delete removes the key from the key-value data store.
+func (r *replayer) Delete(key []byte) {
+	// If the replay already failed, stop executing ops
+	if r.failure != nil {
+		return
+	}
+	r.failure = r.writer.Delete(key)
 }

@@ -16,7 +16,7 @@
 
 // Contains all the wrappers from the math/big package.
 
-package geth
+package gochain
 
 import (
 	"errors"
@@ -83,6 +83,13 @@ func (bi *BigInt) SetString(x string, base int) {
 
 // BigInts represents a slice of big ints.
 type BigInts struct{ bigints []*big.Int }
+
+// NewBigInts creates a slice of uninitialized big numbers.
+func NewBigInts(size int) *BigInts {
+	return &BigInts{
+		bigints: make([]*big.Int, size),
+	}
+}
 
 // Size returns the number of big ints in the slice.
 func (bi *BigInts) Size() int {

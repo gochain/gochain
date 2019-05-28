@@ -93,7 +93,7 @@ func TestTable_Compact(t *testing.T) {
 		}
 
 		// Force compaction.
-		if err := tbl.Compact(context.Background()); err != nil {
+		if err := tbl.CompactAll(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -151,7 +151,7 @@ func TestTable_Compact(t *testing.T) {
 		}
 
 		// Attempt compaction, too soon. Expect LDB segment still.
-		if err := tbl.Compact(context.Background()); err != nil {
+		if err := tbl.CompactAll(context.Background()); err != nil {
 			t.Fatal(err)
 		} else if _, ok := tbl.SegmentSlice()[0].(*ethdb.LDBSegment); !ok {
 			t.Fatalf("expected ldb segment")
@@ -159,7 +159,7 @@ func TestTable_Compact(t *testing.T) {
 
 		// Wait and retry. Expect compaction to file segment.
 		time.Sleep(tbl.MinCompactionAge)
-		if err := tbl.Compact(context.Background()); err != nil {
+		if err := tbl.CompactAll(context.Background()); err != nil {
 			t.Fatal(err)
 		} else if _, ok := tbl.SegmentSlice()[0].(*ethdb.FileSegment); !ok {
 			t.Fatalf("expected file segment")
@@ -173,7 +173,7 @@ func TestTable_Compact(t *testing.T) {
 		}
 
 		// Attempt compaction immediately. Too soon again.
-		if err := tbl.Compact(context.Background()); err != nil {
+		if err := tbl.CompactAll(context.Background()); err != nil {
 			t.Fatal(err)
 		} else if _, ok := tbl.SegmentSlice()[0].(*ethdb.LDBSegment); !ok {
 			t.Fatalf("expected ldb segment")
@@ -181,7 +181,7 @@ func TestTable_Compact(t *testing.T) {
 
 		// Wait and retry. Expect compaction to file segment.
 		time.Sleep(tbl.MinCompactionAge)
-		if err := tbl.Compact(context.Background()); err != nil {
+		if err := tbl.CompactAll(context.Background()); err != nil {
 			t.Fatal(err)
 		} else if _, ok := tbl.SegmentSlice()[0].(*ethdb.FileSegment); !ok {
 			t.Fatalf("expected file segment")

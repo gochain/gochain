@@ -98,7 +98,7 @@ func (t *BlockTest) Run() error {
 	}
 
 	// import pre accounts & construct test genesis block & state root
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	gblock, err := t.genesis(config).Commit(db)
 	if err != nil {
 		return err

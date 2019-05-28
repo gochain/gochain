@@ -65,7 +65,7 @@ func (b *benchmarkBlockHeaders) init(pm *ProtocolManager, count int) error {
 	if b.byHash {
 		b.hashes = make([]common.Hash, count)
 		for i := range b.hashes {
-			b.hashes[i] = rawdb.ReadCanonicalHash(pm.chainDb, uint64(b.offset+rand.Int63n(b.randMax)))
+			b.hashes[i] = rawdb.ReadCanonicalHash(pm.chainDb.HeaderTable(), uint64(b.offset+rand.Int63n(b.randMax)))
 		}
 	}
 	return nil
@@ -89,7 +89,7 @@ func (b *benchmarkBodiesOrReceipts) init(pm *ProtocolManager, count int) error {
 	randMax := pm.blockchain.CurrentHeader().Number.Int64() + 1
 	b.hashes = make([]common.Hash, count)
 	for i := range b.hashes {
-		b.hashes[i] = rawdb.ReadCanonicalHash(pm.chainDb, uint64(rand.Int63n(randMax)))
+		b.hashes[i] = rawdb.ReadCanonicalHash(pm.chainDb.HeaderTable(), uint64(rand.Int63n(randMax)))
 	}
 	return nil
 }
@@ -135,8 +135,7 @@ func (b *benchmarkHelperTrie) init(pm *ProtocolManager, count int) error {
 		b.sectionCount, b.headNum, _ = pm.server.bloomTrieIndexer.Sections()
 	} else {
 		b.sectionCount, _, _ = pm.server.chtIndexer.Sections()
-		b.sectionCount /= (params.CHTFrequencyClient / params.CHTFrequencyServer)
-		b.headNum = b.sectionCount*params.CHTFrequencyClient - 1
+		b.headNum = b.sectionCount*params.CHTFrequency - 1
 	}
 	if b.sectionCount == 0 {
 		return fmt.Errorf("no processed sections available")

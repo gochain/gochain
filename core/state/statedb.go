@@ -22,12 +22,13 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
-	"sync"
+	"time"
 
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core/types"
 	"github.com/gochain-io/gochain/v3/crypto"
 	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain-io/gochain/v3/metrics"
 	"github.com/gochain-io/gochain/v3/rlp"
 	"github.com/gochain-io/gochain/v3/trie"
 )
@@ -38,8 +39,8 @@ type revision struct {
 }
 
 var (
-	// emptyState is the known hash of an empty state trie entry.
-	emptyState = crypto.Keccak256Hash(nil)
+	// emptyRoot is the known root hash of an empty trie.
+	emptyRoot = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 
 	// emptyCode is the known hash of the empty EVM bytecode.
 	emptyCode = crypto.Keccak256Hash(nil)
@@ -50,6 +51,10 @@ type proofList [][]byte
 func (n *proofList) Put(key []byte, value []byte) error {
 	*n = append(*n, value)
 	return nil
+}
+
+func (n *proofList) Delete(key []byte) error {
+	panic("not supported")
 }
 
 // StateDBs within the ethereum protocol are used to store anything
@@ -81,7 +86,15 @@ type StateDB struct {
 	validRevisions []revision
 	nextRevisionId int
 
-	lock sync.Mutex
+	// Measurements gathered during execution for debugging purposes
+	AccountReads   time.Duration
+	AccountHashes  time.Duration
+	AccountUpdates time.Duration
+	AccountCommits time.Duration
+	StorageReads   time.Duration
+	StorageHashes  time.Duration
+	StorageUpdates time.Duration
+	StorageCommits time.Duration
 }
 
 // Create a new state from a given trie.
@@ -454,17 +467,29 @@ func (db *StateDB) Suicide(addr common.Address) bool {
 
 // updateStateObject writes the given object to the trie.
 func (db *StateDB) updateStateObject(stateObject *stateObject) error {
+	// Track the amount of time wasted on updating the account from the trie
+	if metrics.EnabledExpensive {
+		defer func(start time.Time) { db.AccountUpdates += time.Since(start) }(time.Now())
+	}
+	// Encode the account and update the account trie
 	addr := stateObject.Address()
-	buf, err := stateObject.MarshalRLP()
+
+	data, err := rlp.EncodeToBytes(stateObject)
 	if err != nil {
 		panic(fmt.Errorf("can't encode object at %x: %v", addr[:], err))
 	}
-	return db.trie.TryUpdate(addr[:], buf)
+	return db.trie.TryUpdate(addr[:], data)
 }
 
 // deleteStateObject removes the given object from the state trie.
 func (db *StateDB) deleteStateObject(stateObject *stateObject) error {
+	// Track the amount of time wasted on deleting the account from the trie
+	if metrics.EnabledExpensive {
+		defer func(start time.Time) { db.AccountUpdates += time.Since(start) }(time.Now())
+	}
+	// Delete the account from the trie
 	stateObject.deleted = true
+
 	addr := stateObject.Address()
 	return db.trie.TryDelete(addr[:])
 }
@@ -477,6 +502,10 @@ func (db *StateDB) getStateObject(addr common.Address) (stateObject *stateObject
 			return nil, nil
 		}
 		return obj, nil
+	}
+	// Track the amount of time wasted on loading the object from the database
+	if metrics.EnabledExpensive {
+		defer func(start time.Time) { db.AccountReads += time.Since(start) }(time.Now())
 	}
 
 	// Load the object from the database.
@@ -546,23 +575,36 @@ func (db *StateDB) CreateAccount(addr common.Address) {
 	}
 }
 
-func (db *StateDB) ForEachStorage(addr common.Address, cb func(key, value common.Hash) bool) {
+func (db *StateDB) ForEachStorage(addr common.Address, cb func(key, value common.Hash) bool) error {
 	so, err := db.getStateObject(addr)
 	if err != nil {
-		log.Error("Failed to get state object", "err", err)
+		return fmt.Errorf("failed to get state object: %v", err)
 	}
 	if so == nil {
-		return
+		return nil
 	}
 	it := trie.NewIterator(so.getTrie(db.db).NodeIterator(nil))
+
 	for it.Next() {
 		key := common.BytesToHash(db.trie.GetKey(it.Key))
 		if value, dirty := so.dirtyStorage[key]; dirty {
-			cb(key, value)
+			if !cb(key, value) {
+				return nil
+			}
 			continue
 		}
-		cb(key, common.BytesToHash(it.Value))
+
+		if len(it.Value) > 0 {
+			_, content, _, err := rlp.Split(it.Value)
+			if err != nil {
+				return err
+			}
+			if !cb(key, common.BytesToHash(content)) {
+				return nil
+			}
+		}
 	}
+	return nil
 }
 
 // Copy creates a deep, independent copy of the state.
@@ -675,6 +717,11 @@ func (db *StateDB) Finalise(deleteEmptyObjects bool) {
 // goes into transaction receipts.
 func (db *StateDB) IntermediateRoot(deleteEmptyObjects bool) common.Hash {
 	db.Finalise(deleteEmptyObjects)
+
+	// Track the amount of time wasted on hashing the account trie
+	if metrics.EnabledExpensive {
+		defer func(start time.Time) { db.AccountHashes += time.Since(start) }(time.Now())
+	}
 	return db.trie.Hash()
 }
 
@@ -699,7 +746,7 @@ func (db *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error)
 	for addr := range db.journal.dirties {
 		db.stateObjectsDirty[addr] = struct{}{}
 	}
-	// Commit objects to the trie.
+	// Commit objects to the trie, measuring the elapsed time
 	for addr, stateObject := range db.stateObjects {
 		_, isDirty := db.stateObjectsDirty[addr]
 		switch {
@@ -722,13 +769,16 @@ func (db *StateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error)
 		}
 		delete(db.stateObjectsDirty, addr)
 	}
-	// Write trie changes.
+	// Write the account trie changes, measuring the amount of wasted time
+	if metrics.EnabledExpensive {
+		defer func(start time.Time) { db.AccountCommits += time.Since(start) }(time.Now())
+	}
 	root, err = db.trie.Commit(func(leaf []byte, parent common.Hash) error {
 		var account Account
 		if err := rlp.DecodeBytes(leaf, &account); err != nil {
 			return nil
 		}
-		if account.Root != emptyState {
+		if account.Root != emptyRoot {
 			db.db.TrieDB().Reference(account.Root, parent)
 		}
 		code := account.CodeHash

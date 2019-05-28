@@ -61,7 +61,7 @@ type downloadTester struct {
 
 // newTester creates a new downloader test mocker.
 func newTester() *downloadTester {
-	testdb := ethdb.NewMemDatabase()
+	testdb := memorydb.New()
 	genesis := core.GenesisBlockForTesting(testdb, testAddress, big.NewInt(1000000000))
 
 	tester := &downloadTester{
@@ -74,7 +74,7 @@ func newTester() *downloadTester {
 		ownReceipts: map[common.Hash]types.Receipts{genesis.Hash(): nil},
 		ownChainTd:  map[common.Hash]*big.Int{genesis.Hash(): genesis.Difficulty()},
 	}
-	tester.stateDb = ethdb.NewMemDatabase()
+	tester.stateDb = memorydb.New()
 	tester.stateDb.GlobalTable().Put(genesis.Root().Bytes(), []byte{0x00})
 
 	tester.downloader = New(FullSync, tester.stateDb, new(core.InterfaceFeed), tester, nil, tester.dropPeer)

@@ -18,6 +18,7 @@ package les
 
 import (
 	"context"
+	"errors"
 	"math/big"
 
 	"github.com/gochain-io/gochain/v3/accounts"
@@ -37,6 +38,7 @@ import (
 )
 
 type LesApiBackend struct {
+	extRPCEnabled bool
 	eth           *LightGoChain
 	initialSupply *big.Int
 	gpo           *gasprice.Oracle
@@ -87,8 +89,11 @@ func (b *LesApiBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumb
 
 func (b *LesApiBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.StateDB, *types.Header, error) {
 	header, err := b.HeaderByNumber(ctx, blockNr)
-	if header == nil || err != nil {
+	if err != nil {
 		return nil, nil, err
+	}
+	if header == nil {
+		return nil, nil, errors.New("header not found")
 	}
 	return light.NewState(ctx, header, b.eth.odr), header, nil
 }
@@ -135,6 +140,10 @@ func (b *LesApiBackend) GetPoolTransactions() types.Transactions {
 
 func (b *LesApiBackend) GetPoolTransaction(txHash common.Hash) *types.Transaction {
 	return b.eth.txPool.GetTransaction(txHash)
+}
+
+func (b *LesApiBackend) GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error) {
+	return light.GetTransaction(ctx, b.eth.odr, txHash)
 }
 
 func (b *LesApiBackend) GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error) {
@@ -211,6 +220,14 @@ func (b *LesApiBackend) ChainDb() common.Database {
 
 func (b *LesApiBackend) AccountManager() *accounts.Manager {
 	return b.eth.accountManager
+}
+
+func (b *LesApiBackend) ExtRPCEnabled() bool {
+	return b.extRPCEnabled
+}
+
+func (b *LesApiBackend) RPCGasCap() *big.Int {
+	return b.eth.config.RPCGasCap
 }
 
 func (b *LesApiBackend) BloomStatus() (uint64, uint64) {

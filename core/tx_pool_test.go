@@ -111,7 +111,7 @@ func setupTxPool() (*TxPool, *ecdsa.PrivateKey) {
 }
 
 func setupTxPoolState(stFn func(*state.StateDB, *ecdsa.PrivateKey)) (*TxPool, *ecdsa.PrivateKey) {
-	diskdb := ethdb.NewMemDatabase()
+	diskdb := memorydb.New()
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(diskdb))
 	key, _ := crypto.GenerateKey()
 	if stFn != nil {
@@ -205,7 +205,7 @@ func (c *testChain) State() (*state.StateDB, error) {
 	// a state change between those fetches.
 	stdb := c.statedb
 	if *c.trigger {
-		db := ethdb.NewMemDatabase()
+		db := memorydb.New()
 		c.statedb, _ = state.New(common.Hash{}, state.NewDatabase(db))
 		// simulate that the new head block included tx0 and tx1
 		c.statedb.SetNonce(c.address, 2)
@@ -222,7 +222,7 @@ func TestStateChangeDuringTransactionPoolReset(t *testing.T) {
 	t.Parallel()
 
 	var (
-		db         = ethdb.NewMemDatabase()
+		db         = memorydb.New()
 		key, _     = crypto.GenerateKey()
 		address    = crypto.PubkeyToAddress(key.PublicKey)
 		statedb, _ = state.New(common.Hash{}, state.NewDatabase(db))
@@ -896,7 +896,7 @@ func testTransactionQueueGlobalLimiting(t *testing.T, nolocals bool) {
 	t.Parallel()
 
 	// Create the pool to test the limit enforcement with
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 	blockchain := newTestBlockChain(statedb, 1000000)
 
@@ -1002,7 +1002,7 @@ func testTransactionQueueTimeLimiting(t *testing.T, nolocals bool) {
 	evictionInterval = time.Second
 
 	// Create the pool to test the non-expiration enforcement
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 	blockchain := newTestBlockChain(statedb, 1000000)
 
@@ -1174,7 +1174,7 @@ func TestTransactionPendingGlobalLimiting(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the limit enforcement with
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 	blockchain := newTestBlockChain(statedb, 1000000)
 
@@ -1225,7 +1225,7 @@ func TestTransactionCapClearsFromAll(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the limit enforcement with
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 	blockchain := newTestBlockChain(statedb, 1000000)
 
@@ -1262,7 +1262,7 @@ func TestTransactionPendingMinimumAllowance(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the limit enforcement with
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 	blockchain := newTestBlockChain(statedb, 1000000)
 
@@ -1315,7 +1315,7 @@ func TestTransactionPoolRepricing(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the pricing enforcement with
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 	blockchain := newTestBlockChain(statedb, 1000000)
 
@@ -1412,7 +1412,7 @@ func TestTransactionPoolRepricingKeepsLocals(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the pricing enforcement with
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 	blockchain := newTestBlockChain(statedb, 1000000)
 
@@ -1477,7 +1477,7 @@ func TestTransactionPoolUnderpricing(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the pricing enforcement with
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 	blockchain := newTestBlockChain(statedb, 1000000)
 
@@ -1560,7 +1560,7 @@ func TestTransactionPoolStableUnderpricing(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the pricing enforcement with
-	statedb, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	statedb, _ := state.New(common.Hash{}, state.NewDatabase(memorydb.New()))
 	blockchain := &testBlockChain{statedb: statedb, gasLimit: 1000000}
 
 	config := testTxPoolConfig
@@ -1633,7 +1633,7 @@ func TestTransactionReplacement(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the pricing enforcement with
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 	blockchain := newTestBlockChain(statedb, 1000000)
 
@@ -1738,7 +1738,7 @@ func testTransactionJournaling(t *testing.T, nolocals bool) {
 	os.Remove(journal)
 
 	// Create the original pool to inject transaction into the journal
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 	blockchain := newTestBlockChain(statedb, 1000000)
 
@@ -1841,7 +1841,7 @@ func TestTransactionStatusCheck(t *testing.T) {
 	t.Parallel()
 
 	// Create the pool to test the status retrievals with
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 	blockchain := newTestBlockChain(statedb, 1000000)
 

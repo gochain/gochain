@@ -164,6 +164,46 @@ func (db *DB) Table(name string) *Table {
 	}
 }
 
+func (db *DB) Has(key []byte) (bool, error) {
+	panic("implement me")
+}
+
+func (db *DB) Get(key []byte) ([]byte, error) {
+	panic("implement me")
+}
+
+func (db *DB) Put(key []byte, value []byte) error {
+	panic("implement me")
+}
+
+func (db *DB) Delete(key []byte) error {
+	panic("implement me")
+}
+
+func (db *DB) NewBatch() common.Batch {
+	panic("implement me")
+}
+
+func (db *DB) NewIterator() common.Iterator {
+	panic("implement me")
+}
+
+func (db *DB) NewIteratorWithStart(start []byte) common.Iterator {
+	panic("implement me")
+}
+
+func (db *DB) NewIteratorWithPrefix(prefix []byte) common.Iterator {
+	panic("implement me")
+}
+
+func (db *DB) Stat(property string) (string, error) {
+	panic("implement me")
+}
+
+func (db *DB) Compact(start, limit []byte) error {
+	panic("implement me")
+}
+
 // migrate converts a source LevelDB database to the new ethdb formatted database.
 func (db *DB) migrate() error {
 	const suffix = ".migrating"

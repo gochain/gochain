@@ -33,7 +33,7 @@ var (
 )
 
 // ReadDatabaseVersion retrieves the version number of the database.
-func ReadDatabaseVersion(db DatabaseReader) *uint64 {
+func ReadDatabaseVersion(db common.KeyValueReader) *uint64 {
 	var version uint64
 
 	var enc []byte
@@ -52,7 +52,7 @@ func ReadDatabaseVersion(db DatabaseReader) *uint64 {
 }
 
 // WriteDatabaseVersion stores the version number of the database
-func WriteDatabaseVersion(db DatabaseWriter, version uint64) {
+func WriteDatabaseVersion(db common.KeyValueWriter, version uint64) {
 	enc, err := rlp.EncodeToBytes(version)
 	if err != nil {
 		log.Crit("Failed to encode database version", "err", err)
@@ -63,7 +63,7 @@ func WriteDatabaseVersion(db DatabaseWriter, version uint64) {
 }
 
 // ReadChainConfig retrieves the consensus settings based on the given genesis hash.
-func ReadChainConfig(db DatabaseReader, hash common.Hash) *params.ChainConfig {
+func ReadChainConfig(db common.KeyValueReader, hash common.Hash) *params.ChainConfig {
 	var data []byte
 	Must("get chain config", func() (err error) {
 		data, err = db.Get(configKey(hash))
@@ -84,7 +84,7 @@ func ReadChainConfig(db DatabaseReader, hash common.Hash) *params.ChainConfig {
 }
 
 // WriteChainConfig writes the chain config settings to the database.
-func WriteChainConfig(db DatabaseWriter, hash common.Hash, cfg *params.ChainConfig) {
+func WriteChainConfig(db common.KeyValueWriter, hash common.Hash, cfg *params.ChainConfig) {
 	if cfg == nil {
 		return
 	}
@@ -98,7 +98,7 @@ func WriteChainConfig(db DatabaseWriter, hash common.Hash, cfg *params.ChainConf
 }
 
 // ReadPreimage retrieves a single preimage of the provided hash.
-func ReadPreimage(db DatabaseReader, hash common.Hash) []byte {
+func ReadPreimage(db common.KeyValueReader, hash common.Hash) []byte {
 	var data []byte
 	Must("get preimage", func() (err error) {
 		data, err = db.Get(preimageKey(hash))

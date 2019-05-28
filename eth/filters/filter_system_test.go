@@ -19,6 +19,7 @@ package filters
 import (
 	"context"
 	"fmt"
+	"github.com/gochain-io/gochain/v3/ethdb/memorydb"
 	"math/big"
 	"math/rand"
 	"reflect"
@@ -63,7 +64,7 @@ func (b *testBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumbe
 		num = *number
 	} else {
 		num = uint64(blockNr)
-		hash = rawdb.ReadCanonicalHash(b.db, num)
+		hash = rawdb.ReadCanonicalHash(b.db.HeaderTable(), num)
 	}
 	return rawdb.ReadHeader(b.db.HeaderTable(), hash, num), nil
 }
@@ -158,7 +159,7 @@ func (b *testBackend) ServiceFilter(ctx context.Context, session *bloombits.Matc
 				task.Bitsets = make([][]byte, len(task.Sections))
 				for i, section := range task.Sections {
 					if rand.Int()%4 != 0 { // Handle occasional missing deliveries
-						head := rawdb.ReadCanonicalHash(b.db, (section+1)*params.BloomBitsBlocks-1)
+						head := rawdb.ReadCanonicalHash(b.db.HeaderTable(), (section+1)*params.BloomBitsBlocks-1)
 						task.Bitsets[i] = rawdb.ReadBloomBits(b.db.GlobalTable(), task.Bit, section, head)
 					}
 				}
@@ -177,7 +178,7 @@ func TestBlockSubscription(t *testing.T) {
 	t.Parallel()
 
 	var (
-		db          = ethdb.NewMemDatabase()
+		db          = memorydb.New()
 		backend     = &testBackend{db: db}
 		api         = NewPublicFilterAPI(backend, false)
 		genesis     = core.GenesisBlockForTesting(db, common.Address{1}, common.Big256)
@@ -229,7 +230,7 @@ func TestPendingTxFilter(t *testing.T) {
 	t.Parallel()
 
 	var (
-		db      = ethdb.NewMemDatabase()
+		db      = memorydb.New()
 		backend = &testBackend{db: db}
 		api     = NewPublicFilterAPI(backend, false)
 
@@ -284,7 +285,7 @@ func TestPendingTxFilter(t *testing.T) {
 // If not it must return an error.
 func TestLogFilterCreation(t *testing.T) {
 	var (
-		db      = ethdb.NewMemDatabase()
+		db      = memorydb.New()
 		backend = &testBackend{db: db}
 		api     = NewPublicFilterAPI(backend, false)
 
@@ -328,7 +329,7 @@ func TestInvalidLogFilterCreation(t *testing.T) {
 	t.Parallel()
 
 	var (
-		db      = ethdb.NewMemDatabase()
+		db      = memorydb.New()
 		backend = &testBackend{db: db}
 		api     = NewPublicFilterAPI(backend, false)
 	)
@@ -350,7 +351,7 @@ func TestInvalidLogFilterCreation(t *testing.T) {
 
 func TestInvalidGetLogsRequest(t *testing.T) {
 	var (
-		db        = ethdb.NewMemDatabase()
+		db        = memorydb.New()
 		backend   = &testBackend{db: db}
 		api       = NewPublicFilterAPI(backend, false)
 		blockHash = common.HexToHash("0x1111111111111111111111111111111111111111111111111111111111111111")
@@ -375,7 +376,7 @@ func TestLogFilter(t *testing.T) {
 	t.Parallel()
 
 	var (
-		db      = ethdb.NewMemDatabase()
+		db      = memorydb.New()
 		backend = &testBackend{db: db}
 		api     = NewPublicFilterAPI(backend, false)
 
@@ -488,7 +489,7 @@ func TestPendingLogsSubscription(t *testing.T) {
 	t.Parallel()
 
 	var (
-		db      = ethdb.NewMemDatabase()
+		db      = memorydb.New()
 		backend = &testBackend{db: db}
 		api     = NewPublicFilterAPI(backend, false)
 

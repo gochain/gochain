@@ -20,10 +20,9 @@ import (
 	"hash"
 	"sync"
 
-	"golang.org/x/crypto/sha3"
-
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/rlp"
+	"golang.org/x/crypto/sha3"
 )
 
 type hasher struct {

@@ -53,7 +53,7 @@ func makeHeaderChain(parent *types.Header, n int, db common.Database, seed int) 
 // chain. Depending on the full flag, if creates either a full block chain or a
 // header only chain.
 func newCanonical(n int) (common.Database, *LightChain, error) {
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	signer := hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
 	gspec := core.Genesis{Config: params.TestChainConfig, Signer: signer}
 	genesis := gspec.MustCommit(db)
@@ -71,7 +71,7 @@ func newCanonical(n int) (common.Database, *LightChain, error) {
 
 // newTestLightChain creates a LightChain that doesn't validate anything.
 func newTestLightChain() *LightChain {
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	gspec := &core.Genesis{
 		Difficulty: big.NewInt(1),
 		Config:     params.TestChainConfig,

@@ -25,6 +25,7 @@ type Segment interface {
 	Has(key []byte) (bool, error)
 	Get(key []byte) ([]byte, error)
 	Iterator() SegmentIterator
+	//TODO range on iterator?
 }
 
 // SortSegments sorts a by name.

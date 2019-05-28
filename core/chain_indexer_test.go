@@ -19,6 +19,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"github.com/gochain-io/gochain/v3/ethdb/memorydb"
 	"math/big"
 	"math/rand"
 	"testing"
@@ -27,7 +28,6 @@ import (
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core/rawdb"
 	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/ethdb"
 )
 
 // Runs multiple tests with randomized parameters.
@@ -49,7 +49,7 @@ func TestChainIndexerWithChildren(t *testing.T) {
 // multiple backends. The section size and required confirmation count parameters
 // are randomized.
 func testChainIndexer(t *testing.T, count int) {
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	defer db.Close()
 
 	// Create a chain of indexers and ensure they all report empty
@@ -94,10 +94,10 @@ func testChainIndexer(t *testing.T, count int) {
 	inject := func(number uint64) {
 		header := &types.Header{Number: big.NewInt(int64(number)), Extra: big.NewInt(rand.Int63()).Bytes()}
 		if number > 0 {
-			header.ParentHash = rawdb.ReadCanonicalHash(db, number-1)
+			header.ParentHash = rawdb.ReadCanonicalHash(db.HeaderTable(), number-1)
 		}
 		rawdb.WriteHeader(db.GlobalTable(), db.HeaderTable(), header)
-		rawdb.WriteCanonicalHash(db, header.Hash(), number)
+		rawdb.WriteCanonicalHash(db.HeaderTable(), header.Hash(), number)
 	}
 	// Start indexer with an already existing chain
 	for i := uint64(0); i <= 100; i++ {

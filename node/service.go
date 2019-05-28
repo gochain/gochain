@@ -44,7 +44,7 @@ type ServiceContext struct {
 // node is an ephemeral one, a memory database is returned.
 func (ctx *ServiceContext) OpenDatabase(name string, cache int, handles int) (common.Database, error) {
 	if ctx.config.DataDir == "" {
-		return ethdb.NewMemDatabase(), nil
+		return memorydb.New(), nil
 	}
 	db := ethdb.NewDB(ctx.config.ResolvePath(name))
 	if err := s3.ConfigureDB(db, ctx.config.Ethdb); err != nil {
@@ -72,6 +72,12 @@ func (ctx *ServiceContext) Service(service interface{}) error {
 		return nil
 	}
 	return ErrServiceUnknown
+}
+
+// ExtRPCEnabled returns the indicator whether node enables the external
+// RPC(http, ws or graphql).
+func (ctx *ServiceContext) ExtRPCEnabled() bool {
+	return ctx.config.ExtRPCEnabled()
 }
 
 // ServiceConstructor is the function signature of the constructors needed to be

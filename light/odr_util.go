@@ -19,6 +19,7 @@ package light
 import (
 	"bytes"
 	"context"
+	"github.com/gochain-io/gochain/v3/core"
 
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core/rawdb"
@@ -31,7 +32,7 @@ var sha3Nil = crypto.Keccak256Hash(nil)
 
 func GetHeaderByNumber(ctx context.Context, odr OdrBackend, number uint64) (*types.Header, error) {
 	db := odr.Database()
-	hash := rawdb.ReadCanonicalHash(db, number)
+	hash := rawdb.ReadCanonicalHash(db.HeaderTable(), number)
 	if (hash != common.Hash{}) {
 		// if there is a canonical hash, there is a header too
 		header := rawdb.ReadHeader(db.HeaderTable(), hash, number)
@@ -47,14 +48,14 @@ func GetHeaderByNumber(ctx context.Context, odr OdrBackend, number uint64) (*typ
 	)
 	if odr.ChtIndexer() != nil {
 		chtCount, sectionHeadNum, sectionHead = odr.ChtIndexer().Sections()
-		canonicalHash := rawdb.ReadCanonicalHash(db, sectionHeadNum)
+		canonicalHash := rawdb.ReadCanonicalHash(db.HeaderTable(), sectionHeadNum)
 		// if the CHT was injected as a trusted checkpoint, we have no canonical hash yet so we accept zero hash too
 		for chtCount > 0 && canonicalHash != sectionHead && canonicalHash != (common.Hash{}) {
 			chtCount--
 			if chtCount > 0 {
 				sectionHeadNum = chtCount*odr.IndexerConfig().ChtSize - 1
 				sectionHead = odr.ChtIndexer().SectionHead(chtCount - 1)
-				canonicalHash = rawdb.ReadCanonicalHash(db, sectionHeadNum)
+				canonicalHash = rawdb.ReadCanonicalHash(db.HeaderTable(), sectionHeadNum)
 			}
 		}
 	}
@@ -69,7 +70,7 @@ func GetHeaderByNumber(ctx context.Context, odr OdrBackend, number uint64) (*typ
 }
 
 func GetCanonicalHash(ctx context.Context, odr OdrBackend, number uint64) (common.Hash, error) {
-	hash := rawdb.ReadCanonicalHash(odr.Database(), number)
+	hash := rawdb.ReadCanonicalHash(odr.Database().HeaderTable(), number)
 	if (hash != common.Hash{}) {
 		return hash, nil
 	}
@@ -141,7 +142,7 @@ func GetBlockReceipts(ctx context.Context, odr OdrBackend, hash common.Hash, num
 		if err != nil {
 			return nil, err
 		}
-		genesis := rawdb.ReadCanonicalHash(odr.Database(), 0)
+		genesis := rawdb.ReadCanonicalHash(odr.Database().HeaderTable(), 0)
 		config := rawdb.ReadChainConfig(odr.Database().GlobalTable(), genesis)
 
 		if err := receipts.DeriveFields(config, block.Hash(), block.NumberU64(), block.Transactions()); err != nil {
@@ -183,20 +184,20 @@ func GetBloomBits(ctx context.Context, odr OdrBackend, bitIdx uint, sectionIdxLi
 	)
 	if odr.BloomTrieIndexer() != nil {
 		bloomTrieCount, sectionHeadNum, sectionHead = odr.BloomTrieIndexer().Sections()
-		canonicalHash := rawdb.ReadCanonicalHash(db, sectionHeadNum)
+		canonicalHash := rawdb.ReadCanonicalHash(db.HeaderTable(), sectionHeadNum)
 		// if the BloomTrie was injected as a trusted checkpoint, we have no canonical hash yet so we accept zero hash too
 		for bloomTrieCount > 0 && canonicalHash != sectionHead && canonicalHash != (common.Hash{}) {
 			bloomTrieCount--
 			if bloomTrieCount > 0 {
 				sectionHeadNum = bloomTrieCount*odr.IndexerConfig().BloomTrieSize - 1
 				sectionHead = odr.BloomTrieIndexer().SectionHead(bloomTrieCount - 1)
-				canonicalHash = rawdb.ReadCanonicalHash(db, sectionHeadNum)
+				canonicalHash = rawdb.ReadCanonicalHash(db.HeaderTable(), sectionHeadNum)
 			}
 		}
 	}
 
 	for i, sectionIdx := range sectionIdxList {
-		sectionHead := rawdb.ReadCanonicalHash(db, (sectionIdx+1)*odr.IndexerConfig().BloomSize-1)
+		sectionHead := rawdb.ReadCanonicalHash(db.HeaderTable(), (sectionIdx+1)*odr.IndexerConfig().BloomSize-1)
 		// if we don't have the canonical hash stored for this section head number, we'll still look for
 		// an entry with a zero sectionHead (we store it with zero section head too if we don't know it
 		// at the time of the retrieval)
@@ -225,5 +226,25 @@ func GetBloomBits(ctx context.Context, odr OdrBackend, bitIdx uint, sectionIdxLi
 			result[idx] = r.BloomBits[i]
 		}
 		return result, nil
+	}
+}
+
+// GetTransaction retrieves a canonical transaction by hash and also returns its position in the chain
+func GetTransaction(ctx context.Context, odr OdrBackend, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error) {
+	r := &TxStatusRequest{Hashes: []common.Hash{txHash}}
+	if err := odr.Retrieve(ctx, r); err != nil || r.Status[0].Status != core.TxStatusIncluded {
+		return nil, common.Hash{}, 0, 0, err
+	} else {
+		pos := r.Status[0].Lookup
+		// first ensure that we have the header, otherwise block body retrieval will fail
+		// also verify if this is a canonical block by getting the header by number and checking its hash
+		if header, err := GetHeaderByNumber(ctx, odr, pos.BlockIndex); err != nil || header.Hash() != pos.BlockHash {
+			return nil, common.Hash{}, 0, 0, err
+		}
+		if body, err := GetBody(ctx, odr, pos.BlockHash, pos.BlockIndex); err != nil || uint64(len(body.Transactions)) <= pos.Index || body.Transactions[pos.Index].Hash() != txHash {
+			return nil, common.Hash{}, 0, 0, err
+		} else {
+			return body.Transactions[pos.Index], pos.BlockHash, pos.BlockIndex, pos.Index, nil
+		}
 	}
 }

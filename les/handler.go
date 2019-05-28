@@ -173,9 +173,12 @@ func NewProtocolManager(
 	if disableClientRemovePeer {
 		removePeer = func(id string) {}
 	}
-
 	if lightSync {
-		manager.downloader = downloader.New(downloader.LightSync, chainDb, manager.eventMux, nil, blockchain, removePeer)
+		var checkpoint uint64
+		if cht, ok := params.TrustedCheckpoints[blockchain.Genesis().Hash()]; ok {
+			checkpoint = (cht.SectionIndex+1)*params.CHTFrequency - 1
+		}
+		manager.downloader = downloader.New(checkpoint, chainDb, nil, manager.eventMux, nil, blockchain, removePeer)
 		manager.peers.notify((*downloaderPeerNotify)(manager))
 		manager.fetcher = newLightFetcher(manager)
 	}
@@ -721,31 +724,34 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if !accept(req.ReqID, uint64(reqCnt), MaxReceiptFetch) {
 			return errResp(ErrRequestRejected, "")
 		}
-		for _, hash := range req.Hashes {
-			if bytes >= softResponseLimit {
-				break
-			}
-			// Retrieve the requested block's receipts, skipping if unknown to us
-			var results types.Receipts
-			if number := rawdb.ReadHeaderNumber(pm.chainDb.GlobalTable(), hash); number != nil {
-				results = rawdb.ReadRawReceipts(pm.chainDb.ReceiptTable(), hash, *number)
-			}
-			if results == nil {
-				if header := pm.blockchain.GetHeaderByHash(hash); header == nil || header.ReceiptHash != types.EmptyRootHash {
-					continue
+		go func() {
+			for i, hash := range req.Hashes {
+				if i != 0 && !task.waitOrStop() {
+					return
+				}
+				if bytes >= softResponseLimit {
+					break
+				}
+				// Retrieve the requested block's receipts, skipping if unknown to us
+				var results types.Receipts
+				if number := rawdb.ReadHeaderNumber(pm.chainDb.GlobalTable(), hash); number != nil {
+					results = rawdb.ReadRawReceipts(pm.chainDb.ReceiptTable(), hash, *number)
+				}
+				if results == nil {
+					if header := pm.blockchain.GetHeaderByHash(hash); header == nil || header.ReceiptHash != types.EmptyRootHash {
+						continue
+					}
+				}
+				// If known, encode and queue for response packet
+				if encoded, err := rlp.EncodeToBytes(results); err != nil {
+					log.Error("Failed to encode receipt", "err", err)
+				} else {
+					receipts = append(receipts, encoded)
+					bytes += len(encoded)
 				}
 			}
-			// If known, encode and queue for response packet
-			if encoded, err := rlp.EncodeToBytes(results); err != nil {
-				log.Error("Failed to encode receipt", "err", err)
-			} else {
-				receipts = append(receipts, encoded)
-				bytes += len(encoded)
-			}
-		}
-		bv, rcost := p.fcClient.RequestProcessed(costs.baseCost + uint64(reqCnt)*costs.reqCost)
-		pm.server.fcCostStats.update(msg.Code, uint64(reqCnt), rcost)
-		return p.SendReceiptsRLP(req.ReqID, bv, receipts)
+			sendResponse(req.ReqID, uint64(reqCnt), p.ReplyReceiptsRLP(req.ReqID, receipts), task.done())
+		}()
 
 	case ReceiptsMsg:
 		if pm.odr == nil {
@@ -767,80 +773,6 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			ReqID:   resp.ReqID,
 			Obj:     resp.Receipts,
 		}
-
-	case GetProofsV1Msg:
-		p.Log().Trace("Received proofs request")
-		// Decode the retrieval message
-		var req struct {
-			ReqID uint64
-			Reqs  []ProofReq
-		}
-		if err := msg.Decode(&req); err != nil {
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
-		}
-		// Gather state data until the fetch or network limits is reached
-		var (
-			bytes  int
-			proofs proofsData
-		)
-		reqCnt := len(req.Reqs)
-		if !accept(req.ReqID, uint64(reqCnt), MaxProofsFetch) {
-			return errResp(ErrRequestRejected, "")
-		}
-		go func() {
-			for i, req := range req.Reqs {
-				if i != 0 && !task.waitOrStop() {
-					return
-				}
-				// Look up the root hash belonging to the request
-				number := rawdb.ReadHeaderNumber(pm.chainDb.GlobalTable(), req.BHash)
-				if number == nil {
-					p.Log().Warn("Failed to retrieve block num for proof", "hash", req.BHash)
-					continue
-				}
-				header := rawdb.ReadHeader(pm.chainDb.HeaderTable(), req.BHash, *number)
-				if header == nil {
-					p.Log().Warn("Failed to retrieve header for proof", "block", *number, "hash", req.BHash)
-					continue
-				}
-				// Open the account or storage trie for the request
-				statedb := pm.blockchain.StateCache()
-
-				var trie state.Trie
-				switch len(req.AccKey) {
-				case 0:
-					// No account key specified, open an account trie
-					trie, err = statedb.OpenTrie(header.Root)
-					if trie == nil || err != nil {
-						p.Log().Warn("Failed to open storage trie for proof", "block", header.Number, "hash", header.Hash(), "root", header.Root, "err", err)
-						continue
-					}
-				default:
-					// Account key specified, open a storage trie
-					account, err := pm.getAccount(statedb.TrieDB(), header.Root, common.BytesToHash(req.AccKey))
-					if err != nil {
-						p.Log().Warn("Failed to retrieve account for proof", "block", header.Number, "hash", header.Hash(), "account", common.BytesToHash(req.AccKey), "err", err)
-						continue
-					}
-					trie, err = statedb.OpenStorageTrie(common.BytesToHash(req.AccKey), account.Root)
-					if trie == nil || err != nil {
-						p.Log().Warn("Failed to open storage trie for proof", "block", header.Number, "hash", header.Hash(), "account", common.BytesToHash(req.AccKey), "root", account.Root, "err", err)
-						continue
-					}
-				}
-				// Prove the user's request from the account or stroage trie
-				var proof light.NodeList
-				if err := trie.Prove(req.Key, 0, &proof); err != nil {
-					p.Log().Warn("Failed to prove state request", "block", header.Number, "hash", header.Hash(), "err", err)
-					continue
-				}
-				proofs = append(proofs, proof)
-				if bytes += proof.DataSize(); bytes >= softResponseLimit {
-					break
-				}
-			}
-			sendResponse(req.ReqID, uint64(reqCnt), p.ReplyProofs(req.ReqID, proofs), task.done())
-		}()
 
 	case GetProofsV2Msg:
 		p.Log().Trace("Received les/2 proofs request")
@@ -923,27 +855,6 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			sendResponse(req.ReqID, uint64(reqCnt), p.ReplyProofsV2(req.ReqID, nodes.NodeList()), task.done())
 		}()
 
-	case ProofsV1Msg:
-		if pm.odr == nil {
-			return errResp(ErrUnexpectedResponse, "")
-		}
-
-		p.Log().Trace("Received proofs response")
-		// A batch of merkle proofs arrived to one of our previous requests
-		var resp struct {
-			ReqID, BV uint64
-			Data      []light.NodeList
-		}
-		if err := msg.Decode(&resp); err != nil {
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
-		}
-		p.fcServer.ReceivedReply(resp.ReqID, resp.BV)
-		deliverMsg = &Msg{
-			MsgType: MsgProofsV1,
-			ReqID:   resp.ReqID,
-			Obj:     resp.Data,
-		}
-
 	case ProofsV2Msg:
 		if pm.odr == nil {
 			return errResp(ErrUnexpectedResponse, "")
@@ -964,54 +875,6 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			ReqID:   resp.ReqID,
 			Obj:     resp.Data,
 		}
-
-	case GetHeaderProofsMsg:
-		p.Log().Trace("Received headers proof request")
-		// Decode the retrieval message
-		var req struct {
-			ReqID uint64
-			Reqs  []ChtReq
-		}
-		if err := msg.Decode(&req); err != nil {
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
-		}
-		// Gather state data until the fetch or network limits is reached
-		var (
-			bytes  int
-			proofs []ChtResp
-		)
-		reqCnt := len(req.Reqs)
-		if !accept(req.ReqID, uint64(reqCnt), MaxHelperTrieProofsFetch) {
-			return errResp(ErrRequestRejected, "")
-		}
-		go func() {
-			trieDb := trie.NewDatabase(common.NewTablePrefixer(pm.chainDb.GlobalTable(), light.ChtTablePrefix))
-			for i, req := range req.Reqs {
-				if i != 0 && !task.waitOrStop() {
-					return
-				}
-				if header := pm.blockchain.GetHeaderByNumber(req.BlockNum); header != nil {
-					sectionHead := rawdb.ReadCanonicalHash(pm.chainDb, req.ChtNum*pm.iConfig.ChtSize-1)
-					if root := light.GetChtRoot(pm.chainDb, req.ChtNum-1, sectionHead); root != (common.Hash{}) {
-						trie, err := trie.New(root, trieDb)
-						if err != nil {
-							continue
-						}
-						var encNumber [8]byte
-						binary.BigEndian.PutUint64(encNumber[:], req.BlockNum)
-
-						var proof light.NodeList
-						trie.Prove(encNumber[:], 0, &proof)
-
-						proofs = append(proofs, ChtResp{Header: header, Proof: proof})
-						if bytes += proof.DataSize() + estHeaderRlpSize; bytes >= softResponseLimit {
-							break
-						}
-					}
-				}
-			}
-			sendResponse(req.ReqID, uint64(reqCnt), p.ReplyHeaderProofs(req.ReqID, proofs), task.done())
-		}()
 
 	case GetHelperTrieProofsMsg:
 		p.Log().Trace("Received helper trie proof request")
@@ -1077,26 +940,6 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			sendResponse(req.ReqID, uint64(reqCnt), p.ReplyHelperTrieProofs(req.ReqID, HelperTrieResps{Proofs: nodes.NodeList(), AuxData: auxData}), task.done())
 		}()
 
-	case HeaderProofsMsg:
-		if pm.odr == nil {
-			return errResp(ErrUnexpectedResponse, "")
-		}
-
-		p.Log().Trace("Received headers proof response")
-		var resp struct {
-			ReqID, BV uint64
-			Data      []ChtResp
-		}
-		if err := msg.Decode(&resp); err != nil {
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
-		}
-		p.fcServer.ReceivedReply(resp.ReqID, resp.BV)
-		deliverMsg = &Msg{
-			MsgType: MsgHeaderProofs,
-			ReqID:   resp.ReqID,
-			Obj:     resp.Data,
-		}
-
 	case HelperTrieProofsMsg:
 		if pm.odr == nil {
 			return errResp(ErrUnexpectedResponse, "")
@@ -1118,29 +961,6 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			Obj:     resp.Data,
 		}
 
-	case SendTxMsg:
-		if pm.txpool == nil {
-			return errResp(ErrRequestRejected, "")
-		}
-		// Transactions arrived, parse all of them and deliver to the pool
-		var txs []*types.Transaction
-		if err := msg.Decode(&txs); err != nil {
-			return errResp(ErrDecode, "msg %v: %v", msg, err)
-		}
-		reqCnt := len(txs)
-		if !accept(0, uint64(reqCnt), MaxTxSend) {
-			return errResp(ErrRequestRejected, "")
-		}
-		go func() {
-			for i, tx := range txs {
-				if i != 0 && !task.waitOrStop() {
-					return
-				}
-				pm.txpool.AddRemotes([]*types.Transaction{tx})
-			}
-			sendResponse(0, uint64(reqCnt), nil, task.done())
-		}()
-
 	case SendTxV2Msg:
 		if pm.txpool == nil {
 			return errResp(ErrRequestRejected, "")
@@ -1158,7 +978,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrRequestRejected, "")
 		}
 		go func() {
-			stats := make([]txStatus, len(req.Txs))
+			stats := make([]light.TxStatus, len(req.Txs))
 			for i, tx := range req.Txs {
 				if i != 0 && !task.waitOrStop() {
 					return
@@ -1166,7 +986,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 				hash := tx.Hash()
 				stats[i] = pm.txStatus(hash)
 				if stats[i].Status == core.TxStatusUnknown {
-					if errs := pm.txpool.AddRemotes([]*types.Transaction{tx}); len(errs) > 0 {
+					if errs := pm.txpool.AddRemotes([]*types.Transaction{tx}); errs[0] != nil {
 						stats[i].Error = errs[0].Error()
 						continue
 					}
@@ -1193,7 +1013,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			return errResp(ErrRequestRejected, "")
 		}
 		go func() {
-			stats := make([]txStatus, len(req.Hashes))
+			stats := make([]light.TxStatus, len(req.Hashes))
 			for i, hash := range req.Hashes {
 				if i != 0 && !task.waitOrStop() {
 					return
@@ -1211,13 +1031,20 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		p.Log().Trace("Received tx status response")
 		var resp struct {
 			ReqID, BV uint64
-			Status    []txStatus
+			Status    []light.TxStatus
 		}
 		if err := msg.Decode(&resp); err != nil {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
 
 		p.fcServer.ReceivedReply(resp.ReqID, resp.BV)
+
+		p.Log().Trace("Received helper trie proof response")
+		deliverMsg = &Msg{
+			MsgType: MsgTxStatus,
+			ReqID:   resp.ReqID,
+			Obj:     resp.Status,
+		}
 
 	default:
 		p.Log().Trace("Received unknown message", "code", msg.Code)
@@ -1257,11 +1084,10 @@ func (pm *ProtocolManager) getAccount(triedb *trie.Database, root, hash common.H
 func (pm *ProtocolManager) getHelperTrie(id uint, idx uint64) (common.Hash, string) {
 	switch id {
 	case htCanonical:
-		idxV1 := (idx+1)*(pm.iConfig.PairChtSize/pm.iConfig.ChtSize) - 1
-		sectionHead := rawdb.ReadCanonicalHash(pm.chainDb, (idxV1+1)*pm.iConfig.ChtSize-1)
-		return light.GetChtRoot(pm.chainDb, idxV1, sectionHead), light.ChtTablePrefix
+		sectionHead := rawdb.ReadCanonicalHash(pm.chainDb.HeaderTable(), (idx+1)*pm.iConfig.ChtSize-1)
+		return light.GetChtRoot(pm.chainDb, idx, sectionHead), light.ChtTablePrefix
 	case htBloomBits:
-		sectionHead := rawdb.ReadCanonicalHash(pm.chainDb, (idx+1)*pm.iConfig.BloomTrieSize-1)
+		sectionHead := rawdb.ReadCanonicalHash(pm.chainDb.HeaderTable(), (idx+1)*pm.iConfig.BloomTrieSize-1)
 		return light.GetBloomTrieRoot(pm.chainDb, idx, sectionHead), light.BloomTrieTablePrefix
 	}
 	return common.Hash{}, ""
@@ -1271,24 +1097,20 @@ func (pm *ProtocolManager) getHelperTrie(id uint, idx uint64) (common.Hash, stri
 func (pm *ProtocolManager) getHelperTrieAuxData(req HelperTrieReq) []byte {
 	if req.Type == htCanonical && req.AuxReq == auxHeader && len(req.Key) == 8 {
 		blockNum := binary.BigEndian.Uint64(req.Key)
-		hash := rawdb.ReadCanonicalHash(pm.chainDb, blockNum)
+		hash := rawdb.ReadCanonicalHash(pm.chainDb.HeaderTable(), blockNum)
 		return rawdb.ReadHeaderRLP(pm.chainDb.HeaderTable(), hash, blockNum)
 	}
 	return nil
 }
 
-func (pm *ProtocolManager) txStatus(hashes []common.Hash) []txStatus {
-	stats := make([]txStatus, len(hashes))
-	for i, stat := range pm.txpool.Status(hashes) {
-		// Save the status we've got from the transaction pool
-		stats[i].Status = stat
-
-		// If the transaction is unknown to the pool, try looking it up locally
-		if stat == core.TxStatusUnknown {
-			if tx, block, number, index := rawdb.ReadTransaction(pm.chainDb, hashes[i]); tx != nil {
-				stats[i].Status = core.TxStatusIncluded
-				stats[i].Lookup = &rawdb.LegacyTxLookupEntry{BlockHash: block, BlockIndex: number, Index: index}
-			}
+func (pm *ProtocolManager) txStatus(hash common.Hash) light.TxStatus {
+	var stat light.TxStatus
+	stat.Status = pm.txpool.Status([]common.Hash{hash})[0]
+	// If the transaction is unknown to the pool, try looking it up locally
+	if stat.Status == core.TxStatusUnknown {
+		if tx, blockHash, blockNumber, txIndex := rawdb.ReadTransaction(pm.chainDb, hash); tx != nil {
+			stat.Status = core.TxStatusIncluded
+			stat.Lookup = &rawdb.LegacyTxLookupEntry{BlockHash: blockHash, BlockIndex: blockNumber, Index: txIndex}
 		}
 	}
 	return stat

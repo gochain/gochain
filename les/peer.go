@@ -34,10 +34,9 @@ import (
 )
 
 var (
-	errClosed             = errors.New("peer set is closed")
-	errAlreadyRegistered  = errors.New("peer is already registered")
-	errNotRegistered      = errors.New("peer is not registered")
-	errInvalidHelpTrieReq = errors.New("invalid help trie request")
+	errClosed            = errors.New("peer set is closed")
+	errAlreadyRegistered = errors.New("peer is already registered")
+	errNotRegistered     = errors.New("peer is not registered")
 )
 
 const maxResponseErrors = 50 // number of invalid responses tolerated (makes the protocol less brittle but still avoids spam)
@@ -233,7 +232,11 @@ func (p *peer) GetRequestCost(msgcode uint64, amount int) uint64 {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	cost := p.fcCosts[msgcode].baseCost + p.fcCosts[msgcode].reqCost*uint64(amount)
+	costs := p.fcCosts[msgcode]
+	if costs == nil {
+		return 0
+	}
+	cost := costs.baseCost + costs.reqCost*uint64(amount)
 	if cost > p.fcParams.BufLimit {
 		cost = p.fcParams.BufLimit
 	}
@@ -244,18 +247,12 @@ func (p *peer) GetTxRelayCost(amount, size int) uint64 {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	var msgcode uint64
-	switch p.version {
-	case lpv1:
-		msgcode = SendTxMsg
-	case lpv2:
-		msgcode = SendTxV2Msg
-	default:
-		panic(nil)
+	costs := p.fcCosts[SendTxV2Msg]
+	if costs == nil {
+		return 0
 	}
-
-	cost := p.fcCosts[msgcode].baseCost + p.fcCosts[msgcode].reqCost*uint64(amount)
-	sizeCost := p.fcCosts[msgcode].baseCost + p.fcCosts[msgcode].reqCost*uint64(size)/txSizeCostLimit
+	cost := costs.baseCost + costs.reqCost*uint64(amount)
+	sizeCost := costs.baseCost + costs.reqCost*uint64(size)/txSizeCostLimit
 	if sizeCost > cost {
 		cost = sizeCost
 	}
@@ -307,22 +304,10 @@ func (p *peer) ReplyReceiptsRLP(reqID uint64, receipts []rlp.RawValue) *reply {
 	return &reply{p.rw, ReceiptsMsg, reqID, data}
 }
 
-// ReplyProofs creates a reply with a batch of legacy LES/1 merkle proofs, corresponding to the ones requested.
-func (p *peer) ReplyProofs(reqID uint64, proofs proofsData) *reply {
-	data, _ := rlp.EncodeToBytes(proofs)
-	return &reply{p.rw, ProofsV1Msg, reqID, data}
-}
-
 // ReplyProofsV2 creates a reply with a batch of merkle proofs, corresponding to the ones requested.
 func (p *peer) ReplyProofsV2(reqID uint64, proofs light.NodeList) *reply {
 	data, _ := rlp.EncodeToBytes(proofs)
 	return &reply{p.rw, ProofsV2Msg, reqID, data}
-}
-
-// ReplyHeaderProofs creates a reply with a batch of legacy LES/1 header proofs, corresponding to the ones requested.
-func (p *peer) ReplyHeaderProofs(reqID uint64, proofs []ChtResp) *reply {
-	data, _ := rlp.EncodeToBytes(proofs)
-	return &reply{p.rw, HeaderProofsMsg, reqID, data}
 }
 
 // ReplyHelperTrieProofs creates a reply with a batch of HelperTrie proofs, corresponding to the ones requested.
@@ -332,7 +317,7 @@ func (p *peer) ReplyHelperTrieProofs(reqID uint64, resp HelperTrieResps) *reply 
 }
 
 // ReplyTxStatus creates a reply with a batch of transaction status records, corresponding to the ones requested.
-func (p *peer) ReplyTxStatus(reqID uint64, stats []txStatus) *reply {
+func (p *peer) ReplyTxStatus(reqID uint64, stats []light.TxStatus) *reply {
 	data, _ := rlp.EncodeToBytes(stats)
 	return &reply{p.rw, TxStatusMsg, reqID, data}
 }
@@ -374,36 +359,13 @@ func (p *peer) RequestReceipts(reqID, cost uint64, hashes []common.Hash) error {
 // RequestProofs fetches a batch of merkle proofs from a remote node.
 func (p *peer) RequestProofs(reqID, cost uint64, reqs []ProofReq) error {
 	p.Log().Debug("Fetching batch of proofs", "count", len(reqs))
-	switch p.version {
-	case lpv1:
-		return sendRequest(p.rw, GetProofsV1Msg, reqID, cost, reqs)
-	case lpv2:
-		return sendRequest(p.rw, GetProofsV2Msg, reqID, cost, reqs)
-	default:
-		panic(nil)
-	}
+	return sendRequest(p.rw, GetProofsV2Msg, reqID, cost, reqs)
 }
 
 // RequestHelperTrieProofs fetches a batch of HelperTrie merkle proofs from a remote node.
-func (p *peer) RequestHelperTrieProofs(reqID, cost uint64, data interface{}) error {
-	switch p.version {
-	case lpv1:
-		reqs, ok := data.([]ChtReq)
-		if !ok {
-			return errInvalidHelpTrieReq
-		}
-		p.Log().Debug("Fetching batch of header proofs", "count", len(reqs))
-		return sendRequest(p.rw, GetHeaderProofsMsg, reqID, cost, reqs)
-	case lpv2:
-		reqs, ok := data.([]HelperTrieReq)
-		if !ok {
-			return errInvalidHelpTrieReq
-		}
-		p.Log().Debug("Fetching batch of HelperTrie proofs", "count", len(reqs))
-		return sendRequest(p.rw, GetHelperTrieProofsMsg, reqID, cost, reqs)
-	default:
-		panic(nil)
-	}
+func (p *peer) RequestHelperTrieProofs(reqID, cost uint64, reqs []HelperTrieReq) error {
+	p.Log().Debug("Fetching batch of HelperTrie proofs", "count", len(reqs))
+	return sendRequest(p.rw, GetHelperTrieProofsMsg, reqID, cost, reqs)
 }
 
 // RequestTxStatus fetches a batch of transaction status records from a remote node.
@@ -415,14 +377,7 @@ func (p *peer) RequestTxStatus(reqID, cost uint64, txHashes []common.Hash) error
 // SendTxStatus creates a reply with a batch of transactions to be added to the remote transaction pool.
 func (p *peer) SendTxs(reqID, cost uint64, txs rlp.RawValue) error {
 	p.Log().Debug("Sending batch of transactions", "size", len(txs))
-	switch p.version {
-	case lpv1:
-		return p2p.Send(p.rw, SendTxMsg, txs) // old message format does not include reqID
-	case lpv2:
-		return sendRequest(p.rw, SendTxV2Msg, reqID, cost, txs)
-	default:
-		panic(nil)
-	}
+	return sendRequest(p.rw, SendTxV2Msg, reqID, cost, txs)
 }
 
 type keyValueEntry struct {
@@ -524,7 +479,7 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis 
 			costList = testCostList()
 		}
 		send = send.add("flowControl/MRC", costList)
-		p.fcCosts = costList.decode()
+		p.fcCosts = costList.decode(ProtocolLengths[uint(p.version)])
 		p.fcParams = server.defParams
 	} else {
 		//on client node
@@ -616,7 +571,14 @@ func (p *peer) Handshake(td *big.Int, head common.Hash, headNum uint64, genesis 
 		}
 		p.fcParams = params
 		p.fcServer = flowcontrol.NewServerNode(params, &mclock.System{})
-		p.fcCosts = MRC.decode()
+		p.fcCosts = MRC.decode(ProtocolLengths[uint(p.version)])
+		if !p.isOnlyAnnounce {
+			for msgCode := range reqAvgTimeCost {
+				if p.fcCosts[msgCode] == nil {
+					return errResp(ErrUselessPeer, "peer does not support message %d", msgCode)
+				}
+			}
+		}
 	}
 	p.headInfo = &announceData{Td: rTd, Hash: rHash, Number: rNum}
 	return nil
@@ -642,7 +604,10 @@ func (p *peer) updateFlowControl(update keyValueMap) {
 	}
 	var MRC RequestCostList
 	if update.get("flowControl/MRC", &MRC) == nil {
-		p.fcCosts = MRC.decode()
+		costUpdate := MRC.decode(ProtocolLengths[uint(p.version)])
+		for code, cost := range costUpdate {
+			p.fcCosts[code] = cost
+		}
 	}
 }
 

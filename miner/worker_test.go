@@ -48,6 +48,12 @@ var (
 	// Test transactions
 	pendingTxs []*types.Transaction
 	newTxs     []*types.Transaction
+
+	testConfig = &Config{
+		Recommit: time.Second,
+		GasFloor: params.GenesisGasLimit,
+		GasCeil:  params.GenesisGasLimit,
+	}
 )
 
 func init() {
@@ -74,7 +80,7 @@ type testWorkerBackend struct {
 
 func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, n int) *testWorkerBackend {
 	var (
-		db    = ethdb.NewMemDatabase()
+		db    = memorydb.New()
 		gspec = core.Genesis{
 			Config:    chainConfig,
 			Alloc:     core.GenesisAlloc{testBankAddress: {Balance: testBankFunds}},
@@ -124,7 +130,7 @@ func (b *testWorkerBackend) PostChainEvents(events []interface{}) {
 func newTestWorker(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine, blocks int) (*worker, *testWorkerBackend) {
 	backend := newTestWorkerBackend(t, chainConfig, engine, blocks)
 	backend.txPool.AddLocals(pendingTxs)
-	w := newWorker(chainConfig, engine, backend, new(core.InterfaceFeed), time.Second, params.GenesisGasLimit, params.GenesisGasLimit, nil)
+	w := newWorker(testConfig, chainConfig, engine, backend, new(core.InterfaceFeed), time.Second, params.GenesisGasLimit, params.GenesisGasLimit, nil)
 	w.setEtherbase(testBankAddress)
 	return w, backend
 }

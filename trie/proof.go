@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/crypto"
 	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/rlp"
 )
@@ -33,7 +32,7 @@ import (
 // If the trie does not contain a value for key, the returned proof contains all
 // nodes of the longest existing prefix of the key (at least the root node), ending
 // with the node that proves the absence of the key.
-func (t *Trie) Prove(key []byte, fromLevel uint, proofDb common.Putter) error {
+func (t *Trie) Prove(key []byte, fromLevel uint, proofDb common.KeyValueWriter) error {
 	// Collect all nodes on the path to key.
 	key = keybytesToHex(key)
 	var nodes []node
@@ -80,11 +79,9 @@ func (t *Trie) Prove(key []byte, fromLevel uint, proofDb common.Putter) error {
 			} else {
 				enc, _ := rlp.EncodeToBytes(n)
 				if !ok {
-					hash = crypto.Keccak256(enc)
+					hash = hasher.makeHashNode(enc)
 				}
-				if err := proofDb.Put(hash, enc); err != nil {
-					log.Error("Cannot insert into proof db", "err", err)
-				}
+				proofDb.Put(hash, enc)
 			}
 		}
 	}
@@ -98,14 +95,14 @@ func (t *Trie) Prove(key []byte, fromLevel uint, proofDb common.Putter) error {
 // If the trie does not contain a value for key, the returned proof contains all
 // nodes of the longest existing prefix of the key (at least the root node), ending
 // with the node that proves the absence of the key.
-func (t *SecureTrie) Prove(key []byte, fromLevel uint, proofDb common.Putter) error {
+func (t *SecureTrie) Prove(key []byte, fromLevel uint, proofDb common.KeyValueWriter) error {
 	return t.trie.Prove(key, fromLevel, proofDb)
 }
 
 // VerifyProof checks merkle proofs. The given proof must contain the value for
 // key in a trie with the given root hash. VerifyProof returns an error if the
 // proof contains invalid trie nodes or the wrong value.
-func VerifyProof(rootHash common.Hash, key []byte, proofDb DatabaseReader) (value []byte, nodes int, err error) {
+func VerifyProof(rootHash common.Hash, key []byte, proofDb common.KeyValueReader) (value []byte, nodes int, err error) {
 	key = keybytesToHex(key)
 	wantHash := rootHash
 	for i := 0; ; i++ {

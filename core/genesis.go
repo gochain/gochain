@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gochain-io/gochain/v3/ethdb/memorydb"
 	"math/big"
 	"math/rand"
 	"time"
@@ -174,7 +175,7 @@ func SetupGenesisBlockWithOverride(db common.Database, genesis *Genesis, constan
 	}
 
 	// Just commit the new block if there is no stored genesis block.
-	stored := rawdb.ReadCanonicalHash(db, 0)
+	stored := rawdb.ReadCanonicalHash(db.HeaderTable(), 0)
 	if (stored == common.Hash{}) {
 		if genesis == nil {
 			log.Info("Writing default main-net genesis block")
@@ -245,7 +246,7 @@ func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 // to the given database (or discards it if nil).
 func (g *Genesis) ToBlock(db common.Database) *types.Block {
 	if db == nil {
-		db = ethdb.NewMemDatabase()
+		db = memorydb.New()
 	}
 	statedb, _ := state.New(common.Hash{}, state.NewDatabase(db))
 	for addr, account := range g.Alloc {
@@ -299,7 +300,7 @@ func (g *Genesis) Commit(db common.Database) (*types.Block, error) {
 	rawdb.WriteTd(db.GlobalTable(), block.Hash(), block.NumberU64(), g.Difficulty)
 	rawdb.WriteBlock(db, block)
 	rawdb.WriteReceipts(db.ReceiptTable(), block.Hash(), block.NumberU64(), nil)
-	rawdb.WriteCanonicalHash(db, block.Hash(), block.NumberU64())
+	rawdb.WriteCanonicalHash(db.HeaderTable(), block.Hash(), block.NumberU64())
 	rawdb.WriteHeadBlockHash(db.GlobalTable(), block.Hash())
 	rawdb.WriteHeadHeaderHash(db.GlobalTable(), block.Hash())
 	config := g.Config

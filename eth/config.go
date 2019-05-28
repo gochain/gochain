@@ -17,11 +17,11 @@
 package eth
 
 import (
+	"github.com/gochain-io/gochain/v3/miner"
 	"math/big"
 	"time"
 
 	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/common/hexutil"
 	"github.com/gochain-io/gochain/v3/core"
 	"github.com/gochain-io/gochain/v3/eth/downloader"
 	"github.com/gochain-io/gochain/v3/eth/gasprice"
@@ -37,11 +37,12 @@ var DefaultConfig = Config{
 	TrieCleanCache: 256,
 	TrieDirtyCache: 256,
 	TrieTimeout:    60 * time.Minute,
-	MinerGasFloor:  params.TargetGasLimit,
-	MinerGasCeil:   params.TargetGasLimit,
-	MinerGasPrice:  gasprice.Default,
-	MinerRecommit:  1 * time.Second,
-
+	Miner: miner.Config{
+		GasFloor: params.TargetGasLimit,
+		GasCeil:  params.TargetGasLimit,
+		GasPrice: gasprice.Default,
+		Recommit: 1 * time.Second,
+	},
 	TxPool: core.DefaultTxPoolConfig,
 	GPO: gasprice.Config{
 		Blocks:     5,
@@ -49,7 +50,7 @@ var DefaultConfig = Config{
 	},
 }
 
-//go:generate gencodec -type Config -field-override configMarshaling -formats toml -out gen_config.go
+//go:generate gencodec -type Config -formats toml -out gen_config.go
 
 type Config struct {
 	// The genesis block, which is inserted if the database is empty.
@@ -59,7 +60,9 @@ type Config struct {
 	// Protocol options
 	NetworkId uint64 // Network ID to use for selecting peers to connect to
 	SyncMode  downloader.SyncMode
-	NoPruning bool
+
+	NoPruning  bool // Whether to disable pruning and flush everything to disk
+	NoPrefetch bool // Whether to disable prefetching and only load state on demand
 
 	// Whitelist of required block number -> hash values to accept
 	Whitelist map[uint64]common.Hash `toml:"-"`
@@ -83,15 +86,8 @@ type Config struct {
 	TrieDirtyCache int
 	TrieTimeout    time.Duration
 
-	// Mining-related options
-	Etherbase      common.Address `toml:",omitempty"`
-	MinerNotify    []string       `toml:",omitempty"`
-	MinerExtraData []byte         `toml:",omitempty"`
-	MinerGasFloor  uint64
-	MinerGasCeil   uint64
-	MinerGasPrice  *big.Int
-	MinerRecommit  time.Duration
-	MinerNoverify  bool
+	// Mining options
+	Miner miner.Config
 
 	// Transaction pool options
 	TxPool core.TxPoolConfig
@@ -113,8 +109,7 @@ type Config struct {
 
 	// Constantinople block override (TODO: remove after the fork)
 	ConstantinopleOverride *big.Int
-}
 
-type configMarshaling struct {
-	MinerExtraData hexutil.Bytes
+	// RPCGasCap is the global gas cap for eth-call variants.
+	RPCGasCap *big.Int `toml:",omitempty"`
 }

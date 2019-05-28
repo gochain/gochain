@@ -34,6 +34,13 @@ const (
 	TestnetChainID = 31337
 )
 
+// TrustedCheckpoints associates each known checkpoint with the genesis hash of
+// the chain it belongs to.
+var TrustedCheckpoints = map[common.Hash]*TrustedCheckpoint{
+	MainnetGenesisHash: MainnetTrustedCheckpoint,
+	TestnetGenesisHash: TestnetTrustedCheckpoint,
+}
+
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
@@ -50,6 +57,16 @@ var (
 		Clique: DefaultCliqueConfig(),
 	}
 
+	// MainnetTrustedCheckpoint contains the light client trusted checkpoint for the main network.
+	//TODO
+	MainnetTrustedCheckpoint = &TrustedCheckpoint{
+		Name:         "mainnet",
+		SectionIndex: 0,
+		SectionHead:  common.Hash{},
+		CHTRoot:      common.Hash{},
+		BloomRoot:    common.Hash{},
+	}
+
 	// TestnetChainConfig contains the chain parameters to run a node on the test network.
 	TestnetChainConfig = &ChainConfig{
 		ChainId:             big.NewInt(TestnetChainID),
@@ -63,6 +80,16 @@ var (
 		PetersburgBlock:     nil,
 
 		Clique: DefaultCliqueConfig(),
+	}
+
+	// TestnetTrustedCheckpoint contains the light client trusted checkpoint for the Ropsten test network.
+	//TODO
+	TestnetTrustedCheckpoint = &TrustedCheckpoint{
+		Name:         "testnet",
+		SectionIndex: 0,
+		SectionHead:  common.Hash{},
+		CHTRoot:      common.Hash{},
+		BloomRoot:    common.Hash{},
 	}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced

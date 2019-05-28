@@ -114,13 +114,11 @@ type intervalAdjust struct {
 // worker is the main object which takes care of submitting new work to consensus engine
 // and gathering the sealing result.
 type worker struct {
-	config *params.ChainConfig
-	engine consensus.Engine
-	eth    Backend
-	chain  *core.BlockChain
-
-	gasFloor uint64
-	gasCeil  uint64
+	config      *Config
+	chainConfig *params.ChainConfig
+	engine      consensus.Engine
+	eth         Backend
+	chain       *core.BlockChain
 
 	// Subscriptions
 	mux         *core.InterfaceFeed
@@ -164,15 +162,14 @@ type worker struct {
 	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
 }
 
-func newWorker(config *params.ChainConfig, engine consensus.Engine, eth Backend, mux *core.InterfaceFeed, recommit time.Duration, gasFloor, gasCeil uint64, isLocalBlock func(*types.Block) bool) *worker {
+func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *core.InterfaceFeed, isLocalBlock func(*types.Block) bool) *worker {
 	worker := &worker{
 		config:             config,
+		chainConfig:        chainConfig,
 		engine:             engine,
 		eth:                eth,
 		mux:                mux,
 		chain:              eth.BlockChain(),
-		gasFloor:           gasFloor,
-		gasCeil:            gasCeil,
 		isLocalBlock:       isLocalBlock,
 		unconfirmed:        newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth),
 		pendingTasks:       make(map[common.Hash]*task),
@@ -192,6 +189,7 @@ func newWorker(config *params.ChainConfig, engine consensus.Engine, eth Backend,
 	eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh, "miner.worker")
 
 	// Sanitize recommit interval if the user-specified one is too short.
+	recommit := worker.config.Recommit
 	if recommit < minRecommitInterval {
 		log.Warn("Sanitizing miner recommit interval", "provided", recommit, "updated", minRecommitInterval)
 		recommit = minRecommitInterval
@@ -339,7 +337,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		case <-timer.C:
 			// If mining is running resubmit a new work cycle periodically to pull in
 			// higher priced transactions. Disable this overhead for pending blocks.
-			if w.isRunning() && (w.config.Clique == nil || w.config.Clique.Period > 0) {
+			if w.isRunning() && (w.chainConfig.Clique == nil || w.chainConfig.Clique.Period > 0) {
 				// Short circuit if no new transaction arrives.
 				if atomic.LoadInt32(&w.newTxs) == 0 {
 					timer.Reset(recommit)
@@ -434,9 +432,10 @@ func (w *worker) mainLoop() {
 				w.commitTransactions(txset, coinbase, nil)
 				w.updateSnapshot()
 			} else {
-				// If we're mining, but nothing is being processed, wake on new transactions
-				if w.config.Clique != nil && w.config.Clique.Period == 0 {
-					w.commitNewWork(nil, false, time.Now().Unix())
+				// If clique is running in dev mode(period is 0), disable
+				// advance sealing here.
+				if w.chainConfig.Clique != nil && w.chainConfig.Clique.Period == 0 {
+					w.commitNewWork(nil, true, time.Now().Unix())
 				}
 			}
 			atomic.AddInt32(&w.newTxs, int32(cnt))
@@ -529,7 +528,6 @@ func (w *worker) resultLoop() {
 			if w.chain.HasBlock(block.Hash(), block.NumberU64()) {
 				continue
 			}
-
 			var (
 				sealhash = w.engine.SealHash(block.Header())
 				hash     = block.Hash()
@@ -547,9 +545,11 @@ func (w *worker) resultLoop() {
 				logs     []*types.Log
 			)
 			for i, receipt := range task.receipts {
+				// add block location fields
 				receipt.BlockHash = hash
 				receipt.BlockNumber = block.Number()
 				receipt.TransactionIndex = uint(i)
+
 				receipts[i] = new(types.Receipt)
 				*receipts[i] = *receipt
 				// Update the block hash in all logs since it is now available and not when the
@@ -597,7 +597,7 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 		return err
 	}
 	env := &environment{
-		signer: types.NewEIP155Signer(w.config.ChainId),
+		signer: types.NewEIP155Signer(w.chainConfig.ChainId),
 		state:  state,
 		header: header,
 	}
@@ -626,7 +626,7 @@ func (w *worker) updateSnapshot() {
 func (w *worker) commitTransaction(vmenv *vm.EVM, tx *types.Transaction) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
 
-	receipt, _, err := core.ApplyTransaction(vmenv, w.config, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, w.current.signer)
+	receipt, _, err := core.ApplyTransaction(vmenv, w.chainConfig, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, w.current.signer)
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
 		return nil, err
@@ -654,7 +654,7 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 	tracing := log.Tracing()
 	// Create a new emv context and environment.
 	evmContext := core.NewEVMContextLite(w.current.header, w.chain, &coinbase)
-	vmenv := vm.NewEVM(evmContext, w.current.state, w.config, vm.Config{})
+	vmenv := vm.NewEVM(evmContext, w.current.state, w.chainConfig, vm.Config{})
 	var coalescedLogs []*types.Log
 	for {
 		// In the following three cases, we will interrupt the execution of the transaction.
@@ -706,9 +706,9 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 		from, _ := types.Sender(w.current.signer, tx)
 		// Check whether the tx is replay protected. If we're not in the EIP155 hf
 		// phase, start ignoring the sender until we do.
-		if tx.Protected() && !w.config.IsEIP155(w.current.header.Number) {
+		if tx.Protected() && !w.chainConfig.IsEIP155(w.current.header.Number) {
 			if tracing {
-				log.Trace("Ignoring reply protected transaction", "hash", tx.Hash(), "eip155", w.config.EIP155Block)
+				log.Trace("Ignoring reply protected transaction", "hash", tx.Hash(), "eip155", w.chainConfig.EIP155Block)
 			}
 
 			txs.Pop()
@@ -799,7 +799,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     num.Add(num, common.Big1),
-		GasLimit:   core.CalcGasLimit(parent, w.gasFloor, w.gasCeil),
+		GasLimit:   core.CalcGasLimit(parent, w.config.GasFloor, w.config.GasCeil),
 		Extra:      w.extra,
 	}
 	// Only set the coinbase if our consensus engine is running (avoid spurious block rewards)

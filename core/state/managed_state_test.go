@@ -20,13 +20,13 @@ import (
 	"testing"
 
 	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/ethdb"
+	"github.com/gochain-io/gochain/v3/ethdb/memorydb"
 )
 
 var addr = common.BytesToAddress([]byte("test"))
 
 func create(t *testing.T) (*ManagedState, *account) {
-	db := ethdb.NewMemDatabase()
+	db := memorydb.New()
 	statedb, _ := New(common.Hash{}, NewDatabase(db))
 	ms := ManageState(statedb)
 	ms.StateDB.SetNonce(addr, 100)

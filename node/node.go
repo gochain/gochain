@@ -255,6 +255,11 @@ func (n *Node) Start() error {
 	return nil
 }
 
+// Config returns the configuration of node.
+func (n *Node) Config() *Config {
+	return n.config
+}
+
 func (n *Node) openDataDir() error {
 	if n.config.DataDir == "" {
 		return nil // ephemeral
@@ -608,7 +613,7 @@ func (n *Node) EventMux() *core.InterfaceFeed {
 // ephemeral, a memory database is returned.
 func (n *Node) OpenDatabase(name string, cache, handles int) (common.Database, error) {
 	if n.config.DataDir == "" {
-		return ethdb.NewMemDatabase(), nil
+		return memorydb.New(), nil
 	}
 	db := ethdb.NewDB(n.config.ResolvePath(name))
 	if err := s3.ConfigureDB(db, n.config.Ethdb); err != nil {
@@ -641,11 +646,6 @@ func (n *Node) apis() []rpc.API {
 			Namespace: "debug",
 			Version:   "1.0",
 			Service:   debug.Handler,
-		}, {
-			Namespace: "debug",
-			Version:   "1.0",
-			Service:   NewPublicDebugAPI(n),
-			Public:    true,
 		}, {
 			Namespace: "web3",
 			Version:   "1.0",

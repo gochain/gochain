@@ -24,8 +24,6 @@ import (
 	"math/big"
 
 	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/core"
-	"github.com/gochain-io/gochain/v3/core/rawdb"
 	"github.com/gochain-io/gochain/v3/crypto"
 	"github.com/gochain-io/gochain/v3/p2p/enode"
 	"github.com/gochain-io/gochain/v3/rlp"
@@ -33,19 +31,18 @@ import (
 
 // Constants to match up protocol versions and messages
 const (
-	lpv1 = 1
 	lpv2 = 2
 )
 
 // Supported versions of the les protocol (first is primary)
 var (
-	ClientProtocolVersions    = []uint{lpv2, lpv1}
-	ServerProtocolVersions    = []uint{lpv2, lpv1}
+	ClientProtocolVersions    = []uint{lpv2}
+	ServerProtocolVersions    = []uint{lpv2}
 	AdvertiseProtocolVersions = []uint{lpv2} // clients are searching for the first advertised protocol in the list
 )
 
 // Number of implemented message corresponding to different protocol versions.
-var ProtocolLengths = map[uint]uint64{lpv1: 15, lpv2: 22}
+var ProtocolLengths = map[uint]uint64{lpv2: 22}
 
 const (
 	NetworkId          = 1
@@ -54,7 +51,7 @@ const (
 
 // les protocol message codes
 const (
-	// Protocol messages belonging to LPV1
+	// Protocol messages inherited from LPV1
 	StatusMsg          = 0x00
 	AnnounceMsg        = 0x01
 	GetBlockHeadersMsg = 0x02
@@ -63,14 +60,9 @@ const (
 	BlockBodiesMsg     = 0x05
 	GetReceiptsMsg     = 0x06
 	ReceiptsMsg        = 0x07
-	GetProofsV1Msg     = 0x08
-	ProofsV1Msg        = 0x09
 	GetCodeMsg         = 0x0a
 	CodeMsg            = 0x0b
-	SendTxMsg          = 0x0c
-	GetHeaderProofsMsg = 0x0d
-	HeaderProofsMsg    = 0x0e
-	// Protocol messages belonging to LPV2
+	// Protocol messages introduced in LPV2
 	GetProofsV2Msg         = 0x0f
 	ProofsV2Msg            = 0x10
 	GetHelperTrieProofsMsg = 0x11
@@ -89,10 +81,7 @@ var requests = map[uint64]requestInfo{
 	GetBlockHeadersMsg:     {"GetBlockHeaders", MaxHeaderFetch},
 	GetBlockBodiesMsg:      {"GetBlockBodies", MaxBodyFetch},
 	GetReceiptsMsg:         {"GetReceipts", MaxReceiptFetch},
-	GetProofsV1Msg:         {"GetProofsV1", MaxProofsFetch},
 	GetCodeMsg:             {"GetCode", MaxCodeFetch},
-	SendTxMsg:              {"SendTx", MaxTxSend},
-	GetHeaderProofsMsg:     {"GetHeaderProofs", MaxHelperTrieProofsFetch},
 	GetProofsV2Msg:         {"GetProofsV2", MaxProofsFetch},
 	GetHelperTrieProofsMsg: {"GetHelperTrieProofs", MaxHelperTrieProofsFetch},
 	SendTxV2Msg:            {"SendTxV2", MaxTxSend},
@@ -236,9 +225,3 @@ type CodeData []struct {
 }
 
 type proofsData [][]rlp.RawValue
-
-type txStatus struct {
-	Status core.TxStatus
-	Lookup *rawdb.LegacyTxLookupEntry `rlp:"nil"`
-	Error  string
-}

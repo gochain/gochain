@@ -22,7 +22,7 @@ import (
 
 	"github.com/gochain-io/gochain/v3/common"
 	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/ethdb"
+	"github.com/gochain-io/gochain/v3/ethdb/memorydb"
 	"github.com/gochain-io/gochain/v3/rlp"
 )
 
@@ -30,17 +30,17 @@ import (
 func TestLookupStorage(t *testing.T) {
 	tests := []struct {
 		name                 string
-		writeTxLookupEntries func(DatabaseWriter, *types.Block)
+		writeTxLookupEntries func(common.Writer, *types.Block)
 	}{
 		{
 			"DatabaseV6",
-			func(db DatabaseWriter, block *types.Block) {
+			func(db common.Writer, block *types.Block) {
 				WriteTxLookupEntries(db, block)
 			},
 		},
 		{
 			"DatabaseV4-V5",
-			func(db DatabaseWriter, block *types.Block) {
+			func(db common.Writer, block *types.Block) {
 				for _, tx := range block.Transactions() {
 					db.Put(hashKey(lookupPrefix, tx.Hash()), block.Hash().Bytes())
 				}
@@ -48,7 +48,7 @@ func TestLookupStorage(t *testing.T) {
 		},
 		{
 			"DatabaseV3",
-			func(db DatabaseWriter, block *types.Block) {
+			func(db common.Writer, block *types.Block) {
 				for index, tx := range block.Transactions() {
 					entry := LegacyTxLookupEntry{
 						BlockHash:  block.Hash(),
@@ -64,7 +64,7 @@ func TestLookupStorage(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			db := ethdb.NewMemDatabase()
+			db := memorydb.New()
 
 			tx1 := types.NewTransaction(1, common.BytesToAddress([]byte{0x11}), big.NewInt(111), 1111, big.NewInt(11111), []byte{0x11, 0x11, 0x11})
 			tx2 := types.NewTransaction(2, common.BytesToAddress([]byte{0x22}), big.NewInt(222), 2222, big.NewInt(22222), []byte{0x22, 0x22, 0x22})
@@ -80,7 +80,7 @@ func TestLookupStorage(t *testing.T) {
 				}
 			}
 			// Insert all the transactions into the database, and verify contents
-			WriteCanonicalHash(db, block.Hash(), block.NumberU64())
+			WriteCanonicalHash(db.HeaderTable(), block.Hash(), block.NumberU64())
 			WriteBlock(db, block)
 			tc.writeTxLookupEntries(db, block)
 
@@ -98,33 +98,11 @@ func TestLookupStorage(t *testing.T) {
 			}
 			// Delete the transactions and check purge
 			for i, tx := range txs {
-				DeleteTxLookupEntry(db, tx.Hash())
+				DeleteTxLookupEntry(db.GlobalTable(), tx.Hash())
 				if txn, _, _, _ := ReadTransaction(db, tx.Hash()); txn != nil {
 					t.Fatalf("tx #%d [%x]: deleted transaction returned: %v", i, tx.Hash(), txn)
 				}
 			}
 		})
-	}
-	// Insert legacy txlookup and verify the data retrieval
-	for index, tx := range block.Transactions() {
-		entry := LegacyTxLookupEntry{
-			BlockHash:  block.Hash(),
-			BlockIndex: block.NumberU64(),
-			Index:      uint64(index),
-		}
-		data, _ := rlp.EncodeToBytes(entry)
-		db.Put(hashKey(lookupPrefix, tx.Hash()), data)
-	}
-	for i, tx := range txs {
-		if txn, hash, number, index := ReadTransaction(db, tx.Hash()); txn == nil {
-			t.Fatalf("tx #%d [%x]: transaction not found", i, tx.Hash())
-		} else {
-			if hash != block.Hash() || number != block.NumberU64() || index != uint64(i) {
-				t.Fatalf("tx #%d [%x]: positional metadata mismatch: have %x/%d/%d, want %x/%v/%v", i, tx.Hash(), hash, number, index, block.Hash(), block.NumberU64(), i)
-			}
-			if tx.Hash() != txn.Hash() {
-				t.Fatalf("tx #%d [%x]: transaction mismatch: have %v, want %v", i, tx.Hash(), txn, tx)
-			}
-		}
 	}
 }
