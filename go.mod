@@ -4,7 +4,7 @@ go 1.12
 
 require (
 	bazil.org/fuse v0.0.0-20180421153158-65cc252bf669
-	cloud.google.com/go v0.27.0 // indirect
+	cloud.google.com/go v0.39.0 // indirect
 	contrib.go.opencensus.io/exporter/stackdriver v0.6.0
 	github.com/OneOfOne/xxhash v1.2.2 // indirect
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
@@ -24,19 +24,21 @@ require (
 	github.com/go-ini/ini v1.36.0 // indirect
 	github.com/go-ole/go-ole v1.2.1 // indirect
 	github.com/go-stack/stack v1.7.0
-	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
-	github.com/golang/protobuf v1.2.0
+	github.com/golang/mock v1.3.1 // indirect
+	github.com/golang/protobuf v1.3.1
 	github.com/golang/snappy v0.0.0-20170215233205-553a64147049
-	github.com/google/go-cmp v0.2.0 // indirect
+	github.com/google/btree v1.0.0 // indirect
+	github.com/google/pprof v0.0.0-20190515194954-54271f7e092f // indirect
 	github.com/googleapis/gax-go v2.0.0+incompatible // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e // indirect
-	github.com/hashicorp/golang-lru v0.0.0-20180201235237-0fb14efe8c47
+	github.com/hashicorp/golang-lru v0.5.1
 	github.com/huin/goupnp v0.0.0-20180415215157-1395d1447324
 	github.com/influxdata/influxdb v1.6.3
 	github.com/jackpal/go-nat-pmp v1.0.1
 	github.com/jtolds/gls v4.2.1+incompatible // indirect
 	github.com/julienschmidt/httprouter v1.1.0
 	github.com/karalabe/hid v0.0.0-20180420081245-2b4488a37358
+	github.com/kr/pty v1.1.4 // indirect
 	github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348 // indirect
 	github.com/maruel/panicparse v1.1.1 // indirect
 	github.com/mattn/go-colorable v0.0.9
@@ -63,20 +65,27 @@ require (
 	github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72 // indirect
 	github.com/stretchr/testify v1.2.1
 	github.com/syndtr/goleveldb v0.0.0-20180502072349-ae970a0732be
-	go.opencensus.io v0.14.0
-	golang.org/x/crypto v0.0.0-20190123085648-057139ce5d2b
-	golang.org/x/net v0.0.0-20180906233101-161cd47e91fd
-	golang.org/x/oauth2 v0.0.0-20180821212333-d2e6202438be // indirect
-	golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f
-	golang.org/x/sys v0.0.0-20180909124046-d0be0721c37e
-	google.golang.org/api v0.0.0-20180904000447-0ad5a633fea1 // indirect
-	google.golang.org/appengine v1.1.0 // indirect
-	google.golang.org/genproto v0.0.0-20180831171423-11092d34479b // indirect
-	google.golang.org/grpc v1.14.0 // indirect
-	gopkg.in/check.v1 v1.0.0-20161208181325-20d25e280405
+	go.opencensus.io v0.22.0
+	golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5
+	golang.org/x/exp v0.0.0-20190510132918-efd6b22b2522 // indirect
+	golang.org/x/image v0.0.0-20190523035834-f03afa92d3ff // indirect
+	golang.org/x/lint v0.0.0-20190409202823-959b441ac422 // indirect
+	golang.org/x/mobile v0.0.0-20190509164839-32b2708ab171 // indirect
+	golang.org/x/mod v0.1.0 // indirect
+	golang.org/x/net v0.0.0-20190603091049-60506f45cf65
+	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45 // indirect
+	golang.org/x/sync v0.0.0-20190423024810-112230192c58
+	golang.org/x/sys v0.0.0-20190606122018-79a91cf218c4
+	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 // indirect
+	golang.org/x/tools v0.0.0-20190606124116-d0a3d012864b // indirect
+	google.golang.org/appengine v1.6.0 // indirect
+	google.golang.org/genproto v0.0.0-20190605220351-eb0b1bdb6ae6 // indirect
+	google.golang.org/grpc v1.21.1 // indirect
+	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/ini.v1 v1.41.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20180302121509-abf0ba0be5d5
 	gopkg.in/sourcemap.v1 v1.0.5 // indirect
 	gopkg.in/urfave/cli.v1 v1.20.0
+	honnef.co/go/tools v0.0.0-20190605142022-0a11fc526260 // indirect
 )
