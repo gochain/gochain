@@ -177,7 +177,6 @@ func (w *wizard) deployComponent() {
 	fmt.Println(" 4. Explorer  - Chain analysis webservice (ethash only)")
 	fmt.Println(" 5. Wallet    - Browser wallet for quick sends")
 	fmt.Println(" 6. Faucet    - Crypto faucet to give away funds")
-	fmt.Println(" 7. Dashboard - Website listing above web-services")
 
 	switch w.read() {
 	case "1":
@@ -193,9 +192,6 @@ func (w *wizard) deployComponent() {
 		w.deployWallet()
 	case "6":
 		w.deployFaucet()
-	case "7":
-		//w.deployDashboard()
-		log.Error("dasboard is not available")
 	default:
 		log.Error("That's not something I can do")
 	}

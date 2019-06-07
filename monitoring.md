@@ -38,5 +38,3 @@ and
 ```
 docker run -d --net=host --name net-intelligence -v $PWD/app.json:/home/ethnetintel/eth-net-intelligence-api/app.json  gochain/net-intelligence-api
 ```
-
-After this you should see some stats in dashboard at http://IP_ADDRESS_OF_YOUR_HOST

@@ -40,7 +40,6 @@ import (
 	"github.com/gochain-io/gochain/v3/core/state"
 	"github.com/gochain-io/gochain/v3/core/vm"
 	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/dashboard"
 	"github.com/gochain-io/gochain/v3/eth"
 	"github.com/gochain-io/gochain/v3/eth/downloader"
 	"github.com/gochain-io/gochain/v3/eth/gasprice"
@@ -197,31 +196,6 @@ var (
 	LightKDFFlag = cli.BoolFlag{
 		Name:  "lightkdf",
 		Usage: "Reduce key-derivation RAM & CPU usage at some expense of KDF strength",
-	}
-	// Dashboard settings
-	DashboardEnabledFlag = cli.BoolFlag{
-		Name:  "dashboard",
-		Usage: "Enable the dashboard",
-	}
-	DashboardAddrFlag = cli.StringFlag{
-		Name:  "dashboard.addr",
-		Usage: "Dashboard listening interface",
-		Value: dashboard.DefaultConfig.Host,
-	}
-	DashboardPortFlag = cli.IntFlag{
-		Name:  "dashboard.host",
-		Usage: "Dashboard listening port",
-		Value: dashboard.DefaultConfig.Port,
-	}
-	DashboardRefreshFlag = cli.DurationFlag{
-		Name:  "dashboard.refresh",
-		Usage: "Dashboard metrics collection refresh rate",
-		Value: dashboard.DefaultConfig.Refresh,
-	}
-	DashboardAssetsFlag = cli.StringFlag{
-		Name:  "dashboard.assets",
-		Usage: "Developer flag to serve the dashboard from the local file system",
-		Value: dashboard.DefaultConfig.Assets,
 	}
 	// Transaction pool settings
 	TxPoolLocalsFlag = cli.StringFlag{
@@ -1295,13 +1269,6 @@ func GenesisExists(ctx *cli.Context, stack *node.Node) bool {
 	return stored != common.Hash{}
 }
 
-// SetDashboardConfig applies dashboard related command line flags to the config.
-func SetDashboardConfig(ctx *cli.Context, cfg *dashboard.Config) {
-	cfg.Host = ctx.GlobalString(DashboardAddrFlag.Name)
-	cfg.Port = ctx.GlobalInt(DashboardPortFlag.Name)
-	cfg.Refresh = ctx.GlobalDuration(DashboardRefreshFlag.Name)
-}
-
 // RegisterEthService adds an GoChain client to the stack.
 func RegisterEthService(ctx context.Context, stack *node.Node, cfg *eth.Config) {
 	var err error
@@ -1322,13 +1289,6 @@ func RegisterEthService(ctx context.Context, stack *node.Node, cfg *eth.Config) 
 	if err != nil {
 		Fatalf("Failed to register the GoChain service: %v", err)
 	}
-}
-
-// RegisterDashboardService adds a dashboard to the stack.
-func RegisterDashboardService(stack *node.Node, cfg *dashboard.Config, commit string) {
-	stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		return dashboard.New(cfg, commit)
-	})
 }
 
 // RegisterShhService configures Whisper and adds it to the given node.

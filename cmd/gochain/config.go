@@ -30,7 +30,6 @@ import (
 	cli "gopkg.in/urfave/cli.v1"
 
 	"github.com/gochain-io/gochain/v3/cmd/utils"
-	"github.com/gochain-io/gochain/v3/dashboard"
 	"github.com/gochain-io/gochain/v3/eth"
 	"github.com/gochain-io/gochain/v3/netstats"
 	"github.com/gochain-io/gochain/v3/node"
@@ -74,11 +73,10 @@ var tomlSettings = toml.Config{
 }
 
 type gochainConfig struct {
-	Eth       eth.Config
-	Shh       whisper.Config
-	Node      node.Config
-	Netstats  netstats.Config
-	Dashboard dashboard.Config
+	Eth      eth.Config
+	Shh      whisper.Config
+	Node     node.Config
+	Netstats netstats.Config
 }
 
 func loadConfig(file string, cfg *gochainConfig) error {
@@ -109,10 +107,9 @@ func defaultNodeConfig() node.Config {
 func makeConfigNode(ctx *cli.Context) (*node.Node, gochainConfig) {
 	// Load defaults.
 	cfg := gochainConfig{
-		Eth:       eth.DefaultConfig,
-		Shh:       whisper.DefaultConfig,
-		Node:      defaultNodeConfig(),
-		Dashboard: dashboard.DefaultConfig,
+		Eth:  eth.DefaultConfig,
+		Shh:  whisper.DefaultConfig,
+		Node: defaultNodeConfig(),
 	}
 
 	// Load config file.
@@ -137,7 +134,6 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gochainConfig) {
 	}
 
 	utils.SetShhConfig(ctx, stack, &cfg.Shh)
-	utils.SetDashboardConfig(ctx, &cfg.Dashboard)
 
 	return stack, cfg
 }
@@ -159,9 +155,6 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 	}
 	utils.RegisterEthService(context.TODO(), stack, &cfg.Eth)
 
-	if ctx.GlobalBool(utils.DashboardEnabledFlag.Name) {
-		utils.RegisterDashboardService(stack, &cfg.Dashboard, gitCommit)
-	}
 	// Whisper must be explicitly enabled by specifying at least 1 whisper flag or in dev mode
 	shhEnabled := enableWhisper(ctx)
 	shhAutoEnabled := !ctx.GlobalIsSet(utils.WhisperEnabledFlag.Name) &&
