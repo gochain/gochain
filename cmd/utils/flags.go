@@ -1224,26 +1224,19 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 		} else {
 			keys := make(map[common.Address]string)
 			for i := 0; i < 10; i++ {
-				seed, err := ks.NewAccount("")
+				acc, err := crypto.CreateKey()
 				if err != nil {
 					Fatalf("Failed to create account: %v", err)
 				}
-				alloc[seed.Address] = core.GenesisAccount{Balance: oneThousandGO}
-				json, err := ks.Export(seed, "", "")
-				if err != nil {
-					Fatalf("Failed to export account: %v", err)
-				}
-				key, err := keystore.DecryptKey(json, "")
-				if err != nil {
-					Fatalf("Failed to decrypt key: %v", err)
-				}
-				keys[seed.Address] = "0x" + common.Bytes2Hex(key.PrivateKey.D.Bytes())
+				addr := crypto.PubkeyToAddress(acc.PrivateKey().PublicKey)
+				alloc[addr] = core.GenesisAccount{Balance: oneThousandGO}
+				keys[addr] = acc.PrivateKeyHex()
 			}
 
 			var buf bytes.Buffer
 			fmt.Fprintln(&buf, "Pre-funded accounts:")
 			fmt.Fprintln(&buf)
-			fmt.Fprintln(&buf, "\t\tAddress\t\t\t\t\t\tKey")
+			fmt.Fprintln(&buf, "\tAddress\t\t\t\t\t\tKey")
 			for addr, key := range keys {
 				fmt.Fprintf(&buf, "\t%s %s\n", addr.Hex(), key)
 			}
