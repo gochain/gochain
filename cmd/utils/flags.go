@@ -1224,13 +1224,13 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 		} else {
 			keys := make(map[common.Address]string)
 			for i := 0; i < 10; i++ {
-				acc, err := crypto.CreateAccount()
+				acc, err := crypto.CreateKey()
 				if err != nil {
 					Fatalf("Failed to create account: %v", err)
 				}
 				addr := crypto.PubkeyToAddress(acc.PrivateKey().PublicKey)
 				alloc[addr] = core.GenesisAccount{Balance: oneThousandGO}
-				keys[addr] = acc.PrivateKeyHex() //  "0x" + common.Bytes2Hex(key.PrivateKey.D.Bytes())
+				keys[addr] = acc.PrivateKeyHex()
 			}
 
 			var buf bytes.Buffer
