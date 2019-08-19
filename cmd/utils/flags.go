@@ -364,13 +364,21 @@ var (
 		Name:  "netstats",
 		Usage: "Reporting URL of a netstats service (nodename:secret@host:port)",
 	}
+	StackdriverFlag = cli.StringFlag{
+		Name:  "stackdriver",
+		Usage: "GCP Project ID to enable stackdriver tracing and stats",
+	}
 	MetricsEnabledFlag = cli.BoolFlag{
 		Name:  metrics.MetricsEnabledFlag,
 		Usage: "Enable metrics collection and reporting",
 	}
+	TracingEnabledFlag = cli.BoolFlag{
+		Name:  "tracing",
+		Usage: "Enable tracing",
+	}
 	TracingStackdriverFlag = cli.StringFlag{
 		Name:  "tracing.stackdriver",
-		Usage: "GCP Project ID to enable stackdriver tracing",
+		Usage: "GCP Project ID to enable stackdriver tracing (deprecated, use --stackdriver)",
 	}
 	TracingSampleRateFlag = cli.Float64Flag{
 		Name:  "tracing.samplerate",
@@ -702,7 +710,7 @@ func setHTTP(ctx *cli.Context, cfg *node.Config) {
 	}
 
 	cfg.HTTPVirtualHosts = splitAndTrim(ctx.GlobalString(RPCVirtualHostsFlag.Name))
-	cfg.HTTPTracing = ctx.GlobalIsSet(TracingStackdriverFlag.Name)
+	cfg.HTTPTracing = ctx.GlobalIsSet(TracingEnabledFlag.Name)
 }
 
 // setWS creates the WebSocket RPC listener interface string from the set

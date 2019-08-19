@@ -204,6 +204,8 @@ var AppHelpFlagGroups = []flagGroup{
 		Name: "LOGGING AND DEBUGGING",
 		Flags: append([]cli.Flag{
 			utils.MetricsEnabledFlag,
+			utils.TracingEnabledFlag,
+			utils.StackdriverFlag,
 			utils.TracingStackdriverFlag,
 			utils.TracingSampleRateFlag,
 			utils.FakePoWFlag,

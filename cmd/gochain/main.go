@@ -39,6 +39,7 @@ import (
 	"github.com/gochain-io/gochain/v3/internal/debug"
 	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/metrics"
+	"github.com/gochain-io/gochain/v3/metrics/opencensus"
 	"github.com/gochain-io/gochain/v3/node"
 )
 
@@ -121,6 +122,8 @@ var (
 		utils.RPCVirtualHostsFlag,
 		utils.NetStatsURLFlag,
 		utils.MetricsEnabledFlag,
+		utils.TracingEnabledFlag,
+		utils.StackdriverFlag,
 		utils.TracingStackdriverFlag,
 		utils.TracingSampleRateFlag,
 		utils.FakePoWFlag,
@@ -222,9 +225,21 @@ func main() {
 // It creates a default node based on the command line arguments and runs it in
 // blocking mode, waiting for it to be shut down.
 func gochain(ctx *cli.Context) error {
-	if ctx.GlobalIsSet(utils.TracingStackdriverFlag.Name) {
-		gcpProjectID := ctx.GlobalString(utils.TracingStackdriverFlag.Name)
-		// Enable the Stackdriver Tracing exporter.
+	if ctx.GlobalIsSet(utils.StackdriverFlag.Name) || ctx.GlobalIsSet(utils.TracingStackdriverFlag.Name) {
+		var gcpProjectID string
+		if ctx.GlobalIsSet(utils.StackdriverFlag.Name) {
+			gcpProjectID = ctx.GlobalString(utils.StackdriverFlag.Name)
+			if ctx.GlobalIsSet(utils.TracingStackdriverFlag.Name) {
+				utils.Fatalf("Only one of %q and %q may be used at a time.", utils.StackdriverFlag, utils.TracingStackdriverFlag)
+			}
+		} else {
+			// Fall back to legacy.
+			gcpProjectID = ctx.GlobalString(utils.TracingStackdriverFlag.Name)
+		}
+
+		log.Info("Starting stackdriver exporter", "projectID", gcpProjectID)
+
+		// Enable the Stackdriver exporter.
 		sd, err := stackdriver.NewExporter(stackdriver.Options{
 			ProjectID: gcpProjectID,
 		})
@@ -233,12 +248,19 @@ func gochain(ctx *cli.Context) error {
 		}
 		defer sd.Flush()
 
-		// Register/enable the trace exporter.
-		trace.RegisterExporter(sd)
+		if ctx.GlobalBool(utils.TracingEnabledFlag.Name) || ctx.GlobalIsSet(utils.TracingStackdriverFlag.Name) {
+			// Register/enable the trace exporter.
+			trace.RegisterExporter(sd)
+			if ctx.GlobalIsSet(utils.TracingSampleRateFlag.Name) {
+				rate := ctx.GlobalFloat64(utils.TracingSampleRateFlag.Name)
+				trace.ApplyConfig(trace.Config{DefaultSampler: trace.ProbabilitySampler(rate)})
+			}
+			log.Info("Registered stackdriver tracing exporter")
+		}
 
-		if ctx.GlobalIsSet(utils.TracingSampleRateFlag.Name) {
-			rate := ctx.GlobalFloat64(utils.TracingSampleRateFlag.Name)
-			trace.ApplyConfig(trace.Config{DefaultSampler: trace.ProbabilitySampler(rate)})
+		if ctx.GlobalBool(utils.MetricsEnabledFlag.Name) {
+			_ = opencensus.StartExporter(10*time.Second, metrics.DefaultRegistry, sd)
+			log.Info("Registered stackdriver metrics exporter")
 		}
 	}
 
