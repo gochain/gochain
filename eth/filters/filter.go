@@ -21,11 +21,11 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/core"
-	"github.com/gochain-io/gochain/v3/core/bloombits"
-	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/rpc"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/core"
+	"github.com/gochain/gochain/v3/core/bloombits"
+	"github.com/gochain/gochain/v3/core/types"
+	"github.com/gochain/gochain/v3/rpc"
 )
 
 type Backend interface {

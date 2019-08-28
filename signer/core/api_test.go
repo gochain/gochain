@@ -27,14 +27,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain-io/gochain/v3/accounts"
-	"github.com/gochain-io/gochain/v3/accounts/keystore"
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/common/hexutil"
-	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/internal/ethapi"
-	"github.com/gochain-io/gochain/v3/rlp"
-	"github.com/gochain-io/gochain/v3/signer/storage"
+	"github.com/gochain/gochain/v3/accounts"
+	"github.com/gochain/gochain/v3/accounts/keystore"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/common/hexutil"
+	"github.com/gochain/gochain/v3/core/types"
+	"github.com/gochain/gochain/v3/internal/ethapi"
+	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/gochain/v3/signer/storage"
 )
 
 //Used for testing

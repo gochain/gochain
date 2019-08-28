@@ -23,7 +23,7 @@ import (
 	"math/big"
 	"regexp"
 
-	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain/gochain/v3/common"
 )
 
 // The validation package contains validation checks for transactions
@@ -118,7 +118,7 @@ func (v *Validator) validate(msgs *ValidationMessages, txargs *SendTxArgs, metho
 	if txargs.To == nil {
 		//Contract creation should contain sufficient data to deploy a contract
 		// A typical error is omitting sender due to some quirk in the javascript call
-		// e.g. https://github.com/gochain-io/gochain/v3/issues/16106
+		// e.g. https://github.com/gochain/gochain/v3/issues/16106
 		if len(data) == 0 {
 			if txargs.Value.ToInt().Cmp(big.NewInt(0)) > 0 {
 				// Sending ether into black hole

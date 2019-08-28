@@ -1,4 +1,4 @@
-module github.com/gochain-io/gochain/v3
+module github.com/gochain/gochain/v3
 
 go 1.12
 

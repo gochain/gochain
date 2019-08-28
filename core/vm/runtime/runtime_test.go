@@ -21,12 +21,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gochain-io/gochain/v3/accounts/abi"
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/core/state"
-	"github.com/gochain-io/gochain/v3/core/vm"
-	"github.com/gochain-io/gochain/v3/ethdb"
-	"github.com/gochain-io/gochain/v3/params"
+	"github.com/gochain/gochain/v3/accounts/abi"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/core/state"
+	"github.com/gochain/gochain/v3/core/vm"
+	"github.com/gochain/gochain/v3/ethdb"
+	"github.com/gochain/gochain/v3/params"
 )
 
 func TestDefaults(t *testing.T) {

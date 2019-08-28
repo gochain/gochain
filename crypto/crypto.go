@@ -30,9 +30,9 @@ import (
 
 	"golang.org/x/crypto/sha3"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/common/math"
-	"github.com/gochain-io/gochain/v3/rlp"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/common/math"
+	"github.com/gochain/gochain/v3/rlp"
 )
 
 var (

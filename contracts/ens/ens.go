@@ -23,11 +23,11 @@ package ens
 import (
 	"strings"
 
-	"github.com/gochain-io/gochain/v3/accounts/abi/bind"
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/contracts/ens/contract"
-	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain/gochain/v3/accounts/abi/bind"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/contracts/ens/contract"
+	"github.com/gochain/gochain/v3/core/types"
+	"github.com/gochain/gochain/v3/crypto"
 )
 
 var (

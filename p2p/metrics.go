@@ -21,7 +21,7 @@ package p2p
 import (
 	"net"
 
-	"github.com/gochain-io/gochain/v3/metrics"
+	"github.com/gochain/gochain/v3/metrics"
 )
 
 var (

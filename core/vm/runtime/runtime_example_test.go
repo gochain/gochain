@@ -19,8 +19,8 @@ package runtime_test
 import (
 	"fmt"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/core/vm/runtime"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/core/vm/runtime"
 )
 
 func ExampleExecute() {

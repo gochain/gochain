@@ -27,9 +27,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain-io/gochain/v3/accounts"
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain/gochain/v3/accounts"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/log"
 )
 
 // Minimum amount of time between cache reloads. This limit applies if the platform does

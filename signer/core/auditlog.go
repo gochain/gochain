@@ -19,10 +19,10 @@ package core
 import (
 	"context"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/common/hexutil"
-	"github.com/gochain-io/gochain/v3/internal/ethapi"
-	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/common/hexutil"
+	"github.com/gochain/gochain/v3/internal/ethapi"
+	"github.com/gochain/gochain/v3/log"
 )
 
 type AuditLogger struct {

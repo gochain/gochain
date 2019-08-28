@@ -24,13 +24,13 @@ import (
 	"net"
 	"os"
 
-	"github.com/gochain-io/gochain/v3/cmd/utils"
-	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/log"
-	"github.com/gochain-io/gochain/v3/p2p/discover"
-	"github.com/gochain-io/gochain/v3/p2p/discv5"
-	"github.com/gochain-io/gochain/v3/p2p/nat"
-	"github.com/gochain-io/gochain/v3/p2p/netutil"
+	"github.com/gochain/gochain/v3/cmd/utils"
+	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v3/p2p/discover"
+	"github.com/gochain/gochain/v3/p2p/discv5"
+	"github.com/gochain/gochain/v3/p2p/nat"
+	"github.com/gochain/gochain/v3/p2p/netutil"
 )
 
 func main() {

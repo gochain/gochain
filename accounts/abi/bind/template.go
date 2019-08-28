@@ -16,7 +16,7 @@
 
 package bind
 
-import "github.com/gochain-io/gochain/v3/accounts/abi"
+import "github.com/gochain/gochain/v3/accounts/abi"
 
 // tmplData is the data structure required to fill the binding template.
 type tmplData struct {
@@ -68,12 +68,12 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/gochain-io/gochain/v3"
-	"github.com/gochain-io/gochain/v3/accounts/abi"
-	"github.com/gochain-io/gochain/v3/accounts/abi/bind"
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/event"
+	"github.com/gochain/gochain/v3"
+	"github.com/gochain/gochain/v3/accounts/abi"
+	"github.com/gochain/gochain/v3/accounts/abi/bind"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/core/types"
+	"github.com/gochain/gochain/v3/event"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.

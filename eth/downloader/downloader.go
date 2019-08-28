@@ -25,14 +25,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gochain-io/gochain/v3"
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/core"
-	"github.com/gochain-io/gochain/v3/core/rawdb"
-	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/log"
-	"github.com/gochain-io/gochain/v3/metrics"
-	"github.com/gochain-io/gochain/v3/params"
+	"github.com/gochain/gochain/v3"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/core"
+	"github.com/gochain/gochain/v3/core/rawdb"
+	"github.com/gochain/gochain/v3/core/types"
+	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v3/metrics"
+	"github.com/gochain/gochain/v3/params"
 )
 
 var (

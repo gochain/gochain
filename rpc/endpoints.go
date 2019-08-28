@@ -19,7 +19,7 @@ package rpc
 import (
 	"net"
 
-	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain/gochain/v3/log"
 )
 
 // StartHTTPEndpoint starts the HTTP RPC endpoint, configured with cors/vhosts/modules

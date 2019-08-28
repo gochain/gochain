@@ -25,14 +25,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/common/prque"
-	"github.com/gochain-io/gochain/v3/core/state"
-	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/eth/gasprice"
-	"github.com/gochain-io/gochain/v3/log"
-	"github.com/gochain-io/gochain/v3/metrics"
-	"github.com/gochain-io/gochain/v3/params"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/common/prque"
+	"github.com/gochain/gochain/v3/core/state"
+	"github.com/gochain/gochain/v3/core/types"
+	"github.com/gochain/gochain/v3/eth/gasprice"
+	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v3/metrics"
+	"github.com/gochain/gochain/v3/params"
 )
 
 const (

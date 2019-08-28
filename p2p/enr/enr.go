@@ -37,8 +37,8 @@ import (
 
 	"golang.org/x/crypto/sha3"
 
-	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/rlp"
+	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/gochain/v3/rlp"
 )
 
 const SizeLimit = 300 // maximum encoded size of a node record in bytes

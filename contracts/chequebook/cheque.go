@@ -36,13 +36,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain-io/gochain/v3/accounts/abi/bind"
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/common/hexutil"
-	"github.com/gochain-io/gochain/v3/contracts/chequebook/contract"
-	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain/gochain/v3/accounts/abi/bind"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/common/hexutil"
+	"github.com/gochain/gochain/v3/contracts/chequebook/contract"
+	"github.com/gochain/gochain/v3/core/types"
+	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/gochain/v3/log"
 )
 
 // TODO(zelig): watch peer solvency and notify of bouncing cheques

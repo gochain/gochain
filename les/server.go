@@ -23,17 +23,17 @@ import (
 	"math"
 	"sync"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/core"
-	"github.com/gochain-io/gochain/v3/core/rawdb"
-	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/eth"
-	"github.com/gochain-io/gochain/v3/les/flowcontrol"
-	"github.com/gochain-io/gochain/v3/light"
-	"github.com/gochain-io/gochain/v3/log"
-	"github.com/gochain-io/gochain/v3/p2p"
-	"github.com/gochain-io/gochain/v3/p2p/discv5"
-	"github.com/gochain-io/gochain/v3/rlp"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/core"
+	"github.com/gochain/gochain/v3/core/rawdb"
+	"github.com/gochain/gochain/v3/core/types"
+	"github.com/gochain/gochain/v3/eth"
+	"github.com/gochain/gochain/v3/les/flowcontrol"
+	"github.com/gochain/gochain/v3/light"
+	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v3/p2p"
+	"github.com/gochain/gochain/v3/p2p/discv5"
+	"github.com/gochain/gochain/v3/rlp"
 )
 
 type LesServer struct {

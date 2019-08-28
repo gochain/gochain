@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain/gochain/v3/log"
 	"github.com/hashicorp/golang-lru"
 	"golang.org/x/sync/semaphore"
 )

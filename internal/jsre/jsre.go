@@ -26,8 +26,8 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/internal/jsre/deps"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/internal/jsre/deps"
 	"github.com/robertkrimen/otto"
 )
 

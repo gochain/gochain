@@ -28,9 +28,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/gochain-io/gochain/v3/internal/jsre"
-	"github.com/gochain-io/gochain/v3/internal/web3ext"
-	"github.com/gochain-io/gochain/v3/rpc"
+	"github.com/gochain/gochain/v3/internal/jsre"
+	"github.com/gochain/gochain/v3/internal/web3ext"
+	"github.com/gochain/gochain/v3/rpc"
 	"github.com/mattn/go-colorable"
 	"github.com/peterh/liner"
 	"github.com/robertkrimen/otto"

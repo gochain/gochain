@@ -38,11 +38,11 @@ import (
 	"github.com/golang/snappy"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/crypto/ecies"
-	"github.com/gochain-io/gochain/v3/crypto/secp256k1"
-	"github.com/gochain-io/gochain/v3/p2p/discover"
-	"github.com/gochain-io/gochain/v3/rlp"
+	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/gochain/v3/crypto/ecies"
+	"github.com/gochain/gochain/v3/crypto/secp256k1"
+	"github.com/gochain/gochain/v3/p2p/discover"
+	"github.com/gochain/gochain/v3/rlp"
 )
 
 const (
