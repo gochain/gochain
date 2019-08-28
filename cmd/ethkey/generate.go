@@ -27,7 +27,7 @@ import (
 	"github.com/gochain-io/gochain/v3/cmd/utils"
 	"github.com/gochain-io/gochain/v3/crypto"
 	"github.com/pborman/uuid"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli"
 )
 
 type outputGenerate struct {

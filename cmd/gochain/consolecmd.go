@@ -28,7 +28,7 @@ import (
 	"github.com/gochain-io/gochain/v3/console"
 	"github.com/gochain-io/gochain/v3/node"
 	"github.com/gochain-io/gochain/v3/rpc"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli"
 )
 
 var (

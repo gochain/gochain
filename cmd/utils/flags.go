@@ -55,7 +55,7 @@ import (
 	"github.com/gochain-io/gochain/v3/p2p/netutil"
 	"github.com/gochain-io/gochain/v3/params"
 	whisper "github.com/gochain-io/gochain/v3/whisper/whisperv6"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli"
 )
 
 var (

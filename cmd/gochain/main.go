@@ -27,7 +27,7 @@ import (
 
 	"contrib.go.opencensus.io/exporter/stackdriver"
 	"go.opencensus.io/trace"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli"
 
 	"github.com/gochain-io/gochain/v3/accounts"
 	"github.com/gochain-io/gochain/v3/accounts/keystore"

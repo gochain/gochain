@@ -30,7 +30,7 @@ import (
 	"github.com/gochain-io/gochain/v3/params"
 
 	"github.com/gochain-io/gochain/v3/cmd/utils"
-	cli "gopkg.in/urfave/cli.v1"
+	cli "github.com/urfave/cli"
 )
 
 var bugCommand = cli.Command{

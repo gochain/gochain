@@ -21,7 +21,7 @@ import (
 	"os"
 
 	"github.com/gochain-io/gochain/v3/cmd/utils"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli"
 )
 
 const (

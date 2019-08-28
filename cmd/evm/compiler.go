@@ -23,7 +23,7 @@ import (
 
 	"github.com/gochain-io/gochain/v3/cmd/evm/internal/compiler"
 
-	cli "gopkg.in/urfave/cli.v1"
+	cli "github.com/urfave/cli"
 )
 
 var compileCommand = cli.Command{

@@ -51,7 +51,7 @@ import (
 	"github.com/gochain-io/gochain/v3/p2p/simulations"
 	"github.com/gochain-io/gochain/v3/p2p/simulations/adapters"
 	"github.com/gochain-io/gochain/v3/rpc"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli"
 )
 
 var client *simulations.Client

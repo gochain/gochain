@@ -30,7 +30,7 @@ import (
 	"github.com/gochain-io/gochain/v3/metrics"
 	"github.com/gochain-io/gochain/v3/metrics/exp"
 	colorable "github.com/mattn/go-colorable"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli"
 )
 
 var Memsize memsizeui.Handler

@@ -24,7 +24,7 @@ import (
 
 	"github.com/gochain-io/gochain/v3/cmd/utils"
 	"github.com/gochain-io/gochain/v3/internal/debug"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli"
 )
 
 // AppHelpTemplate is the test template for the default, global app help topic.

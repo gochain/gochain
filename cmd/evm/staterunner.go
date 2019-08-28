@@ -28,7 +28,7 @@ import (
 	"github.com/gochain-io/gochain/v3/log"
 	"github.com/gochain-io/gochain/v3/tests"
 
-	cli "gopkg.in/urfave/cli.v1"
+	cli "github.com/urfave/cli"
 )
 
 var stateTestCommand = cli.Command{

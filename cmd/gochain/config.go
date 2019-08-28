@@ -27,7 +27,7 @@ import (
 	"reflect"
 	"unicode"
 
-	cli "gopkg.in/urfave/cli.v1"
+	cli "github.com/urfave/cli"
 
 	"github.com/gochain-io/gochain/v3/cmd/utils"
 	"github.com/gochain-io/gochain/v3/eth"
