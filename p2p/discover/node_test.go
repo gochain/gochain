@@ -28,8 +28,8 @@ import (
 	"testing/quick"
 	"time"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/crypto"
 )
 
 func ExampleNewNode() {
@@ -54,34 +54,35 @@ func ExampleNewNode() {
 }
 
 var parseNodeTests = []struct {
-	rawurl     string
-	wantError  string
-	wantResult *Node
+	name   string
+	rawurl string
+	want   *Node
 }{
 	{
-		rawurl:    "http://foobar",
-		wantError: `invalid URL scheme, want "enode"`,
+		name:   `invalid URL scheme`,
+		rawurl: "http://foobar",
 	},
 	{
-		rawurl:    "enode://01010101@123.124.125.126:3",
-		wantError: `invalid node ID (wrong length, want 128 hex chars)`,
+		name:   `invalid node ID`,
+		rawurl: "enode://01010101@123.124.125.126:3",
 	},
 	// Complete nodes with IP address.
 	{
-		rawurl:    "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@hostname:3",
-		wantError: `invalid IP address`,
+		name:   `invalid IP address`,
+		rawurl: "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@hostname:3",
 	},
 	{
-		rawurl:    "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@127.0.0.1:foo",
-		wantError: `invalid port`,
+		name:   `invalid port`,
+		rawurl: "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@127.0.0.1:foo",
 	},
 	{
-		rawurl:    "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@127.0.0.1:3?discport=foo",
-		wantError: `invalid discport in query`,
+		name:   `invalid discport in query`,
+		rawurl: "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@127.0.0.1:3?discport=foo",
 	},
 	{
+		name:   `normal`,
 		rawurl: "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@127.0.0.1:52150",
-		wantResult: NewNode(
+		want: NewNode(
 			MustHexID("0x1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439"),
 			net.IP{0x7f, 0x0, 0x0, 0x1},
 			52150,
@@ -89,8 +90,9 @@ var parseNodeTests = []struct {
 		),
 	},
 	{
+		name:   `missing IP`,
 		rawurl: "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@[::]:52150",
-		wantResult: NewNode(
+		want: NewNode(
 			MustHexID("0x1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439"),
 			net.ParseIP("::"),
 			52150,
@@ -98,8 +100,9 @@ var parseNodeTests = []struct {
 		),
 	},
 	{
+		name:   `IPv6`,
 		rawurl: "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@[2001:db8:3c4d:15::abcd:ef12]:52150",
-		wantResult: NewNode(
+		want: NewNode(
 			MustHexID("0x1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439"),
 			net.ParseIP("2001:db8:3c4d:15::abcd:ef12"),
 			52150,
@@ -107,8 +110,9 @@ var parseNodeTests = []struct {
 		),
 	},
 	{
+		name:   `discport`,
 		rawurl: "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@127.0.0.1:52150?discport=22334",
-		wantResult: NewNode(
+		want: NewNode(
 			MustHexID("0x1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439"),
 			net.IP{0x7f, 0x0, 0x0, 0x1},
 			22334,
@@ -117,64 +121,60 @@ var parseNodeTests = []struct {
 	},
 	// Incomplete nodes with no address.
 	{
+		name:   `only ID`,
 		rawurl: "1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439",
-		wantResult: NewNode(
+		want: NewNode(
 			MustHexID("0x1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439"),
 			nil, 0, 0,
 		),
 	},
 	{
+		name:   `scheme and ID`,
 		rawurl: "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439",
-		wantResult: NewNode(
+		want: NewNode(
 			MustHexID("0x1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439"),
 			nil, 0, 0,
 		),
 	},
 	// Invalid URLs
 	{
-		rawurl:    "01010101",
-		wantError: `invalid node ID (wrong length, want 128 hex chars)`,
+		name:   `invalid node ID`,
+		rawurl: "01010101",
 	},
 	{
-		rawurl:    "enode://01010101",
-		wantError: `invalid node ID (wrong length, want 128 hex chars)`,
+		name:   `invalid node ID`,
+		rawurl: "enode://01010101",
 	},
 	{
 		// This test checks that errors from url.Parse are handled.
-		rawurl:    "://foo",
-		wantError: `parse ://foo: missing protocol scheme`,
+		name:   `missing protocol scheme`,
+		rawurl: "://foo",
 	},
 }
 
 func TestParseNode(t *testing.T) {
 	for _, test := range parseNodeTests {
 		n, err := ParseNode(test.rawurl)
-		if test.wantError != "" {
+		if test.want == nil {
 			if err == nil {
-				t.Errorf("test %q:\n  got nil error, expected %#q", test.rawurl, test.wantError)
-				continue
-			} else if err.Error() != test.wantError {
-				t.Errorf("test %q:\n  got error %#q, expected %#q", test.rawurl, err.Error(), test.wantError)
-				continue
+				t.Errorf("%q (%s): expected error", test.rawurl, test.name)
 			}
 		} else {
 			if err != nil {
-				t.Errorf("test %q:\n  unexpected error: %v", test.rawurl, err)
-				continue
-			}
-			if !reflect.DeepEqual(n, test.wantResult) {
-				t.Errorf("test %q:\n  result mismatch:\ngot:  %#v, want: %#v", test.rawurl, n, test.wantResult)
+				t.Errorf("%q (%s): unexpected error: %v", test.rawurl, test.name, err)
+			} else if !reflect.DeepEqual(n, test.want) {
+				t.Errorf("%q (%s):\n  result mismatch:\ngot:  %#v, want: %#v", test.rawurl, test.name, n, test.want)
 			}
 		}
 	}
 }
 
 func TestNodeString(t *testing.T) {
-	for i, test := range parseNodeTests {
-		if test.wantError == "" && strings.HasPrefix(test.rawurl, "enode://") {
-			str := test.wantResult.String()
+	for _, test := range parseNodeTests {
+		if test.want != nil && strings.HasPrefix(test.rawurl, "enode://") {
+			str := test.want.String()
 			if str != test.rawurl {
-				t.Errorf("test %d: Node.String() mismatch:\ngot:  %s\nwant: %s", i, str, test.rawurl)
+				t.Errorf("%q (%s): Node.String() mismatch:\ngot:  %s", test.rawurl, test.name, str)
 			}
 		}
 	}

@@ -24,12 +24,12 @@ import (
 
 	"golang.org/x/crypto/sha3"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/core/rawdb"
-	"github.com/gochain-io/gochain/v3/core/state"
-	"github.com/gochain-io/gochain/v3/ethdb"
-	"github.com/gochain-io/gochain/v3/log"
-	"github.com/gochain-io/gochain/v3/trie"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/core/rawdb"
+	"github.com/gochain/gochain/v3/core/state"
+	"github.com/gochain/gochain/v3/ethdb"
+	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v3/trie"
 )
 
 // stateReq represents a batch of state fetch requests grouped together into

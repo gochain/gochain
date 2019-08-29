@@ -29,12 +29,12 @@ import (
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/log"
-	"github.com/gochain-io/gochain/v3/p2p"
-	"github.com/gochain-io/gochain/v3/rlp"
-	"github.com/gochain-io/gochain/v3/rpc"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v3/p2p"
+	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/gochain/v3/rpc"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/sync/syncmap"

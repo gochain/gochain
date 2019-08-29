@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gochain-io/gochain/v3/accounts/abi"
-	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain/gochain/v3/accounts/abi"
+	"github.com/gochain/gochain/v3/common"
 )
 
 func TestMakeTopics(t *testing.T) {

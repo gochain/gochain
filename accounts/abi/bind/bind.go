@@ -29,7 +29,7 @@ import (
 	"text/template"
 	"unicode"
 
-	"github.com/gochain-io/gochain/v3/accounts/abi"
+	"github.com/gochain/gochain/v3/accounts/abi"
 )
 
 // Lang is a target programming language selector to generate bindings for.

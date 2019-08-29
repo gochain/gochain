@@ -22,8 +22,8 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/core/types"
 )
 
 // NotFound is returned by API methods if the requested item does not exist.

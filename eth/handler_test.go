@@ -22,15 +22,15 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/core"
-	"github.com/gochain-io/gochain/v3/core/state"
-	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/eth/downloader"
-	"github.com/gochain-io/gochain/v3/ethdb"
-	"github.com/gochain-io/gochain/v3/p2p"
-	"github.com/gochain-io/gochain/v3/params"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/core"
+	"github.com/gochain/gochain/v3/core/state"
+	"github.com/gochain/gochain/v3/core/types"
+	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/gochain/v3/eth/downloader"
+	"github.com/gochain/gochain/v3/ethdb"
+	"github.com/gochain/gochain/v3/p2p"
+	"github.com/gochain/gochain/v3/params"
 )
 
 // Tests that protocol versions and modes of operations are matched up properly.

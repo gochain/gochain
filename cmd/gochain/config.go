@@ -27,14 +27,14 @@ import (
 	"reflect"
 	"unicode"
 
-	cli "gopkg.in/urfave/cli.v1"
+	cli "github.com/urfave/cli"
 
-	"github.com/gochain-io/gochain/v3/cmd/utils"
-	"github.com/gochain-io/gochain/v3/eth"
-	"github.com/gochain-io/gochain/v3/netstats"
-	"github.com/gochain-io/gochain/v3/node"
-	"github.com/gochain-io/gochain/v3/params"
-	whisper "github.com/gochain-io/gochain/v3/whisper/whisperv6"
+	"github.com/gochain/gochain/v3/cmd/utils"
+	"github.com/gochain/gochain/v3/eth"
+	"github.com/gochain/gochain/v3/netstats"
+	"github.com/gochain/gochain/v3/node"
+	"github.com/gochain/gochain/v3/params"
+	whisper "github.com/gochain/gochain/v3/whisper/whisperv6"
 	"github.com/naoina/toml"
 )
 

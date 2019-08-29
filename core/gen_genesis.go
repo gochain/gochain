@@ -7,10 +7,10 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/common/hexutil"
-	"github.com/gochain-io/gochain/v3/common/math"
-	"github.com/gochain-io/gochain/v3/params"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/common/hexutil"
+	"github.com/gochain/gochain/v3/common/math"
+	"github.com/gochain/gochain/v3/params"
 )
 
 var _ = (*genesisSpecMarshaling)(nil)

@@ -20,9 +20,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/rlp"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/gochain/v3/rlp"
 )
 
 func TestEIP155Signing(t *testing.T) {

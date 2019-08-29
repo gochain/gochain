@@ -6,7 +6,7 @@ Official golang implementation of the GoChain protocol.
 
 [![API Reference](
 https://camo.githubusercontent.com/915b7be44ada53c290eb157634330494ebe3e30a/68747470733a2f2f676f646f632e6f72672f6769746875622e636f6d2f676f6c616e672f6764646f3f7374617475732e737667
-)](https://godoc.org/github.com/gochain-io/gochain)
+)](https://godoc.org/github.com/gochain/gochain)
 
 Mainnet: [Live Stats](https://stats.gochain.io/) | [Block Explorer](https://explorer.gochain.io/) | [Public RPC Endpoint](https://rpc.gochain.io/)
 
@@ -15,7 +15,7 @@ Testnet: [Live Stats](https://testnet-stats.gochain.io/) | [Block Explorer](http
 ## General Documentation
 
 If you are looking to build DApps, deploy smart contracts, setup a private network or run a node, please see
-our [Documentation Repository](https://github.com/gochain-io/docs), it will be much more useful to you.
+our [Documentation Repository](https://github.com/gochain/docs), it will be much more useful to you.
 
 If you plan on working on the GoChain core code, then read on.
 
@@ -107,13 +107,13 @@ separate the two networks and will not make any accounts available between them.
 
 As an alternative to passing the numerous flags to the `gochain` binary, you can also pass a configuration file via:
 
-```
+```sh
 $ gochain --config /path/to/your_config.toml
 ```
 
 To get an idea how the file should look like you can use the `dumpconfig` subcommand to export your existing configuration:
 
-```
+```sh
 $ gochain --your-favourite-flags dumpconfig
 ```
 
@@ -121,10 +121,10 @@ $ gochain --your-favourite-flags dumpconfig
 
 One of the quickest ways to get GoChain up and running on your machine is by using Docker:
 
-```
+```sh
 docker run -d --name gochain-node -v /Users/alice/GoChain:/root \
            -p 8545:8545 -p 30303:30303 \
-           gochain-io/gochain
+           gochain/gochain
 ```
 
 This will start GoChain in fast-sync mode with a DB memory allowance of 1GB just as the above command does.  It will also create a persistent volume in your home directory for saving your blockchain as well as map the default ports.
@@ -170,7 +170,7 @@ subvert locally available APIs!**
 
 ### Operating a private network
 
-See: https://github.com/gochain-io/docs/tree/master/nodes/custom
+See: https://github.com/gochain/docs/tree/master/nodes/custom
 
 ## Contribution
 

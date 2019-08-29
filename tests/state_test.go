@@ -24,8 +24,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gochain-io/gochain/v3/cmd/utils"
-	"github.com/gochain-io/gochain/v3/core/vm"
+	"github.com/gochain/gochain/v3/cmd/utils"
+	"github.com/gochain/gochain/v3/core/vm"
 )
 
 func TestState(t *testing.T) {

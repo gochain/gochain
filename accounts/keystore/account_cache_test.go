@@ -29,8 +29,8 @@ import (
 
 	"github.com/cespare/cp"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/gochain-io/gochain/v3/accounts"
-	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain/gochain/v3/accounts"
+	"github.com/gochain/gochain/v3/common"
 )
 
 var (

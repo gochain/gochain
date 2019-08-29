@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain/gochain/v3/log"
 )
 
 // Enabled is checked by the constructor functions for all of the

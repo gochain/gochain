@@ -19,8 +19,8 @@ package les
 import (
 	"time"
 
-	"github.com/gochain-io/gochain/v3/common/bitutil"
-	"github.com/gochain-io/gochain/v3/light"
+	"github.com/gochain/gochain/v3/common/bitutil"
+	"github.com/gochain/gochain/v3/light"
 )
 
 const (

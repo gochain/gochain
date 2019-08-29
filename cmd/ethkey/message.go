@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/gochain-io/gochain/v3/accounts/keystore"
-	"github.com/gochain-io/gochain/v3/cmd/utils"
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/crypto"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/gochain/gochain/v3/accounts/keystore"
+	"github.com/gochain/gochain/v3/cmd/utils"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/crypto"
+	"github.com/urfave/cli"
 )
 
 type outputSign struct {

@@ -27,17 +27,17 @@ import (
 	"runtime/pprof"
 	"time"
 
-	"github.com/gochain-io/gochain/v3/cmd/evm/internal/compiler"
-	"github.com/gochain-io/gochain/v3/cmd/utils"
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/core"
-	"github.com/gochain-io/gochain/v3/core/state"
-	"github.com/gochain-io/gochain/v3/core/vm"
-	"github.com/gochain-io/gochain/v3/core/vm/runtime"
-	"github.com/gochain-io/gochain/v3/ethdb"
-	"github.com/gochain-io/gochain/v3/log"
-	"github.com/gochain-io/gochain/v3/params"
-	cli "gopkg.in/urfave/cli.v1"
+	"github.com/gochain/gochain/v3/cmd/evm/internal/compiler"
+	"github.com/gochain/gochain/v3/cmd/utils"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/core"
+	"github.com/gochain/gochain/v3/core/state"
+	"github.com/gochain/gochain/v3/core/vm"
+	"github.com/gochain/gochain/v3/core/vm/runtime"
+	"github.com/gochain/gochain/v3/ethdb"
+	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v3/params"
+	cli "github.com/urfave/cli"
 )
 
 var runCommand = cli.Command{

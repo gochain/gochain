@@ -21,9 +21,9 @@ import (
 	"context"
 	"sync"
 
-	"github.com/gochain-io/gochain/v3/internal/ethapi"
-	"github.com/gochain-io/gochain/v3/log"
-	"github.com/gochain-io/gochain/v3/rpc"
+	"github.com/gochain/gochain/v3/internal/ethapi"
+	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v3/rpc"
 )
 
 type StdIOUI struct {

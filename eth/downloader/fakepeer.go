@@ -19,10 +19,10 @@ package downloader
 import (
 	"math/big"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/core"
-	"github.com/gochain-io/gochain/v3/core/rawdb"
-	"github.com/gochain-io/gochain/v3/core/types"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/core"
+	"github.com/gochain/gochain/v3/core/rawdb"
+	"github.com/gochain/gochain/v3/core/types"
 )
 
 // FakePeer is a mock downloader peer that operates on a local database instance

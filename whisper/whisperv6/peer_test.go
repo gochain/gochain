@@ -27,12 +27,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/common/hexutil"
-	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/p2p"
-	"github.com/gochain-io/gochain/v3/p2p/discover"
-	"github.com/gochain-io/gochain/v3/p2p/nat"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/common/hexutil"
+	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/gochain/v3/p2p"
+	"github.com/gochain/gochain/v3/p2p/discover"
+	"github.com/gochain/gochain/v3/p2p/nat"
 )
 
 var keys = []string{

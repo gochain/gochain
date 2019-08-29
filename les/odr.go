@@ -19,10 +19,10 @@ package les
 import (
 	"context"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/core"
-	"github.com/gochain-io/gochain/v3/light"
-	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/core"
+	"github.com/gochain/gochain/v3/light"
+	"github.com/gochain/gochain/v3/log"
 )
 
 // LesOdr implements light.OdrBackend

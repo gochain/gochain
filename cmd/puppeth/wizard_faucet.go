@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/gochain-io/gochain/v3/accounts/keystore"
-	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain/gochain/v3/accounts/keystore"
+	"github.com/gochain/gochain/v3/log"
 )
 
 // deployFaucet queries the user for various input on deploying a faucet, after

@@ -29,7 +29,7 @@ import (
 	"net"
 	"sort"
 
-	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain/gochain/v3/common"
 )
 
 const (

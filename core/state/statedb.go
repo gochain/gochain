@@ -24,12 +24,12 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/log"
-	"github.com/gochain-io/gochain/v3/rlp"
-	"github.com/gochain-io/gochain/v3/trie"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/core/types"
+	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/gochain/v3/trie"
 )
 
 type revision struct {

@@ -26,11 +26,11 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/gochain-io/gochain/v3/cmd/internal/browser"
-	"github.com/gochain-io/gochain/v3/params"
+	"github.com/gochain/gochain/v3/cmd/internal/browser"
+	"github.com/gochain/gochain/v3/params"
 
-	"github.com/gochain-io/gochain/v3/cmd/utils"
-	cli "gopkg.in/urfave/cli.v1"
+	"github.com/gochain/gochain/v3/cmd/utils"
+	cli "github.com/urfave/cli"
 )
 
 var bugCommand = cli.Command{

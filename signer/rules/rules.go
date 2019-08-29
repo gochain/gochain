@@ -22,11 +22,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gochain-io/gochain/v3/internal/ethapi"
-	"github.com/gochain-io/gochain/v3/log"
-	"github.com/gochain-io/gochain/v3/signer/core"
-	"github.com/gochain-io/gochain/v3/signer/rules/deps"
-	"github.com/gochain-io/gochain/v3/signer/storage"
+	"github.com/gochain/gochain/v3/internal/ethapi"
+	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v3/signer/core"
+	"github.com/gochain/gochain/v3/signer/rules/deps"
+	"github.com/gochain/gochain/v3/signer/storage"
 	"github.com/robertkrimen/otto"
 )
 

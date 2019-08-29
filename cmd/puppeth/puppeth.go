@@ -22,8 +22,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/gochain-io/gochain/v3/log"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/gochain/gochain/v3/log"
+	"github.com/urfave/cli"
 )
 
 // main is just a boring entry point to set up the CLI app.

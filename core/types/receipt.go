@@ -24,11 +24,11 @@ import (
 	"math/big"
 	"unsafe"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/common/hexutil"
-	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/params"
-	"github.com/gochain-io/gochain/v3/rlp"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/common/hexutil"
+	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/gochain/v3/params"
+	"github.com/gochain/gochain/v3/rlp"
 )
 
 //go:generate gencodec -type Receipt -field-override receiptMarshaling -out gen_receipt_json.go

@@ -24,8 +24,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain-io/gochain/v3/log"
-	"github.com/gochain-io/gochain/v3/p2p/discover"
+	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v3/p2p/discover"
 )
 
 //a map of mocker names to its function

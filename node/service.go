@@ -19,14 +19,14 @@ package node
 import (
 	"reflect"
 
-	"github.com/gochain-io/gochain/v3/accounts"
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/core"
-	"github.com/gochain-io/gochain/v3/ethdb"
-	"github.com/gochain-io/gochain/v3/ethdb/s3"
-	"github.com/gochain-io/gochain/v3/log"
-	"github.com/gochain-io/gochain/v3/p2p"
-	"github.com/gochain-io/gochain/v3/rpc"
+	"github.com/gochain/gochain/v3/accounts"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/core"
+	"github.com/gochain/gochain/v3/ethdb"
+	"github.com/gochain/gochain/v3/ethdb/s3"
+	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v3/p2p"
+	"github.com/gochain/gochain/v3/rpc"
 )
 
 // ServiceContext is a collection of service independent options inherited from

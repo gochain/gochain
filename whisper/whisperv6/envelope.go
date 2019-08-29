@@ -26,11 +26,11 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/common/math"
-	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/crypto/ecies"
-	"github.com/gochain-io/gochain/v3/rlp"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/common/math"
+	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/gochain/v3/crypto/ecies"
+	"github.com/gochain/gochain/v3/rlp"
 )
 
 // Envelope represents a clear-text data packet to transmit through the Whisper

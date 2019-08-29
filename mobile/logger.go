@@ -19,7 +19,7 @@ package geth
 import (
 	"os"
 
-	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain/gochain/v3/log"
 )
 
 // SetVerbosity sets the global verbosity level (between 0 and 6 - see logger/verbosity.go).

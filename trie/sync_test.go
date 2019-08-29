@@ -20,8 +20,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/ethdb"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/ethdb"
 )
 
 // makeTestTrie create a sample test trie to test node-wise reconstruction.

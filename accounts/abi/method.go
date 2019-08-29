@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gochain-io/gochain/v3/crypto"
+	"github.com/gochain/gochain/v3/crypto"
 )
 
 // Method represents a callable given a `Name` and whether the method is a constant.

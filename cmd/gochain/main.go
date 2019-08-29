@@ -27,19 +27,19 @@ import (
 
 	"contrib.go.opencensus.io/exporter/stackdriver"
 	"go.opencensus.io/trace"
-	"gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli"
 
-	"github.com/gochain-io/gochain/v3/accounts"
-	"github.com/gochain-io/gochain/v3/accounts/keystore"
-	"github.com/gochain-io/gochain/v3/cmd/utils"
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/console"
-	"github.com/gochain-io/gochain/v3/eth"
-	"github.com/gochain-io/gochain/v3/goclient"
-	"github.com/gochain-io/gochain/v3/internal/debug"
-	"github.com/gochain-io/gochain/v3/log"
-	"github.com/gochain-io/gochain/v3/metrics"
-	"github.com/gochain-io/gochain/v3/node"
+	"github.com/gochain/gochain/v3/accounts"
+	"github.com/gochain/gochain/v3/accounts/keystore"
+	"github.com/gochain/gochain/v3/cmd/utils"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/console"
+	"github.com/gochain/gochain/v3/eth"
+	"github.com/gochain/gochain/v3/goclient"
+	"github.com/gochain/gochain/v3/internal/debug"
+	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v3/metrics"
+	"github.com/gochain/gochain/v3/node"
 )
 
 const (

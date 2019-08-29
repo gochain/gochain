@@ -21,9 +21,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain-io/gochain/v3/eth/downloader"
-	"github.com/gochain-io/gochain/v3/p2p"
-	"github.com/gochain-io/gochain/v3/p2p/discover"
+	"github.com/gochain/gochain/v3/eth/downloader"
+	"github.com/gochain/gochain/v3/p2p"
+	"github.com/gochain/gochain/v3/p2p/discover"
 )
 
 // Tests that fast sync gets disabled as soon as a real block is successfully

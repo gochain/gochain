@@ -25,17 +25,17 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/consensus"
-	"github.com/gochain-io/gochain/v3/core"
-	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/eth/downloader"
-	"github.com/gochain-io/gochain/v3/eth/fetcher"
-	"github.com/gochain-io/gochain/v3/log"
-	"github.com/gochain-io/gochain/v3/p2p"
-	"github.com/gochain-io/gochain/v3/p2p/discover"
-	"github.com/gochain-io/gochain/v3/params"
-	"github.com/gochain-io/gochain/v3/rlp"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/consensus"
+	"github.com/gochain/gochain/v3/core"
+	"github.com/gochain/gochain/v3/core/types"
+	"github.com/gochain/gochain/v3/eth/downloader"
+	"github.com/gochain/gochain/v3/eth/fetcher"
+	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v3/p2p"
+	"github.com/gochain/gochain/v3/p2p/discover"
+	"github.com/gochain/gochain/v3/params"
+	"github.com/gochain/gochain/v3/rlp"
 )
 
 const (

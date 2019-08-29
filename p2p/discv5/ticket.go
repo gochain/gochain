@@ -25,10 +25,10 @@ import (
 	"sort"
 	"time"
 
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/common/mclock"
-	"github.com/gochain-io/gochain/v3/crypto"
-	"github.com/gochain-io/gochain/v3/log"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/common/mclock"
+	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/gochain/v3/log"
 )
 
 const (

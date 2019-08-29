@@ -25,11 +25,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain-io/gochain/v3"
-	"github.com/gochain-io/gochain/v3/common"
-	"github.com/gochain-io/gochain/v3/common/hexutil"
-	"github.com/gochain-io/gochain/v3/core/types"
-	"github.com/gochain-io/gochain/v3/rpc"
+	"github.com/gochain/gochain/v3"
+	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/common/hexutil"
+	"github.com/gochain/gochain/v3/core/types"
+	"github.com/gochain/gochain/v3/rpc"
 )
 
 var (
