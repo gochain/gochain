@@ -17,416 +17,319 @@
 package discover
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"encoding/hex"
-	"errors"
+	"bytes"
 	"fmt"
 	"math/big"
 	"math/rand"
 	"net"
-	"net/url"
-	"regexp"
-	"strconv"
+	"reflect"
 	"strings"
+	"testing"
+	"testing/quick"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/crypto"
-	"github.com/gochain/gochain/v3/crypto/secp256k1"
+	"github.com/gochain-io/gochain/v3/common"
+	"github.com/gochain-io/gochain/v3/crypto"
 )
 
-const NodeIDBits = 512
+func ExampleNewNode() {
+	id := MustHexID("1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439")
 
-// Node represents a host on the network.
-// The fields of Node may not be modified.
-type Node struct {
-	IP       net.IP // len 4 for IPv4 or 16 for IPv6
-	UDP, TCP uint16 // port numbers
-	ID       NodeID // the node's public key
+	// Complete nodes contain UDP and TCP endpoints:
+	n1 := NewNode(id, net.ParseIP("2001:db8:3c4d:15::abcd:ef12"), 52150, 30303)
+	fmt.Println("n1:", n1)
+	fmt.Println("n1.Incomplete() ->", n1.Incomplete())
 
-	// This is a cached copy of sha3(ID) which is used for node
-	// distance calculations. This is part of Node in order to make it
-	// possible to write tests that need a node at a certain distance.
-	// In those tests, the content of sha will not actually correspond
-	// with ID.
-	sha common.Hash
+	// An incomplete node can be created by passing zero values
+	// for all parameters except id.
+	n2 := NewNode(id, nil, 0, 0)
+	fmt.Println("n2:", n2)
+	fmt.Println("n2.Incomplete() ->", n2.Incomplete())
 
-	// Time when the node was added to the table.
-	addedAt time.Time
+	// Output:
+	// n1: enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@[2001:db8:3c4d:15::abcd:ef12]:30303?discport=52150
+	// n1.Incomplete() -> false
+	// n2: enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439
+	// n2.Incomplete() -> true
 }
 
-// NewNode creates a new node. It is mostly meant to be used for
-// testing purposes.
-func NewNode(id NodeID, ip net.IP, udpPort, tcpPort uint16) *Node {
-	if ipv4 := ip.To4(); ipv4 != nil {
-		ip = ipv4
-	}
-	return &Node{
-		IP:  ip,
-		UDP: udpPort,
-		TCP: tcpPort,
-		ID:  id,
-		sha: crypto.Keccak256Hash(id[:]),
-	}
+var parseNodeTests = []struct {
+	name   string
+	rawurl string
+	want   *Node
+}{
+	{
+		name:   `invalid URL scheme`,
+		rawurl: "http://foobar",
+	},
+	{
+		name:   `invalid node ID`,
+		rawurl: "enode://01010101@123.124.125.126:3",
+	},
+	// Complete nodes with IP address.
+	{
+		name:   `invalid IP address`,
+		rawurl: "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@hostname:3",
+	},
+	{
+		name:   `invalid port`,
+		rawurl: "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@127.0.0.1:foo",
+	},
+	{
+		name:   `invalid discport in query`,
+		rawurl: "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@127.0.0.1:3?discport=foo",
+	},
+	{
+		name:   `normal`,
+		rawurl: "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@127.0.0.1:52150",
+		want: NewNode(
+			MustHexID("0x1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439"),
+			net.IP{0x7f, 0x0, 0x0, 0x1},
+			52150,
+			52150,
+		),
+	},
+	{
+		name:   `missing IP`,
+		rawurl: "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@[::]:52150",
+		want: NewNode(
+			MustHexID("0x1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439"),
+			net.ParseIP("::"),
+			52150,
+			52150,
+		),
+	},
+	{
+		name:   `IPv6`,
+		rawurl: "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@[2001:db8:3c4d:15::abcd:ef12]:52150",
+		want: NewNode(
+			MustHexID("0x1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439"),
+			net.ParseIP("2001:db8:3c4d:15::abcd:ef12"),
+			52150,
+			52150,
+		),
+	},
+	{
+		name:   `discport`,
+		rawurl: "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439@127.0.0.1:52150?discport=22334",
+		want: NewNode(
+			MustHexID("0x1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439"),
+			net.IP{0x7f, 0x0, 0x0, 0x1},
+			22334,
+			52150,
+		),
+	},
+	// Incomplete nodes with no address.
+	{
+		name:   `only ID`,
+		rawurl: "1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439",
+		want: NewNode(
+			MustHexID("0x1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439"),
+			nil, 0, 0,
+		),
+	},
+	{
+		name:   `scheme and ID`,
+		rawurl: "enode://1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439",
+		want: NewNode(
+			MustHexID("0x1dd9d65c4552b5eb43d5ad55a2ee3f56c6cbc1c64a5c8d659f51fcd51bace24351232b8d7821617d2b29b54b81cdefb9b3e9c37d7fd5f63270bcc9e1a6f6a439"),
+			nil, 0, 0,
+		),
+	},
+	// Invalid URLs
+	{
+		name:   `invalid node ID`,
+		rawurl: "01010101",
+	},
+	{
+		name:   `invalid node ID`,
+		rawurl: "enode://01010101",
+	},
+	{
+		// This test checks that errors from url.Parse are handled.
+		name:   `missing protocol scheme`,
+		rawurl: "://foo",
+	},
 }
 
-func (n *Node) addr() *net.UDPAddr {
-	return &net.UDPAddr{IP: n.IP, Port: int(n.UDP)}
-}
-
-// Incomplete returns true for nodes with no IP address.
-func (n *Node) Incomplete() bool {
-	return n.IP == nil
-}
-
-// checks whether n is a valid complete node.
-func (n *Node) validateComplete() error {
-	if n.Incomplete() {
-		return errors.New("incomplete node")
-	}
-	if n.UDP == 0 {
-		return errors.New("missing UDP port")
-	}
-	if n.TCP == 0 {
-		return errors.New("missing TCP port")
-	}
-	if n.IP.IsMulticast() || n.IP.IsUnspecified() {
-		return errors.New("invalid IP (multicast/unspecified)")
-	}
-	_, err := n.ID.Pubkey() // validate the key (on curve, etc.)
-	return err
-}
-
-// The string representation of a Node is a URL.
-// Please see ParseNode for a description of the format.
-func (n *Node) String() string {
-	u := url.URL{Scheme: "enode"}
-	if n.Incomplete() {
-		u.Host = fmt.Sprintf("%x", n.ID[:])
-	} else {
-		addr := net.TCPAddr{IP: n.IP, Port: int(n.TCP)}
-		u.User = url.User(fmt.Sprintf("%x", n.ID[:]))
-		u.Host = addr.String()
-		if n.UDP != n.TCP {
-			u.RawQuery = "discport=" + strconv.Itoa(int(n.UDP))
-		}
-	}
-	return u.String()
-}
-
-var incompleteNodeURL = regexp.MustCompile("(?i)^(?:enode://)?([0-9a-f]+)$")
-
-// ParseNode parses a node designator.
-//
-// There are two basic forms of node designators
-//   - incomplete nodes, which only have the public key (node ID)
-//   - complete nodes, which contain the public key and IP/Port information
-//
-// For incomplete nodes, the designator must look like one of these
-//
-//    enode://<hex node id>
-//    <hex node id>
-//
-// For complete nodes, the node ID is encoded in the username portion
-// of the URL, separated from the host by an @ sign. The hostname can
-// only be given as an IP address, DNS domain names are not allowed.
-// The port in the host name section is the TCP listening port. If the
-// TCP and UDP (discovery) ports differ, the UDP port is specified as
-// query parameter "discport".
-//
-// In the following example, the node URL describes
-// a node with IP address 10.3.58.6, TCP listening port 30303
-// and UDP discovery port 30301.
-//
-//    enode://<hex node id>@10.3.58.6:30303?discport=30301
-func ParseNode(rawurl string) (*Node, error) {
-	if m := incompleteNodeURL.FindStringSubmatch(rawurl); m != nil {
-		id, err := HexID(m[1])
-		if err != nil {
-			return nil, fmt.Errorf("invalid node ID (%v)", err)
-		}
-		return NewNode(id, nil, 0, 0), nil
-	}
-	return parseComplete(rawurl)
-}
-
-func parseComplete(rawurl string) (*Node, error) {
-	var (
-		id               NodeID
-		ip               net.IP
-		tcpPort, udpPort uint64
-	)
-	u, err := url.Parse(rawurl)
-	if err != nil {
-		return nil, err
-	}
-	if u.Scheme != "enode" {
-		return nil, errors.New("invalid URL scheme, want \"enode\"")
-	}
-	// Parse the Node ID from the user portion.
-	if u.User == nil {
-		return nil, errors.New("does not contain node ID")
-	}
-	if id, err = HexID(u.User.String()); err != nil {
-		return nil, fmt.Errorf("invalid node ID (%v)", err)
-	}
-	// Parse the IP address.
-	host, port, err := net.SplitHostPort(u.Host)
-	if err != nil {
-		return nil, fmt.Errorf("invalid host: %v", err)
-	}
-	if ip = net.ParseIP(host); ip == nil {
-		return nil, errors.New("invalid IP address")
-	}
-	// Ensure the IP is 4 bytes long for IPv4 addresses.
-	if ipv4 := ip.To4(); ipv4 != nil {
-		ip = ipv4
-	}
-	// Parse the port numbers.
-	if tcpPort, err = strconv.ParseUint(port, 10, 16); err != nil {
-		return nil, errors.New("invalid port")
-	}
-	udpPort = tcpPort
-	qv := u.Query()
-	if qv.Get("discport") != "" {
-		udpPort, err = strconv.ParseUint(qv.Get("discport"), 10, 16)
-		if err != nil {
-			return nil, errors.New("invalid discport in query")
-		}
-	}
-	return NewNode(id, ip, uint16(udpPort), uint16(tcpPort)), nil
-}
-
-// MustParseNode parses a node URL. It panics if the URL is not valid.
-func MustParseNode(rawurl string) *Node {
-	n, err := ParseNode(rawurl)
-	if err != nil {
-		panic("invalid node URL: " + err.Error())
-	}
-	return n
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (n *Node) MarshalText() ([]byte, error) {
-	return []byte(n.String()), nil
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (n *Node) UnmarshalText(text []byte) error {
-	dec, err := ParseNode(string(text))
-	if err == nil {
-		*n = *dec
-	}
-	return err
-}
-
-// NodeID is a unique identifier for each node.
-// The node identifier is a marshaled elliptic curve public key.
-type NodeID [NodeIDBits / 8]byte
-
-// Bytes returns a byte slice representation of the NodeID
-func (n NodeID) Bytes() []byte {
-	return n[:]
-}
-
-// NodeID prints as a long hexadecimal number.
-func (n NodeID) String() string {
-	return fmt.Sprintf("%x", n[:])
-}
-
-// The Go syntax representation of a NodeID is a call to HexID.
-func (n NodeID) GoString() string {
-	return fmt.Sprintf("discover.HexID(\"%x\")", n[:])
-}
-
-// TerminalString returns a shortened hex string for terminal logging.
-func (n NodeID) TerminalString() string {
-	return hex.EncodeToString(n[:8])
-}
-
-// MarshalText implements the encoding.TextMarshaler interface.
-func (n NodeID) MarshalText() ([]byte, error) {
-	return []byte(hex.EncodeToString(n[:])), nil
-}
-
-// UnmarshalText implements the encoding.TextUnmarshaler interface.
-func (n *NodeID) UnmarshalText(text []byte) error {
-	id, err := HexID(string(text))
-	if err != nil {
-		return err
-	}
-	*n = id
-	return nil
-}
-
-// BytesID converts a byte slice to a NodeID
-func BytesID(b []byte) (NodeID, error) {
-	var id NodeID
-	if len(b) != len(id) {
-		return id, fmt.Errorf("wrong length, want %d bytes", len(id))
-	}
-	copy(id[:], b)
-	return id, nil
-}
-
-// MustBytesID converts a byte slice to a NodeID.
-// It panics if the byte slice is not a valid NodeID.
-func MustBytesID(b []byte) NodeID {
-	id, err := BytesID(b)
-	if err != nil {
-		panic(err)
-	}
-	return id
-}
-
-// HexID converts a hex string to a NodeID.
-// The string may be prefixed with 0x.
-func HexID(in string) (NodeID, error) {
-	var id NodeID
-	b, err := hex.DecodeString(strings.TrimPrefix(in, "0x"))
-	if err != nil {
-		return id, err
-	} else if len(b) != len(id) {
-		return id, fmt.Errorf("wrong length, want %d hex chars", len(id)*2)
-	}
-	copy(id[:], b)
-	return id, nil
-}
-
-// MustHexID converts a hex string to a NodeID.
-// It panics if the string is not a valid NodeID.
-func MustHexID(in string) NodeID {
-	id, err := HexID(in)
-	if err != nil {
-		panic(err)
-	}
-	return id
-}
-
-// PubkeyID returns a marshaled representation of the given public key.
-func PubkeyID(pub *ecdsa.PublicKey) NodeID {
-	var id NodeID
-	pbytes := elliptic.Marshal(pub.Curve, pub.X, pub.Y)
-	if len(pbytes)-1 != len(id) {
-		panic(fmt.Errorf("need %d bit pubkey, got %d bits", (len(id)+1)*8, len(pbytes)))
-	}
-	copy(id[:], pbytes[1:])
-	return id
-}
-
-// Pubkey returns the public key represented by the node ID.
-// It returns an error if the ID is not a point on the curve.
-func (id NodeID) Pubkey() (*ecdsa.PublicKey, error) {
-	p := &ecdsa.PublicKey{Curve: crypto.S256(), X: new(big.Int), Y: new(big.Int)}
-	half := len(id) / 2
-	p.X.SetBytes(id[:half])
-	p.Y.SetBytes(id[half:])
-	if !p.Curve.IsOnCurve(p.X, p.Y) {
-		return nil, errors.New("id is invalid secp256k1 curve point")
-	}
-	return p, nil
-}
-
-// recoverNodeID computes the public key used to sign the
-// given hash from the signature.
-func recoverNodeID(hash, sig []byte) (id NodeID, err error) {
-	pubkey, err := secp256k1.RecoverPubkey(hash, sig)
-	if err != nil {
-		return id, err
-	}
-	if len(pubkey)-1 != len(id) {
-		return id, fmt.Errorf("recovered pubkey has %d bits, want %d bits", len(pubkey)*8, (len(id)+1)*8)
-	}
-	for i := range id {
-		id[i] = pubkey[i+1]
-	}
-	return id, nil
-}
-
-// distcmp compares the distances a->target and b->target.
-// Returns -1 if a is closer to target, 1 if b is closer to target
-// and 0 if they are equal.
-func distcmp(target, a, b common.Hash) int {
-	for i := range target {
-		da := a[i] ^ target[i]
-		db := b[i] ^ target[i]
-		if da > db {
-			return 1
-		} else if da < db {
-			return -1
-		}
-	}
-	return 0
-}
-
-// table of leading zero counts for bytes [0..255]
-var lzcount = [256]int{
-	8, 7, 6, 6, 5, 5, 5, 5,
-	4, 4, 4, 4, 4, 4, 4, 4,
-	3, 3, 3, 3, 3, 3, 3, 3,
-	3, 3, 3, 3, 3, 3, 3, 3,
-	2, 2, 2, 2, 2, 2, 2, 2,
-	2, 2, 2, 2, 2, 2, 2, 2,
-	2, 2, 2, 2, 2, 2, 2, 2,
-	2, 2, 2, 2, 2, 2, 2, 2,
-	1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-}
-
-// logdist returns the logarithmic distance between a and b, log2(a ^ b).
-func logdist(a, b common.Hash) int {
-	lz := 0
-	for i := range a {
-		x := a[i] ^ b[i]
-		if x == 0 {
-			lz += 8
+func TestParseNode(t *testing.T) {
+	for _, test := range parseNodeTests {
+		n, err := ParseNode(test.rawurl)
+		if test.want == nil {
+			if err == nil {
+				t.Errorf("%q (%s): expected error", test.rawurl, test.name)
+			}
 		} else {
-			lz += lzcount[x]
-			break
+			if err != nil {
+				t.Errorf("%q (%s): unexpected error: %v", test.rawurl, test.name, err)
+			} else if !reflect.DeepEqual(n, test.want) {
+				t.Errorf("%q (%s):\n  result mismatch:\ngot:  %#v, want: %#v", test.rawurl, test.name, n, test.want)
+			}
 		}
 	}
-	return len(a)*8 - lz
 }
 
-// hashAtDistance returns a random hash such that logdist(a, b) == n
-func hashAtDistance(a common.Hash, n int) (b common.Hash) {
-	if n == 0 {
-		return a
+func TestNodeString(t *testing.T) {
+	for _, test := range parseNodeTests {
+		if test.want != nil && strings.HasPrefix(test.rawurl, "enode://") {
+			str := test.want.String()
+			if str != test.rawurl {
+				t.Errorf("%q (%s): Node.String() mismatch:\ngot:  %s", test.rawurl, test.name, str)
+			}
+		}
 	}
-	// flip bit at position n, fill the rest with random bits
-	b = a
-	pos := len(a) - n/8 - 1
-	bit := byte(0x01) << (byte(n%8) - 1)
-	if bit == 0 {
-		pos++
-		bit = 0x80
+}
+
+func TestHexID(t *testing.T) {
+	ref := NodeID{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 106, 217, 182, 31, 165, 174, 1, 67, 7, 235, 220, 150, 66, 83, 173, 205, 159, 44, 10, 57, 42, 161, 26, 188}
+	id1 := MustHexID("0x000000000000000000000000000000000000000000000000000000000000000000000000000000806ad9b61fa5ae014307ebdc964253adcd9f2c0a392aa11abc")
+	id2 := MustHexID("000000000000000000000000000000000000000000000000000000000000000000000000000000806ad9b61fa5ae014307ebdc964253adcd9f2c0a392aa11abc")
+
+	if id1 != ref {
+		t.Errorf("wrong id1\ngot  %v\nwant %v", id1[:], ref[:])
 	}
-	b[pos] = a[pos]&^bit | ^a[pos]&bit // TODO: randomize end bits
-	for i := pos + 1; i < len(a); i++ {
-		b[i] = byte(rand.Intn(255))
+	if id2 != ref {
+		t.Errorf("wrong id2\ngot  %v\nwant %v", id2[:], ref[:])
 	}
-	return b
+}
+
+func TestNodeID_textEncoding(t *testing.T) {
+	ref := NodeID{
+		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x10,
+		0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x20,
+		0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x30,
+		0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x40,
+		0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x50,
+		0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x60,
+		0x61, 0x62, 0x63, 0x64,
+	}
+	hex := "01020304050607080910111213141516171819202122232425262728293031323334353637383940414243444546474849505152535455565758596061626364"
+
+	text, err := ref.MarshalText()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(text, []byte(hex)) {
+		t.Fatalf("text encoding did not match\nexpected: %s\ngot:      %s", hex, text)
+	}
+
+	id := new(NodeID)
+	if err := id.UnmarshalText(text); err != nil {
+		t.Fatal(err)
+	}
+	if *id != ref {
+		t.Fatalf("text decoding did not match\nexpected: %s\ngot:      %s", ref, id)
+	}
+}
+
+func TestNodeID_recover(t *testing.T) {
+	prv := newkey()
+	hash := make([]byte, 32)
+	sig, err := crypto.Sign(hash, prv)
+	if err != nil {
+		t.Fatalf("signing error: %v", err)
+	}
+
+	pub := PubkeyID(&prv.PublicKey)
+	recpub, err := recoverNodeID(hash, sig)
+	if err != nil {
+		t.Fatalf("recovery error: %v", err)
+	}
+	if pub != recpub {
+		t.Errorf("recovered wrong pubkey:\ngot:  %v\nwant: %v", recpub, pub)
+	}
+
+	ecdsa, err := pub.Pubkey()
+	if err != nil {
+		t.Errorf("Pubkey error: %v", err)
+	}
+	if !reflect.DeepEqual(ecdsa, &prv.PublicKey) {
+		t.Errorf("Pubkey mismatch:\n  got:  %#v\n  want: %#v", ecdsa, &prv.PublicKey)
+	}
+}
+
+func TestNodeID_pubkeyBad(t *testing.T) {
+	ecdsa, err := NodeID{}.Pubkey()
+	if err == nil {
+		t.Error("expected error for zero ID")
+	}
+	if ecdsa != nil {
+		t.Error("expected nil result")
+	}
+}
+
+func TestNodeID_distcmp(t *testing.T) {
+	distcmpBig := func(target, a, b common.Hash) int {
+		tbig := new(big.Int).SetBytes(target[:])
+		abig := new(big.Int).SetBytes(a[:])
+		bbig := new(big.Int).SetBytes(b[:])
+		return new(big.Int).Xor(tbig, abig).Cmp(new(big.Int).Xor(tbig, bbig))
+	}
+	if err := quick.CheckEqual(distcmp, distcmpBig, quickcfg()); err != nil {
+		t.Error(err)
+	}
+}
+
+// the random tests is likely to miss the case where they're equal.
+func TestNodeID_distcmpEqual(t *testing.T) {
+	base := common.Hash{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+	x := common.Hash{15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}
+	if distcmp(base, x, x) != 0 {
+		t.Errorf("distcmp(base, x, x) != 0")
+	}
+}
+
+func TestNodeID_logdist(t *testing.T) {
+	logdistBig := func(a, b common.Hash) int {
+		abig, bbig := new(big.Int).SetBytes(a[:]), new(big.Int).SetBytes(b[:])
+		return new(big.Int).Xor(abig, bbig).BitLen()
+	}
+	if err := quick.CheckEqual(logdist, logdistBig, quickcfg()); err != nil {
+		t.Error(err)
+	}
+}
+
+// the random tests is likely to miss the case where they're equal.
+func TestNodeID_logdistEqual(t *testing.T) {
+	x := common.Hash{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+	if logdist(x, x) != 0 {
+		t.Errorf("logdist(x, x) != 0")
+	}
+}
+
+func TestNodeID_hashAtDistance(t *testing.T) {
+	// we don't use quick.Check here because its output isn't
+	// very helpful when the test fails.
+	cfg := quickcfg()
+	for i := 0; i < cfg.MaxCount; i++ {
+		a := gen(common.Hash{}, cfg.Rand).(common.Hash)
+		dist := cfg.Rand.Intn(len(common.Hash{}) * 8)
+		result := hashAtDistance(a, dist)
+		actualdist := logdist(result, a)
+
+		if dist != actualdist {
+			t.Log("a:     ", a)
+			t.Log("result:", result)
+			t.Fatalf("#%d: distance of result is %d, want %d", i, actualdist, dist)
+		}
+	}
+}
+
+func quickcfg() *quick.Config {
+	return &quick.Config{
+		MaxCount: 5000,
+		Rand:     rand.New(rand.NewSource(time.Now().Unix())),
+	}
+}
+
+// TODO: The Generate method can be dropped when we require Go >= 1.5
+// because testing/quick learned to generate arrays in 1.5.
+
+func (NodeID) Generate(rand *rand.Rand, size int) reflect.Value {
+	var id NodeID
+	m := rand.Intn(len(id))
+	for i := len(id) - 1; i > m; i-- {
+		id[i] = byte(rand.Uint32())
+	}
+	return reflect.ValueOf(id)
 }
