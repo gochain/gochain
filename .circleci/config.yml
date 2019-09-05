@@ -3,12 +3,11 @@ version: 2.0
 defaults: &defaults
   working_directory: /go/src/github.com/gochain/gochain
   docker:
-    - image: circleci/golang:1.12
+    - image: circleci/golang:1.13
   environment: # apparently expansion doesn't work here yet: https://discuss.circleci.com/t/environment-variable-expansion-in-working-directory/11322
     - OS=linux
     - ARCH=amd64
     - GOCACHE=/tmp/go/cache
-    - GO111MODULE=on
 
 jobs:
   prepare:
@@ -72,8 +71,7 @@ jobs:
 #    environment: # apparently expansion doesn't work here yet: https://discuss.circleci.com/t/environment-variable-expansion-in-working-directory/11322
 #      - GOPATH=/home/circleci/go
 #      - GOCACHE=/tmp/go/cache
-#      - GOVERSION=1.12
-#      - GO111MODULE=on
+#      - GOVERSION=1.13
 #      - OS=linux
 #      - ARCH=amd64
 #    steps:
