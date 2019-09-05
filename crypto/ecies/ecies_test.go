@@ -38,6 +38,7 @@ import (
 	"flag"
 	"fmt"
 	"math/big"
+	"os"
 	"testing"
 
 	"github.com/gochain/gochain/v3/crypto"
@@ -45,10 +46,10 @@ import (
 
 var dumpEnc bool
 
-func init() {
-	flDump := flag.Bool("dump", false, "write encrypted test message to file")
+func TestMain(m *testing.M) {
+	flag.BoolVar(&dumpEnc, "dump", false, "write encrypted test message to file")
 	flag.Parse()
-	dumpEnc = *flDump
+	os.Exit(m.Run())
 }
 
 // Ensure the KDF generates appropriately sized keys.
