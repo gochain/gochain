@@ -19,12 +19,10 @@ package tests
 import (
 	"bufio"
 	"bytes"
-	"flag"
 	"fmt"
 	"reflect"
 	"testing"
 
-	"github.com/gochain/gochain/v3/cmd/utils"
 	"github.com/gochain/gochain/v3/core/vm"
 )
 
@@ -71,17 +69,8 @@ func TestState(t *testing.T) {
 // Transactions with gasLimit above this value will not get a VM trace on failure.
 const traceErrorLimit = 400000
 
-// The VM config for state tests that accepts --vm.* command line arguments.
-var testVMConfig = func() vm.Config {
-	vmconfig := vm.Config{}
-	flag.StringVar(&vmconfig.EVMInterpreter, utils.EVMInterpreterFlag.Name, utils.EVMInterpreterFlag.Value, utils.EVMInterpreterFlag.Usage)
-	flag.StringVar(&vmconfig.EWASMInterpreter, utils.EWASMInterpreterFlag.Name, utils.EWASMInterpreterFlag.Value, utils.EWASMInterpreterFlag.Usage)
-	flag.Parse()
-	return vmconfig
-}()
-
 func withTrace(t *testing.T, gasLimit uint64, test func(vm.Config) error) {
-	err := test(testVMConfig)
+	err := test(vmConfig)
 	if err == nil {
 		return
 	}
