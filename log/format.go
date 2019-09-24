@@ -196,6 +196,20 @@ func logfmt(buf *bytes.Buffer, ctx []interface{}, color int, term bool) {
 	buf.WriteByte('\n')
 }
 
+var stackdriverKeyNames = RecordKeyNames{
+	Time: "timestamp",
+	Msg:  "message",
+	Lvl:  "severity",
+}
+
+func StackdriverFormat() Format {
+	jf := JsonFormat()
+	return FormatFunc(func(r *Record) []byte {
+		r.KeyNames = stackdriverKeyNames
+		return jf.Format(r)
+	})
+}
+
 // JsonFormat formats log records as JSON objects separated by newlines.
 // It is the equivalent of JsonFormatEx(false, true).
 func JsonFormat() Format {

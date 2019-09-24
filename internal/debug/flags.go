@@ -29,7 +29,7 @@ import (
 	"github.com/gochain/gochain/v3/log/term"
 	"github.com/gochain/gochain/v3/metrics"
 	"github.com/gochain/gochain/v3/metrics/exp"
-	colorable "github.com/mattn/go-colorable"
+	"github.com/mattn/go-colorable"
 	"github.com/urfave/cli"
 )
 
@@ -90,6 +90,10 @@ var (
 		Name:  "trace",
 		Usage: "Write execution trace to the given file",
 	}
+	stackdriverLogging = cli.BoolFlag{
+		Name:  "logging.stackdriver",
+		Usage: "Use stackdriver log format (JSON with specific key names).",
+	}
 )
 
 // Flags holds all command-line flags required for debugging.
@@ -98,6 +102,7 @@ var Flags = []cli.Flag{
 	pprofFlag, pprofAddrFlag, pprofPortFlag,
 	memprofilerateFlag, cpuprofileFlag, traceFlag,
 	blockprofilerateFlag, mutexProfileFractionFlag,
+	stackdriverLogging,
 }
 
 var glogger *log.GlogHandler
@@ -116,6 +121,9 @@ func init() {
 func Setup(ctx *cli.Context) error {
 	// logging
 	log.PrintOrigins(ctx.GlobalBool(debugFlag.Name))
+	if ctx.GlobalBool(stackdriverLogging.Name) {
+		glogger = log.NewGlogHandler(log.StreamHandler(os.Stderr, log.StackdriverFormat()))
+	}
 	glogger.Verbosity(log.Lvl(ctx.GlobalInt(verbosityFlag.Name)))
 	glogger.Vmodule(ctx.GlobalString(vmoduleFlag.Name))
 	glogger.BacktraceAt(ctx.GlobalString(backtraceAtFlag.Name))
