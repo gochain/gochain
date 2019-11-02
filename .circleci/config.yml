@@ -123,8 +123,7 @@ jobs:
   release-master:
     <<: *defaults
     steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
+      - setup_remote_docker
       - attach_workspace:
           at: .
       - run:
@@ -154,8 +153,7 @@ jobs:
   docker:
     <<: *defaults
     steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
+      - setup_remote_docker
       - attach_workspace:
           at: .
       - run:
