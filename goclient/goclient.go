@@ -74,7 +74,7 @@ func (ec *Client) BlockByNumber(ctx context.Context, number *big.Int) (*types.Bl
 // LatestBlockNumber gets latest block number
 func (ec *Client) LatestBlockNumber(ctx context.Context) (*big.Int, error) {
 	var result hexutil.Big
-	err := ec.c.CallContext(ctx, &result, "eth_blockNumber", nil)
+	err := ec.c.CallContext(ctx, &result, "eth_blockNumber")
 	return (*big.Int)(&result), err
 }
 
