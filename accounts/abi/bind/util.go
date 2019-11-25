@@ -62,6 +62,9 @@ func WaitDeployed(ctx context.Context, b DeployBackend, tx *types.Transaction) (
 	if err != nil {
 		return common.Address{}, err
 	}
+	if receipt.Status != types.ReceiptStatusSuccessful {
+		return common.Address{}, fmt.Errorf("receipt status not successful: %d", receipt.Status)
+	}
 	if receipt.ContractAddress == (common.Address{}) {
 		return common.Address{}, fmt.Errorf("zero address")
 	}

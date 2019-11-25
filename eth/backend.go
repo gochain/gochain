@@ -126,7 +126,7 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 	if chainConfig.Clique == nil {
 		return nil, fmt.Errorf("invalid configuration, clique is nil: %v", chainConfig)
 	}
-	eth := &GoChain{
+	gochain := &GoChain{
 		config:         config,
 		chainDb:        chainDb,
 		chainConfig:    chainConfig,
@@ -162,44 +162,44 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 		vmConfig    = vm.Config{EnablePreimageRecording: config.EnablePreimageRecording}
 		cacheConfig = &core.CacheConfig{Disabled: config.NoPruning, TrieNodeLimit: config.TrieCache, TrieTimeLimit: config.TrieTimeout}
 	)
-	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, eth.chainConfig, eth.engine, vmConfig)
+	gochain.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, gochain.chainConfig, gochain.engine, vmConfig)
 	if err != nil {
 		return nil, err
 	}
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
-		if err := eth.blockchain.SetHead(compat.RewindTo); err != nil {
+		if err := gochain.blockchain.SetHead(compat.RewindTo); err != nil {
 			log.Error("Cannot set head during chain rewind", "rewind_to", compat.RewindTo, "err", err)
 		}
 		rawdb.WriteChainConfig(chainDb.GlobalTable(), genesisHash, chainConfig)
 	}
-	eth.bloomIndexer.Start(eth.blockchain)
+	gochain.bloomIndexer.Start(gochain.blockchain)
 
 	if config.TxPool.Journal != "" {
 		config.TxPool.Journal = sctx.ResolvePath(config.TxPool.Journal)
 	}
-	eth.txPool = core.NewTxPool(config.TxPool, eth.chainConfig, eth.blockchain)
+	gochain.txPool = core.NewTxPool(config.TxPool, gochain.chainConfig, gochain.blockchain)
 
-	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.SyncMode, config.NetworkId, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb); err != nil {
+	if gochain.protocolManager, err = NewProtocolManager(gochain.chainConfig, config.SyncMode, config.NetworkId, gochain.eventMux, gochain.txPool, gochain.engine, gochain.blockchain, chainDb); err != nil {
 		return nil, err
 	}
-	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine, config.MinerRecommit, config.MinerGasFloor, config.MinerGasCeil, eth.isLocalBlock)
-	if err := eth.miner.SetExtra(makeExtraData(config.MinerExtraData)); err != nil {
+	gochain.miner = miner.New(gochain, gochain.chainConfig, gochain.EventMux(), gochain.engine, config.MinerRecommit, config.MinerGasFloor, config.MinerGasCeil, gochain.isLocalBlock)
+	if err := gochain.miner.SetExtra(makeExtraData(config.MinerExtraData)); err != nil {
 		log.Error("Cannot set extra chain data", "err", err)
 	}
 
-	eth.ApiBackend = &EthApiBackend{eth: eth}
-	if g := eth.config.Genesis; g != nil {
-		eth.ApiBackend.initialSupply = g.Alloc.Total()
+	gochain.ApiBackend = &EthApiBackend{eth: gochain}
+	if g := gochain.config.Genesis; g != nil {
+		gochain.ApiBackend.initialSupply = g.Alloc.Total()
 	}
 	gpoParams := config.GPO
 	if gpoParams.Default == nil {
 		gpoParams.Default = config.MinerGasPrice
 	}
-	eth.ApiBackend.gpo = gasprice.NewOracle(eth.ApiBackend, gpoParams)
+	gochain.ApiBackend.gpo = gasprice.NewOracle(gochain.ApiBackend, gpoParams)
 
-	return eth, nil
+	return gochain, nil
 }
 
 // Example: 2.0.73/linux-amd64/go1.10.2
