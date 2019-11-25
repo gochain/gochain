@@ -23,6 +23,7 @@ import (
 	"github.com/gochain/gochain/v3/common"
 	"github.com/gochain/gochain/v3/common/hexutil"
 	"github.com/gochain/gochain/v3/core"
+	"github.com/gochain/gochain/v3/cross"
 	"github.com/gochain/gochain/v3/eth/downloader"
 	"github.com/gochain/gochain/v3/eth/gasprice"
 	"github.com/gochain/gochain/v3/params"
@@ -80,6 +81,9 @@ type Config struct {
 	MinerGasPrice  *big.Int
 	MinerRecommit  time.Duration
 	MinerNoverify  bool
+
+	// Cross chain options
+	Cross cross.Config `toml: ",omitempty"`
 
 	// Transaction pool options
 	TxPool core.TxPoolConfig

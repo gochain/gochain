@@ -43,7 +43,7 @@ type Miner struct {
 	mux      *core.InterfaceFeed
 	worker   *worker
 	coinbase common.Address
-	eth      Backend
+	gochain  Backend
 	engine   consensus.Engine
 	exitCh   chan struct{}
 
@@ -51,13 +51,13 @@ type Miner struct {
 	shouldStart int32 // should start indicates whether we should start after sync
 }
 
-func New(eth Backend, config *params.ChainConfig, mux *core.InterfaceFeed, engine consensus.Engine, recommit time.Duration, gasFloor, gasCeil uint64, isLocalBlock func(block *types.Block) bool) *Miner {
+func New(gochain Backend, config *params.ChainConfig, mux *core.InterfaceFeed, engine consensus.Engine, recommit time.Duration, gasFloor, gasCeil uint64, isLocalBlock func(block *types.Block) bool) *Miner {
 	miner := &Miner{
-		eth:      eth,
+		gochain:  gochain,
 		mux:      mux,
 		engine:   engine,
 		exitCh:   make(chan struct{}),
-		worker:   newWorker(config, engine, eth, mux, recommit, gasFloor, gasCeil, isLocalBlock),
+		worker:   newWorker(config, engine, gochain, mux, recommit, gasFloor, gasCeil, isLocalBlock),
 		canStart: 1,
 	}
 	go miner.update()

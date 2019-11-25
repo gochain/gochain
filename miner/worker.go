@@ -114,10 +114,10 @@ type intervalAdjust struct {
 // worker is the main object which takes care of submitting new work to consensus engine
 // and gathering the sealing result.
 type worker struct {
-	config *params.ChainConfig
-	engine consensus.Engine
-	eth    Backend
-	chain  *core.BlockChain
+	config  *params.ChainConfig
+	engine  consensus.Engine
+	gochain Backend
+	chain   *core.BlockChain
 
 	gasFloor uint64
 	gasCeil  uint64
@@ -164,17 +164,17 @@ type worker struct {
 	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
 }
 
-func newWorker(config *params.ChainConfig, engine consensus.Engine, eth Backend, mux *core.InterfaceFeed, recommit time.Duration, gasFloor, gasCeil uint64, isLocalBlock func(*types.Block) bool) *worker {
+func newWorker(config *params.ChainConfig, engine consensus.Engine, gochain Backend, mux *core.InterfaceFeed, recommit time.Duration, gasFloor, gasCeil uint64, isLocalBlock func(*types.Block) bool) *worker {
 	worker := &worker{
 		config:             config,
 		engine:             engine,
-		eth:                eth,
+		gochain:            gochain,
 		mux:                mux,
-		chain:              eth.BlockChain(),
+		chain:              gochain.BlockChain(),
 		gasFloor:           gasFloor,
 		gasCeil:            gasCeil,
 		isLocalBlock:       isLocalBlock,
-		unconfirmed:        newUnconfirmedBlocks(eth.BlockChain(), miningLogAtDepth),
+		unconfirmed:        newUnconfirmedBlocks(gochain.BlockChain(), miningLogAtDepth),
 		pendingTasks:       make(map[common.Hash]*task),
 		txsCh:              make(chan core.NewTxsEvent, txChanSize),
 		chainHeadCh:        make(chan core.ChainHeadEvent, chainHeadChanSize),
@@ -187,9 +187,9 @@ func newWorker(config *params.ChainConfig, engine consensus.Engine, eth Backend,
 		resubmitAdjustCh:   make(chan *intervalAdjust, resubmitAdjustChanSize),
 	}
 	// Subscribe NewTxsEvent for tx pool
-	eth.TxPool().SubscribeNewTxsEvent(worker.txsCh, "miner.worker")
+	gochain.TxPool().SubscribeNewTxsEvent(worker.txsCh, "miner.worker")
 	// Subscribe events for blockchain
-	eth.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh, "miner.worker")
+	gochain.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh, "miner.worker")
 
 	// Sanitize recommit interval if the user-specified one is too short.
 	if recommit < minRecommitInterval {
@@ -385,8 +385,8 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 
 // mainLoop is a standalone goroutine to regenerate the sealing task based on the received event.
 func (w *worker) mainLoop() {
-	defer w.eth.TxPool().UnsubscribeNewTxsEvent(w.txsCh)
-	defer w.eth.BlockChain().UnsubscribeChainHeadEvent(w.chainHeadCh)
+	defer w.gochain.TxPool().UnsubscribeNewTxsEvent(w.txsCh)
+	defer w.gochain.BlockChain().UnsubscribeChainHeadEvent(w.chainHeadCh)
 
 	for {
 		select {
@@ -833,7 +833,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	}
 
 	// Fill the block with all available pending transactions.
-	pending := w.eth.TxPool().Pending()
+	pending := w.gochain.TxPool().Pending()
 	// Short circuit if there is no available pending transactions
 	if len(pending) == 0 {
 		w.updateSnapshot()
@@ -841,7 +841,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	}
 	// Split the pending transactions into locals and remotes
 	localTxs, remoteTxs := make(map[common.Address]types.Transactions), pending
-	for _, account := range w.eth.TxPool().Locals() {
+	for _, account := range w.gochain.TxPool().Locals() {
 		if txs := remoteTxs[account]; len(txs) > 0 {
 			delete(remoteTxs, account)
 			localTxs[account] = txs
