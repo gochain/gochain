@@ -46,7 +46,7 @@ const (
 	// maxQueuedTxs is the maximum number of transaction lists to queue up before
 	// dropping broadcasts. This is a sensitive number as a transaction list might
 	// contain a single transaction, or thousands.
-	maxQueuedTxs = 16384
+	maxQueuedTxs = 1024
 
 	// maxQueuedProps is the maximum number of block propagations to queue up before
 	// dropping broadcasts.
