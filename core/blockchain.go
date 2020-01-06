@@ -79,7 +79,10 @@ const (
 	// - Version 6
 	//  The following incompatible database changes were added:
 	//    * Transaction lookup information stores the corresponding block number instead of block hash
-	BlockChainVersion uint64 = 6
+	// - Version 7
+	//  The following incompatible database changes were added:
+	//    * Canonical hash mappings moved from header table to global.
+	BlockChainVersion uint64 = 7
 )
 
 // CacheConfig contains the configuration values for the trie caching/pruning

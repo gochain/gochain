@@ -58,6 +58,7 @@ type FileSegment struct {
 	name string // segment name
 	path string // on-disk path
 	data []byte // memory-mapped data
+	file *os.File // file backing data
 }
 
 // NewFileSegment returns a new instance of FileSegment.
@@ -75,12 +76,13 @@ func (s *FileSegment) Open() error {
 		log.Error("Cannot open file segment", "path", s.path, "err", err)
 		return err
 	}
-	defer file.Close()
+	s.file = file
 
 	// Memory-map data.
 	data, err := mmap.Map(file, mmap.RDONLY, 0)
 	if err != nil {
 		log.Error("Cannot mmap file segment", "path", s.path, "err", err)
+		file.Close()
 		return err
 	}
 	s.data = []byte(data)
@@ -97,14 +99,18 @@ func (s *FileSegment) Open() error {
 }
 
 // Close closes the file and its mmap.
-func (s *FileSegment) Close() error {
+func (s *FileSegment) Close() (err error) {
 	if s.data != nil {
-		if err := (*mmap.MMap)(&s.data).Unmap(); err != nil {
-			return err
-		}
+		err = (*mmap.MMap)(&s.data).Unmap()
 		s.data = nil
 	}
-	return nil
+	if s.file != nil {
+		if ferr := s.file.Close(); ferr != nil && err == nil {
+			err = ferr
+		}
+		s.file = nil
+	}
+	return
 }
 
 // Name returns the name of the segment.

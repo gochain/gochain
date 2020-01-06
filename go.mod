@@ -14,7 +14,7 @@ require (
 	github.com/cespare/xxhash v1.0.0
 	github.com/davecgh/go-spew v1.1.0
 	github.com/docker/docker v1.13.1
-	github.com/edsrzf/mmap-go v0.0.0-20170320065105-0bce6a688712
+	github.com/edsrzf/mmap-go v1.0.0
 	github.com/fatih/color v1.6.0
 	github.com/fjl/memsize v0.0.0-20180929194037-2a09253e352a
 	github.com/gizak/termui v2.2.0+incompatible
@@ -60,7 +60,7 @@ require (
 	golang.org/x/net v0.0.0-20190603091049-60506f45cf65
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45 // indirect
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
-	golang.org/x/sys v0.0.0-20190606122018-79a91cf218c4
+	golang.org/x/sys v0.0.0-20200106162015-b016eb3dc98e
 	google.golang.org/appengine v1.6.0 // indirect
 	google.golang.org/genproto v0.0.0-20190605220351-eb0b1bdb6ae6 // indirect
 	google.golang.org/grpc v1.21.1 // indirect
