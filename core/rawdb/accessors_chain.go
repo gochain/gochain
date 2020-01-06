@@ -23,6 +23,7 @@ import (
 
 	"github.com/gochain/gochain/v3/common"
 	"github.com/gochain/gochain/v3/core/types"
+	"github.com/gochain/gochain/v3/ethdb"
 	"github.com/gochain/gochain/v3/log"
 	"github.com/gochain/gochain/v3/params"
 	"github.com/gochain/gochain/v3/rlp"
@@ -30,11 +31,27 @@ import (
 
 // ReadCanonicalHash retrieves the hash assigned to a canonical block number.
 func ReadCanonicalHash(db common.Database, number uint64) common.Hash {
+	k := numKey(number)
 	var data []byte
 	Must("get canonical hash", func() (err error) {
-		data, err = db.HeaderTable().Get(numKey(number))
+		data, err = db.GlobalTable().Get(k)
 		if err == common.ErrNotFound {
-			err = nil
+			data, err = db.HeaderTable().Get(k)
+			if err == common.ErrNotFound {
+				err = nil
+			}
+			if err != nil {
+				// Move to global for faster future lookup.
+				perr := db.GlobalTable().Put(k, data)
+				if perr != nil {
+					log.Warn("Failed to put canonical hash to global table", "number", number, "err", perr)
+				} else {
+					// Can ignore ErrImmutableSegment errors here.
+					if derr := db.HeaderTable().Delete(k); err != nil && err != ethdb.ErrImmutableSegment {
+						log.Warn("Failed to delete canonical hash from header table", "number", number, "err", derr)
+					}
+				}
+			}
 		}
 		return
 	})
@@ -47,14 +64,22 @@ func ReadCanonicalHash(db common.Database, number uint64) common.Hash {
 // WriteCanonicalHash stores the hash assigned to a canonical block number.
 func WriteCanonicalHash(db common.Database, hash common.Hash, number uint64) {
 	Must("put canonical hash", func() error {
-		return db.HeaderTable().Put(numKey(number), hash.Bytes())
+		return db.GlobalTable().Put(numKey(number), hash.Bytes())
 	})
 }
 
 // DeleteCanonicalHash removes the number to hash canonical mapping.
 func DeleteCanonicalHash(db common.Database, number uint64) {
+	k := numKey(number)
 	Must("delete canonical hash", func() error {
-		return db.HeaderTable().Delete(numKey(number))
+		if err := db.HeaderTable().Delete(k); err != nil && err != ethdb.ErrImmutableSegment {
+			log.Warn("Failed to delete canonical hash from header table", "number", number, "err", err)
+			return err
+		} else if err == ethdb.ErrImmutableSegment {
+			// Cannot tolerate ErrImmutableSegment errors here, but this shouldn't happen in practice.
+			log.Crit("Unable to delete canonical hash from immutable segment. Database may not be recoverable.", "number", number, "err", err)
+		}
+		return db.GlobalTable().Delete(k)
 	})
 }
 
