@@ -1243,7 +1243,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 			log.Info(buf.String())
 		}
 
-		cfg.Genesis = core.LocalGenesisBlock(uint64(ctx.GlobalInt(DeveloperPeriodFlag.Name)), signer.Address, alloc)
+		cfg.Genesis = core.LocalGenesisBlock(uint64(ctx.GlobalInt(DeveloperPeriodFlag.Name)), []common.Address{signer.Address}, 0, alloc)
 		cfg.NetworkId = cfg.Genesis.Config.ChainId.Uint64()
 		if !ctx.GlobalIsSet(MinerGasPriceFlag.Name) && !ctx.GlobalIsSet(MinerLegacyGasPriceFlag.Name) {
 			cfg.MinerGasPrice = big.NewInt(1)

@@ -71,7 +71,7 @@ func New(gochain Backend, config *params.ChainConfig, mux *core.InterfaceFeed, e
 // and halt your mining operation for as long as the DOS continues.
 func (self *Miner) update() {
 	events := make(chan interface{})
-	self.mux.Subscribe(events, "downloader.PublicDownloaderAPI-eventLoop")
+	self.mux.Subscribe(events, "miner.Miner-update")
 	defer self.mux.Unsubscribe(events)
 
 	for {

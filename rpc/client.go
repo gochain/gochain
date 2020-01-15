@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/url"
 	"os"
@@ -539,7 +540,7 @@ func (c *Client) reconnect(ctx context.Context) error {
 func (c *Client) dispatch(conn net.Conn) {
 	// Spawn the initial read loop.
 	go func() {
-		if err := c.read(conn); err != nil {
+		if err := c.read(conn); err != nil && err != io.EOF {
 			log.Error("Cannot read dispatch from connection", "err", err)
 		}
 	}()

@@ -1,6 +1,7 @@
 package cross
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/big"
@@ -115,7 +116,7 @@ func (p *proc) newConfirmedHead(ctx context.Context, confsConfNum *big.Int) erro
 	if err != nil {
 		return fmt.Errorf("failed to get latest snapshot: %v", err)
 	}
-	if latestSnap.Signers[p.signer] == 0 {
+	if _, ok := latestSnap.Signers[p.signer]; !ok {
 		log.Warn(p.logPre+"Not a signer", "number", latestSnap.Number)
 		return nil
 		//TODO what if we are still a voter on-contract and need to vote ourself out?
@@ -174,17 +175,59 @@ func (p *proc) voterAdmin(ctx context.Context, latestSnap *clique.Snapshot) erro
 	if err != nil {
 		return fmt.Errorf("failed to get voters from Confirmations contract: %v", err)
 	}
+
+	pendingOpts := &bind.CallOpts{Context: ctx, Pending: true}
+
 	// Check for voters to remove.
 	if remove := difference(voters, latestSnap.Voters); len(remove) > 0 {
-		//TODO sort and act (if action not already pending)
-		return fmt.Errorf("remove voters: unimplemented")
+		toRemove := firstAlpha(remove)
+		isVoterPending, err := p.confs.IsVoter(pendingOpts, toRemove)
+		if err != nil {
+			return fmt.Errorf("failed to check pending state for voter: %v", err)
+		}
+		if !isVoterPending {
+			// Already voted out (pending). Nothing to do.
+			return nil
+		}
+		// TODO do we need to vote?
+		return fmt.Errorf("remove voter %s: unimplemented", toRemove.String())
 	}
 	//TODO if removed self? stop?
 
 	// Check for voters to add.
 	if add := difference(latestSnap.Voters, voters); len(add) > 0 {
-		//TODO sort and act (if not already pending)
-		return fmt.Errorf("add voters: unimplemented")
+		toAdd := firstAlpha(add)
+		isVoterPending, err := p.confs.IsVoter(pendingOpts, toAdd)
+		if err != nil {
+			return fmt.Errorf("failed to check pending state for voter: %v", err)
+		}
+		if isVoterPending {
+			// Already voted in (pending). Nothing to do.
+			return nil
+		}
+		vote, err := p.confs.Votes(pendingOpts, p.signer)
+		if err != nil {
+			return fmt.Errorf("failed to get pending vote: %v", err)
+		}
+		if vote.Addr == (common.Address{}) {
+			// No pending vote, so set one.
+			transactOpts, err := bind.NewKeyStoreTransactor(p.keystore, accounts.Account{Address: p.signer})
+			if err != nil {
+				return fmt.Errorf("failed to create keystore transactor: %v", err)
+			}
+			_, err = p.confs.SetVote(transactOpts, toAdd, true, true)
+			if err != nil {
+				return fmt.Errorf("failed to vote to add voter: %v", err)
+			}
+			return nil
+		}
+		if vote.Addr == toAdd && vote.Add && vote.Voter {
+			// Pending vote is correct. Nothing to do.
+			return nil
+		}
+		//TODO replace pending vote
+		return fmt.Errorf("add voter: replace pending (%s,%t,%t) with %s: unimplemented",
+			vote.Addr.String(), vote.Add, vote.Voter, toAdd.String())
 	}
 
 	signers, err := confsSigners(latestOpts, p.confs)
@@ -192,30 +235,80 @@ func (p *proc) voterAdmin(ctx context.Context, latestSnap *clique.Snapshot) erro
 		return fmt.Errorf("failed to get signers from Confirmations contract: %v", err)
 	}
 	// Check for signers to remove.
-	var sRemove []common.Address
+	var remove []common.Address
 	for s := range signers {
 		if _, ok := latestSnap.Signers[s]; !ok {
-			sRemove = append(sRemove, s)
+			remove = append(remove, s)
 		}
 	}
-	if len(sRemove) > 0 {
-		//TODO sort and act (if action not already pending)
-		return fmt.Errorf("remove signers: unimplemented")
+	if len(remove) > 0 {
+		toRemove := firstAlpha(remove)
+		isSignerPending, err := p.confs.IsSigner(pendingOpts, toRemove)
+		if err != nil {
+			return fmt.Errorf("failed to check pending state for signer: %v", err)
+		}
+		if !isSignerPending {
+			// Already voted out (pending). Nothing to do.
+			return nil
+		}
+		// TODO do we need to vote?
+
+		return fmt.Errorf("remove signer: unimplemented")
 	}
-	//TODO if removed self? stop?
+	//TODO if removed self, stop?
 
 	// Check for signers to add.
-	var sAdd []common.Address
+	var add []common.Address
 	for s := range latestSnap.Signers {
 		if _, ok := signers[s]; !ok {
-			sAdd = append(sAdd, s)
+			add = append(add, s)
 		}
 	}
-	if len(sAdd) > 0 {
-		//TODO sort and act (if action not already pending)
-		return fmt.Errorf("add signers: unimplemented")
+	if len(add) > 0 {
+		toAdd := firstAlpha(add)
+		isSignerPending, err := p.confs.IsSigner(pendingOpts, toAdd)
+		if err != nil {
+			return fmt.Errorf("failed to check pending state for signer: %v", err)
+		}
+		if isSignerPending {
+			// Already voted in (pending). Nothing to do.
+			return nil
+		}
+		vote, err := p.confs.Votes(pendingOpts, p.signer)
+		if err != nil {
+			return fmt.Errorf("failed to get pending vote: %v", err)
+		}
+		if vote.Addr == (common.Address{}) {
+			// No pending vote, so set one.
+			transactOpts, err := bind.NewKeyStoreTransactor(p.keystore, accounts.Account{Address: p.signer})
+			if err != nil {
+				return fmt.Errorf("failed to create keystore transactor: %v", err)
+			}
+			_, err = p.confs.SetVote(transactOpts, toAdd, false, true)
+			if err != nil {
+				return fmt.Errorf("failed to vote to add voter: %v", err)
+			}
+			return nil
+		}
+		if vote.Addr == toAdd && vote.Add && !vote.Voter {
+			// Pending vote is correct. Nothing to do.
+			return nil
+		}
+		//TODO replace pending vote
+		return fmt.Errorf("add signer: replace pending (%s,%t,%t) with %s: unimplemented",
+			vote.Addr.String(), vote.Add, vote.Voter, toAdd.String())
 	}
 	return nil
+}
+
+func firstAlpha(as []common.Address) common.Address {
+	l := as[0]
+	for _, a := range as[1:] {
+		if bytes.Compare(a.Bytes(), l.Bytes()) < 0 {
+			l = a
+		}
+	}
+	return l
 }
 
 func (p *proc) signerAdmin(ctx context.Context, latestSnap *clique.Snapshot, confirmedNum uint64) error {
