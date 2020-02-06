@@ -171,7 +171,7 @@ func (p *proc) voterAdmin(ctx context.Context, latestSnap *clique.Snapshot) erro
 	}
 
 	// As a contract voter, sync go auth.
-	voters, err := confsVoters(latestOpts, p.confs)
+	voters, err := ConfirmationsVoters(ctx, confsLatest, p.confs)
 	if err != nil {
 		return fmt.Errorf("failed to get voters from Confirmations contract: %v", err)
 	}
@@ -230,7 +230,7 @@ func (p *proc) voterAdmin(ctx context.Context, latestSnap *clique.Snapshot) erro
 			vote.Addr.String(), vote.Add, vote.Voter, toAdd.String())
 	}
 
-	signers, err := confsSigners(latestOpts, p.confs)
+	signers, err := ConfirmationsSigners(ctx, confsLatest, p.confs)
 	if err != nil {
 		return fmt.Errorf("failed to get signers from Confirmations contract: %v", err)
 	}

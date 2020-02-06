@@ -1,6 +1,7 @@
 package cross
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 
@@ -14,7 +15,9 @@ type ConfirmationRequest struct {
 	EventHash [32]byte
 }
 
-func confsVoters(opts *bind.CallOpts, confs *Confirmations) (map[common.Address]struct{}, error) {
+// ConfirmationsVoters returns the set of voters from confs at the given block.
+func ConfirmationsVoters(ctx context.Context, block *big.Int, confs *Confirmations) (map[common.Address]struct{}, error) {
+	opts := &bind.CallOpts{Context: ctx, BlockNumber: block}
 	l, err := confs.VotersLength(opts)
 	if err != nil {
 		return nil, err
@@ -31,7 +34,9 @@ func confsVoters(opts *bind.CallOpts, confs *Confirmations) (map[common.Address]
 	return voters, nil
 }
 
-func confsSigners(opts *bind.CallOpts, confs *Confirmations) (map[common.Address]struct{}, error) {
+// ConfirmationsSigners returns the set of signers from confs at the given block.
+func ConfirmationsSigners(ctx context.Context, block *big.Int, confs *Confirmations) (map[common.Address]struct{}, error) {
+	opts := &bind.CallOpts{Context: ctx, BlockNumber: block}
 	l, err := confs.SignersLength(opts)
 	if err != nil {
 		return nil, err

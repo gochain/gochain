@@ -352,10 +352,11 @@ func TestCross_confirmations(t *testing.T) {
 		}
 	}
 
-	//t.Run("1/1", test(1, 1))
+	t.Run("1/1", test(1, 1))
+	//TODO run some of these combos in another noop?
 	//t.Run("2/1", test(2, 1))
 	//t.Run("2/2", test(2, 2))
-	t.Run("3/2", test(3, 1))
+	//t.Run("3/2", test(3, 1))
 	//t.Run("3/3", test(3, 3))
 	//t.Run("5/1", test(5, 1))
 	//t.Run("5/2", test(5, 2))
@@ -365,7 +366,93 @@ func TestCross_confirmations(t *testing.T) {
 	//t.Run("50/50", test(50, 50))
 }
 
-//TODO test remove signers/voters (start with single voter many signers?)
+func TestRemove(t *testing.T) {
+	userKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	userOpts := bind.NewKeyedTransactor(userKey)
+	//TODO drop seed?
+	crossTest(t, 3, 2, []common.Address{userOpts.From}, func(c *C) {
+		signers, voters := cliqueAdmin(context.Background(), t, c.InClient)
+
+		//TODO vote out 3rd signer
+		//TODO confirm processed
+		waitForClique(t, 2, 2, time.Minute)
+
+		//TODO poll until 2/2 in both places (or timeout)
+		waitForConfsAdmin(t, c.InConfs, 2, 2, time.Minute)
+		waitForConfsAdmin(t, c.ExConfs, 2, 2, time.Minute)
+
+		//TODO vote out 2nd voter
+		//TODO confirm processed
+		waitForClique(t, 1, 1, time.Minute)
+
+		//TODO poll until 1/1 in both places
+		waitForConfsAdmin(t, c.InConfs, 1, 1, time.Minute)
+		waitForConfsAdmin(t, c.ExConfs, 1, 1, time.Minute)
+	})
+}
+
+func cliqueAdmin(ctx context.Context, t *testing.T, client *goclient.Client) ([]common.Address, []common.Address) {
+	signers, err := client.SignersAt(ctx, nil)
+	if err != nil {
+		t.Fatalf("failed to get signers: %v", err)
+	}
+	voters, err := client.VotersAt(ctx, nil)
+	if err != nil {
+		t.Fatalf("failed to get voters: %v", err)
+	}
+	return signers, voters
+}
+
+func confsAdmin(ctx context.Context, t *testing.T, confs *cross.Confirmations) (map[common.Address]struct{}, map[common.Address]struct{}) {
+	signers, err := cross.ConfirmationsSigners(ctx, nil, confs)
+	if err != nil {
+		t.Fatalf("failed to get confs signers: %v", err)
+	}
+	voters, err := cross.ConfirmationsVoters(ctx, nil, confs)
+	if err != nil {
+		t.Fatalf("failed to get confs voters: %v", err)
+	}
+	return signers, voters
+}
+
+func waitForClique(t *testing.T, signers, voters []common.Address, timeout time.Duration) {
+	//TODO polling loop
+	//TODO doc
+}
+
+func waitForConfsAdmin(t *testing.T, confs *cross.Confirmations, signers, voters []common.Address, timeout time.Duration) {
+	ctx, _ := context.WithTimeout(context.Background(), timeout)
+
+poll:
+	for {
+		confsSigners, confsVoters := confsAdmin(ctx, t, confs)
+		if len(confsSigners) != len(signers) || len(confsVoters) != len(voters) {
+			if sleepCtx(ctx, time.Second) != nil {
+				return
+			}
+			continue poll
+		}
+		for _, s := range signers {
+			if _, ok := confsSigners[s]; !ok {
+				if sleepCtx(ctx, time.Second) != nil {
+					return
+				}
+				continue poll
+			}
+		}
+		for _, v := range voters {
+			if _, ok := confsVoters[v]; !ok {
+				if sleepCtx(ctx, time.Second) != nil {
+					return
+				}
+				continue poll
+			}
+		}
+	}
+}
 
 type fixture struct {
 	userOpts        *bind.TransactOpts
@@ -591,4 +678,13 @@ func confirmConfirmationRequested(t *testing.T, confs *cross.Confirmations, l *t
 		t.Fatalf("expected event hash %s but got %s", hash.Hex(), common.Hash(cr.EventHash).Hex())
 	}
 	return cr
+}
+
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(d):
+		return nil
+	}
 }
