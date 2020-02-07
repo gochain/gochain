@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/gochain/gochain/v3/accounts/keystore"
 	"github.com/gochain/gochain/v3/common"
 	"github.com/gochain/gochain/v3/common/math"
+	"github.com/gochain/gochain/v3/consensus/clique"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/types"
 	"github.com/gochain/gochain/v3/cross"
@@ -43,6 +45,7 @@ type C struct {
 	InRPC, ExRPC       *rpc.Client
 	InClient, ExClient *goclient.Client
 	InConfs, ExConfs   *cross.Confirmations
+	CliqueAPI          func(*testing.T, common.Address) *clique.API
 }
 
 type testNode struct {
@@ -194,6 +197,21 @@ func crossTest(t *testing.T, signerCount, voterCount int, seeds []common.Address
 		InRPC: inRPC, ExRPC: exRPC,
 		InClient: inClient, ExClient: exClient,
 		InConfs: inConfs, ExConfs: exConfs,
+		CliqueAPI: func(t *testing.T, addr common.Address) *clique.API {
+			for _, node := range inNodes {
+				if node.coinbase != addr {
+					continue
+				}
+				for _, api := range node.gochain.APIs() {
+					if api.Namespace == "clique" {
+						return api.Service.(*clique.API)
+					}
+				}
+				t.Fatalf("clique api not found for node %s", addr.Hex())
+			}
+			t.Fatalf("node not found for addr %s", addr.Hex())
+			return nil
+		},
 	})
 }
 
@@ -352,10 +370,11 @@ func TestCross_confirmations(t *testing.T) {
 		}
 	}
 
-	//t.Run("1/1", test(1, 1))
+	t.Run("1/1", test(1, 1))
+	//TODO run some of these combos in another noop?
 	//t.Run("2/1", test(2, 1))
 	//t.Run("2/2", test(2, 2))
-	t.Run("3/2", test(3, 1))
+	//t.Run("3/2", test(3, 1))
 	//t.Run("3/3", test(3, 3))
 	//t.Run("5/1", test(5, 1))
 	//t.Run("5/2", test(5, 2))
@@ -365,7 +384,156 @@ func TestCross_confirmations(t *testing.T) {
 	//t.Run("50/50", test(50, 50))
 }
 
-//TODO test remove signers/voters (start with single voter many signers?)
+type addrSetStringer []common.Address
+
+func (as addrSetStringer) String() string {
+	var sb strings.Builder
+	for i, addr := range as {
+		if i != 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(addr.Hex())
+	}
+	return sb.String()
+}
+
+func TestRemove(t *testing.T) {
+	const timeout = 30 * time.Second
+	crossTest(t, 3, 2, nil, func(c *C) {
+		signers, voters := cliqueAdmin(context.Background(), t, c.InClient)
+
+		t.Logf("Signers: %v", addrSetStringer(signers))
+		t.Logf("Voters: %v", addrSetStringer(voters))
+
+		t.Log("Voting out third signer...")
+		c.CliqueAPI(t, voters[0]).Propose(signers[2], false)
+		c.CliqueAPI(t, voters[1]).Propose(signers[2], false)
+		signers = signers[:2]
+
+		waitForClique(t, c.InClient, signers, voters, timeout)
+		waitForConfsAdmin(t, c.InConfs, signers, voters, timeout)
+		waitForConfsAdmin(t, c.ExConfs, signers, voters, timeout)
+
+		t.Log("Voting out second voter...")
+		c.CliqueAPI(t, voters[0]).ProposeVoter(voters[1], false)
+		c.CliqueAPI(t, voters[1]).ProposeVoter(voters[1], false)
+		voters = voters[:1]
+
+		waitForClique(t, c.InClient, signers, voters, timeout)
+		waitForConfsAdmin(t, c.InConfs, signers, voters, timeout)
+		waitForConfsAdmin(t, c.ExConfs, signers, voters, timeout)
+
+		t.Log("Voting out second signer...")
+		c.CliqueAPI(t, voters[0]).Propose(signers[1], false)
+		signers = signers[:1]
+
+		waitForClique(t, c.InClient, signers, voters, timeout)
+		waitForConfsAdmin(t, c.InConfs, signers, voters, timeout)
+		waitForConfsAdmin(t, c.ExConfs, signers, voters, timeout)
+	})
+}
+
+func cliqueAdmin(ctx context.Context, t *testing.T, client *goclient.Client) ([]common.Address, []common.Address) {
+	signers, err := client.SignersAt(ctx, nil)
+	if err != nil {
+		t.Fatalf("failed to get signers: %v", err)
+	}
+	voters, err := client.VotersAt(ctx, nil)
+	if err != nil {
+		t.Fatalf("failed to get voters: %v", err)
+	}
+	return signers, voters
+}
+
+func confsAdmin(ctx context.Context, t *testing.T, confs *cross.Confirmations) (map[common.Address]struct{}, map[common.Address]struct{}) {
+	signers, err := cross.ConfirmationsSigners(ctx, nil, confs)
+	if err != nil {
+		t.Fatalf("failed to get confs signers: %v", err)
+	}
+	voters, err := cross.ConfirmationsVoters(ctx, nil, confs)
+	if err != nil {
+		t.Fatalf("failed to get confs voters: %v", err)
+	}
+	return signers, voters
+}
+
+// waitForClique polls the clique state until it matches signers and voters, or
+// fails the test after timeout.
+func waitForClique(t *testing.T, client *goclient.Client, signers, voters []common.Address, timeout time.Duration) {
+	mSigners := map[common.Address]struct{}{}
+	for _, s := range signers {
+		mSigners[s] = struct{}{}
+	}
+	mVoters := map[common.Address]struct{}{}
+	for _, v := range voters {
+		mVoters[v] = struct{}{}
+	}
+
+	ctx, _ := context.WithTimeout(context.Background(), timeout)
+
+poll:
+	for {
+		clSigners, clVoters := cliqueAdmin(ctx, t, client)
+		if len(clSigners) != len(signers) || len(clVoters) != len(voters) {
+			if sleepCtx(ctx, time.Second) != nil {
+				return
+			}
+			continue poll
+		}
+		for _, s := range clSigners {
+			if _, ok := mSigners[s]; !ok {
+				if sleepCtx(ctx, time.Second) != nil {
+					return
+				}
+				continue poll
+			}
+		}
+		for _, v := range clVoters {
+			if _, ok := mVoters[v]; !ok {
+				if sleepCtx(ctx, time.Second) != nil {
+					return
+				}
+				continue poll
+			}
+		}
+		// Match
+		return
+	}
+}
+
+// waitForConfsAdmin polls confs until it matches signers and voters, or fails the test after timeout.
+func waitForConfsAdmin(t *testing.T, confs *cross.Confirmations, signers, voters []common.Address, timeout time.Duration) {
+	ctx, _ := context.WithTimeout(context.Background(), timeout)
+
+poll:
+	for {
+		confsSigners, confsVoters := confsAdmin(ctx, t, confs)
+		if len(confsSigners) != len(signers) || len(confsVoters) != len(voters) {
+			if sleepCtx(ctx, time.Second) != nil {
+				return
+			}
+			continue poll
+		}
+		for _, s := range signers {
+			if _, ok := confsSigners[s]; !ok {
+				if sleepCtx(ctx, time.Second) != nil {
+					return
+				}
+				continue poll
+			}
+		}
+		for _, v := range voters {
+			if _, ok := confsVoters[v]; !ok {
+				if sleepCtx(ctx, time.Second) != nil {
+					return
+				}
+				continue poll
+			}
+		}
+		// Match
+		return
+	}
+}
 
 type fixture struct {
 	userOpts        *bind.TransactOpts
@@ -591,4 +759,13 @@ func confirmConfirmationRequested(t *testing.T, confs *cross.Confirmations, l *t
 		t.Fatalf("expected event hash %s but got %s", hash.Hex(), common.Hash(cr.EventHash).Hex())
 	}
 	return cr
+}
+
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(d):
+		return nil
+	}
 }
