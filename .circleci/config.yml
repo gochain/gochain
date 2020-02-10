@@ -57,50 +57,11 @@ jobs:
               - /tmp/go/cache
       - attach_workspace:
           at: .
-      - run: go test -p=8 $(go list ./... | grep -v /swarm/fuse)
+      - run: go test ./...
       - save_cache:
           key: test-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
           paths:
               - /tmp/go/cache
-
-  # Separate since fuse is not supported via containers.
-# Temporarily disabled until swarm package restored
-#  test-fuse:
-#    machine: true
-#    working_directory: ~/go/src/github.com/gochain/gochain
-#    environment: # apparently expansion doesn't work here yet: https://discuss.circleci.com/t/environment-variable-expansion-in-working-directory/11322
-#      - GOPATH=/home/circleci/go
-#      - GOCACHE=/tmp/go/cache
-#      - GOVERSION=1.13
-#      - OS=linux
-#      - ARCH=amd64
-#    steps:
-#      - restore_cache:
-#          keys:
-#              - test-fuse-cache-{{ .Branch }}-{{ .Environment.CIRCLE_PREVIOUS_BUILD_NUM }}
-#              - test-fuse-cache-{{ .Branch }}-
-#              - test-fuse-cache-
-#          paths:
-#              - /tmp/go/cache
-#      - checkout
-#      - run:
-#          name: update Go
-#          command: |
-#            go version
-#            go env GOROOT
-#            mkdir tmp
-#            cd tmp
-#            sudo rm -rf /usr/local/go
-#            wget https://storage.googleapis.com/golang/go$GOVERSION.$OS-$ARCH.tar.gz
-#            sudo tar -C /usr/local -xzf go$GOVERSION.$OS-$ARCH.tar.gz
-#            export PATH=$PATH:$HOME/go/bin
-#      - run: go version
-#      - run: make all
-#      - run: go test ./swarm/fuse
-#      - save_cache:
-#          key: test-fuse-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
-#          paths:
-#              - /tmp/go/cache
 
   race:
     <<: *defaults
@@ -185,9 +146,6 @@ workflows:
       - test:
           requires:
             - prepare
-#      - test-fuse:
-#          requires:
-#            - prepare
       - race:
           requires:
             - prepare
@@ -199,7 +157,6 @@ workflows:
           requires:
             - build
             - test
-#            - test-fuse
             - race
 
       - approve-docker:
@@ -214,7 +171,6 @@ workflows:
           requires:
             - test
             - build
-#            - test-fuse
             - race
 
       - docker:
