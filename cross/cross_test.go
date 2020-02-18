@@ -113,7 +113,7 @@ func crossTest(t *testing.T, signerCount, voterCount int, seeds []common.Address
 
 	// Start signing.
 	for _, tn := range inNodes {
-		if err := tn.gochain.StartMining(1); err != nil {
+		if err := tn.gochain.StartMining(1, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -140,32 +140,29 @@ func crossTest(t *testing.T, signerCount, voterCount int, seeds []common.Address
 	exAddr, exConfs := deployConfirmations(t, exClient, signer, ks)
 	time.Sleep(testBlockPeriodSeconds * time.Second)
 
-	cfg := cross.Config{
-		Internal: cross.NetConfig{
-			Contract:      inAddr,
-			Confirmations: 1,
-		},
-		External: cross.NetConfig{
-			Contract:      exAddr,
-			Confirmations: 1,
-		},
+	internal := cross.NetConfig{
+		Contract:      inAddr,
+		Confirmations: 1,
 	}
+	external := cross.NetConfig{
+		Contract:      exAddr,
+		Confirmations: 1,
+	}
+	exRPCFn := func() (*rpc.Client, error) { return exRPC, nil }
 
 	// Spawn cross chain processing.
-	for i := 0; i < signerCount; i++ {
-		inRPC, err := inNodes[i].node.Attach()
+	for _, tn := range inNodes {
+		ks := tn.node.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+
+		c := cross.NewCross(internal, external, exRPCFn, ks)
+		c.SetSigner(tn.coinbase)
+		inRPC, err := tn.node.Attach()
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer inRPC.Close()
-
-		ks := inNodes[i].node.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
-		signer := inNodes[i].coinbase
-
-		c, err := cross.NewCross(cfg, inRPC, exRPC, signer, ks)
-		if err != nil {
-			t.Fatal(err)
-		}
+		c.SetInternalClient(goclient.NewClient(inRPC))
+		c.Start()
 		defer c.Stop()
 	}
 
@@ -317,7 +314,7 @@ func newExternalNode(t *testing.T, seeds []common.Address) (*node.Node, *rpc.Cli
 	if err := n.Service(&gochain); err != nil {
 		t.Fatal(err)
 	}
-	if err := gochain.StartMining(1); err != nil {
+	if err := gochain.StartMining(1, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -397,10 +394,11 @@ func (as addrSetStringer) String() string {
 	return sb.String()
 }
 
-func TestRemove(t *testing.T) {
+// TestAdminRemove votes out signers and voters, and then verifies the changes are propogated to the contracts.
+func TestAdminRemove(t *testing.T) {
 	const timeout = 30 * time.Second
 	crossTest(t, 3, 2, nil, func(c *C) {
-		signers, voters := cliqueAdmin(context.Background(), t, c.InClient)
+		signers, voters := cliqueAdmins(context.Background(), t, c.InClient)
 
 		t.Logf("Signers: %v", addrSetStringer(signers))
 		t.Logf("Voters: %v", addrSetStringer(voters))
@@ -410,30 +408,25 @@ func TestRemove(t *testing.T) {
 		c.CliqueAPI(t, voters[1]).Propose(signers[2], false)
 		signers = signers[:2]
 
-		waitForClique(t, c.InClient, signers, voters, timeout)
-		waitForConfsAdmin(t, c.InConfs, signers, voters, timeout)
-		waitForConfsAdmin(t, c.ExConfs, signers, voters, timeout)
+		waitForAdmins(t, c, signers, voters, timeout)
 
 		t.Log("Voting out second voter...")
 		c.CliqueAPI(t, voters[0]).ProposeVoter(voters[1], false)
 		c.CliqueAPI(t, voters[1]).ProposeVoter(voters[1], false)
 		voters = voters[:1]
 
-		waitForClique(t, c.InClient, signers, voters, timeout)
-		waitForConfsAdmin(t, c.InConfs, signers, voters, timeout)
-		waitForConfsAdmin(t, c.ExConfs, signers, voters, timeout)
+		waitForAdmins(t, c, signers, voters, timeout)
 
 		t.Log("Voting out second signer...")
 		c.CliqueAPI(t, voters[0]).Propose(signers[1], false)
 		signers = signers[:1]
 
-		waitForClique(t, c.InClient, signers, voters, timeout)
-		waitForConfsAdmin(t, c.InConfs, signers, voters, timeout)
-		waitForConfsAdmin(t, c.ExConfs, signers, voters, timeout)
+		waitForAdmins(t, c, signers, voters, timeout)
 	})
 }
 
-func cliqueAdmin(ctx context.Context, t *testing.T, client *goclient.Client) ([]common.Address, []common.Address) {
+// cliqueAdmins gets the latest clique signer and voter sets.
+func cliqueAdmins(ctx context.Context, t *testing.T, client *goclient.Client) ([]common.Address, []common.Address) {
 	signers, err := client.SignersAt(ctx, nil)
 	if err != nil {
 		t.Fatalf("failed to get signers: %v", err)
@@ -445,7 +438,8 @@ func cliqueAdmin(ctx context.Context, t *testing.T, client *goclient.Client) ([]
 	return signers, voters
 }
 
-func confsAdmin(ctx context.Context, t *testing.T, confs *cross.Confirmations) (map[common.Address]struct{}, map[common.Address]struct{}) {
+// confsAdmins gets the latest signer and voter sets from the confs contract.
+func confsAdmins(ctx context.Context, t *testing.T, confs *cross.Confirmations) (map[common.Address]struct{}, map[common.Address]struct{}) {
 	signers, err := cross.ConfirmationsSigners(ctx, nil, confs)
 	if err != nil {
 		t.Fatalf("failed to get confs signers: %v", err)
@@ -455,6 +449,14 @@ func confsAdmin(ctx context.Context, t *testing.T, confs *cross.Confirmations) (
 		t.Fatalf("failed to get confs voters: %v", err)
 	}
 	return signers, voters
+}
+
+// waitForAdmins waits up to timeout for each of clique, internal confs, and external confs to
+// sync with signers and voters.
+func waitForAdmins(t *testing.T, c *C, signers, voters []common.Address, timeout time.Duration) {
+	waitForClique(t, c.InClient, signers, voters, timeout)
+	waitForConfsAdmins(t, c.InConfs, signers, voters, timeout)
+	waitForConfsAdmins(t, c.ExConfs, signers, voters, timeout)
 }
 
 // waitForClique polls the clique state until it matches signers and voters, or
@@ -473,7 +475,7 @@ func waitForClique(t *testing.T, client *goclient.Client, signers, voters []comm
 
 poll:
 	for {
-		clSigners, clVoters := cliqueAdmin(ctx, t, client)
+		clSigners, clVoters := cliqueAdmins(ctx, t, client)
 		if len(clSigners) != len(signers) || len(clVoters) != len(voters) {
 			if sleepCtx(ctx, time.Second) != nil {
 				return
@@ -501,13 +503,13 @@ poll:
 	}
 }
 
-// waitForConfsAdmin polls confs until it matches signers and voters, or fails the test after timeout.
-func waitForConfsAdmin(t *testing.T, confs *cross.Confirmations, signers, voters []common.Address, timeout time.Duration) {
+// waitForConfsAdmins polls confs until it matches signers and voters, or fails the test after timeout.
+func waitForConfsAdmins(t *testing.T, confs *cross.Confirmations, signers, voters []common.Address, timeout time.Duration) {
 	ctx, _ := context.WithTimeout(context.Background(), timeout)
 
 poll:
 	for {
-		confsSigners, confsVoters := confsAdmin(ctx, t, confs)
+		confsSigners, confsVoters := confsAdmins(ctx, t, confs)
 		if len(confsSigners) != len(signers) || len(confsVoters) != len(voters) {
 			if sleepCtx(ctx, time.Second) != nil {
 				return
@@ -579,7 +581,8 @@ func (f *fixture) testConfirm(t *testing.T) {
 	}
 }
 
-//TODO doc returns true if confirmed, or false if invalid.
+// confirmHash returns true if the status is confirmed or false if invalid.
+// Errors or a delay of more than 10s will fail the test.
 func (f *fixture) confirmHash(t *testing.T, block *big.Int, logIdx *big.Int, hash common.Hash) bool {
 	// Poll for confirmation.
 	timeout := time.After(10 * time.Second)

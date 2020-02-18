@@ -22,14 +22,18 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gochain/gochain/v3/accounts/keystore"
 	"github.com/gochain/gochain/v3/common"
 	"github.com/gochain/gochain/v3/consensus"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/state"
 	"github.com/gochain/gochain/v3/core/types"
+	"github.com/gochain/gochain/v3/cross"
 	"github.com/gochain/gochain/v3/eth/downloader"
+	"github.com/gochain/gochain/v3/goclient"
 	"github.com/gochain/gochain/v3/log"
 	"github.com/gochain/gochain/v3/params"
+	"github.com/gochain/gochain/v3/rpc"
 )
 
 // Backend wraps all methods required for mining.
@@ -42,6 +46,7 @@ type Backend interface {
 type Miner struct {
 	mux      *core.InterfaceFeed
 	worker   *worker
+	cross    []*cross.Cross
 	coinbase common.Address
 	gochain  Backend
 	engine   consensus.Engine
@@ -51,7 +56,9 @@ type Miner struct {
 	shouldStart int32 // should start indicates whether we should start after sync
 }
 
-func New(gochain Backend, config *params.ChainConfig, mux *core.InterfaceFeed, engine consensus.Engine, recommit time.Duration, gasFloor, gasCeil uint64, isLocalBlock func(block *types.Block) bool) *Miner {
+func New(gochain Backend, config *params.ChainConfig, mux *core.InterfaceFeed, engine consensus.Engine,
+	recommit time.Duration, gasFloor, gasCeil uint64, isLocalBlock func(block *types.Block) bool,
+	crCfg []cross.Config, ks *keystore.KeyStore) *Miner {
 	miner := &Miner{
 		gochain:  gochain,
 		mux:      mux,
@@ -59,6 +66,12 @@ func New(gochain Backend, config *params.ChainConfig, mux *core.InterfaceFeed, e
 		exitCh:   make(chan struct{}),
 		worker:   newWorker(config, engine, gochain, mux, recommit, gasFloor, gasCeil, isLocalBlock),
 		canStart: 1,
+	}
+	if len(crCfg) > 0 {
+		miner.cross = make([]*cross.Cross, len(crCfg))
+		for i, cr := range crCfg {
+			miner.cross[i] = cross.NewCross(cr.Internal, cr.External, cr.DialRPC, ks)
+		}
 	}
 	go miner.update()
 
@@ -94,7 +107,7 @@ func (self *Miner) update() {
 				atomic.StoreInt32(&self.canStart, 1)
 				atomic.StoreInt32(&self.shouldStart, 0)
 				if shouldStart {
-					self.Start(self.coinbase)
+					self.Start(self.coinbase, nil)
 				}
 				// stop immediately and ignore all further pending events
 				return
@@ -105,19 +118,26 @@ func (self *Miner) update() {
 	}
 }
 
-func (self *Miner) Start(coinbase common.Address) {
+func (self *Miner) Start(coinbase common.Address, rpcClient *rpc.Client) {
 	atomic.StoreInt32(&self.shouldStart, 1)
 	self.SetEtherbase(coinbase)
+	self.SetInternalClient(rpcClient)
 
 	if atomic.LoadInt32(&self.canStart) == 0 {
 		log.Info("Network syncing, will start miner afterwards")
 		return
 	}
 	self.worker.start()
+	for _, cr := range self.cross {
+		cr.Start()
+	}
 }
 
 func (self *Miner) Stop() {
 	self.worker.stop()
+	for _, cr := range self.cross {
+		cr.Stop()
+	}
 	atomic.StoreInt32(&self.shouldStart, 0)
 }
 
@@ -160,4 +180,14 @@ func (self *Miner) PendingBlock() *types.Block {
 func (self *Miner) SetEtherbase(addr common.Address) {
 	self.coinbase = addr
 	self.worker.setEtherbase(addr)
+	for _, cr := range self.cross {
+		cr.SetSigner(addr)
+	}
+}
+
+func (self *Miner) SetInternalClient(rpcClient *rpc.Client) {
+	cl := goclient.NewClient(rpcClient)
+	for _, cr := range self.cross {
+		cr.SetInternalClient(cl)
+	}
 }

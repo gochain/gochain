@@ -18,19 +18,15 @@ const (
 	StatusConfirmed
 )
 
-var (
-	//TODO fill in or remove
-	ContractGOMainnet  = common.HexToAddress("0x")
-	ContractGOTestnet  = common.HexToAddress("0x")
-	ContractETHMainnet = common.HexToAddress("0x")
-	ContractETHTestnet = common.HexToAddress("0x")
-)
-
-//TODO wite to --cross.* flags
-//TODO need a default for mainnet signer and --testnet signer, otherwise custom, should support --local as well?
+// Config holds options for a cross chain configuration.
 type Config struct {
-	Internal NetConfig `toml:",omitempty"`
-	External NetConfig `toml:",omitempty"`
+	Internal    NetConfig `toml:",omitempty"`
+	External    NetConfig `toml:",omitempty"`
+	ExternalURL string    `toml:",omitempty"` // TODO launch light node when empty?
+}
+
+func (c *Config) DialRPC() (*rpc.Client, error) {
+	return rpc.Dial(c.ExternalURL)
 }
 
 type NetConfig struct {
@@ -38,37 +34,41 @@ type NetConfig struct {
 	Confirmations uint64         `toml:",omitempty"` // Number of block confirmations to wait.
 }
 
-//TODO local rpc to (in-mem) eth light node?
-var DefaultConfig = Config{
-	Internal: NetConfig{
-		Contract:      ContractGOMainnet,
-		Confirmations: 30,
-	},
-	External: NetConfig{
-		Contract:      ContractETHMainnet,
-		Confirmations: 30,
+const defaultsConfs = 30
+
+// DefaultConfig bridges the GoChain and Ethereum mainnets.
+var DefaultConfig = []Config{
+	{
+		Internal: NetConfig{
+			Contract:      common.HexToAddress("0xTODO"),
+			Confirmations: defaultsConfs,
+		},
+		External: NetConfig{
+			Contract:      common.HexToAddress("0xTODO"),
+			Confirmations: defaultsConfs,
+		},
 	},
 }
 
-//TODO https://ropsten-rpc.linkpool.io/
-var TestnetConfig = Config{
-	Internal: NetConfig{
-		Contract:      ContractGOTestnet,
-		Confirmations: 5,
-	},
-	External: NetConfig{
-		Contract:      ContractETHTestnet,
-		Confirmations: 5,
+// TestnetConfig bridges the GoChain testnet with the Ethereum Ropsten testnet.
+var TestnetConfig = []Config{
+	{
+		Internal: NetConfig{
+			Contract:      common.HexToAddress("0xTODO"),
+			Confirmations: 5,
+		},
+		External: NetConfig{
+			Contract:      common.HexToAddress("0xTODO"),
+			Confirmations: 3,
+		},
+		ExternalURL: "https://ropsten-rpc.linkpool.io/",
 	},
 }
 
-func (config *Config) sanitize() Config {
+func (config *NetConfig) sanitized() NetConfig {
 	c := *config
-	if c.Internal.Confirmations == 0 {
-		c.Internal.Confirmations = DefaultConfig.Internal.Confirmations
-	}
-	if c.External.Confirmations == 0 {
-		c.External.Confirmations = DefaultConfig.External.Confirmations
+	if c.Confirmations == 0 {
+		c.Confirmations = defaultsConfs
 	}
 	return c
 }
@@ -76,49 +76,49 @@ func (config *Config) sanitize() Config {
 type Cross struct {
 	wg     sync.WaitGroup
 	cancel func()
+
+	in, ex      proc
+	setInClient func(*goclient.Client)
 }
 
-// NewCross starts cross chain processing between the inRPC and exRPC networks.
-//TODO when to launch? wait during sync? or handle that internally? (e.g. just consider time sufficient?)
-func NewCross(config Config, inRPC, exRPC *rpc.Client, signer common.Address, ks *keystore.KeyStore) (*Cross, error) {
-	config = (&config).sanitize()
+// NewCross creates a cross chain processor between the inRPC and exRPC networks.
+func NewCross(inCfg, exCfg NetConfig, exRPC func() (*rpc.Client, error), ks *keystore.KeyStore) *Cross {
+	inCfg = inCfg.sanitized()
+	exCfg = exCfg.sanitized()
+
+	exCl := &cachedClientFn{fn: exRPC}
+	inCl := &cachedClientSettable{}
+
+	return &Cross{
+		setInClient: inCl.set,
+		in: proc{
+			logPre:     "cross/internal: ",
+			confsCfg:   inCfg,
+			emitCfg:    exCfg,
+			keystore:   ks,
+			internalCl: inCl,
+			confsCl:    inCl,
+			emitCl:     exCl,
+		},
+		ex: proc{
+			logPre:     "cross/external: ",
+			confsCfg:   exCfg,
+			emitCfg:    inCfg,
+			keystore:   ks,
+			internalCl: inCl,
+			confsCl:    exCl,
+			emitCl:     inCl,
+		},
+	}
+}
+
+func (c *Cross) Start() {
 	ctx, cancel := context.WithCancel(context.Background())
-	c := &Cross{
-		cancel: cancel,
-	}
-
-	inClient := goclient.NewClient(inRPC)
-	exClient := goclient.NewClient(exRPC)
-
-	in := proc{
-		logPre:     "cross/internal: ",
-		confsCfg:   config.Internal,
-		emitCfg:    config.External,
-		signer:     signer,
-		keystore:   ks,
-		internalCl: inClient,
-		confsCl:    inClient,
-		emitCl:     exClient,
-	}
-
-	ex := proc{
-		logPre:     "cross/external: ",
-		confsCfg:   config.External,
-		emitCfg:    config.Internal,
-		signer:     signer,
-		keystore:   ks,
-		internalCl: inClient,
-		confsCl:    exClient,
-		emitCl:     inClient,
-	}
-
+	c.cancel = cancel
 	c.wg.Add(2)
-	go in.run(ctx, c.wg.Done)
-	go ex.run(ctx, c.wg.Done)
-
+	go c.in.run(ctx, c.wg.Done)
+	go c.ex.run(ctx, c.wg.Done)
 	log.Info("cross: Started")
-
-	return c, nil
 }
 
 func (c *Cross) Stop() {
@@ -126,4 +126,15 @@ func (c *Cross) Stop() {
 	c.cancel()
 	c.wg.Wait()
 	log.Info("cross: Stopped")
+}
+
+// SetInternalClient sets the internal rpc client.
+func (c *Cross) SetInternalClient(internal *goclient.Client) {
+	c.setInClient(internal)
+}
+
+func (c *Cross) SetSigner(addr common.Address) {
+	c.in.signer.Store(addr)
+	c.ex.signer.Store(addr)
+	log.Debug("cross: Signer address changed", "signer", addr.Hex())
 }

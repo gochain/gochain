@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"contrib.go.opencensus.io/exporter/stackdriver"
-	"go.opencensus.io/trace"
 	"github.com/urfave/cli"
+	"go.opencensus.io/trace"
 
 	"github.com/gochain/gochain/v3/accounts"
 	"github.com/gochain/gochain/v3/accounts/keystore"
@@ -327,7 +327,11 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 		if ctx.GlobalIsSet(utils.MinerThreadsFlag.Name) {
 			threads = ctx.GlobalInt(utils.MinerThreadsFlag.Name)
 		}
-		if err := gochain.StartMining(threads); err != nil {
+		rpcClient, err := stack.Attach()
+		if err != nil {
+			utils.Fatalf("Failed to attach to self: %v", err)
+		}
+		if err := gochain.StartMining(threads, rpcClient); err != nil {
 			utils.Fatalf("Failed to start mining: %v", err)
 		}
 	}

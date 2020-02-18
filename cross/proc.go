@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gochain/gochain/v3"
@@ -16,6 +18,7 @@ import (
 	"github.com/gochain/gochain/v3/core/types"
 	"github.com/gochain/gochain/v3/goclient"
 	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v3/rpc"
 )
 
 // proc manages a Confirmations contract by processing confirmation requests
@@ -25,7 +28,7 @@ import (
 // wait to be voted in.
 //
 // For voters, the first priority is to manage the voter and signer set in Auth.
-//  1. Vote out any contract voter who is no longer a voter on-chain (TODO latest, no-confirmed delay, since already delayed by real majority vote)
+//  1. Vote out any contract voter who is no longer a voter on-chain
 //  2. Vote in any chain voter who is not listed on-contract
 //  3. Vote out any contract signer who is no longer a signer on-chain
 //  4. Vote in any chain signer who is not listed on-contract
@@ -42,12 +45,12 @@ import (
 type proc struct {
 	logPre            string
 	confsCfg, emitCfg NetConfig
-	signer            common.Address
 	keystore          *keystore.KeyStore
+	signer            atomic.Value // common.Address
 
-	internalCl *goclient.Client // Where we are a signer.
-	confsCl    *goclient.Client // Where we are confirming.
-	emitCl     *goclient.Client // Where events are emitted from.
+	internalCl cachedClient // Signing network - source of truth for voter/signer set.
+	confsCl    cachedClient // Confirming network.
+	emitCl     cachedClient // Network emitting events to confirm.
 
 	confs            *Confirmations
 	isContractSigner bool
@@ -72,7 +75,11 @@ func (p *proc) run(ctx context.Context, done func()) {
 			return
 
 		case <-confsT.C:
-			latest, err := p.confsCl.LatestBlockNumber(ctx)
+			cl, err := p.confsCl.get(ctx)
+			if err != nil {
+				return
+			}
+			latest, err := cl.LatestBlockNumber(ctx)
 			if err != nil {
 				log.Error(p.logPre+"Failed to get latest confs head", "err", err)
 				continue
@@ -87,14 +94,19 @@ func (p *proc) run(ctx context.Context, done func()) {
 			}
 
 		case <-emitT.C:
-			latest, err := p.emitCl.LatestBlockNumber(ctx)
+			cl, err := p.emitCl.get(ctx)
+			if err != nil {
+				return
+			}
+			latest, err := cl.LatestBlockNumber(ctx)
 			if err != nil {
 				log.Error(p.logPre+"Failed to get latest emit head", "err", err)
 				continue
 			}
 			if l := latest.Uint64(); l-p.emitConfNum > p.emitCfg.Confirmations {
 				p.emitConfNum = l - p.emitCfg.Confirmations
-				err := p.confirmRequests(ctx)
+				signer := p.signer.Load().(common.Address)
+				err := p.confirmRequests(ctx, signer)
 				if err != nil {
 					log.Error(p.logPre+"Failed to process new confirmed emit head", "num", p.emitConfNum, "err", err)
 					continue
@@ -112,23 +124,28 @@ func (p *proc) newConfirmedHead(ctx context.Context, confsConfNum *big.Int) erro
 		}
 	}
 	// Ensure we are currently a chain signer.
-	latestSnap, err := p.internalCl.SnapshotAt(ctx, nil)
+	cl, err := p.internalCl.get(ctx)
+	if err != nil {
+		return err
+	}
+	latestSnap, err := cl.SnapshotAt(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get latest snapshot: %v", err)
 	}
-	if _, ok := latestSnap.Signers[p.signer]; !ok {
+	signer := p.signer.Load().(common.Address)
+	if _, ok := latestSnap.Signers[signer]; !ok {
 		log.Warn(p.logPre+"Not a signer", "number", latestSnap.Number)
 		return nil
 		//TODO what if we are still a voter on-contract and need to vote ourself out?
 	}
 
 	// Ensure client state caught up.
-	if err := p.voterAdmin(ctx, latestSnap); err != nil {
+	if err := p.voterAdmin(ctx, signer, latestSnap); err != nil {
 		return err
 	}
 	// TODO do we need to be able to resubmit w/ increased gas price to 'unstick' txs?
 
-	if err := p.signerAdmin(ctx, latestSnap, confsConfNum.Uint64()); err != nil {
+	if err := p.signerAdmin(ctx, signer, latestSnap, confsConfNum.Uint64()); err != nil {
 		return err
 	}
 
@@ -137,12 +154,16 @@ func (p *proc) newConfirmedHead(ctx context.Context, confsConfNum *big.Int) erro
 
 // initConfs initializes p.confs if the contract is deployed as of head, otherwise it returns an error.
 func (p *proc) initConfs(ctx context.Context, head *big.Int) error {
-	if code, err := p.confsCl.CodeAt(ctx, p.confsCfg.Contract, head); err != nil {
+	cl, err := p.confsCl.get(ctx)
+	if err != nil {
+		return err
+	}
+	if code, err := cl.CodeAt(ctx, p.confsCfg.Contract, head); err != nil {
 		return err
 	} else if len(code) == 0 {
 		return fmt.Errorf("no confirmations contract as of block %s", head)
 	}
-	confs, err := NewConfirmations(p.confsCfg.Contract, p.confsCl)
+	confs, err := NewConfirmations(p.confsCfg.Contract, cl)
 	if err != nil {
 		return fmt.Errorf("failed to bind to confirmations contract: %v", err)
 	}
@@ -150,14 +171,19 @@ func (p *proc) initConfs(ctx context.Context, head *big.Int) error {
 	return nil
 }
 
-func (p *proc) voterAdmin(ctx context.Context, latestSnap *clique.Snapshot) error {
-	confsLatest, err := p.confsCl.LatestBlockNumber(ctx)
+// voterAdmin performs the administrative duties of a voter.
+func (p *proc) voterAdmin(ctx context.Context, signer common.Address, latestSnap *clique.Snapshot) error {
+	cl, err := p.confsCl.get(ctx)
+	if err != nil {
+		return err
+	}
+	confsLatest, err := cl.LatestBlockNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get latest Confirmations block number: %v", err)
 	}
-	_, isHeadVoter := latestSnap.Voters[p.signer]
+	_, isHeadVoter := latestSnap.Voters[signer]
 	latestOpts := &bind.CallOpts{Context: ctx, BlockNumber: confsLatest}
-	isContractVoter, err := p.confs.IsVoter(latestOpts, p.signer)
+	isContractVoter, err := p.confs.IsVoter(latestOpts, signer)
 	if err != nil {
 		return fmt.Errorf("failed to check voter on Confirmations contract: %v", err)
 	}
@@ -176,79 +202,14 @@ func (p *proc) voterAdmin(ctx context.Context, latestSnap *clique.Snapshot) erro
 		return fmt.Errorf("failed to get voters from Confirmations contract: %v", err)
 	}
 
-	pendingOpts := &bind.CallOpts{Context: ctx, Pending: true}
-
 	// Check for voters to remove.
 	if remove := difference(voters, latestSnap.Voters); len(remove) > 0 {
-		toRemove := firstAlpha(remove)
-		isVoterPending, err := p.confs.IsVoter(pendingOpts, toRemove)
-		if err != nil {
-			return fmt.Errorf("failed to check pending state for voter: %v", err)
-		}
-		if !isVoterPending {
-			// Already voted out (pending). Nothing to do.
-			return nil
-		}
-		vote, err := p.confs.Votes(pendingOpts, p.signer)
-		if err != nil {
-			return fmt.Errorf("failed to get pending vote: %v", err)
-		}
-		if vote.Addr == (common.Address{}) {
-			// No pending vote, so set one.
-			transactOpts, err := bind.NewKeyStoreTransactor(p.keystore, accounts.Account{Address: p.signer})
-			if err != nil {
-				return fmt.Errorf("failed to create keystore transactor: %v", err)
-			}
-			_, err = p.confs.SetVote(transactOpts, toRemove, true, false)
-			if err != nil {
-				return fmt.Errorf("failed to vote to remove voter: %v", err)
-			}
-			return nil
-		}
-		if vote.Addr == toRemove && vote.Voter && !vote.Add {
-			// Pending vote is correct. Nothing to do.
-			return nil
-		}
-		//TODO replace pending vote
-		return fmt.Errorf("remove voter: replace pending (%s,%t,%t) with %s: unimplemented",
-			vote.Addr.String(), vote.Add, vote.Voter, toRemove.String())
+		return p.removeVoter(ctx, signer, firstAlpha(remove))
 	}
-	//TODO if removed self? stop?
 
 	// Check for voters to add.
 	if add := difference(latestSnap.Voters, voters); len(add) > 0 {
-		toAdd := firstAlpha(add)
-		isVoterPending, err := p.confs.IsVoter(pendingOpts, toAdd)
-		if err != nil {
-			return fmt.Errorf("failed to check pending state for voter: %v", err)
-		}
-		if isVoterPending {
-			// Already voted in (pending). Nothing to do.
-			return nil
-		}
-		vote, err := p.confs.Votes(pendingOpts, p.signer)
-		if err != nil {
-			return fmt.Errorf("failed to get pending vote: %v", err)
-		}
-		if vote.Addr == (common.Address{}) {
-			// No pending vote, so set one.
-			transactOpts, err := bind.NewKeyStoreTransactor(p.keystore, accounts.Account{Address: p.signer})
-			if err != nil {
-				return fmt.Errorf("failed to create keystore transactor: %v", err)
-			}
-			_, err = p.confs.SetVote(transactOpts, toAdd, true, true)
-			if err != nil {
-				return fmt.Errorf("failed to vote to add voter: %v", err)
-			}
-			return nil
-		}
-		if vote.Addr == toAdd && vote.Voter && vote.Add {
-			// Pending vote is correct. Nothing to do.
-			return nil
-		}
-		//TODO replace pending vote
-		return fmt.Errorf("add voter: replace pending (%s,%t,%t) with %s: unimplemented",
-			vote.Addr.String(), vote.Add, vote.Voter, toAdd.String())
+		return p.addVoter(ctx, signer, firstAlpha(add))
 	}
 
 	signers, err := ConfirmationsSigners(ctx, confsLatest, p.confs)
@@ -263,40 +224,8 @@ func (p *proc) voterAdmin(ctx context.Context, latestSnap *clique.Snapshot) erro
 		}
 	}
 	if len(remove) > 0 {
-		toRemove := firstAlpha(remove)
-		isSignerPending, err := p.confs.IsSigner(pendingOpts, toRemove)
-		if err != nil {
-			return fmt.Errorf("failed to check pending state for signer: %v", err)
-		}
-		if !isSignerPending {
-			// Already voted out (pending). Nothing to do.
-			return nil
-		}
-		vote, err := p.confs.Votes(pendingOpts, p.signer)
-		if err != nil {
-			return fmt.Errorf("failed to get pending vote: %v", err)
-		}
-		if vote.Addr == (common.Address{}) {
-			// No pending vote, so set one.
-			transactOpts, err := bind.NewKeyStoreTransactor(p.keystore, accounts.Account{Address: p.signer})
-			if err != nil {
-				return fmt.Errorf("failed to create keystore transactor: %v", err)
-			}
-			_, err = p.confs.SetVote(transactOpts, toRemove, false, false)
-			if err != nil {
-				return fmt.Errorf("failed to vote to remove signer: %v", err)
-			}
-			return nil
-		}
-		if vote.Addr == toRemove && !vote.Voter && !vote.Add {
-			// Pending vote is correct. Nothing to do.
-			return nil
-		}
-		//TODO replace pending vote
-		return fmt.Errorf("remove signer: replace pending (%s,%t,%t) with %s: unimplemented",
-			vote.Addr.String(), vote.Add, vote.Voter, toRemove.String())
+		return p.removeSigner(ctx, signer, firstAlpha(remove))
 	}
-	//TODO if removed self, stop?
 
 	// Check for signers to add.
 	var add []common.Address
@@ -306,40 +235,69 @@ func (p *proc) voterAdmin(ctx context.Context, latestSnap *clique.Snapshot) erro
 		}
 	}
 	if len(add) > 0 {
-		toAdd := firstAlpha(add)
-		isSignerPending, err := p.confs.IsSigner(pendingOpts, toAdd)
-		if err != nil {
-			return fmt.Errorf("failed to check pending state for signer: %v", err)
-		}
-		if isSignerPending {
-			// Already voted in (pending). Nothing to do.
-			return nil
-		}
-		vote, err := p.confs.Votes(pendingOpts, p.signer)
-		if err != nil {
-			return fmt.Errorf("failed to get pending vote: %v", err)
-		}
-		if vote.Addr == (common.Address{}) {
-			// No pending vote, so set one.
-			transactOpts, err := bind.NewKeyStoreTransactor(p.keystore, accounts.Account{Address: p.signer})
-			if err != nil {
-				return fmt.Errorf("failed to create keystore transactor: %v", err)
-			}
-			_, err = p.confs.SetVote(transactOpts, toAdd, false, true)
-			if err != nil {
-				return fmt.Errorf("failed to vote to add signer: %v", err)
-			}
-			return nil
-		}
-		if vote.Addr == toAdd && !vote.Voter && vote.Add {
-			// Pending vote is correct. Nothing to do.
-			return nil
-		}
-		//TODO replace pending vote
-		return fmt.Errorf("add signer: replace pending (%s,%t,%t) with %s: unimplemented",
-			vote.Addr.String(), vote.Add, vote.Voter, toAdd.String())
+		return p.addSigner(ctx, signer, firstAlpha(add))
 	}
 	return nil
+}
+
+func (p *proc) addVoter(ctx context.Context, signer common.Address, addr common.Address) error {
+	return p.ensureVote(ctx, signer, true, true, addr)
+}
+
+func (p *proc) removeVoter(ctx context.Context, signer common.Address, addr common.Address) error {
+	return p.ensureVote(ctx, signer, false, true, addr)
+}
+
+func (p *proc) addSigner(ctx context.Context, signer common.Address, addr common.Address) error {
+	return p.ensureVote(ctx, signer, true, false, addr)
+}
+
+func (p *proc) removeSigner(ctx context.Context, signer common.Address, addr common.Address) error {
+	return p.ensureVote(ctx, signer, false, false, addr)
+}
+
+// ensureVote checks the pending state and casts the vote if it is still necessary.
+func (p *proc) ensureVote(ctx context.Context, signer common.Address, add bool, voter bool, addr common.Address) error {
+	pendingOpts := &bind.CallOpts{Context: ctx, Pending: true}
+
+	var isFn func(opts *bind.CallOpts, voter common.Address) (bool, error)
+	if voter {
+		isFn = p.confs.IsVoter
+	} else {
+		isFn = p.confs.IsSigner
+	}
+
+	isPending, err := isFn(pendingOpts, addr)
+	if err != nil {
+		return fmt.Errorf("failed to check pending state: %v", err)
+	}
+	if isPending {
+		// Already voted (pending). Nothing to do.
+		return nil
+	}
+	vote, err := p.confs.Votes(pendingOpts, signer)
+	if err != nil {
+		return fmt.Errorf("failed to get pending vote: %v", err)
+	}
+	if vote.Addr == (common.Address{}) {
+		// No pending vote, so set one.
+		transactOpts, err := bind.NewKeyStoreTransactor(p.keystore, accounts.Account{Address: signer})
+		if err != nil {
+			return fmt.Errorf("failed to create keystore transactor: %v", err)
+		}
+		_, err = p.confs.SetVote(transactOpts, addr, voter, add)
+		if err != nil {
+			return fmt.Errorf("failed to vote to add signer: %v", err)
+		}
+		return nil
+	}
+	if vote.Addr == addr && vote.Voter == voter && vote.Add == add {
+		// Pending vote is correct. Nothing to do.
+		return nil
+	}
+	//TODO replace pending vote
+	return fmt.Errorf("unimplemented: replace pending vote (%s,add:%t,voter:%t) with (%s,add:%t,voter:%t)",
+		vote.Addr.String(), vote.Add, vote.Voter, addr.String(), add, voter)
 }
 
 func firstAlpha(as []common.Address) common.Address {
@@ -352,9 +310,10 @@ func firstAlpha(as []common.Address) common.Address {
 	return l
 }
 
-func (p *proc) signerAdmin(ctx context.Context, latestSnap *clique.Snapshot, confirmedNum uint64) error {
-	_, isHeadSigner := latestSnap.Signers[p.signer]
-	isContractSigner, err := p.confs.IsSigner(&bind.CallOpts{Context: ctx}, p.signer)
+// signerAdmin performs the administrative duties of a signer.
+func (p *proc) signerAdmin(ctx context.Context, signer common.Address, latestSnap *clique.Snapshot, confirmedNum uint64) error {
+	_, isHeadSigner := latestSnap.Signers[signer]
+	isContractSigner, err := p.confs.IsSigner(&bind.CallOpts{Context: ctx}, signer)
 	if err != nil {
 		return fmt.Errorf("failed to check signer on Confirmations contract: %v", err)
 	}
@@ -382,16 +341,16 @@ func (p *proc) signerAdmin(ctx context.Context, latestSnap *clique.Snapshot, con
 	log.Debug(p.logPre+"Updated pending confirmations", "count", len(p.reqs))
 
 	// Process them.
-	return p.confirmRequests(ctx)
+	return p.confirmRequests(ctx, signer)
 }
 
 // confirmRequests processes ip.reqs and votes to confirm any outstanding requests which do not already have a pending vote.
-func (p *proc) confirmRequests(ctx context.Context) error {
+func (p *proc) confirmRequests(ctx context.Context, signer common.Address) error {
 	if p.confs == nil || !p.isContractSigner || len(p.reqs) == 0 {
 		return nil
 	}
 	log.Debug(p.logPre+"Confirming pending requests", "count", len(p.reqs))
-	signerConfirmOpts, err := bind.NewKeyStoreTransactor(p.keystore, accounts.Account{Address: p.signer})
+	signerConfirmOpts, err := bind.NewKeyStoreTransactor(p.keystore, accounts.Account{Address: signer})
 	if err != nil {
 		return fmt.Errorf("failed to create keystore transactor: %v", err)
 	}
@@ -405,7 +364,7 @@ func (p *proc) confirmRequests(ctx context.Context) error {
 		}
 
 		// Check the PENDING status of this confirmation, so that pending tx votes are included.
-		pendingOpts := &bind.CallOpts{Pending: true, From: p.signer}
+		pendingOpts := &bind.CallOpts{Pending: true, From: signer}
 		status, err := p.confs.Status(pendingOpts, r.BlockNum, r.LogIndex, r.EventHash)
 		if err != nil {
 			log.Error(p.logPre+"Failed to get status of confirmation",
@@ -452,7 +411,11 @@ func (p *proc) confirmRequests(ctx context.Context) error {
 		// Fetch logs.
 		logs, ok := logsCache[r.BlockNum.Uint64()]
 		if !ok {
-			logs, err = p.emitCl.FilterLogs(ctx, gochain.FilterQuery{FromBlock: r.BlockNum, ToBlock: r.BlockNum})
+			cl, err := p.emitCl.get(ctx)
+			if err != nil {
+				return err
+			}
+			logs, err = cl.FilterLogs(ctx, gochain.FilterQuery{FromBlock: r.BlockNum, ToBlock: r.BlockNum})
 			if err != nil {
 				log.Error(p.logPre+"Failed to get logs", "block", r.BlockNum.String())
 				continue
@@ -489,4 +452,72 @@ func (p *proc) confirmRequests(ctx context.Context) error {
 	log.Info(p.logPre+"Confirmed events", "count", confirmed)
 
 	return nil
+}
+
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(d):
+		return nil
+	}
+}
+
+// cachedClient caches a client reference which may be delayed or updated.
+type cachedClient interface {
+	// get blocks until a client is available, or returns an error if the context is cancelled.
+	get(context.Context) (*goclient.Client, error)
+}
+
+// cachedClientFn blocks until a client is available
+// via fn, and caches the first non-error result.
+type cachedClientFn struct {
+	mu sync.RWMutex
+	fn func() (*rpc.Client, error)
+	cl *goclient.Client
+}
+
+func (c *cachedClientFn) get(ctx context.Context) (*goclient.Client, error) {
+	c.mu.RLock()
+	r := c.cl
+	c.mu.RUnlock()
+	if r != nil {
+		return r, nil
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for c.cl == nil {
+		rpc, err := c.fn()
+		if err != nil {
+			log.Warn("Failed to create rpc client", "err", err)
+			if sleepCtx(ctx, time.Second) != nil {
+				return nil, ctx.Err()
+			}
+			continue
+		}
+		c.cl = goclient.NewClient(rpc)
+	}
+	return c.cl, nil
+}
+
+// cachedClientSettable blocks until a client is set, caches it,
+// and may be updated again later.
+type cachedClientSettable struct {
+	val atomic.Value
+}
+
+func (c *cachedClientSettable) get(ctx context.Context) (*goclient.Client, error) {
+	l := c.val.Load()
+	for l == nil {
+		if sleepCtx(ctx, time.Second) != nil {
+			return nil, ctx.Err()
+		}
+		l = c.val.Load()
+	}
+	return l.(*goclient.Client), nil
+}
+
+func (c *cachedClientSettable) set(cl *goclient.Client) {
+	c.val.Store(cl)
 }

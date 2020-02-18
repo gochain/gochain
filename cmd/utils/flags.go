@@ -39,6 +39,7 @@ import (
 	"github.com/gochain/gochain/v3/core/rawdb"
 	"github.com/gochain/gochain/v3/core/state"
 	"github.com/gochain/gochain/v3/core/vm"
+	"github.com/gochain/gochain/v3/cross"
 	"github.com/gochain/gochain/v3/crypto"
 	"github.com/gochain/gochain/v3/eth"
 	"github.com/gochain/gochain/v3/eth/downloader"
@@ -970,6 +971,18 @@ func setTxPool(ctx *cli.Context, cfg *core.TxPoolConfig) {
 	}
 }
 
+func setCross(ctx *cli.Context, cfg *eth.Config) {
+	if cfg.Cross != nil {
+		// Already set from toml.
+		return
+	}
+	if ctx.GlobalBool(TestnetFlag.Name) {
+		cfg.Cross = cross.TestnetConfig
+		return
+	}
+	cfg.Cross = cross.DefaultConfig
+}
+
 func setEthdb(ctx *cli.Context, cfg *ethdb.Config) {
 	if ctx.GlobalIsSet(EthdbEndpointFlag.Name) {
 		cfg.Endpoint = ctx.GlobalString(EthdbEndpointFlag.Name)
@@ -1051,6 +1064,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 	setEtherbase(ctx, ks, cfg)
 	setGPO(ctx, &cfg.GPO)
 	setTxPool(ctx, &cfg.TxPool)
+	setCross(ctx, cfg)
 
 	switch {
 	case ctx.GlobalIsSet(SyncModeFlag.Name):

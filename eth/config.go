@@ -82,8 +82,8 @@ type Config struct {
 	MinerRecommit  time.Duration
 	MinerNoverify  bool
 
-	// Cross chain options
-	Cross cross.Config `toml: ",omitempty"`
+	// Cross chain configurations
+	Cross []cross.Config `toml: ",omitempty"`
 
 	// Transaction pool options
 	TxPool core.TxPoolConfig

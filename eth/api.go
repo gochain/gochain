@@ -105,9 +105,9 @@ func NewPrivateMinerAPI(e *GoChain) *PrivateMinerAPI {
 // transaction pool.
 func (api *PrivateMinerAPI) Start(threads *int) error {
 	if threads == nil {
-		return api.e.StartMining(runtime.NumCPU())
+		return api.e.StartMining(runtime.NumCPU(), nil)
 	}
-	return api.e.StartMining(*threads)
+	return api.e.StartMining(*threads, nil)
 }
 
 // Stop terminates the miner, both at the consensus engine level as well as at

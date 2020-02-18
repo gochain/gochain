@@ -184,7 +184,8 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 	if gochain.protocolManager, err = NewProtocolManager(gochain.chainConfig, config.SyncMode, config.NetworkId, gochain.eventMux, gochain.txPool, gochain.engine, gochain.blockchain, chainDb); err != nil {
 		return nil, err
 	}
-	gochain.miner = miner.New(gochain, gochain.chainConfig, gochain.EventMux(), gochain.engine, config.MinerRecommit, config.MinerGasFloor, config.MinerGasCeil, gochain.isLocalBlock)
+	ks := sctx.AccountManager.Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+	gochain.miner = miner.New(gochain, gochain.chainConfig, gochain.EventMux(), gochain.engine, config.MinerRecommit, config.MinerGasFloor, config.MinerGasCeil, gochain.isLocalBlock, config.Cross, ks)
 	if err := gochain.miner.SetExtra(makeExtraData(config.MinerExtraData)); err != nil {
 		log.Error("Cannot set extra chain data", "err", err)
 	}
@@ -357,7 +358,7 @@ func (gc *GoChain) SetEtherbase(etherbase common.Address) {
 // StartMining starts the miner with the given number of CPU threads. If mining
 // is already running, this method adjust the number of threads allowed to use
 // and updates the minimum price required by the transaction pool.
-func (gc *GoChain) StartMining(threads int) error {
+func (gc *GoChain) StartMining(threads int, rpcClient *rpc.Client) error {
 	// Update the thread count within the consensus engine
 	type threaded interface {
 		SetThreads(threads int)
@@ -395,7 +396,10 @@ func (gc *GoChain) StartMining(threads int) error {
 		// introduced to speed sync times.
 		atomic.StoreUint32(&gc.protocolManager.acceptTxs, 1)
 
-		go gc.miner.Start(eb)
+		go gc.miner.Start(eb, rpcClient)
+	} else if rpcClient != nil {
+		// Already running, so just update the client.
+		gc.miner.SetInternalClient(rpcClient)
 	}
 	return nil
 }
