@@ -47,7 +47,7 @@ var DefaultConfig = []Config{
 			Contract:      common.HexToAddress("0xTODO"),
 			Confirmations: defaultsConfs,
 		},
-		ExternalURL: "http://localhost:8545",
+		ExternalURL: "http://ethereum:8545",
 	},
 }
 
@@ -62,7 +62,7 @@ var TestnetConfig = []Config{
 			Contract:      common.HexToAddress("0x4bE1f85654021E6AcA62E88a7E2124D23B129493"),
 			Confirmations: 3,
 		},
-		ExternalURL: "http://localhost:8545",
+		ExternalURL: "http://ropsten:8545",
 	},
 }
 

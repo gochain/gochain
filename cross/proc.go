@@ -267,6 +267,13 @@ func (p *proc) ensureVote(ctx context.Context, signer common.Address, add bool, 
 		isFn = p.confs.IsSigner
 	}
 
+	// Get pending vote first, so we don't race after checking state.
+	vote, err := p.confs.Votes(pendingOpts, signer)
+	if err != nil {
+		return fmt.Errorf("failed to get pending vote: %v", err)
+	}
+
+	// Check pending state, which could have already processed the vote.
 	isPending, err := isFn(pendingOpts, addr)
 	if err != nil {
 		return fmt.Errorf("failed to check pending state: %v", err)
@@ -275,10 +282,8 @@ func (p *proc) ensureVote(ctx context.Context, signer common.Address, add bool, 
 		// Already voted (pending). Nothing to do.
 		return nil
 	}
-	vote, err := p.confs.Votes(pendingOpts, signer)
-	if err != nil {
-		return fmt.Errorf("failed to get pending vote: %v", err)
-	}
+
+	// Inspect the previously fetched pending vote.
 	if vote.Addr == (common.Address{}) {
 		// No pending vote, so set one.
 		transactOpts, err := bind.NewKeyStoreTransactor(p.keystore, accounts.Account{Address: signer})
