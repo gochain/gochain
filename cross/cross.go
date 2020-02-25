@@ -22,7 +22,7 @@ const (
 type Config struct {
 	Internal    NetConfig `toml:",omitempty"`
 	External    NetConfig `toml:",omitempty"`
-	ExternalURL string    `toml:",omitempty"` // TODO launch light node when empty?
+	ExternalURL string    `toml:",omitempty"`
 }
 
 func (c *Config) DialRPC() (*rpc.Client, error) {
@@ -47,6 +47,7 @@ var DefaultConfig = []Config{
 			Contract:      common.HexToAddress("0xTODO"),
 			Confirmations: defaultsConfs,
 		},
+		ExternalURL: "http://localhost:8545",
 	},
 }
 
@@ -54,14 +55,14 @@ var DefaultConfig = []Config{
 var TestnetConfig = []Config{
 	{
 		Internal: NetConfig{
-			Contract:      common.HexToAddress("0xTODO"),
+			Contract:      common.HexToAddress("0x1dA55eC8c1008386839A831Bb791d5612d351c7F"),
 			Confirmations: 5,
 		},
 		External: NetConfig{
-			Contract:      common.HexToAddress("0xTODO"),
+			Contract:      common.HexToAddress("0x4bE1f85654021E6AcA62E88a7E2124D23B129493"),
 			Confirmations: 3,
 		},
-		ExternalURL: "https://ropsten-rpc.linkpool.io/",
+		ExternalURL: "http://localhost:8545",
 	},
 }
 

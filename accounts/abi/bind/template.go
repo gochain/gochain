@@ -132,11 +132,19 @@ var (
 		    return common.Address{}, nil, nil, err
 		  }
 		  {{decapitalise $contract.Type}}Bin := {{$contract.Type}}Bin
+		  {{if .Libraries}}
+		  if auth.Nonce == nil {
+			if err := bind.EnsureNonce(auth, backend); err != nil {
+			  return common.Address{}, nil, nil, err
+			}
+		  }
+		  {{end}}
 		  {{range $pattern, $name := .Libraries}}
 			{{decapitalise $name}}Addr, _, _, err := Deploy{{capitalise $name}}(auth, backend)
 			if err != nil {
 			  return common.Address{}, nil, nil, err
 			}
+			auth.Nonce = auth.Nonce.Add(auth.Nonce, big.NewInt(1))
 			{{decapitalise $contract.Type}}Bin = strings.Replace({{decapitalise $contract.Type}}Bin, "__${{$pattern}}$__", {{decapitalise $name}}Addr.String()[2:], -1)
 		  {{end}}
 		  address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex({{decapitalise .Type}}Bin), backend {{range .Constructor.Inputs}}, {{.Name}}{{end}})

@@ -364,3 +364,12 @@ func ensureContext(ctx context.Context) context.Context {
 	}
 	return ctx
 }
+
+func EnsureNonce(opts *TransactOpts, transactor ContractBackend) error {
+	nonce, err := transactor.PendingNonceAt(ensureContext(opts.Context), opts.From)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve account nonce: %v", err)
+	}
+	opts.Nonce = new(big.Int).SetUint64(nonce)
+	return nil
+}
