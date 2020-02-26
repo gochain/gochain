@@ -260,26 +260,26 @@ func (p *proc) removeSigner(ctx context.Context, signer common.Address, addr com
 func (p *proc) ensureVote(ctx context.Context, signer common.Address, add bool, voter bool, addr common.Address) error {
 	pendingOpts := &bind.CallOpts{Context: ctx, Pending: true}
 
-	var isFn func(opts *bind.CallOpts, voter common.Address) (bool, error)
-	if voter {
-		isFn = p.confs.IsVoter
-	} else {
-		isFn = p.confs.IsSigner
-	}
-
 	// Get pending vote first, so we don't race after checking state.
 	vote, err := p.confs.Votes(pendingOpts, signer)
 	if err != nil {
 		return fmt.Errorf("failed to get pending vote: %v", err)
 	}
 
-	// Check pending state, which could have already processed the vote.
+	// Check pending state (which may have already processed the vote).
+	var isFn func(opts *bind.CallOpts, voter common.Address) (bool, error)
+	if voter {
+		isFn = p.confs.IsVoter
+	} else {
+		isFn = p.confs.IsSigner
+	}
 	isPending, err := isFn(pendingOpts, addr)
 	if err != nil {
 		return fmt.Errorf("failed to check pending state: %v", err)
 	}
-	if isPending {
+	if isPending == add {
 		// Already voted (pending). Nothing to do.
+		log.Debug(p.logPre+"Pending processed", "signer", signer.Hex(), "addr", addr.String(), "add", add, "voter", voter)
 		return nil
 	}
 
@@ -292,12 +292,14 @@ func (p *proc) ensureVote(ctx context.Context, signer common.Address, add bool, 
 		}
 		_, err = p.confs.SetVote(transactOpts, addr, voter, add)
 		if err != nil {
-			return fmt.Errorf("failed to vote to add signer: %v", err)
+			return fmt.Errorf("failed to set vote (%s,add:%t,voter:%t): %v", addr.String(), add, voter, err)
 		}
+		log.Debug(p.logPre+"Set vote", "signer", signer.Hex(), "addr", addr.String(), "add", add, "voter", voter)
 		return nil
 	}
 	if vote.Addr == addr && vote.Voter == voter && vote.Add == add {
 		// Pending vote is correct. Nothing to do.
+		log.Debug(p.logPre+"Pending vote is correct", "signer", signer.Hex())
 		return nil
 	}
 	//TODO replace pending vote
@@ -327,7 +329,7 @@ func (p *proc) signerAdmin(ctx context.Context, signer common.Address, latestSna
 		// Can't confirm.
 		if isHeadSigner {
 			// New signer.
-			log.Info("Signer not yet voted in on Confirmations", "network", "GoChain")
+			log.Info(p.logPre + "Signer not yet voted in on Confirmations")
 		}
 		return nil
 	}
