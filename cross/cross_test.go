@@ -145,7 +145,7 @@ func crossTest(t *testing.T, signerCount, voterCount int, seeds []common.Address
 
 	internal := cross.NetConfig{
 		Contract:      inAddr,
-		Confirmations: 1,
+		Confirmations: uint64(signerCount/2) + 1,
 	}
 	external := cross.NetConfig{
 		Contract:      exAddr,

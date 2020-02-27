@@ -367,6 +367,9 @@ func (p *proc) confirmRequests(ctx context.Context, signer common.Address) error
 	for _, r := range p.reqs {
 		if r.BlockNum.Uint64() > p.emitConfNum {
 			// Too soon to confirm.
+			log.Debug(p.logPre+"Too soon to confirm",
+				"confirmed", p.emitConfNum, "num", r.BlockNum.String(),
+				"idx", r.LogIndex.String(), "hash", common.Hash(r.EventHash).Hex())
 			continue
 		}
 
@@ -411,6 +414,9 @@ func (p *proc) confirmRequests(ctx context.Context, signer common.Address) error
 		}
 		if !allow {
 			// Either we've already voted, or it is no longer pending.
+			log.Debug(p.logPre+"Confirmation already pending",
+				"num", r.BlockNum.String(), "idx", r.LogIndex.String(),
+				"hash", common.Hash(r.EventHash).Hex())
 			// (TODO possible edge case where pending vote need to be updated?)
 			continue
 		}
@@ -456,7 +462,7 @@ func (p *proc) confirmRequests(ctx context.Context, signer common.Address) error
 		log.Debug(p.logPre+"Confirmed event", "num", r.BlockNum.String(), "idx", r.LogIndex.String(),
 			"hash", common.Hash(r.EventHash).Hex(), "valid", valid, "hash", tx.Hash().Hex())
 	}
-	log.Info(p.logPre+"Confirmed events", "count", confirmed)
+	log.Info(p.logPre+"Confirmed events", "count", confirmed, "reqs", len(p.reqs))
 
 	return nil
 }
