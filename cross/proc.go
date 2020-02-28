@@ -171,12 +171,32 @@ func (p *proc) initConfs(ctx context.Context, head *big.Int) error {
 	return nil
 }
 
+// pendingTxCount returns the pending tx count for an address, by subtracting latest from pending nonce.
+func pendingTxCount(ctx context.Context, cl *goclient.Client, addr common.Address) (uint64, error) {
+	pending, err := cl.PendingNonceAt(ctx, addr)
+	if err != nil {
+		return 0, err
+	}
+	latest, err := cl.NonceAt(ctx, addr, nil)
+	if err != nil {
+		return 0, err
+	}
+	return pending - latest, nil
+}
+
 // voterAdmin performs the administrative duties of a voter.
 func (p *proc) voterAdmin(ctx context.Context, signer common.Address, latestSnap *clique.Snapshot) error {
 	cl, err := p.confsCl.get(ctx)
 	if err != nil {
 		return err
 	}
+	if txs, err := pendingTxCount(ctx, cl, signer); err != nil {
+		return err
+	} else if txs > 0 {
+		log.Debug(p.logPre+"Waiting for pending txs before voter admin", "txs", txs)
+		return nil
+	}
+
 	confsLatest, err := cl.LatestBlockNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get latest Confirmations block number: %v", err)
@@ -359,7 +379,19 @@ func (p *proc) confirmRequests(ctx context.Context, signer common.Address) error
 	if p.confs == nil || !p.isContractSigner || len(p.reqs) == 0 {
 		return nil
 	}
-	log.Debug(p.logPre+"Confirming pending requests", "count", len(p.reqs))
+
+	cl, err := p.confsCl.get(ctx)
+	if err != nil {
+		return err
+	}
+	if txs, err := pendingTxCount(ctx, cl, signer); err != nil {
+		return err
+	} else if txs > 0 {
+		log.Debug(p.logPre+"Waiting for pending txs before confirming requests", "txs", txs, "reqs", len(p.reqs))
+		return nil
+	}
+
+	log.Debug(p.logPre+"Confirming pending requests", "reqs", len(p.reqs))
 	signerConfirmOpts, err := bind.NewKeyStoreTransactor(p.keystore, accounts.Account{Address: signer})
 	if err != nil {
 		return fmt.Errorf("failed to create keystore transactor: %v", err)
