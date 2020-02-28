@@ -55,11 +55,11 @@ var DefaultConfig = []Config{
 var TestnetConfig = []Config{
 	{
 		Internal: NetConfig{
-			Contract:      common.HexToAddress("0x1dA55eC8c1008386839A831Bb791d5612d351c7F"),
+			Contract:      common.HexToAddress("0xBf1aE5053834aFd46E27eF64B10411A113F356Bf"),
 			Confirmations: 5,
 		},
 		External: NetConfig{
-			Contract:      common.HexToAddress("0x4bE1f85654021E6AcA62E88a7E2124D23B129493"),
+			Contract:      common.HexToAddress("0xa803AB92BAd1B3271afa9639417D2D858884c92A"),
 			Confirmations: 3,
 		},
 		ExternalURL: "http://ropsten:8545",

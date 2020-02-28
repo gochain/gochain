@@ -1,11 +1,9 @@
 package cross
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 
-	"github.com/gochain/gochain/v3/accounts/abi/bind"
 	"github.com/gochain/gochain/v3/common"
 )
 
@@ -16,16 +14,15 @@ type ConfirmationRequest struct {
 }
 
 // ConfirmationsVoters returns the set of voters from confs at the given block.
-func ConfirmationsVoters(ctx context.Context, block *big.Int, confs *Confirmations) (map[common.Address]struct{}, error) {
-	opts := &bind.CallOpts{Context: ctx, BlockNumber: block}
-	l, err := confs.VotersLength(opts)
+func ConfirmationsVoters(session ConfirmationsSession) (map[common.Address]struct{}, error) {
+	l, err := session.VotersLength()
 	if err != nil {
 		return nil, err
 	}
 	voters := make(map[common.Address]struct{})
 	var i int64
 	for i = 0; i < l.Int64(); i++ {
-		v, err := confs.GetVoter(opts, big.NewInt(i))
+		v, err := session.GetVoter(big.NewInt(i))
 		if err != nil {
 			return nil, err
 		}
@@ -35,16 +32,15 @@ func ConfirmationsVoters(ctx context.Context, block *big.Int, confs *Confirmatio
 }
 
 // ConfirmationsSigners returns the set of signers from confs at the given block.
-func ConfirmationsSigners(ctx context.Context, block *big.Int, confs *Confirmations) (map[common.Address]struct{}, error) {
-	opts := &bind.CallOpts{Context: ctx, BlockNumber: block}
-	l, err := confs.SignersLength(opts)
+func ConfirmationsSigners(session ConfirmationsSession) (map[common.Address]struct{}, error) {
+	l, err := session.SignersLength()
 	if err != nil {
 		return nil, err
 	}
 	signers := make(map[common.Address]struct{})
 	var i int64
 	for i = 0; i < l.Int64(); i++ {
-		s, err := confs.GetSigner(opts, big.NewInt(i))
+		s, err := session.GetSigner(big.NewInt(i))
 		if err != nil {
 			return nil, err
 		}
@@ -65,9 +61,8 @@ func difference(a, b map[common.Address]struct{}) []common.Address {
 }
 
 // pendingRequests returns the pending list of confirmation requests.
-func pendingRequests(confs *Confirmations, num *big.Int) ([]ConfirmationRequest, error) {
-	confirmedOpts := &bind.CallOpts{BlockNumber: num}
-	pll, err := confs.PendingListLength(confirmedOpts)
+func pendingRequests(session ConfirmationsSession) ([]ConfirmationRequest, error) {
+	pll, err := session.PendingListLength()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pending list length: %v", err)
 	}
@@ -77,7 +72,7 @@ func pendingRequests(confs *Confirmations, num *big.Int) ([]ConfirmationRequest,
 	var arg big.Int
 	for ; i < max; i++ {
 		_ = arg.SetUint64(i)
-		raw, err := confs.PendingList(confirmedOpts, &arg)
+		raw, err := session.PendingList(&arg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get pending request %d: %v", i, err)
 		}

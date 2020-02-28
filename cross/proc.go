@@ -182,8 +182,9 @@ func (p *proc) voterAdmin(ctx context.Context, signer common.Address, latestSnap
 		return fmt.Errorf("failed to get latest Confirmations block number: %v", err)
 	}
 	_, isHeadVoter := latestSnap.Voters[signer]
-	latestOpts := &bind.CallOpts{Context: ctx, BlockNumber: confsLatest}
-	isContractVoter, err := p.confs.IsVoter(latestOpts, signer)
+	latestSession := ConfirmationsSession{Contract: p.confs,
+		CallOpts: bind.CallOpts{Context: ctx, BlockNumber: confsLatest}}
+	isContractVoter, err := latestSession.IsVoter(signer)
 	if err != nil {
 		return fmt.Errorf("failed to check voter on Confirmations contract: %v", err)
 	}
@@ -197,7 +198,7 @@ func (p *proc) voterAdmin(ctx context.Context, signer common.Address, latestSnap
 	}
 
 	// As a contract voter, sync go auth.
-	voters, err := ConfirmationsVoters(ctx, confsLatest, p.confs)
+	voters, err := ConfirmationsVoters(latestSession)
 	if err != nil {
 		return fmt.Errorf("failed to get voters from Confirmations contract: %v", err)
 	}
@@ -212,7 +213,7 @@ func (p *proc) voterAdmin(ctx context.Context, signer common.Address, latestSnap
 		return p.addVoter(ctx, signer, firstAlpha(add))
 	}
 
-	signers, err := ConfirmationsSigners(ctx, confsLatest, p.confs)
+	signers, err := ConfirmationsSigners(latestSession)
 	if err != nil {
 		return fmt.Errorf("failed to get signers from Confirmations contract: %v", err)
 	}
@@ -258,22 +259,22 @@ func (p *proc) removeSigner(ctx context.Context, signer common.Address, addr com
 
 // ensureVote checks the pending state and casts the vote if it is still necessary.
 func (p *proc) ensureVote(ctx context.Context, signer common.Address, add bool, voter bool, addr common.Address) error {
-	pendingOpts := &bind.CallOpts{Context: ctx, Pending: true}
+	pendingSession := ConfirmationsSession{Contract: p.confs, CallOpts: bind.CallOpts{Context: ctx, Pending: true}}
 
 	// Get pending vote first, so we don't race after checking state.
-	vote, err := p.confs.Votes(pendingOpts, signer)
+	vote, err := pendingSession.Votes(signer)
 	if err != nil {
 		return fmt.Errorf("failed to get pending vote: %v", err)
 	}
 
 	// Check pending state (which may have already processed the vote).
-	var isFn func(opts *bind.CallOpts, voter common.Address) (bool, error)
+	var isFn func(voter common.Address) (bool, error)
 	if voter {
-		isFn = p.confs.IsVoter
+		isFn = pendingSession.IsVoter
 	} else {
-		isFn = p.confs.IsSigner
+		isFn = pendingSession.IsSigner
 	}
-	isPending, err := isFn(pendingOpts, addr)
+	isPending, err := isFn(addr)
 	if err != nil {
 		return fmt.Errorf("failed to check pending state: %v", err)
 	}
@@ -338,7 +339,9 @@ func (p *proc) signerAdmin(ctx context.Context, signer common.Address, latestSna
 	// Update the local set of requested confirmations.
 	log.Debug(p.logPre+"Updating pending confirmations", "confirmed", confirmedNum)
 
-	reqs, err := pendingRequests(p.confs, big.NewInt(int64(confirmedNum)))
+	session := ConfirmationsSession{Contract: p.confs,
+		CallOpts: bind.CallOpts{Context: ctx, BlockNumber: big.NewInt(int64(confirmedNum))}}
+	reqs, err := pendingRequests(session)
 	if err != nil {
 		return fmt.Errorf("failed to get pending requests at block %d: %v", confirmedNum, err)
 	}
@@ -373,9 +376,10 @@ func (p *proc) confirmRequests(ctx context.Context, signer common.Address) error
 			continue
 		}
 
+		pendingSession := ConfirmationsSession{Contract: p.confs,
+			CallOpts: bind.CallOpts{Context: ctx, Pending: true, From: signer}}
 		// Check the PENDING status of this confirmation, so that pending tx votes are included.
-		pendingOpts := &bind.CallOpts{Pending: true, From: signer}
-		status, err := p.confs.Status(pendingOpts, r.BlockNum, r.LogIndex, r.EventHash)
+		status, err := pendingSession.Status(r.BlockNum, r.LogIndex, r.EventHash)
 		if err != nil {
 			log.Error(p.logPre+"Failed to get status of confirmation",
 				"num", r.BlockNum.String(), "idx", r.LogIndex.String(),
@@ -405,7 +409,7 @@ func (p *proc) confirmRequests(ctx context.Context, signer common.Address) error
 		}
 
 		// Check the PENDING state to see if we've already confirmed.
-		allow, err := p.confs.ConfirmAllowed(pendingOpts, r.BlockNum, r.LogIndex, r.EventHash)
+		allow, requestPrice, err := pendingSession.ShouldConfirm(r.BlockNum, r.LogIndex, r.EventHash)
 		if err != nil {
 			log.Error(p.logPre+"Failed to check if confirmation allowed",
 				"num", r.BlockNum.String(), "idx", r.LogIndex.String(),
@@ -451,6 +455,8 @@ func (p *proc) confirmRequests(ctx context.Context, signer common.Address) error
 		}
 
 		// Vote.
+		opts := *signerConfirmOpts
+		opts.GasPrice = requestPrice
 		tx, err := p.confs.Confirm(signerConfirmOpts, r.BlockNum, r.LogIndex, r.EventHash, valid)
 		if err != nil {
 			log.Error(p.logPre+"Failed to confirm event",

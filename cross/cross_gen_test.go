@@ -28,7 +28,7 @@ var (
 )
 
 // TestABI is the input ABI used to generate the binding from.
-const TestABI = "[{\"constant\":false,\"inputs\":[{\"internalType\":\"string\",\"name\":\"value\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"number\",\"type\":\"uint256\"}],\"name\":\"Emit\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"string\",\"name\":\"value\",\"type\":\"string\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"number\",\"type\":\"uint256\"}],\"name\":\"TestEvent\",\"type\":\"event\"}]"
+const TestABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"string\",\"name\":\"value\",\"type\":\"string\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"number\",\"type\":\"uint256\"}],\"name\":\"TestEvent\",\"type\":\"event\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"string\",\"name\":\"value\",\"type\":\"string\"},{\"internalType\":\"address\",\"name\":\"addr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"number\",\"type\":\"uint256\"}],\"name\":\"Emit\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
 
 // TestFuncSigs maps the 4-byte function signature to its string representation.
 var TestFuncSigs = map[string]string{
@@ -36,7 +36,7 @@ var TestFuncSigs = map[string]string{
 }
 
 // TestBin is the compiled bytecode used for deploying new contracts.
-const TestBin = "0x608060405234801561001057600080fd5b50610145806100206000396000f3fe608060405234801561001057600080fd5b506004361061002b5760003560e01c8063e8519bdb14610030575b600080fd5b6100af6004803603606081101561004657600080fd5b81019060208101813564010000000081111561006157600080fd5b82018360208201111561007357600080fd5b8035906020019184600183028401116401000000008311171561009557600080fd5b91935091506001600160a01b0381351690602001356100b1565b005b816001600160a01b03168484604051808383808284376040805193909101839003832088845290519095507f4d6505ad1d1176fa8decd5a5b1ae05ba7751bfdffd68a284d111648bfaf24d94945091829003602001925050a35050505056fea265627a7a7231582078c2125584f3eed21dfbf100e5ec9f33052c7faae243a14952e50bbb719a8a2764736f6c634300050b0032"
+const TestBin = "0x608060405234801561001057600080fd5b50610145806100206000396000f3fe608060405234801561001057600080fd5b506004361061002b5760003560e01c8063e8519bdb14610030575b600080fd5b6100af6004803603606081101561004657600080fd5b81019060208101813564010000000081111561006157600080fd5b82018360208201111561007357600080fd5b8035906020019184600183028401116401000000008311171561009557600080fd5b91935091506001600160a01b0381351690602001356100b1565b005b816001600160a01b03168484604051808383808284376040805193909101839003832088845290519095507f4d6505ad1d1176fa8decd5a5b1ae05ba7751bfdffd68a284d111648bfaf24d94945091829003602001925050a35050505056fea265627a7a72315820928dcb60c3f6f4af343cf7fa6341bba0d31bff78713fd99f4244baca9295bf0564736f6c63430005100032"
 
 // DeployTest deploys a new GoChain contract, binding an instance of Test to it.
 func DeployTest(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Test, error) {

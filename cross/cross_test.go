@@ -483,12 +483,12 @@ func cliqueAdmins(ctx context.Context, t *testing.T, client *goclient.Client) ([
 }
 
 // confsAdmins gets the latest signer and voter sets from the confs contract.
-func confsAdmins(ctx context.Context, t *testing.T, confs *cross.Confirmations) (map[common.Address]struct{}, map[common.Address]struct{}) {
-	signers, err := cross.ConfirmationsSigners(ctx, nil, confs)
+func confsAdmins(t *testing.T, session cross.ConfirmationsSession) (map[common.Address]struct{}, map[common.Address]struct{}) {
+	signers, err := cross.ConfirmationsSigners(session)
 	if err != nil {
 		t.Fatalf("failed to get confs signers: %v", err)
 	}
-	voters, err := cross.ConfirmationsVoters(ctx, nil, confs)
+	voters, err := cross.ConfirmationsVoters(session)
 	if err != nil {
 		t.Fatalf("failed to get confs voters: %v", err)
 	}
@@ -554,9 +554,10 @@ func waitForConfsAdmins(t *testing.T, confs *cross.Confirmations, signers, voter
 	t.Helper()
 	ctx, _ := context.WithTimeout(context.Background(), timeout)
 
+	session := cross.ConfirmationsSession{Contract: confs, CallOpts: bind.CallOpts{Context: ctx}}
 poll:
 	for {
-		confsSigners, confsVoters := confsAdmins(ctx, t, confs)
+		confsSigners, confsVoters := confsAdmins(t, session)
 		if len(confsSigners) != len(signers) || len(confsVoters) != len(voters) {
 			if sleepCtx(ctx, time.Second) != nil {
 				t.Fatal("Timed out waiting for", kind, "confs admins")
