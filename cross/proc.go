@@ -364,7 +364,6 @@ func (p *proc) confirmRequests(ctx context.Context, signer common.Address) error
 	if err != nil {
 		return fmt.Errorf("failed to create keystore transactor: %v", err)
 	}
-	signerConfirmOpts.GasLimit = 500000
 	logsCache := map[uint64][]types.Log{}
 	var confirmed int
 	for _, r := range p.reqs {
