@@ -252,7 +252,7 @@ func (c *BoundContract) FilterLogs(opts *FilterOpts, name string, query ...[]int
 		opts = new(FilterOpts)
 	}
 	// Append the event selector to the query parameters and construct the topic set
-	query = append([][]interface{}{{c.abi.Events[name].Id()}}, query...)
+	query = append([][]interface{}{{c.abi.Events[name].ID()}}, query...)
 
 	topics, err := makeTopics(query...)
 	if err != nil {
@@ -301,7 +301,7 @@ func (c *BoundContract) WatchLogs(opts *WatchOpts, name string, query ...[]inter
 		opts = new(WatchOpts)
 	}
 	// Append the event selector to the query parameters and construct the topic set
-	query = append([][]interface{}{{c.abi.Events[name].Id()}}, query...)
+	query = append([][]interface{}{{c.abi.Events[name].ID()}}, query...)
 
 	topics, err := makeTopics(query...)
 	if err != nil {
@@ -340,6 +340,22 @@ func (c *BoundContract) UnpackLog(out interface{}, event string, log types.Log) 
 	return parseTopics(out, indexed, log.Topics[1:])
 }
 
+// UnpackLogIntoMap unpacks a retrieved log into the provided map.
+func (c *BoundContract) UnpackLogIntoMap(out map[string]interface{}, event string, log types.Log) error {
+	if len(log.Data) > 0 {
+		if err := c.abi.UnpackIntoMap(out, event, log.Data); err != nil {
+			return err
+		}
+	}
+	var indexed abi.Arguments
+	for _, arg := range c.abi.Events[event].Inputs {
+		if arg.Indexed {
+			indexed = append(indexed, arg)
+		}
+	}
+	return parseTopicsIntoMap(out, indexed, log.Topics[1:])
+}
+
 // ensureContext is a helper method to ensure a context is not nil, even if the
 // user specified it as such.
 func ensureContext(ctx context.Context) context.Context {
@@ -347,4 +363,13 @@ func ensureContext(ctx context.Context) context.Context {
 		return context.TODO()
 	}
 	return ctx
+}
+
+func EnsureNonce(opts *TransactOpts, transactor ContractBackend) error {
+	nonce, err := transactor.PendingNonceAt(ensureContext(opts.Context), opts.From)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve account nonce: %v", err)
+	}
+	opts.Nonce = new(big.Int).SetUint64(nonce)
+	return nil
 }
