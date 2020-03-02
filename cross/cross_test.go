@@ -3,6 +3,7 @@ package cross_test
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"math/big"
 	"math/rand"
 	"os"
@@ -46,7 +47,6 @@ func init() {
 type C struct {
 	InRPC, ExRPC       *rpc.Client
 	InClient, ExClient *goclient.Client
-	InClientAddr       common.Address // Address of the node backing InClient. Voting out this address may cause problems.
 	InConfs, ExConfs   *cross.Confirmations
 	CliqueAPI          func(*testing.T, common.Address) *clique.API
 }
@@ -196,8 +196,7 @@ func crossTest(t *testing.T, signerCount, voterCount int, seeds []common.Address
 	testFn(&C{
 		InRPC: inRPC, ExRPC: exRPC,
 		InClient: inClient, ExClient: exClient,
-		InClientAddr: inNodes[0].coinbase,
-		InConfs:      inConfs, ExConfs: exConfs,
+		InConfs: inConfs, ExConfs: exConfs,
 		CliqueAPI: func(t *testing.T, addr common.Address) *clique.API {
 			for _, node := range inNodes {
 				if node.coinbase != addr {
@@ -351,23 +350,11 @@ func TestCross_confirmations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	userOpts := bind.NewKeyedTransactor(userKey)
+	seeds := []common.Address{crypto.PubkeyToAddress(userKey.PublicKey)}
+	testFn := testCrossConfirmations(t, userKey, 1)
 	test := func(signers, voters int) func(t *testing.T) {
 		return func(t *testing.T) {
-			crossTest(t, signers, voters, []common.Address{userOpts.From}, func(c *C) {
-				t.Run("import", fixture{
-					userOpts: userOpts,
-					confs:    c.InConfs,
-					confsCl:  c.InClient,
-					emitCl:   c.ExClient,
-				}.tests)
-				t.Run("export", fixture{
-					userOpts: userOpts,
-					confs:    c.ExConfs,
-					confsCl:  c.ExClient,
-					emitCl:   c.InClient,
-				}.tests)
-			})
+			crossTest(t, signers, voters, seeds, testFn)
 		}
 	}
 
@@ -383,6 +370,28 @@ func TestCross_confirmations(t *testing.T) {
 	//t.Run("15/15", test(15, 15))
 	//t.Run("50/1", test(50, 1))
 	//t.Run("50/50", test(50, 50))
+}
+
+func testCrossConfirmations(t *testing.T, userKey *ecdsa.PrivateKey, externalGasFactor int64) func(*C) {
+	userOpts := bind.NewKeyedTransactor(userKey)
+	return func(c *C) {
+		t.Run("import", fixture{
+			userOpts:       userOpts,
+			confs:          c.InConfs,
+			confsCl:        c.InClient,
+			confsGasFactor: big.NewInt(1),
+			emitCl:         c.ExClient,
+			emitGasFactor:  big.NewInt(externalGasFactor),
+		}.tests)
+		t.Run("export", fixture{
+			userOpts:       userOpts,
+			confs:          c.ExConfs,
+			confsCl:        c.ExClient,
+			confsGasFactor: big.NewInt(externalGasFactor),
+			emitCl:         c.InClient,
+			emitGasFactor:  big.NewInt(1),
+		}.tests)
+	}
 }
 
 type addrSetStringer []common.Address
@@ -418,33 +427,21 @@ func TestAdminRemove(t *testing.T) {
 	const timeout = 30 * time.Second
 	crossTest(t, 3, 2, nil, func(c *C) {
 		signers, voters := cliqueAdmins(context.Background(), t, c.InClient)
-		// Sort: InClientAddr < voters < signers
+		// Sort: voters < signers
 		mVoters := make(map[common.Address]struct{})
 		for _, v := range voters {
 			mVoters[v] = struct{}{}
 		}
 		sort.Slice(signers, func(i, j int) bool {
-			ia, ja := signers[i], signers[j]
-			if ia == c.InClientAddr {
-				return true
-			} else if ja == c.InClientAddr {
-				return false
-			}
-			_, iv := mVoters[ia]
-			_, jv := mVoters[ja]
+			_, iv := mVoters[signers[i]]
+			_, jv := mVoters[signers[j]]
 			if iv != jv {
 				return iv
 			}
 			return bytes.Compare(signers[i].Bytes(), signers[j].Bytes()) < 0
 		})
 		sort.Slice(voters, func(i, j int) bool {
-			ia, ja := voters[i], voters[j]
-			if ia == c.InClientAddr {
-				return true
-			} else if ja == c.InClientAddr {
-				return false
-			}
-			return bytes.Compare(ia.Bytes(), ja.Bytes()) < 0
+			return bytes.Compare(voters[i].Bytes(), voters[j].Bytes()) < 0
 		})
 
 		t.Logf("Signers: %v", addrSetStringer(signers))
@@ -586,15 +583,16 @@ poll:
 }
 
 type fixture struct {
-	userOpts        *bind.TransactOpts
-	confs           *cross.Confirmations
-	confsCl, emitCl *goclient.Client
+	userOpts                      *bind.TransactOpts
+	confs                         *cross.Confirmations
+	confsCl, emitCl               *goclient.Client
+	confsGasFactor, emitGasFactor *big.Int
 
 	mockContract *Test
 }
 
 func (f fixture) tests(t *testing.T) {
-	f.mockContract = deployMockContract(t, f.userOpts, f.emitCl)
+	f.mockContract = f.deployMockContract(t)
 
 	t.Run("confirm", f.testConfirm)
 	t.Run("invalid", f.testInvalid)
@@ -608,7 +606,13 @@ func (f *fixture) testConfirm(t *testing.T) {
 	addr := f.userOpts.From
 	num := big.NewInt(99)
 
-	tx, err := f.mockContract.Emit(f.userOpts, value, addr, num)
+	price, err := f.emitCl.SuggestGasPrice(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts := *f.userOpts
+	opts.GasPrice = new(big.Int).Mul(price, f.emitGasFactor)
+	tx, err := f.mockContract.Emit(&opts, value, addr, num)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -630,10 +634,10 @@ func (f *fixture) testConfirm(t *testing.T) {
 }
 
 // confirmHash returns true if the status is confirmed or false if invalid.
-// Errors or a delay of more than 10s will fail the test.
+// Errors or a delay of more than 1m will fail the test.
 func (f *fixture) confirmHash(t *testing.T, block *big.Int, logIdx *big.Int, hash common.Hash) bool {
 	// Poll for confirmation.
-	timeout := time.After(10 * time.Second)
+	timeout := time.After(time.Minute)
 	for {
 		status, err := f.confs.Status(nil, block, logIdx, hash)
 		if err != nil {
@@ -671,8 +675,8 @@ func (f *fixture) requestConfirmation(t *testing.T, blockNum *big.Int, logIndex 
 	}
 	reqOpts := *f.userOpts
 	reqOpts.GasLimit = 3000000
-	reqOpts.GasPrice = price
-	reqOpts.Value = new(big.Int).Mul(totalGas, price)
+	reqOpts.GasPrice = new(big.Int).Mul(price, f.confsGasFactor)
+	reqOpts.Value = new(big.Int).Mul(totalGas, reqOpts.GasPrice)
 	tx, err := f.confs.Request(&reqOpts, blockNum, logIndex, hash)
 	if err != nil {
 		t.Fatal(err)
@@ -686,7 +690,13 @@ func (f *fixture) testInvalid(t *testing.T) {
 	addr := f.userOpts.From
 	num := big.NewInt(99)
 
-	tx, err := f.mockContract.Emit(f.userOpts, value, addr, num)
+	price, err := f.emitCl.SuggestGasPrice(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts := *f.userOpts
+	opts.GasPrice = new(big.Int).Mul(price, f.emitGasFactor)
+	tx, err := f.mockContract.Emit(&opts, value, addr, num)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -741,14 +751,20 @@ func (f *fixture) testInvalid(t *testing.T) {
 	}))
 }
 
-func deployMockContract(t *testing.T, userOpts *bind.TransactOpts, client *goclient.Client) *Test {
-	deployOpts := *userOpts
-	deployOpts.GasLimit = 1000000
-	_, tx, transactor, err := DeployTest(&deployOpts, client)
+func (f *fixture) deployMockContract(t *testing.T) *Test {
+	price, err := f.emitCl.SuggestGasPrice(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = bind.WaitDeployed(context.Background(), client, tx)
+
+	deployOpts := *f.userOpts
+	deployOpts.GasLimit = 1000000
+	deployOpts.GasPrice = new(big.Int).Mul(price, f.emitGasFactor)
+	_, tx, transactor, err := DeployTest(&deployOpts, f.emitCl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = bind.WaitDeployed(context.Background(), f.emitCl, tx)
 	if err != nil {
 		t.Fatal(err)
 	}

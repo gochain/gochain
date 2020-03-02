@@ -60,60 +60,74 @@ type proc struct {
 	reqs         []ConfirmationRequest
 }
 
-// run executes the main process.
+// run executes the main process, alternating between
+// the internal and external chain each tick.
 func (p *proc) run(ctx context.Context, done func()) {
 	defer done()
 
-	confsT := time.NewTicker(time.Second)
-	defer confsT.Stop()
-	emitT := time.NewTicker(time.Second)
-	defer emitT.Stop()
+	t := time.NewTicker(time.Second)
+	defer t.Stop()
+	confs := true
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 
-		case <-confsT.C:
-			cl, err := p.confsCl.get(ctx)
-			if err != nil {
-				return
-			}
-			latest, err := cl.LatestBlockNumber(ctx)
-			if err != nil {
-				log.Error(p.logPre+"Failed to get latest confs head", "err", err)
-				continue
-			}
-			if l := latest.Uint64(); l > p.confsConfNum+p.confsCfg.Confirmations {
-				conf := new(big.Int).SetUint64(l - p.confsCfg.Confirmations)
-				err := p.newConfirmedHead(ctx, conf)
-				if err != nil {
-					log.Error(p.logPre+"Failed to process new confirmed confs head", "num", conf, "err", err)
-					continue
+		case <-t.C:
+			if confs = !confs; confs {
+				if !p.latestConfs(ctx) {
+					return
 				}
-			}
-
-		case <-emitT.C:
-			cl, err := p.emitCl.get(ctx)
-			if err != nil {
-				return
-			}
-			latest, err := cl.LatestBlockNumber(ctx)
-			if err != nil {
-				log.Error(p.logPre+"Failed to get latest emit head", "err", err)
-				continue
-			}
-			if l := latest.Uint64(); l-p.emitConfNum > p.emitCfg.Confirmations {
-				p.emitConfNum = l - p.emitCfg.Confirmations
-				signer := p.signer.Load().(common.Address)
-				err := p.confirmRequests(ctx, signer)
-				if err != nil {
-					log.Error(p.logPre+"Failed to process new confirmed emit head", "num", p.emitConfNum, "err", err)
-					continue
+			} else {
+				if !p.latestEmit(ctx) {
+					return
 				}
 			}
 		}
 	}
+}
+func (p *proc) latestConfs(ctx context.Context) bool {
+	cl, err := p.confsCl.get(ctx)
+	if err != nil {
+		return false
+	}
+	latest, err := cl.LatestBlockNumber(ctx)
+	if err != nil {
+		log.Error(p.logPre+"Failed to get latest confs head", "err", err)
+		return true
+	}
+	if l := latest.Uint64(); l > p.confsConfNum+p.confsCfg.Confirmations {
+		conf := new(big.Int).SetUint64(l - p.confsCfg.Confirmations)
+		err := p.newConfirmedHead(ctx, conf)
+		if err != nil {
+			log.Error(p.logPre+"Failed to process new confirmed confs head", "num", conf, "err", err)
+			return true
+		}
+	}
+	return true
+}
+
+func (p *proc) latestEmit(ctx context.Context) bool {
+	cl, err := p.emitCl.get(ctx)
+	if err != nil {
+		return false
+	}
+	latest, err := cl.LatestBlockNumber(ctx)
+	if err != nil {
+		log.Error(p.logPre+"Failed to get latest emit head", "err", err)
+		return true
+	}
+	if l := latest.Uint64(); l-p.emitConfNum > p.emitCfg.Confirmations {
+		p.emitConfNum = l - p.emitCfg.Confirmations
+		signer := p.signer.Load().(common.Address)
+		err := p.confirmRequests(ctx, signer)
+		if err != nil {
+			log.Error(p.logPre+"Failed to process new confirmed emit head", "num", p.emitConfNum, "err", err)
+			return true
+		}
+	}
+	return true
 }
 
 // newConfirmedHead processes the new confirmed header at confirmedNum, if possible.
@@ -367,8 +381,6 @@ func (p *proc) signerAdmin(ctx context.Context, signer common.Address, latestSna
 	}
 	p.reqs = reqs
 	p.confsConfNum = confirmedNum
-
-	log.Debug(p.logPre+"Updated pending confirmations", "count", len(p.reqs))
 
 	// Process them.
 	return p.confirmRequests(ctx, signer)
