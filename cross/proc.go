@@ -506,7 +506,7 @@ func (p *proc) confirmRequests(ctx context.Context, signer common.Address) error
 			return fmt.Errorf("failed to get totalConfirmGa: %v", err)
 		}
 		opts.GasLimit *= 2 // Double it to be safe.
-		tx, err := p.confs.Confirm(signerConfirmOpts, r.BlockNum, r.LogIndex, r.EventHash, valid)
+		tx, err := p.confs.Confirm(&opts, r.BlockNum, r.LogIndex, r.EventHash, valid)
 		if err != nil {
 			log.Error(p.logPre+"Failed to confirm event",
 				"num", r.BlockNum.String(), "idx", r.LogIndex.String(),
