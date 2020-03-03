@@ -141,7 +141,6 @@ func crossTest(t *testing.T, signerCount, voterCount int, seeds []common.Address
 	signer := inNodes[0].coinbase
 	inAddr, inConfs := deployConfirmations(t, inClient, signer, ks)
 	exAddr, exConfs := deployConfirmations(t, exClient, signer, ks)
-	time.Sleep(testBlockPeriodSeconds * time.Second)
 
 	internal := cross.NetConfig{
 		Contract:      inAddr,
@@ -351,9 +350,10 @@ func TestCross_confirmations(t *testing.T) {
 		t.Fatal(err)
 	}
 	seeds := []common.Address{crypto.PubkeyToAddress(userKey.PublicKey)}
-	testFn := testCrossConfirmations(t, userKey, 1)
+
 	test := func(signers, voters int) func(t *testing.T) {
 		return func(t *testing.T) {
+			testFn := testCrossConfirmations(t, userKey, 1)
 			crossTest(t, signers, voters, seeds, testFn)
 		}
 	}

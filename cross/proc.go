@@ -46,19 +46,17 @@ type proc struct {
 	logPre            string
 	confsCfg, emitCfg NetConfig
 	keystore          *keystore.KeyStore
-	signer            atomic.Value // common.Address
+	internalCl        cachedClient // Signing network - source of truth for voter/signer set.
+	confsCl           cachedClient // Confirming network.
+	emitCl            cachedClient // Network emitting events to confirm.
 
-	internalCl cachedClient // Signing network - source of truth for voter/signer set.
-	confsCl    cachedClient // Confirming network.
-	emitCl     cachedClient // Network emitting events to confirm.
-
+	signer           atomic.Value // common.Address
 	confs            *Confirmations
 	totalConfirmGas  uint64
 	isContractSigner bool
-
-	confsConfNum uint64
-	emitConfNum  uint64
-	reqs         []ConfirmationRequest
+	confsConfNum     uint64
+	emitConfNum      uint64
+	reqs             []ConfirmationRequest
 }
 
 // run executes the main process, alternating between
