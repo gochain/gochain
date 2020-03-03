@@ -53,6 +53,7 @@ type proc struct {
 	emitCl     cachedClient // Network emitting events to confirm.
 
 	confs            *Confirmations
+	totalConfirmGas  uint64
 	isContractSigner bool
 
 	confsConfNum uint64
@@ -497,9 +498,14 @@ func (p *proc) confirmRequests(ctx context.Context, signer common.Address) error
 			}
 		}
 
-		// Vote.
+		// Confirm.
 		opts := *signerConfirmOpts
 		opts.GasPrice = requestPrice
+		opts.GasLimit, err = p.getTotalConfirmGas(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get totalConfirmGa: %v", err)
+		}
+		opts.GasLimit *= 2 // Double it to be safe.
 		tx, err := p.confs.Confirm(signerConfirmOpts, r.BlockNum, r.LogIndex, r.EventHash, valid)
 		if err != nil {
 			log.Error(p.logPre+"Failed to confirm event",
@@ -514,6 +520,20 @@ func (p *proc) confirmRequests(ctx context.Context, signer common.Address) error
 	log.Info(p.logPre+"Confirmed events", "count", confirmed, "reqs", len(p.reqs))
 
 	return nil
+}
+
+func (p *proc) getTotalConfirmGas(ctx context.Context) (uint64, error) {
+	if p.totalConfirmGas == 0 {
+		totalGas, err := p.confs.TotalConfirmGas(&bind.CallOpts{Context: ctx})
+		if err != nil {
+			return 0, err
+		}
+		if !totalGas.IsUint64() {
+			return 0, fmt.Errorf("total confirm gas overflows uint64: %s", totalGas.String())
+		}
+		p.totalConfirmGas = totalGas.Uint64()
+	}
+	return p.totalConfirmGas, nil
 }
 
 func sleepCtx(ctx context.Context, d time.Duration) error {
