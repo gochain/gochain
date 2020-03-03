@@ -37,6 +37,8 @@ import (
 
 const testBlockPeriodSeconds = 2 // TODO 1 should be possible, but currently causes failures
 
+var oneGwei, _ = new(big.Int).SetString("1000000000", 0)
+
 func init() {
 	log.Root().SetHandler(log.LvlFilterHandler(
 		log.LvlWarn,
@@ -623,7 +625,7 @@ func (f *fixture) testConfirm(t *testing.T) {
 	// Request confirmation of event.
 	hash := cross.HashLog(l)
 	logIdx := new(big.Int).SetUint64(uint64(l.Index))
-	tx = f.requestConfirmation(t, toConfirm.BlockNumber, logIdx, hash)
+	tx = f.requestConfirmation(t, toConfirm.BlockNumber, logIdx, hash, oneGwei)
 	_, requestLog := waitForFirstLog(t, tx, f.confsCl)
 	_ = confirmConfirmationRequested(t, f.confs, requestLog, toConfirm.BlockNumber, logIdx, hash)
 
@@ -664,10 +666,13 @@ func (f *fixture) confirmHash(t *testing.T, block *big.Int, logIdx *big.Int, has
 }
 
 // requestConfirmation submits a tx to request confirmation of an event and returns the tx.
-func (f *fixture) requestConfirmation(t *testing.T, blockNum *big.Int, logIndex *big.Int, hash common.Hash) *types.Transaction {
+func (f *fixture) requestConfirmation(t *testing.T, blockNum *big.Int, logIndex *big.Int, hash common.Hash, minPrice *big.Int) *types.Transaction {
 	price, err := f.confsCl.SuggestGasPrice(context.Background())
 	if err != nil {
 		t.Fatal(err)
+	}
+	if price.Cmp(minPrice) < 0 {
+		price.Set(minPrice)
 	}
 	totalGas, err := f.confs.TotalConfirmGas(nil)
 	if err != nil {
@@ -710,7 +715,7 @@ func (f *fixture) testInvalid(t *testing.T) {
 	test := func(block, logIdx *big.Int, log *types.Log) func(t *testing.T) {
 		hash := cross.HashLog(log)
 		return func(t *testing.T) {
-			tx = f.requestConfirmation(t, block, logIdx, hash)
+			tx = f.requestConfirmation(t, block, logIdx, hash, oneGwei)
 			_, requestLog := waitForFirstLog(t, tx, f.confsCl)
 			_ = confirmConfirmationRequested(t, f.confs, requestLog, block, logIdx, hash)
 

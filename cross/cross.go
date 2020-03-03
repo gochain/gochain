@@ -2,6 +2,7 @@ package cross
 
 import (
 	"context"
+	"math/big"
 	"sync"
 
 	"github.com/gochain/gochain/v3/accounts/keystore"
@@ -32,6 +33,7 @@ func (c *Config) DialRPC() (*rpc.Client, error) {
 type NetConfig struct {
 	Contract      common.Address `toml:",omitempty"` // Address of the Confirmations contract.
 	Confirmations uint64         `toml:",omitempty"` // Number of block confirmations to wait.
+	MinGasPrice   *big.Int       `toml:",omitempty"`
 }
 
 const defaultsConfs = 30
@@ -42,10 +44,12 @@ var DefaultConfig = []Config{
 		Internal: NetConfig{
 			Contract:      common.HexToAddress("0xTODO"),
 			Confirmations: defaultsConfs,
+			MinGasPrice:   new(big.Int).SetUint64(2e9),
 		},
 		External: NetConfig{
 			Contract:      common.HexToAddress("0xTODO"),
 			Confirmations: defaultsConfs,
+			MinGasPrice:   new(big.Int).SetUint64(1e9), //TODO
 		},
 		ExternalURL: "http://ethereum:8545",
 	},
@@ -57,10 +61,12 @@ var TestnetConfig = []Config{
 		Internal: NetConfig{
 			Contract:      common.HexToAddress("0xa803AB92BAd1B3271afa9639417D2D858884c92A"),
 			Confirmations: 5,
+			MinGasPrice:   new(big.Int).SetUint64(2e9),
 		},
 		External: NetConfig{
 			Contract:      common.HexToAddress("0x547Ff2FA8B3E1b857Ef2fe859B960153df9e222a"),
 			Confirmations: 3,
+			MinGasPrice:   new(big.Int).SetUint64(1e9),
 		},
 		ExternalURL: "http://ropsten:8545",
 	},
@@ -70,6 +76,9 @@ func (config *NetConfig) sanitized() NetConfig {
 	c := *config
 	if c.Confirmations == 0 {
 		c.Confirmations = defaultsConfs
+	}
+	if c.MinGasPrice == nil {
+		c.MinGasPrice = big.NewInt(1)
 	}
 	return c
 }

@@ -467,6 +467,15 @@ func (p *proc) confirmRequests(ctx context.Context, signer common.Address) error
 			continue
 		}
 
+		// Ignore underpriced requests.
+		if requestPrice.Cmp(p.confsCfg.MinGasPrice) < 0 {
+			log.Warn(p.logPre+"Requested gas price lower than min",
+				"request", requestPrice.String(), "min", p.confsCfg.MinGasPrice.String(),
+				"num", r.BlockNum.String(), "idx", r.LogIndex.String(),
+				"hash", common.Hash(r.EventHash).Hex())
+			continue
+		}
+
 		// Fetch logs.
 		logs, ok := logsCache[r.BlockNum.Uint64()]
 		if !ok {
@@ -501,7 +510,7 @@ func (p *proc) confirmRequests(ctx context.Context, signer common.Address) error
 		opts.GasPrice = requestPrice
 		opts.GasLimit, err = p.getTotalConfirmGas(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to get totalConfirmGa: %v", err)
+			return fmt.Errorf("failed to get totalConfirmGas: %v", err)
 		}
 		opts.GasLimit *= 2 // Double it to be safe.
 		tx, err := p.confs.Confirm(&opts, r.BlockNum, r.LogIndex, r.EventHash, valid)
