@@ -355,7 +355,7 @@ func TestCross_confirmations(t *testing.T) {
 
 	test := func(signers, voters int) func(t *testing.T) {
 		return func(t *testing.T) {
-			testFn := testCrossConfirmations(t, userKey, 1)
+			testFn := testCrossConfirmations(t, userKey, new(big.Int).SetUint64(2e9))
 			crossTest(t, signers, voters, seeds, testFn)
 		}
 	}
@@ -374,24 +374,25 @@ func TestCross_confirmations(t *testing.T) {
 	//t.Run("50/50", test(50, 50))
 }
 
-func testCrossConfirmations(t *testing.T, userKey *ecdsa.PrivateKey, externalGasFactor int64) func(*C) {
+func testCrossConfirmations(t *testing.T, userKey *ecdsa.PrivateKey, externalMinPrice *big.Int) func(*C) {
 	userOpts := bind.NewKeyedTransactor(userKey)
+	internalMinPrice := new(big.Int).SetUint64(2e9)
 	return func(c *C) {
 		t.Run("import", fixture{
-			userOpts:       userOpts,
-			confs:          c.InConfs,
-			confsCl:        c.InClient,
-			confsGasFactor: big.NewInt(1),
-			emitCl:         c.ExClient,
-			emitGasFactor:  big.NewInt(externalGasFactor),
+			userOpts:      userOpts,
+			confs:         c.InConfs,
+			confsCl:       c.InClient,
+			confsMinPrice: internalMinPrice,
+			emitCl:        c.ExClient,
+			emitMinPrice:  externalMinPrice,
 		}.tests)
 		t.Run("export", fixture{
-			userOpts:       userOpts,
-			confs:          c.ExConfs,
-			confsCl:        c.ExClient,
-			confsGasFactor: big.NewInt(externalGasFactor),
-			emitCl:         c.InClient,
-			emitGasFactor:  big.NewInt(1),
+			userOpts:      userOpts,
+			confs:         c.ExConfs,
+			confsCl:       c.ExClient,
+			confsMinPrice: externalMinPrice,
+			emitCl:        c.InClient,
+			emitMinPrice:  internalMinPrice,
 		}.tests)
 	}
 }
@@ -585,10 +586,10 @@ poll:
 }
 
 type fixture struct {
-	userOpts                      *bind.TransactOpts
-	confs                         *cross.Confirmations
-	confsCl, emitCl               *goclient.Client
-	confsGasFactor, emitGasFactor *big.Int
+	userOpts                    *bind.TransactOpts
+	confs                       *cross.Confirmations
+	confsCl, emitCl             *goclient.Client
+	confsMinPrice, emitMinPrice *big.Int
 
 	mockContract *Test
 }
@@ -612,8 +613,11 @@ func (f *fixture) testConfirm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if price.Cmp(f.emitMinPrice) < 0 {
+		price.Set(f.emitMinPrice)
+	}
 	opts := *f.userOpts
-	opts.GasPrice = new(big.Int).Mul(price, f.emitGasFactor)
+	opts.GasPrice = price
 	tx, err := f.mockContract.Emit(&opts, value, addr, num)
 	if err != nil {
 		t.Fatal(err)
@@ -625,7 +629,7 @@ func (f *fixture) testConfirm(t *testing.T) {
 	// Request confirmation of event.
 	hash := cross.HashLog(l)
 	logIdx := new(big.Int).SetUint64(uint64(l.Index))
-	tx = f.requestConfirmation(t, toConfirm.BlockNumber, logIdx, hash, oneGwei)
+	tx = f.requestConfirmation(t, toConfirm.BlockNumber, logIdx, hash)
 	_, requestLog := waitForFirstLog(t, tx, f.confsCl)
 	_ = confirmConfirmationRequested(t, f.confs, requestLog, toConfirm.BlockNumber, logIdx, hash)
 
@@ -666,13 +670,13 @@ func (f *fixture) confirmHash(t *testing.T, block *big.Int, logIdx *big.Int, has
 }
 
 // requestConfirmation submits a tx to request confirmation of an event and returns the tx.
-func (f *fixture) requestConfirmation(t *testing.T, blockNum *big.Int, logIndex *big.Int, hash common.Hash, minPrice *big.Int) *types.Transaction {
+func (f *fixture) requestConfirmation(t *testing.T, blockNum *big.Int, logIndex *big.Int, hash common.Hash) *types.Transaction {
 	price, err := f.confsCl.SuggestGasPrice(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if price.Cmp(minPrice) < 0 {
-		price.Set(minPrice)
+	if price.Cmp(f.confsMinPrice) < 0 {
+		price.Set(f.confsMinPrice)
 	}
 	totalGas, err := f.confs.TotalConfirmGas(nil)
 	if err != nil {
@@ -680,7 +684,7 @@ func (f *fixture) requestConfirmation(t *testing.T, blockNum *big.Int, logIndex 
 	}
 	reqOpts := *f.userOpts
 	reqOpts.GasLimit = 3000000
-	reqOpts.GasPrice = new(big.Int).Mul(price, f.confsGasFactor)
+	reqOpts.GasPrice = price
 	reqOpts.Value = new(big.Int).Mul(totalGas, reqOpts.GasPrice)
 	tx, err := f.confs.Request(&reqOpts, blockNum, logIndex, hash)
 	if err != nil {
@@ -699,8 +703,11 @@ func (f *fixture) testInvalid(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if price.Cmp(f.emitMinPrice) < 0 {
+		price.Set(f.emitMinPrice)
+	}
 	opts := *f.userOpts
-	opts.GasPrice = new(big.Int).Mul(price, f.emitGasFactor)
+	opts.GasPrice = price
 	tx, err := f.mockContract.Emit(&opts, value, addr, num)
 	if err != nil {
 		t.Fatal(err)
@@ -715,7 +722,7 @@ func (f *fixture) testInvalid(t *testing.T) {
 	test := func(block, logIdx *big.Int, log *types.Log) func(t *testing.T) {
 		hash := cross.HashLog(log)
 		return func(t *testing.T) {
-			tx = f.requestConfirmation(t, block, logIdx, hash, oneGwei)
+			tx = f.requestConfirmation(t, block, logIdx, hash)
 			_, requestLog := waitForFirstLog(t, tx, f.confsCl)
 			_ = confirmConfirmationRequested(t, f.confs, requestLog, block, logIdx, hash)
 
@@ -761,10 +768,12 @@ func (f *fixture) deployMockContract(t *testing.T) *Test {
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	if price.Cmp(f.emitMinPrice) < 0 {
+		price.Set(f.emitMinPrice)
+	}
 	deployOpts := *f.userOpts
 	deployOpts.GasLimit = 1000000
-	deployOpts.GasPrice = new(big.Int).Mul(price, f.emitGasFactor)
+	deployOpts.GasPrice = price
 	_, tx, transactor, err := DeployTest(&deployOpts, f.emitCl)
 	if err != nil {
 		t.Fatal(err)

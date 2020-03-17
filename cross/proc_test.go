@@ -18,7 +18,9 @@ func Test_cachedClientFn_get_timeout(t *testing.T) {
 	if cl != nil {
 		t.Errorf("expected nil client but got: %v", cl)
 	}
-	if err != ctx.Err() {
+	if err == nil {
+		t.Error("expected ctx.Err() but got none")
+	} else if err != ctx.Err() {
 		t.Errorf("expected ctx.Err() but got: %v", err)
 	}
 }
@@ -30,7 +32,9 @@ func Test_cachedClientSettable_get_timeout(t *testing.T) {
 	if cl != nil {
 		t.Errorf("expected nil client but got: %v", cl)
 	}
-	if err != ctx.Err() {
+	if err == nil {
+		t.Error("expected ctx.Err() but got none")
+	} else if err != ctx.Err() {
 		t.Errorf("expected ctx.Err() but got: %v", err)
 	}
 }

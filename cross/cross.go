@@ -59,12 +59,12 @@ var DefaultConfig = []Config{
 var TestnetConfig = []Config{
 	{
 		Internal: NetConfig{
-			Contract:      common.HexToAddress("0xa803AB92BAd1B3271afa9639417D2D858884c92A"),
+			Contract:      common.HexToAddress("0x92B7329C1066be06707ea811346C9eEC56706A45"),
 			Confirmations: 5,
 			MinGasPrice:   new(big.Int).SetUint64(2e9),
 		},
 		External: NetConfig{
-			Contract:      common.HexToAddress("0x547Ff2FA8B3E1b857Ef2fe859B960153df9e222a"),
+			Contract:      common.HexToAddress("0x2acfcce7cc4c59e263af6a0d92a91520b7c7eac8"),
 			Confirmations: 3,
 			MinGasPrice:   new(big.Int).SetUint64(1e9),
 		},

@@ -121,7 +121,9 @@ func (self *Miner) update() {
 func (self *Miner) Start(coinbase common.Address, rpcClient *rpc.Client) {
 	atomic.StoreInt32(&self.shouldStart, 1)
 	self.SetEtherbase(coinbase)
-	self.SetInternalClient(rpcClient)
+	if rpcClient != nil {
+		self.SetInternalClient(rpcClient)
+	}
 
 	if atomic.LoadInt32(&self.canStart) == 0 {
 		log.Info("Network syncing, will start miner afterwards")
@@ -186,7 +188,10 @@ func (self *Miner) SetEtherbase(addr common.Address) {
 }
 
 func (self *Miner) SetInternalClient(rpcClient *rpc.Client) {
-	cl := goclient.NewClient(rpcClient)
+	var cl *goclient.Client
+	if rpcClient != nil {
+		cl = goclient.NewClient(rpcClient)
+	}
 	for _, cr := range self.cross {
 		cr.SetInternalClient(cl)
 	}

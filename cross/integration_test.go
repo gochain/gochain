@@ -3,6 +3,7 @@
 package cross_test
 
 import (
+	"math/big"
 	"os"
 	"testing"
 
@@ -26,7 +27,7 @@ func TestIntegration(t *testing.T) {
 	cfg.ExternalURL = "http://localhost:8545"
 	c, close := dialConfig(t, cfg)
 	defer close()
-	testCrossConfirmations(t, userKey.PrivateKey(), 10)(c)
+	testCrossConfirmations(t, userKey.PrivateKey(), new(big.Int).SetUint64(1e9))(c)
 }
 
 func dialConfig(t *testing.T, cfg cross.Config) (*C, func()) {

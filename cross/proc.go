@@ -578,7 +578,7 @@ func (c *cachedClientFn) get(ctx context.Context) (*goclient.Client, error) {
 	defer c.mu.Unlock()
 	for c.cl == nil {
 		rpc, err := c.fn()
-		if err != nil {
+		if err != nil || rpc == nil {
 			log.Warn("Failed to create rpc client", "err", err)
 			if sleepCtx(ctx, time.Second) != nil {
 				return nil, ctx.Err()
@@ -598,7 +598,7 @@ type cachedClientSettable struct {
 
 func (c *cachedClientSettable) get(ctx context.Context) (*goclient.Client, error) {
 	l := c.val.Load()
-	for l == nil {
+	for l == nil || l.(*goclient.Client) == nil {
 		if sleepCtx(ctx, time.Second) != nil {
 			return nil, ctx.Err()
 		}
