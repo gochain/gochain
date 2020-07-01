@@ -464,12 +464,15 @@ func (c *Client) Subscribe(ctx context.Context, namespace string, channel interf
 }
 
 func (c *Client) newMessage(method string, paramsIn ...interface{}) (*jsonrpcMessage, error) {
-	if paramsIn != nil {
-		params, err := json.Marshal(paramsIn)
-		if err != nil {
-			return nil, err
-		}
+	
+	params, err := json.Marshal(paramsIn)
+	if err != nil {
+		return nil, err
 	}
+	if len(paramsIn) == 1 && paramsIn[0] == nil {
+		params = []byte{}
+	}
+	
 	return &jsonrpcMessage{Version: "2.0", ID: c.nextID(), Method: method, Params: params}, nil
 }
 
