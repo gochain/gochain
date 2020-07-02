@@ -103,9 +103,12 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 	if dec.Voters != nil {
 		h.Voters = dec.Voters
 	}
+	/*
 	if dec.Signer == nil {
 		return errors.New("missing required field 'signer' for Header")
 	}
+	*/
+	
 	h.Signer = *dec.Signer
 	if dec.Root == nil {
 		return errors.New("missing required field 'stateRoot' for Header")
@@ -114,6 +117,7 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 	if dec.TxHash == nil {
 		return errors.New("missing required field 'transactionsRoot' for Header")
 	}
+	
 	h.TxHash = *dec.TxHash
 	if dec.ReceiptHash == nil {
 		return errors.New("missing required field 'receiptsRoot' for Header")
