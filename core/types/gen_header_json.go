@@ -109,7 +109,7 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 	}
 	*/
 	
-	h.Signer = *dec.Signer
+	//h.Signer = *dec.Signer
 	if dec.Root == nil {
 		return errors.New("missing required field 'stateRoot' for Header")
 	}
