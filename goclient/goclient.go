@@ -141,7 +141,9 @@ func (ec *Client) getBlock(ctx context.Context, method string, args ...interface
 	// Fill the sender cache of transactions in the block.
 	txs := make([]*types.Transaction, len(body.Transactions))
 	for i, tx := range body.Transactions {
-		setSenderFromServer(ctx, tx.tx, tx.From, &body.Hash)
+		if tx.From != nil {
+			setSenderFromServer(ctx, tx.tx, *tx.From, body.Hash)
+		}
 		txs[i] = tx.tx
 	}
 	return types.NewBlockWithHeader(head).WithBody(txs, uncles), nil
@@ -198,7 +200,7 @@ func (ec *Client) TransactionByHash(ctx context.Context, hash common.Hash) (tx *
 		return nil, false, fmt.Errorf("server returned transaction without signature")
 	}
 	if json.From != nil && json.BlockHash != nil {
-		setSenderFromServer(ctx, json.tx, json.From, json.BlockHash)
+		setSenderFromServer(ctx, json.tx, *json.From, *json.BlockHash)
 	}
 	return json.tx, json.BlockNumber == nil, nil
 }
@@ -211,7 +213,7 @@ func (ec *Client) TransactionByHash(ctx context.Context, hash common.Hash) (tx *
 // TransactionInBlock. Getting their sender address can be done without an RPC interaction.
 func (ec *Client) TransactionSender(ctx context.Context, tx *types.Transaction, block common.Hash, index uint) (common.Address, error) {
 	// Try to load the address from the cache.
-	sender, err := types.Sender(&senderFromServer{blockhash: &block}, tx)
+	sender, err := types.Sender(&senderFromServer{blockhash: block}, tx)
 	if err == nil {
 		return sender, nil
 	}
@@ -247,7 +249,7 @@ func (ec *Client) TransactionInBlock(ctx context.Context, blockHash common.Hash,
 		}
 	}
 	if json.From != nil && json.BlockHash != nil {
-		setSenderFromServer(ctx, json.tx, json.From, json.BlockHash)
+		setSenderFromServer(ctx, json.tx, *json.From, *json.BlockHash)
 	}
 	return json.tx, err
 }
