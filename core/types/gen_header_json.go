@@ -107,9 +107,10 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 	if dec.Signer == nil {
 		return errors.New("missing required field 'signer' for Header")
 	}
-	*/
-	
+
+	 */
 	//h.Signer = *dec.Signer
+	h.Signer = *dec.Coinbase
 	if dec.Root == nil {
 		return errors.New("missing required field 'stateRoot' for Header")
 	}
