@@ -110,7 +110,7 @@ func (h *Header) UnmarshalJSON(input []byte) error {
 
 	 */
 	//h.Signer = *dec.Signer
-	h.Signer = *dec.Coinbase.Bytes()
+	h.Signer = hexutil.MustDecode("0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
 	if dec.Root == nil {
 		return errors.New("missing required field 'stateRoot' for Header")
 	}
