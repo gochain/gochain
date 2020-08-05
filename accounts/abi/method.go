@@ -23,6 +23,11 @@ import (
 	"github.com/gochain/gochain/v3/crypto"
 )
 
+const (
+	MutabilityView = "view"
+	MutabilityPure = "pure"
+)
+
 // Method represents a callable given a `Name` and whether the method is a constant.
 // If the method is `Const` no transaction needs to be created for this
 // particular Method call. It can easily be simulated using a local VM.
@@ -43,10 +48,11 @@ type Method struct {
 	// will be resolved as foo0.
 	Name string
 	// RawName is the raw method name parsed from ABI.
-	RawName string
-	Const   bool
-	Inputs  Arguments
-	Outputs Arguments
+	RawName         string
+	Const           bool
+	StateMutability string
+	Inputs          Arguments
+	Outputs         Arguments
 }
 
 // Sig returns the methods string signature according to the ABI spec.
