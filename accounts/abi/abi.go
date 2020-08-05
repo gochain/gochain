@@ -126,6 +126,7 @@ func (abi *ABI) UnmarshalJSON(data []byte) error {
 		case "constructor":
 			abi.Constructor = Method{
 				Inputs: field.Inputs,
+				StateMutability: field.StateMutability,
 			}
 		// empty defaults to function according to the abi spec
 		case "function", "":
