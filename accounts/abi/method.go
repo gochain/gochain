@@ -24,8 +24,10 @@ import (
 )
 
 const (
-	MutabilityView = "view"
-	MutabilityPure = "pure"
+	MutabilityView       = "view"
+	MutabilityPure       = "pure"
+	MutabilityPayable    = "payable"
+	MutabilityNonPayable = "non-payable"
 )
 
 // Method represents a callable given a `Name` and whether the method is a constant.
