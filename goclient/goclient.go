@@ -199,7 +199,6 @@ func (ec *Client) TransactionByHash(ctx context.Context, hash common.Hash) (tx *
 	} else if _, r, _ := json.tx.RawSignatureValues(); r == nil {
 		return nil, false, fmt.Errorf("server returned transaction without signature")
 	}
-	fmt.Printf("json: %+v\n", json.From)
 	if json.From != nil && json.BlockHash != nil {
 		setSenderFromServer(ctx, json.tx, *json.From, *json.BlockHash)
 	}
