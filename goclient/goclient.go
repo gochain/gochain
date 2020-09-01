@@ -199,10 +199,34 @@ func (ec *Client) TransactionByHash(ctx context.Context, hash common.Hash) (tx *
 	} else if _, r, _ := json.tx.RawSignatureValues(); r == nil {
 		return nil, false, fmt.Errorf("server returned transaction without signature")
 	}
+	fmt.Printf("json: %+v\n", json.From)
 	if json.From != nil && json.BlockHash != nil {
 		setSenderFromServer(ctx, json.tx, *json.From, *json.BlockHash)
 	}
 	return json.tx, json.BlockNumber == nil, nil
+}
+
+type TransactionFull struct {
+	Tx   *types.Transaction
+	From *common.Address `json:"from,omitempty"`
+}
+
+// TransactionByHashFull returns the transaction with the given hash with extra data included such as From
+func (ec *Client) TransactionByHashFull(ctx context.Context, hash common.Hash) (tx *TransactionFull, isPending bool, err error) {
+	var json *rpcTransaction
+	err = ec.c.CallContext(ctx, &json, "eth_getTransactionByHash", hash)
+	if err != nil {
+		return nil, false, err
+	} else if json == nil {
+		return nil, false, gochain.NotFound
+	} else if _, r, _ := json.tx.RawSignatureValues(); r == nil {
+		return nil, false, fmt.Errorf("server returned transaction without signature")
+	}
+	if json.From != nil && json.BlockHash != nil {
+		setSenderFromServer(ctx, json.tx, *json.From, *json.BlockHash)
+	}
+
+	return &TransactionFull{Tx: json.tx, From: json.From}, json.BlockNumber == nil, nil
 }
 
 // TransactionSender returns the sender address of the given transaction. The transaction
