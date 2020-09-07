@@ -206,8 +206,8 @@ func (ec *Client) TransactionByHash(ctx context.Context, hash common.Hash) (tx *
 }
 
 type TransactionFull struct {
-	Tx   *types.Transaction
-	From *common.Address `json:"from,omitempty"`
+	types.Transaction
+	txExtraInfo
 }
 
 // TransactionByHashFull returns the transaction with the given hash with extra data included such as From
@@ -225,7 +225,7 @@ func (ec *Client) TransactionByHashFull(ctx context.Context, hash common.Hash) (
 		setSenderFromServer(ctx, json.tx, *json.From, *json.BlockHash)
 	}
 
-	return &TransactionFull{Tx: json.tx, From: json.From}, json.BlockNumber == nil, nil
+	return &TransactionFull{Transaction: *json.tx, txExtraInfo: txExtraInfo{From: json.From, BlockHash: json.BlockHash, BlockNumber: json.BlockNumber}}, json.BlockNumber == nil, nil
 }
 
 // TransactionSender returns the sender address of the given transaction. The transaction
