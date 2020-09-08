@@ -205,6 +205,29 @@ func (ec *Client) TransactionByHash(ctx context.Context, hash common.Hash) (tx *
 	return json.tx, json.BlockNumber == nil, nil
 }
 
+type TransactionFull struct {
+	types.Transaction
+	txExtraInfo
+}
+
+// TransactionByHashFull returns the transaction with the given hash with extra data included such as From
+func (ec *Client) TransactionByHashFull(ctx context.Context, hash common.Hash) (tx *TransactionFull, isPending bool, err error) {
+	var json *rpcTransaction
+	err = ec.c.CallContext(ctx, &json, "eth_getTransactionByHash", hash)
+	if err != nil {
+		return nil, false, err
+	} else if json == nil {
+		return nil, false, gochain.NotFound
+	} else if _, r, _ := json.tx.RawSignatureValues(); r == nil {
+		return nil, false, fmt.Errorf("server returned transaction without signature")
+	}
+	if json.From != nil && json.BlockHash != nil {
+		setSenderFromServer(ctx, json.tx, *json.From, *json.BlockHash)
+	}
+
+	return &TransactionFull{Transaction: *json.tx, txExtraInfo: txExtraInfo{From: json.From, BlockHash: json.BlockHash, BlockNumber: json.BlockNumber}}, json.BlockNumber == nil, nil
+}
+
 // TransactionSender returns the sender address of the given transaction. The transaction
 // must be known to the remote node and included in the blockchain at the given block and
 // index. The sender is the one derived by the protocol at the time of inclusion.
