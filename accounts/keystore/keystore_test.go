@@ -24,11 +24,14 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/gochain/gochain/v3/accounts"
 	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/crypto"
 )
 
 var testSigData = make([]byte, 32)
@@ -218,7 +221,7 @@ func TestSignRace(t *testing.T) {
 // Tests that the wallet notifier loop starts and stops correctly based on the
 // addition and removal of wallet event subscriptions.
 func TestWalletNotifierLifecycle(t *testing.T) {
-	// Create a temporary keystore to test with
+	// Create a temporary kesytore to test with
 	dir, ks := tmpKeyStore(t, false)
 	defer os.RemoveAll(dir)
 
@@ -337,6 +340,88 @@ func TestWalletNotifications(t *testing.T) {
 	checkEvents(t, wantEvents, events)
 }
 
+// TestImportExport tests the import functionality of a keystore.
+func TestImportECDSA(t *testing.T) {
+	dir, ks := tmpKeyStore(t, true)
+	defer os.RemoveAll(dir)
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", key)
+	}
+	if _, err = ks.ImportECDSA(key, "old"); err != nil {
+		t.Errorf("importing failed: %v", err)
+	}
+	if _, err = ks.ImportECDSA(key, "old"); err == nil {
+		t.Errorf("importing same key twice succeeded")
+	}
+	if _, err = ks.ImportECDSA(key, "new"); err == nil {
+		t.Errorf("importing same key twice succeeded")
+	}
+}
+
+// TestImportECDSA tests the import and export functionality of a keystore.
+func TestImportExport(t *testing.T) {
+	dir, ks := tmpKeyStore(t, true)
+	defer os.RemoveAll(dir)
+	acc, err := ks.NewAccount("old")
+	if err != nil {
+		t.Fatalf("failed to create account: %v", acc)
+	}
+	json, err := ks.Export(acc, "old", "new")
+	if err != nil {
+		t.Fatalf("failed to export account: %v", acc)
+	}
+	dir2, ks2 := tmpKeyStore(t, true)
+	defer os.RemoveAll(dir2)
+	if _, err = ks2.Import(json, "old", "old"); err == nil {
+		t.Errorf("importing with invalid password succeeded")
+	}
+	acc2, err := ks2.Import(json, "new", "new")
+	if err != nil {
+		t.Errorf("importing failed: %v", err)
+	}
+	if acc.Address != acc2.Address {
+		t.Error("imported account does not match exported account")
+	}
+	if _, err = ks2.Import(json, "new", "new"); err == nil {
+		t.Errorf("importing a key twice succeeded")
+	}
+
+}
+
+// TestImportRace tests the keystore on races.
+// This test should fail under -race if importing races.
+func TestImportRace(t *testing.T) {
+	dir, ks := tmpKeyStore(t, true)
+	defer os.RemoveAll(dir)
+	acc, err := ks.NewAccount("old")
+	if err != nil {
+		t.Fatalf("failed to create account: %v", acc)
+	}
+	json, err := ks.Export(acc, "old", "new")
+	if err != nil {
+		t.Fatalf("failed to export account: %v", acc)
+	}
+	dir2, ks2 := tmpKeyStore(t, true)
+	defer os.RemoveAll(dir2)
+	var atom uint32
+	var wg sync.WaitGroup
+	wg.Add(2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			defer wg.Done()
+			if _, err := ks2.Import(json, "new", "new"); err != nil {
+				atomic.AddUint32(&atom, 1)
+			}
+
+		}()
+	}
+	wg.Wait()
+	if atom != 1 {
+		t.Errorf("Import is racy")
+	}
+}
+
 // checkAccounts checks that all known live accounts are present in the wallet list.
 func checkAccounts(t *testing.T, live map[common.Address]accounts.Account, wallets []accounts.Wallet) {
 	if len(live) != len(wallets) {
@@ -378,9 +463,9 @@ func tmpKeyStore(t *testing.T, encrypted bool) (string, *KeyStore) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	newKS := NewPlaintextKeyStore
+	newKs := NewPlaintextKeyStore
 	if encrypted {
-		newKS = func(kd string) *KeyStore { return NewKeyStore(kd, veryLightScryptN, veryLightScryptP) }
+		newKs = func(kd string) *KeyStore { return NewKeyStore(kd, veryLightScryptN, veryLightScryptP) }
 	}
-	return d, newKS(d)
+	return d, newKs(d)
 }

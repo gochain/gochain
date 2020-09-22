@@ -42,6 +42,13 @@ const (
 // HexOrDecimal256 marshals big.Int as hex or decimal.
 type HexOrDecimal256 big.Int
 
+// NewHexOrDecimal256 creates a new HexOrDecimal256
+func NewHexOrDecimal256(x int64) *HexOrDecimal256 {
+	b := big.NewInt(x)
+	h := HexOrDecimal256(*b)
+	return &h
+}
+
 // UnmarshalText implements encoding.TextUnmarshaler.
 func (i *HexOrDecimal256) UnmarshalText(input []byte) error {
 	bigint, ok := ParseBig256(string(input))
@@ -177,6 +184,12 @@ func U256(x *big.Int) *big.Int {
 	return x.And(x, tt256m1)
 }
 
+// U256Bytes converts a big Int into a 256bit EVM number.
+// This operation is destructive.
+func U256Bytes(n *big.Int) []byte {
+	return PaddedBigBytes(U256(n), 32)
+}
+
 // S256 interprets x as a two's complement number.
 // x must not exceed 256 bits (the result is undefined if it does) and is not modified.
 //
@@ -187,9 +200,8 @@ func U256(x *big.Int) *big.Int {
 func S256(x *big.Int) *big.Int {
 	if x.Cmp(tt255) < 0 {
 		return x
-	} else {
-		return new(big.Int).Sub(x, tt256)
 	}
+	return new(big.Int).Sub(x, tt256)
 }
 
 // Exp implements exponentiation by squaring.

@@ -26,9 +26,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gochain/gochain/v3/console/prompt"
+
 	"github.com/gochain/gochain/v3/cmd/utils"
 	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/console"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/state"
 	"github.com/gochain/gochain/v3/core/types"
@@ -357,7 +358,7 @@ func removeDB(ctx *cli.Context) error {
 		}
 		// Confirm removal and execute
 		fmt.Println(dbdir)
-		confirm, err := console.Stdin.PromptConfirm("Remove this database?")
+		confirm, err := prompt.Stdin.PromptConfirm("Remove this database?")
 		switch {
 		case err != nil:
 			utils.Fatalf("%v", err)
