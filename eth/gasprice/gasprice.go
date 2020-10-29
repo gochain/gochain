@@ -22,6 +22,8 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/gochain/gochain/v3/log"
+
 	"github.com/gochain/gochain/v3/common"
 	"github.com/gochain/gochain/v3/core/types"
 	"github.com/gochain/gochain/v3/params"
@@ -29,89 +31,109 @@ import (
 )
 
 var (
-	Default  = new(big.Int).SetUint64(2 * params.Shannon)
-	maxPrice = big.NewInt(500 * params.Shannon)
+	Default         = new(big.Int).SetUint64(2 * params.Shannon)
+	DefaultMaxPrice = big.NewInt(500000 * params.Shannon)
 )
-
-// Backend is a subset of the methods from the interface ethapi.Backend.
-type Backend interface {
-	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error)
-	BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error)
-	ChainConfig() *params.ChainConfig
-}
 
 type Config struct {
 	Blocks     int
 	Percentile int
 	Default    *big.Int `toml:",omitempty"`
+	MaxPrice   *big.Int `toml:",omitempty"`
+}
+
+// OracleBackend includes all necessary background APIs for oracle.
+type OracleBackend interface {
+	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error)
+	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
+	ChainConfig() *params.ChainConfig
 }
 
 // Oracle recommends gas prices based on the content of recent
 // blocks. Suitable for both light and full clients.
 type Oracle struct {
-	backend Backend
-	cfg     Config
-
-	lastMu    sync.RWMutex
+	backend   OracleBackend
 	lastHead  common.Hash
 	lastPrice *big.Int
-
+	maxPrice  *big.Int
+	cacheLock sync.RWMutex
 	fetchLock sync.Mutex
+
+	checkBlocks int
+	percentile  int
 }
 
-// NewOracle returns a new oracle.
-func NewOracle(backend Backend, cfg Config) *Oracle {
-	if cfg.Blocks < 1 {
-		cfg.Blocks = 1
+// NewOracle returns a new gasprice oracle which can recommend suitable
+// gasprice for newly created transaction.
+func NewOracle(backend OracleBackend, params Config) *Oracle {
+	blocks := params.Blocks
+	if blocks < 1 {
+		blocks = 1
+		log.Warn("Sanitizing invalid gasprice oracle sample blocks", "provided", params.Blocks, "updated", blocks)
 	}
-	if cfg.Percentile < 0 {
-		cfg.Percentile = 0
-	} else if cfg.Percentile > 100 {
-		cfg.Percentile = 100
+	percent := params.Percentile
+	if percent < 0 {
+		percent = 0
+		log.Warn("Sanitizing invalid gasprice oracle sample percentile", "provided", params.Percentile, "updated", percent)
 	}
-	if cfg.Default == nil {
-		cfg.Default = Default
+	if percent > 100 {
+		percent = 100
+		log.Warn("Sanitizing invalid gasprice oracle sample percentile", "provided", params.Percentile, "updated", percent)
+	}
+	maxPrice := params.MaxPrice
+	if maxPrice == nil || maxPrice.Int64() <= 0 {
+		maxPrice = DefaultMaxPrice
+		log.Warn("Sanitizing invalid gasprice oracle price cap", "provided", params.MaxPrice, "updated", maxPrice)
+	}
+	lastPrice := params.Default
+	if lastPrice == nil {
+		lastPrice = Default
+	} else if maxPrice.Int64() <= 0 {
+		lastPrice = Default
+		log.Warn("Sanitizing invalid gasprice oracle price default", "provided", params.Default, "updated", lastPrice)
 	}
 	return &Oracle{
-		backend: backend,
-		cfg:     cfg,
+		backend:     backend,
+		lastPrice:   lastPrice,
+		maxPrice:    maxPrice,
+		checkBlocks: blocks,
+		percentile:  percent,
 	}
 }
 
-// SuggestPrice returns the recommended gas price.
+// SuggestPrice returns a gasprice so that newly created transaction can
+// have a very high chance to be included in the following blocks.
 func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
-	gpo.lastMu.RLock()
-	lastHead := gpo.lastHead
-	lastPrice := gpo.lastPrice
-	gpo.lastMu.RUnlock()
-
 	head, _ := gpo.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	headHash := head.Hash()
+
+	// If the latest gasprice is still available, return it.
+	gpo.cacheLock.RLock()
+	lastHead, lastPrice := gpo.lastHead, gpo.lastPrice
+	gpo.cacheLock.RUnlock()
 	if headHash == lastHead {
 		return lastPrice, nil
 	}
-
 	gpo.fetchLock.Lock()
 	defer gpo.fetchLock.Unlock()
 
-	// try checking the cache again, maybe the last fetch fetched what we need
-	gpo.lastMu.RLock()
-	lastHead = gpo.lastHead
-	lastPrice = gpo.lastPrice
-	gpo.lastMu.RUnlock()
+	// Try checking the cache again, maybe the last fetch fetched what we need
+	gpo.cacheLock.RLock()
+	lastHead, lastPrice = gpo.lastHead, gpo.lastPrice
+	gpo.cacheLock.RUnlock()
 	if headHash == lastHead {
 		return lastPrice, nil
 	}
 
 	// Calculate block prices concurrently.
-	results := make(chan result, gpo.cfg.Blocks)
+	results := make(chan result, gpo.checkBlocks)
 	blocks := 0
-	for blockNum := head.Number.Uint64(); blocks < gpo.cfg.Blocks && blockNum > 0; blockNum-- {
+	for blockNum := head.Number.Uint64(); blocks < gpo.checkBlocks && blockNum > 0; blockNum-- {
 		blocks++
 		go gpo.fetchMinBlockPrice(ctx, blockNum, results)
 	}
 	if blocks == 0 {
-		return gpo.cfg.Default, nil
+		return lastPrice, nil
 	}
 
 	// Collect results.
@@ -119,24 +141,22 @@ func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 	for i := 0; i < blocks; i++ {
 		res := <-results
 		if res.err != nil {
-			return gpo.cfg.Default, res.err
+			return lastPrice, res.err
 		}
 		if res.price == nil {
-			res.price = gpo.cfg.Default
+			res.price = lastPrice
 		}
 		blockPrices[i] = res.price
 	}
 	sort.Sort(bigIntArray(blockPrices))
-	price := blockPrices[(len(blockPrices)-1)*gpo.cfg.Percentile/100]
-
-	if price.Cmp(maxPrice) > 0 {
-		price = new(big.Int).Set(maxPrice)
+	price := blockPrices[(len(blockPrices)-1)*gpo.percentile/100]
+	if price.Cmp(gpo.maxPrice) > 0 {
+		price = new(big.Int).Set(gpo.maxPrice)
 	}
-
-	gpo.lastMu.Lock()
+	gpo.cacheLock.Lock()
 	gpo.lastHead = headHash
 	gpo.lastPrice = price
-	gpo.lastMu.Unlock()
+	gpo.cacheLock.Unlock()
 	return price, nil
 }
 
