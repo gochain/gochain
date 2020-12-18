@@ -244,7 +244,7 @@ type suggestPriceTest struct {
 	name    string
 	exp     uint64
 	params  Config
-	backend Backend
+	backend OracleBackend
 }
 
 func (test *suggestPriceTest) run(t *testing.T) {
@@ -274,7 +274,7 @@ type tx struct {
 	local bool
 }
 
-func newTestBackend(blockSpec ...block) Backend {
+func newTestBackend(blockSpec ...block) OracleBackend {
 	number := rand.Intn(1000)
 	localKey, _ := crypto.GenerateKey()
 	localAddr := crypto.PubkeyToAddress(localKey.PublicKey)
