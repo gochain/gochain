@@ -181,7 +181,7 @@ func (gpo *Oracle) minPrice(num *big.Int) *big.Int {
 	if gpo.defaultPrice != nil {
 		return gpo.defaultPrice
 	}
-	const blockOffset = 12 // look ~1 minute ahead, since we are suggesting gas for near-future txs
+	const blockOffset = 60 * 12 // look ~1 hour ahead, since we are suggesting gas for near-future txs
 	return DefaultFn(gpo.backend.ChainConfig())(new(big.Int).Add(big.NewInt(blockOffset), num))
 }
 
