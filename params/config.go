@@ -61,7 +61,8 @@ var (
 		ByzantiumBlock:      big.NewInt(0),
 		ConstantinopleBlock: big.NewInt(4081350),
 		PetersburgBlock:     nil,
-		DarvazaBlock:        nil,
+		DarvazaBlock:        nil, //TODO
+		DarvazaDefaultGas:   new(big.Int).SetUint64(2000 * Shannon),
 
 		Clique: DefaultCliqueConfig(),
 	}
@@ -103,6 +104,7 @@ type ChainConfig struct {
 	ConstantinopleBlock *big.Int `json:"constantinopleBlock,omitempty"` // Constantinople switch block (nil = no fork, 0 = already activated)
 	PetersburgBlock     *big.Int `json:"petersburgBlock,omitempty"`     // Petersburg switch block (nil = same as Constantinople)
 	DarvazaBlock        *big.Int `json:"darvazaBlock,omitempty"`        // Darvaza switch block (nil = no fork, 0 = already activated)
+	DarvazaDefaultGas   *big.Int `json:"darvazaDefaultGas,omitempty"`   // Darvaza default gas value (nil = no change)
 	EWASMBlock          *big.Int `json:"ewasmBlock,omitempty"`          // EWASM switch block (nil = no fork, 0 = already activated)
 
 	// Various consensus engines

@@ -82,7 +82,7 @@ type GoChain struct {
 	ApiBackend *EthApiBackend
 
 	miner     *miner.Miner
-	gasPrice  *big.Int
+	gasPrice  *big.Int // nil for default/dynamic
 	etherbase common.Address
 
 	networkId     uint64

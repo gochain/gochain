@@ -139,7 +139,7 @@ type TxPoolConfig struct {
 	NoLocals  bool             `toml:",omitempty"` // Whether local transaction handling should be disabled
 	Journal   string           `toml:",omitempty"` // Journal of local transactions to survive node restarts
 	Rejournal time.Duration    `toml:",omitempty"` // Time interval to regenerate the local transaction journal
-
+	// 0 for default/dynamic
 	PriceLimit uint64 `toml:",omitempty"` // Minimum gas price to enforce for acceptance into the pool
 	PriceBump  uint64 `toml:",omitempty"` // Minimum price bump percentage to replace an already existing transaction (nonce)
 
@@ -157,7 +157,7 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	Journal:   "transactions.rlp",
 	Rejournal: time.Hour,
 
-	PriceLimit: gasprice.Default.Uint64(),
+	PriceLimit: 0,
 	PriceBump:  10,
 
 	AccountSlots: 8192,
@@ -175,10 +175,6 @@ func (config *TxPoolConfig) sanitize() TxPoolConfig {
 	if conf.Rejournal < time.Second {
 		log.Warn("Sanitizing invalid txpool journal time", "provided", conf.Rejournal, "updated", time.Second)
 		conf.Rejournal = time.Second
-	}
-	if conf.PriceLimit < 1 {
-		log.Warn("Sanitizing invalid txpool price limit", "provided", conf.PriceLimit, "updated", DefaultTxPoolConfig.PriceLimit)
-		conf.PriceLimit = DefaultTxPoolConfig.PriceLimit
 	}
 	if conf.PriceBump < 1 {
 		log.Warn("Sanitizing invalid txpool price bump", "provided", conf.PriceBump, "updated", DefaultTxPoolConfig.PriceBump)
@@ -231,6 +227,7 @@ type TxPool struct {
 	mu     sync.RWMutex
 
 	currentState  *state.StateDB      // Current state in the blockchain head
+	currentNum    *big.Int            // Current block number of blockchain head
 	pendingState  *state.ManagedState // Pending state tracking virtual nonces
 	currentMaxGas uint64              // Current gas limit for transaction caps
 
@@ -336,9 +333,6 @@ func (pool *TxPool) loop() {
 			}
 			if ev.Block != nil {
 				pool.mu.Lock()
-				if pool.chainconfig.IsHomestead(ev.Block.Number()) {
-					pool.homestead = true
-				}
 				pool.reset(head, ev.Block)
 				head = ev.Block
 				pool.mu.Unlock()
@@ -536,6 +530,13 @@ func (pool *TxPool) reset(oldBlock, newBlock *types.Block) {
 	if newBlock == nil {
 		newBlock = pool.chain.CurrentBlock() // Special case during testing
 	}
+	pool.currentNum = newBlock.Number()
+	if pool.chainconfig.IsHomestead(pool.currentNum) {
+		pool.homestead = true
+	}
+	if pool.config.PriceLimit < 1 {
+		pool.gasPrice = gasprice.DefaultFn(pool.chainconfig)(pool.currentNum)
+	}
 	statedb, err := pool.chain.StateAt(newBlock.Root())
 	if err != nil {
 		log.Error("Failed to reset txpool state", "err", err)
@@ -610,7 +611,13 @@ func (pool *TxPool) SetGasPrice(price *big.Int) {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
-	pool.gasPrice = price
+	if price == nil {
+		pool.config.PriceLimit = 0
+		pool.gasPrice = gasprice.DefaultFn(pool.chainconfig)(pool.currentNum)
+	} else {
+		pool.config.PriceLimit = price.Uint64()
+		pool.gasPrice = price
+	}
 	pool.all.ForEach(func(tx *types.Transaction) {
 		if tx.CmpGasPrice(price) < 0 && !pool.locals.containsTx(tx) {
 			pool.removeTx(tx)

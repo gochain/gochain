@@ -31,14 +31,27 @@ import (
 )
 
 var (
+	// Deprecated: use DefaultFn
 	Default         = new(big.Int).SetUint64(2 * params.Shannon)
 	DefaultMaxPrice = big.NewInt(500000 * params.Shannon)
 )
 
+// DefaultFn returns a function to return the default gas price at a given block.
+func DefaultFn(config *params.ChainConfig) func(*big.Int) *big.Int {
+	return func(num *big.Int) *big.Int {
+		if config.IsDarvaza(num) {
+			if g := config.DarvazaDefaultGas; g != nil {
+				return g
+			}
+		}
+		return Default
+	}
+}
+
 type Config struct {
 	Blocks     int
 	Percentile int
-	Default    *big.Int `toml:",omitempty"`
+	Default    *big.Int `toml:",omitempty"` // nil for default/dynamic
 	MaxPrice   *big.Int `toml:",omitempty"`
 }
 
@@ -52,12 +65,13 @@ type OracleBackend interface {
 // Oracle recommends gas prices based on the content of recent
 // blocks. Suitable for both light and full clients.
 type Oracle struct {
-	backend   OracleBackend
-	lastHead  common.Hash
-	lastPrice *big.Int
-	maxPrice  *big.Int
-	cacheLock sync.RWMutex
-	fetchLock sync.Mutex
+	backend      OracleBackend
+	lastHead     common.Hash
+	defaultPrice *big.Int // optional user-configured default/min
+	lastPrice    *big.Int
+	maxPrice     *big.Int
+	cacheLock    sync.RWMutex
+	fetchLock    sync.Mutex
 
 	checkBlocks int
 	percentile  int
@@ -93,11 +107,12 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 		log.Warn("Sanitizing invalid gasprice oracle price default", "provided", params.Default, "updated", lastPrice)
 	}
 	return &Oracle{
-		backend:     backend,
-		lastPrice:   lastPrice,
-		maxPrice:    maxPrice,
-		checkBlocks: blocks,
-		percentile:  percent,
+		backend:      backend,
+		defaultPrice: params.Default,
+		lastPrice:    lastPrice,
+		maxPrice:     maxPrice,
+		checkBlocks:  blocks,
+		percentile:   percent,
 	}
 }
 
@@ -152,12 +167,22 @@ func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 	price := blockPrices[(len(blockPrices)-1)*gpo.percentile/100]
 	if price.Cmp(gpo.maxPrice) > 0 {
 		price = new(big.Int).Set(gpo.maxPrice)
+	} else if min := gpo.minPrice(head.Number); price.Cmp(min) < 0 {
+		price = min
 	}
 	gpo.cacheLock.Lock()
 	gpo.lastHead = headHash
 	gpo.lastPrice = price
 	gpo.cacheLock.Unlock()
 	return price, nil
+}
+
+func (gpo *Oracle) minPrice(num *big.Int) *big.Int {
+	if gpo.defaultPrice != nil {
+		return gpo.defaultPrice
+	}
+	const blockOffset = 12 // look ~1 minute ahead, since we are suggesting gas for near-future txs
+	return DefaultFn(gpo.backend.ChainConfig())(new(big.Int).Add(big.NewInt(blockOffset), num))
 }
 
 type result struct {
