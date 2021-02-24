@@ -38,7 +38,7 @@ var DefaultConfig = Config{
 	TrieTimeout:   60 * time.Minute,
 	MinerGasFloor: params.TargetGasLimit,
 	MinerGasCeil:  params.TargetGasLimit,
-	MinerGasPrice: gasprice.Default,
+	MinerGasPrice: nil,
 	MinerRecommit: 1 * time.Second,
 
 	TxPool: core.DefaultTxPoolConfig,
@@ -78,7 +78,7 @@ type Config struct {
 	MinerExtraData []byte         `toml:",omitempty"`
 	MinerGasFloor  uint64
 	MinerGasCeil   uint64
-	MinerGasPrice  *big.Int
+	MinerGasPrice  *big.Int // nil for default/dynamic
 	MinerRecommit  time.Duration
 	MinerNoverify  bool
 

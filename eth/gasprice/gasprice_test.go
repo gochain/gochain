@@ -24,11 +24,9 @@ func TestOracle_SuggestPrice(t *testing.T) {
 				Blocks:     1,
 				Percentile: 60,
 			},
-			backend: newTestBackend(
-				block{
-					txs: []tx{{price: 1}},
-				},
-			),
+			backend: newTestBackend(nil, block{
+				txs: []tx{{price: 1}},
+			}),
 		},
 		{
 			name: "single",
@@ -37,13 +35,11 @@ func TestOracle_SuggestPrice(t *testing.T) {
 				Blocks:     1,
 				Percentile: 60,
 			},
-			backend: newTestBackend(
-				block{
-					txs: []tx{
-						{price: 1000},
-					},
+			backend: newTestBackend(nil, block{
+				txs: []tx{
+					{price: 1000},
 				},
-			),
+			}),
 		},
 		{
 			name: "single full",
@@ -51,15 +47,14 @@ func TestOracle_SuggestPrice(t *testing.T) {
 			params: Config{
 				Blocks:     1,
 				Percentile: 60,
+				Default:    bigInt(1),
 			},
-			backend: newTestBackend(
-				block{
-					full: true,
-					txs: []tx{
-						{price: 2000},
-					},
+			backend: newTestBackend(nil, block{
+				full: true,
+				txs: []tx{
+					{price: 2000},
 				},
-			),
+			}),
 		},
 		{
 			name: "incomplete",
@@ -68,14 +63,12 @@ func TestOracle_SuggestPrice(t *testing.T) {
 				Blocks:     10,
 				Percentile: 60,
 			},
-			backend: newTestBackend(
-				block{
-					full: true,
-					txs: []tx{
-						{price: Default.Uint64() * 10},
-					},
+			backend: newTestBackend(nil, block{
+				full: true,
+				txs: []tx{
+					{price: Default.Uint64() * 10},
 				},
-			),
+			}),
 		},
 		{
 			name: "some full",
@@ -84,25 +77,19 @@ func TestOracle_SuggestPrice(t *testing.T) {
 				Blocks:     5,
 				Percentile: 60,
 			},
-			backend: newTestBackend(
-				block{
-					full: true,
-					txs:  []tx{{price: 10}},
-				},
-				block{
-					txs: []tx{{price: 1}},
-				},
-				block{
-					txs: []tx{{price: 5}},
-				},
-				block{
-					full: true,
-					txs:  []tx{{price: 7}},
-				},
-				block{
-					txs: []tx{{price: 20}},
-				},
-			),
+			backend: newTestBackend(nil, block{
+				full: true,
+				txs:  []tx{{price: 10}},
+			}, block{
+				txs: []tx{{price: 1}},
+			}, block{
+				txs: []tx{{price: 5}},
+			}, block{
+				full: true,
+				txs:  []tx{{price: 7}},
+			}, block{
+				txs: []tx{{price: 20}},
+			}),
 		},
 		{
 			name: "some full-100",
@@ -112,26 +99,20 @@ func TestOracle_SuggestPrice(t *testing.T) {
 				Percentile: 100,
 				Default:    bigInt(1),
 			},
-			backend: newTestBackend(
-				block{
-					full: true,
-					txs:  []tx{{price: 10}},
-				},
-				block{
-					txs: []tx{{price: 1}},
-				},
-				block{
-					txs: []tx{{price: 5}},
-				},
-				block{
-					full: true,
-					txs:  []tx{{price: 7}},
-				},
-				block{
-					full: true,
-					txs:  []tx{{price: 20}},
-				},
-			),
+			backend: newTestBackend(nil, block{
+				full: true,
+				txs:  []tx{{price: 10}},
+			}, block{
+				txs: []tx{{price: 1}},
+			}, block{
+				txs: []tx{{price: 5}},
+			}, block{
+				full: true,
+				txs:  []tx{{price: 7}},
+			}, block{
+				full: true,
+				txs:  []tx{{price: 20}},
+			}),
 		},
 		{
 			name: "all full",
@@ -139,29 +120,24 @@ func TestOracle_SuggestPrice(t *testing.T) {
 			params: Config{
 				Blocks:     5,
 				Percentile: 50,
+				Default:    bigInt(1),
 			},
-			backend: newTestBackend(
-				block{
-					full: true,
-					txs:  []tx{{price: 10}},
-				},
-				block{
-					full: true,
-					txs:  []tx{{price: 1}},
-				},
-				block{
-					full: true,
-					txs:  []tx{{price: 5}},
-				},
-				block{
-					full: true,
-					txs:  []tx{{price: 7}},
-				},
-				block{
-					full: true,
-					txs:  []tx{{price: 20}},
-				},
-			),
+			backend: newTestBackend(nil, block{
+				full: true,
+				txs:  []tx{{price: 10}},
+			}, block{
+				full: true,
+				txs:  []tx{{price: 1}},
+			}, block{
+				full: true,
+				txs:  []tx{{price: 5}},
+			}, block{
+				full: true,
+				txs:  []tx{{price: 7}},
+			}, block{
+				full: true,
+				txs:  []tx{{price: 20}},
+			}),
 		},
 		{
 			name: "some empty",
@@ -171,22 +147,16 @@ func TestOracle_SuggestPrice(t *testing.T) {
 				Percentile: 60,
 				Default:    bigInt(1),
 			},
-			backend: newTestBackend(
-				block{
-					full: true,
-					txs:  []tx{{price: 10}},
-				},
-				block{},
-				block{
-					full: true,
-					txs:  []tx{{price: 5}},
-				},
-				block{
-					full: true,
-					txs:  []tx{{price: 7}},
-				},
-				block{},
-			),
+			backend: newTestBackend(nil, block{
+				full: true,
+				txs:  []tx{{price: 10}},
+			}, block{}, block{
+				full: true,
+				txs:  []tx{{price: 5}},
+			}, block{
+				full: true,
+				txs:  []tx{{price: 7}},
+			}, block{}),
 		},
 		{
 			name: "all empty",
@@ -195,13 +165,7 @@ func TestOracle_SuggestPrice(t *testing.T) {
 				Blocks:     5,
 				Percentile: 50,
 			},
-			backend: newTestBackend(
-				block{},
-				block{},
-				block{},
-				block{},
-				block{},
-			),
+			backend: newTestBackend(nil, block{}, block{}, block{}, block{}, block{}),
 		},
 		{
 			name: "all full local",
@@ -211,27 +175,50 @@ func TestOracle_SuggestPrice(t *testing.T) {
 				Percentile: 50,
 				Default:    bigInt(1),
 			},
-			backend: newTestBackend(
-				block{
-					full: true,
-					txs:  []tx{{price: 10, local: true}},
-				},
-				block{
-					full: true,
-					txs:  []tx{{price: 50, local: true}},
-				},
-				block{
-					full: true,
-					txs:  []tx{{price: 5, local: true}},
-				},
-				block{
-					full: true,
-					txs:  []tx{{price: 7, local: true}},
-				},
-				block{
-					full: true,
-					txs:  []tx{{price: 20, local: true}},
-				},
+			backend: newTestBackend(nil, block{
+				full: true,
+				txs:  []tx{{price: 10, local: true}},
+			}, block{
+				full: true,
+				txs:  []tx{{price: 50, local: true}},
+			}, block{
+				full: true,
+				txs:  []tx{{price: 5, local: true}},
+			}, block{
+				full: true,
+				txs:  []tx{{price: 7, local: true}},
+			}, block{
+				full: true,
+				txs:  []tx{{price: 20, local: true}},
+			}),
+		},
+		{
+			name: "darvaza-before",
+			exp:  Default.Uint64(),
+			params: Config{
+				Blocks:     5,
+				Percentile: 50,
+				Default:    nil,
+			},
+			backend: newTestBackend(&params.ChainConfig{
+				DarvazaBlock:      big.NewInt(140000),
+				DarvazaDefaultGas: new(big.Int).Mul(Default, bigInt(2))},
+				block{},
+			),
+		},
+		{
+			name: "darvaza-after",
+			exp:  2 * Default.Uint64(),
+			params: Config{
+				Blocks:     5,
+				Percentile: 50,
+				Default:    nil,
+			},
+			backend: newTestBackend(&params.ChainConfig{
+				DarvazaBlock:      big.NewInt(14),
+				DarvazaDefaultGas: new(big.Int).Mul(Default, bigInt(2))},
+				block{},
+				block{},
 			),
 		},
 	} {
@@ -274,12 +261,15 @@ type tx struct {
 	local bool
 }
 
-func newTestBackend(blockSpec ...block) OracleBackend {
+func newTestBackend(config *params.ChainConfig, blockSpec ...block) OracleBackend {
+	tb := &testBackend{config: config}
+	if tb.config == nil {
+		tb.config = params.MainnetChainConfig
+	}
 	number := rand.Intn(1000)
 	localKey, _ := crypto.GenerateKey()
 	localAddr := crypto.PubkeyToAddress(localKey.PublicKey)
 	otherKey, _ := crypto.GenerateKey()
-	var blocks []*types.Block
 	for i, b := range blockSpec {
 		gasUsed := uint64(len(b.txs)) * params.TxGas
 		gasLimit := gasUsed
@@ -300,13 +290,12 @@ func newTestBackend(blockSpec ...block) OracleBackend {
 			}
 			txs = append(txs, transaction(0, tx.price, key))
 		}
-		blocks = append(blocks, types.NewBlock(header, txs, nil, nil))
+		tb.blocks = append(tb.blocks, types.NewBlock(header, txs, nil, nil))
 	}
-	return &testBackend{
-		config:     params.MainnetChainConfig,
-		lastHeader: blocks[len(blocks)-1].Header(),
-		blocks:     blocks,
+	if l := len(tb.blocks); l > 0 {
+		tb.lastHeader = tb.blocks[len(tb.blocks)-1].Header()
 	}
+	return tb
 }
 
 func (b *testBackend) ChainConfig() *params.ChainConfig {

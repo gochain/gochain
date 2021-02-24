@@ -45,6 +45,7 @@ var (
 		ByzantiumBlock:      big.NewInt(0),
 		ConstantinopleBlock: big.NewInt(5100000),
 		PetersburgBlock:     nil,
+		DarvazaBlock:        nil,
 
 		Clique: DefaultCliqueConfig(),
 	}
@@ -60,6 +61,8 @@ var (
 		ByzantiumBlock:      big.NewInt(0),
 		ConstantinopleBlock: big.NewInt(4081350),
 		PetersburgBlock:     nil,
+		DarvazaBlock:        big.NewInt(16811000),
+		DarvazaDefaultGas:   new(big.Int).SetUint64(2000 * Shannon),
 
 		Clique: DefaultCliqueConfig(),
 	}
@@ -69,11 +72,13 @@ var (
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, DefaultCliqueConfig()}
+	AllCliqueProtocolChanges = &ChainConfig{ChainId: big.NewInt(1337), HomesteadBlock: big.NewInt(0),
+		EIP150Block: big.NewInt(0), EIP155Block: big.NewInt(0), EIP158Block: big.NewInt(0),
+		ByzantiumBlock: big.NewInt(0), ConstantinopleBlock: big.NewInt(0), Clique: DefaultCliqueConfig()}
 
-	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0),
-		nil, nil, nil, nil,
-		DefaultCliqueConfig(),
+	TestChainConfig = &ChainConfig{ChainId: big.NewInt(1), HomesteadBlock: big.NewInt(0),
+		EIP150Block: big.NewInt(0), EIP155Block: big.NewInt(0), EIP158Block: big.NewInt(0),
+		ByzantiumBlock: big.NewInt(0), Clique: DefaultCliqueConfig(),
 	}
 	TestRules = TestChainConfig.Rules(new(big.Int))
 )
@@ -98,6 +103,8 @@ type ChainConfig struct {
 	ByzantiumBlock      *big.Int `json:"byzantiumBlock,omitempty"`      // Byzantium switch block (nil = no fork, 0 = already on byzantium)
 	ConstantinopleBlock *big.Int `json:"constantinopleBlock,omitempty"` // Constantinople switch block (nil = no fork, 0 = already activated)
 	PetersburgBlock     *big.Int `json:"petersburgBlock,omitempty"`     // Petersburg switch block (nil = same as Constantinople)
+	DarvazaBlock        *big.Int `json:"darvazaBlock,omitempty"`        // Darvaza switch block (nil = no fork, 0 = already activated)
+	DarvazaDefaultGas   *big.Int `json:"darvazaDefaultGas,omitempty"`   // Darvaza default gas value (nil = no change)
 	EWASMBlock          *big.Int `json:"ewasmBlock,omitempty"`          // EWASM switch block (nil = no fork, 0 = already activated)
 
 	// Various consensus engines
@@ -135,7 +142,8 @@ func (c *ChainConfig) String() string {
 	default:
 		engine = "unknown"
 	}
-	return fmt.Sprintf("{ChainID: %v Homestead: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v ConstantinopleFix: %v EWASM: %v Engine: %v}",
+	return fmt.Sprintf("{ChainID: %v Homestead: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople:"+
+		" %v ConstantinopleFix: %v Darvaza: %v EWASM: %v Engine: %v}",
 		c.ChainId,
 		c.HomesteadBlock,
 		c.EIP150Block,
@@ -144,6 +152,7 @@ func (c *ChainConfig) String() string {
 		c.ByzantiumBlock,
 		c.ConstantinopleBlock,
 		c.PetersburgBlock,
+		c.DarvazaBlock,
 		c.EWASMBlock,
 		engine,
 	)
@@ -184,6 +193,11 @@ func (c *ChainConfig) IsConstantinople(num *big.Int) bool {
 // - OR is nil, and Constantinople is active
 func (c *ChainConfig) IsPetersburg(num *big.Int) bool {
 	return isForked(c.PetersburgBlock, num) || c.PetersburgBlock == nil && isForked(c.ConstantinopleBlock, num)
+}
+
+// IsDarvaza returns whether num is either equal to the Darvaza fork block or greater.
+func (c *ChainConfig) IsDarvaza(num *big.Int) bool {
+	return isForked(c.DarvazaBlock, num)
 }
 
 // IsEWASM returns whether num represents a block number after the EWASM fork
@@ -252,6 +266,9 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 	}
 	if isForkIncompatible(c.PetersburgBlock, newcfg.PetersburgBlock, head) {
 		return newCompatError("ConstantinopleFix fork block", c.PetersburgBlock, newcfg.PetersburgBlock)
+	}
+	if isForkIncompatible(c.DarvazaBlock, newcfg.DarvazaBlock, head) {
+		return newCompatError("Darvaza fork block", c.DarvazaBlock, newcfg.DarvazaBlock)
 	}
 	if isForkIncompatible(c.EWASMBlock, newcfg.EWASMBlock, head) {
 		return newCompatError("ewasm fork block", c.EWASMBlock, newcfg.EWASMBlock)

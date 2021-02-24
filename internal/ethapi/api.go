@@ -735,7 +735,7 @@ func DoCall(ctx context.Context, b Backend, args CallArgs, blockNr rpc.BlockNumb
 	if args.Gas != nil {
 		gas = uint64(*args.Gas)
 	}
-	gasPrice := gasprice.Default
+	gasPrice := gasprice.DefaultFn(b.ChainConfig())(header.Number)
 	if args.GasPrice != nil {
 		gasPrice = args.GasPrice.ToInt()
 	}
