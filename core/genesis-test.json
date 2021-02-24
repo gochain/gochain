@@ -8,6 +8,7 @@
     "eip158Block": 0,
     "byzantiumBlock": 0,
     "constantinopleBlock": 4081350,
+    "darvazaBlock": 16811000,
     "darvazaDefaultGas": 2000000000000,
     "clique": {
       "period": 5,

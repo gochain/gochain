@@ -61,7 +61,7 @@ var (
 		ByzantiumBlock:      big.NewInt(0),
 		ConstantinopleBlock: big.NewInt(4081350),
 		PetersburgBlock:     nil,
-		DarvazaBlock:        nil, //TODO
+		DarvazaBlock:        big.NewInt(16811000),
 		DarvazaDefaultGas:   new(big.Int).SetUint64(2000 * Shannon),
 
 		Clique: DefaultCliqueConfig(),
