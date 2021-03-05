@@ -141,6 +141,10 @@ func testPendingStateAndBlock(t *testing.T, chainConfig *params.ChainConfig, eng
 	// Ensure snapshot has been updated.
 	time.Sleep(100 * time.Millisecond)
 	block, state := w.pending()
+	for block == nil {
+		time.Sleep(100 * time.Millisecond)
+		block, state = w.pending()
+	}
 	if block.NumberU64() != 1 {
 		t.Errorf("block number mismatch: have %d, want %d", block.NumberU64(), 1)
 	}
