@@ -45,9 +45,9 @@ var (
 		ByzantiumBlock:      big.NewInt(0),
 		ConstantinopleBlock: big.NewInt(5100000),
 		PetersburgBlock:     nil,
-		DarvazaBlock:        nil,
-
-		Clique: DefaultCliqueConfig(),
+		DarvazaBlock:        big.NewInt(17900000),
+		DarvazaDefaultGas:   new(big.Int).SetUint64(2000 * Shannon),
+		Clique:              DefaultCliqueConfig(),
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the test network.
