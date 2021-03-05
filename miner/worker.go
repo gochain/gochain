@@ -158,10 +158,10 @@ type worker struct {
 	isLocalBlock func(block *types.Block) bool // Function used to determine whether the specified block is mined by local miner.
 
 	// Test hooks
-	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
-	skipSealHook func(*task) bool                   // Method to decide whether skipping the sealing.
-	fullTaskHook func()                             // Method to call before pushing the full sealing task.
-	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
+	newTaskHook  func(*task)      // Method to call upon receiving a new sealing task.
+	skipSealHook func(*task) bool // Method to decide whether skipping the sealing.
+	delay        time.Duration    // Delay before pushing the full sealing task.
+	resubmitHook atomic.Value     // func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
 }
 
 func newWorker(config *params.ChainConfig, engine consensus.Engine, eth Backend, mux *core.InterfaceFeed, recommit time.Duration, gasFloor, gasCeil uint64, isLocalBlock func(*types.Block) bool) *worker {
@@ -206,6 +206,26 @@ func newWorker(config *params.ChainConfig, engine consensus.Engine, eth Backend,
 	worker.startCh <- struct{}{}
 
 	return worker
+}
+
+func (w *worker) setFullTaskDelay(d time.Duration) {
+	atomic.StoreInt64((*int64)(&w.delay), int64(d))
+}
+
+func (w *worker) getFullTaskDelay() time.Duration {
+	return time.Duration(atomic.LoadInt64((*int64)(&w.delay)))
+}
+
+func (w *worker) setResubmitHook(h func(time.Duration, time.Duration)) {
+	w.resubmitHook.Store(h)
+}
+
+func (w *worker) getResubmitHook() func(time.Duration, time.Duration) {
+	v := w.resubmitHook.Load()
+	if v == nil {
+		return nil
+	}
+	return v.(func(time.Duration, time.Duration))
 }
 
 // setEtherbase sets the etherbase used to initialize the block coinbase field.
@@ -357,8 +377,8 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			log.Info("Miner recommit interval update", "from", minRecommit, "to", interval)
 			minRecommit, recommit = interval, interval
 
-			if w.resubmitHook != nil {
-				w.resubmitHook(minRecommit, recommit)
+			if hook := w.getResubmitHook(); hook != nil {
+				hook(minRecommit, recommit)
 			}
 
 		case adjust := <-w.resubmitAdjustCh:
@@ -373,8 +393,8 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 				log.Trace("Decrease miner recommit interval", "from", before, "to", recommit)
 			}
 
-			if w.resubmitHook != nil {
-				w.resubmitHook(minRecommit, recommit)
+			if hook := w.getResubmitHook(); hook != nil {
+				hook(minRecommit, recommit)
 			}
 
 		case <-w.exitCh:
@@ -829,7 +849,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	if !noempty {
 		// Create an empty block based on temporary copied state for sealing in advance without waiting block
 		// execution finished.
-		w.commit(nil, false, tstart)
+		w.commit(false, false, tstart)
 	}
 
 	// Fill the block with all available pending transactions.
@@ -859,12 +879,12 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 			return
 		}
 	}
-	w.commit(w.fullTaskHook, true, tstart)
+	w.commit(true, true, tstart)
 }
 
 // commit runs any post-transaction state modifications, assembles the final block
 // and commits new work if consensus engine is running.
-func (w *worker) commit(interval func(), update bool, start time.Time) error {
+func (w *worker) commit(delay bool, update bool, start time.Time) error {
 	// Deep copy receipts here to avoid interaction between different tasks.
 	receipts := make([]*types.Receipt, len(w.current.receipts))
 	for i, l := range w.current.receipts {
@@ -874,8 +894,8 @@ func (w *worker) commit(interval func(), update bool, start time.Time) error {
 	s := w.current.state.Copy()
 	block := w.engine.Finalize(w.chain, w.current.header, s, w.current.txs, w.current.receipts, true)
 	if w.isRunning() {
-		if interval != nil {
-			interval()
+		if delay {
+			time.Sleep(w.getFullTaskDelay())
 		}
 		select {
 		case w.taskCh <- &task{receipts: receipts, state: s, block: block, createdAt: time.Now()}:

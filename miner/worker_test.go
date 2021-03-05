@@ -18,6 +18,7 @@ package miner
 
 import (
 	"math/big"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -189,9 +190,7 @@ func testEmptyWork(t *testing.T, chainConfig *params.ChainConfig, engine consens
 			taskCh <- struct{}{}
 		}
 	}
-	w.fullTaskHook = func() {
-		time.Sleep(100 * time.Millisecond)
-	}
+	w.setFullTaskDelay(100 * time.Millisecond)
 
 	// Ensure worker has finished initialization
 	for {
@@ -240,9 +239,8 @@ func testRegenerateMiningBlock(t *testing.T, chainConfig *params.ChainConfig, en
 	w.skipSealHook = func(task *task) bool {
 		return true
 	}
-	w.fullTaskHook = func() {
-		time.Sleep(100 * time.Millisecond)
-	}
+	w.setFullTaskDelay(100 * time.Millisecond)
+
 	// Ensure worker has finished initialization
 	for {
 		b := w.pendingBlock()
@@ -281,18 +279,16 @@ func testAdjustInterval(t *testing.T, chainConfig *params.ChainConfig, engine co
 	w.skipSealHook = func(task *task) bool {
 		return true
 	}
-	w.fullTaskHook = func() {
-		time.Sleep(100 * time.Millisecond)
-	}
+	w.setFullTaskDelay(100 * time.Millisecond)
 	var (
 		progress = make(chan struct{}, 10)
 		result   = make([]float64, 0, 10)
 		index    = 0
-		start    = false
+		start    int32
 	)
-	w.resubmitHook = func(minInterval time.Duration, recommitInterval time.Duration) {
+	w.setResubmitHook(func(minInterval time.Duration, recommitInterval time.Duration) {
 		// Short circuit if interval checking hasn't started.
-		if !start {
+		if atomic.LoadInt32(&start) == 0 {
 			return
 		}
 		var wantMinInterval, wantRecommitInterval time.Duration
@@ -323,7 +319,7 @@ func testAdjustInterval(t *testing.T, chainConfig *params.ChainConfig, engine co
 		result = append(result, float64(recommitInterval.Nanoseconds()))
 		index += 1
 		progress <- struct{}{}
-	}
+	})
 	// Ensure worker has finished initialization
 	for {
 		b := w.pendingBlock()
@@ -336,7 +332,7 @@ func testAdjustInterval(t *testing.T, chainConfig *params.ChainConfig, engine co
 
 	time.Sleep(time.Second)
 
-	start = true
+	atomic.StoreInt32(&start, 1)
 	w.setRecommitInterval(3 * time.Second)
 	select {
 	case <-progress:

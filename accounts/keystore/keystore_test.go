@@ -285,9 +285,11 @@ func TestWalletNotifications(t *testing.T) {
 	var (
 		events  []walletEvent
 		updates = make(chan accounts.WalletEvent)
+		done    = make(chan struct{})
 	)
 	ks.Subscribe(updates, "keystore-TestWalletNotifications")
 	go func() {
+		defer close(done)
 		for {
 			select {
 			case ev, ok := <-updates:
@@ -330,7 +332,7 @@ func TestWalletNotifications(t *testing.T) {
 
 	// Shut down the event collector and check events.
 	ks.Unsubscribe(updates)
-	<-updates
+	<-done
 	checkAccounts(t, live, ks.Wallets())
 	checkEvents(t, wantEvents, events)
 }
