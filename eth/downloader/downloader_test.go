@@ -660,7 +660,6 @@ func TestThrottling64Full(t *testing.T) { testThrottling(t, 64, FullSync) }
 func TestThrottling64Fast(t *testing.T) { testThrottling(t, 64, FastSync) }
 
 func testThrottling(t *testing.T, protocol int, mode SyncMode) {
-	t.Parallel()
 	tester := newTester()
 	defer tester.terminate()
 
@@ -818,8 +817,6 @@ func TestBoundedForkedSync64Fast(t *testing.T)  { testBoundedForkedSync(t, 64, F
 func TestBoundedForkedSync64Light(t *testing.T) { testBoundedForkedSync(t, 64, LightSync) }
 
 func testBoundedForkedSync(t *testing.T, protocol int, mode SyncMode) {
-	t.Parallel()
-
 	tester := newTester()
 	defer tester.terminate()
 
@@ -964,8 +961,6 @@ func TestMultiSynchronisation64Fast(t *testing.T)  { testMultiSynchronisation(t,
 func TestMultiSynchronisation64Light(t *testing.T) { testMultiSynchronisation(t, 64, LightSync) }
 
 func testMultiSynchronisation(t *testing.T, protocol int, mode SyncMode) {
-	t.Parallel()
-
 	tester := newTester()
 	defer tester.terminate()
 
@@ -1157,8 +1152,6 @@ func TestInvalidHeaderRollback64Fast(t *testing.T)  { testInvalidHeaderRollback(
 func TestInvalidHeaderRollback64Light(t *testing.T) { testInvalidHeaderRollback(t, 64, LightSync) }
 
 func testInvalidHeaderRollback(t *testing.T, protocol int, mode SyncMode) {
-	t.Parallel()
-
 	tester := newTester()
 	defer tester.terminate()
 
