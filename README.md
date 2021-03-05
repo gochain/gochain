@@ -1,4 +1,4 @@
-![GoChain Logo](color_logo_transparent.png)
+![GoChain Logo](https://user-images.githubusercontent.com/75826/110122817-18cf5100-7d8e-11eb-8094-5fd189516f3d.png)
 
 ## GoChain
 
