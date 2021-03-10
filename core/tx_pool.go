@@ -619,11 +619,11 @@ func (pool *TxPool) SetGasPrice(price *big.Int) {
 		pool.gasPrice = price
 	}
 	pool.all.ForEach(func(tx *types.Transaction) {
-		if tx.CmpGasPrice(price) < 0 && !pool.locals.containsTx(tx) {
+		if tx.CmpGasPrice(pool.gasPrice) < 0 && !pool.locals.containsTx(tx) {
 			pool.removeTx(tx)
 		}
 	})
-	log.Info("Transaction pool price threshold updated", "price", price)
+	log.Info("Transaction pool price threshold updated", "price", pool.gasPrice)
 }
 
 // State returns the virtual managed state of the transaction pool.
