@@ -1,4 +1,4 @@
-// Copyright 2018 The go-ethereum Authors
+// Copyright 2020 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -14,24 +14,26 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// +build js
-
 package rpc
 
 import (
-	"context"
-	"errors"
-	"net"
+	"fmt"
+
+	"github.com/gochain/gochain/v3/metrics"
 )
 
-var errNotSupported = errors.New("rpc: not supported")
+var (
+	rpcRequestGauge        = metrics.NewRegisteredGauge("rpc/requests", nil)
+	successfulRequestGauge = metrics.NewRegisteredGauge("rpc/success", nil)
+	failedReqeustGauge     = metrics.NewRegisteredGauge("rpc/failure", nil)
+	rpcServingTimer        = metrics.NewRegisteredTimer("rpc/duration/all", nil)
+)
 
-// ipcListen will create a named pipe on the given endpoint.
-func ipcListen(endpoint string) (net.Listener, error) {
-	return nil, errNotSupported
-}
-
-// newIPCConnection will connect to a named pipe with the given endpoint as name.
-func newIPCConnection(ctx context.Context, endpoint string) (net.Conn, error) {
-	return nil, errNotSupported
+func newRPCServingTimer(method string, valid bool) metrics.Timer {
+	flag := "success"
+	if !valid {
+		flag = "failure"
+	}
+	m := fmt.Sprintf("rpc/duration/%s/%s", method, flag)
+	return metrics.GetOrRegisterTimer(m, nil)
 }

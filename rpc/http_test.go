@@ -23,80 +23,103 @@ import (
 	"testing"
 )
 
+func confirmStatusCode(t *testing.T, got, want int) {
+	t.Helper()
+	if got == want {
+		return
+	}
+	if gotName := http.StatusText(got); len(gotName) > 0 {
+		if wantName := http.StatusText(want); len(wantName) > 0 {
+			t.Fatalf("response status code: got %d (%s), want %d (%s)", got, gotName, want, wantName)
+		}
+	}
+	t.Fatalf("response status code: got %d, want %d", got, want)
+}
+
+func confirmRequestValidationCode(t *testing.T, method, contentType, body string, expectedStatusCode int) {
+	t.Helper()
+	request := httptest.NewRequest(method, "http://url.com", strings.NewReader(body))
+	if len(contentType) > 0 {
+		request.Header.Set("Content-Type", contentType)
+	}
+	code, err := validateRequest(request)
+	if code == 0 {
+		if err != nil {
+			t.Errorf("validation: got error %v, expected nil", err)
+		}
+	} else if err == nil {
+		t.Errorf("validation: code %d: got nil, expected error", code)
+	}
+	confirmStatusCode(t, code, expectedStatusCode)
+}
+
 func TestHTTPErrorResponseWithDelete(t *testing.T) {
-	testHTTPErrorResponse(t, http.MethodDelete, contentType, "", http.StatusMethodNotAllowed)
+	confirmRequestValidationCode(t, http.MethodDelete, contentType, "", http.StatusMethodNotAllowed)
 }
 
 func TestHTTPErrorResponseWithPut(t *testing.T) {
-	testHTTPErrorResponse(t, http.MethodPut, contentType, "", http.StatusMethodNotAllowed)
+	confirmRequestValidationCode(t, http.MethodPut, contentType, "", http.StatusMethodNotAllowed)
 }
 
 func TestHTTPErrorResponseWithMaxContentLength(t *testing.T) {
 	body := make([]rune, maxRequestContentLength+1)
-	testHTTPErrorResponse(t,
+	confirmRequestValidationCode(t,
 		http.MethodPost, contentType, string(body), http.StatusRequestEntityTooLarge)
 }
 
 func TestHTTPErrorResponseWithEmptyContentType(t *testing.T) {
-	testHTTPErrorResponse(t, http.MethodPost, "", "", http.StatusUnsupportedMediaType)
+	confirmRequestValidationCode(t, http.MethodPost, "", "", http.StatusUnsupportedMediaType)
 }
 
 func TestHTTPErrorResponseWithValidRequest(t *testing.T) {
-	testHTTPErrorResponse(t, http.MethodPost, contentType, "", 0)
+	confirmRequestValidationCode(t, http.MethodPost, contentType, "", 0)
 }
 
-func testHTTPErrorResponse(t *testing.T, method, contentType, body string, expected int) {
-	request := httptest.NewRequest(method, "http://url.com", strings.NewReader(body))
-	request.Header.Set("content-type", contentType)
-	if code, _ := validateRequest(request); code != expected {
-		t.Fatalf("response code should be %d not %d", expected, code)
+func confirmHTTPRequestYieldsStatusCode(t *testing.T, method, contentType, body string, expectedStatusCode int) {
+	t.Helper()
+	s := Server{}
+	ts := httptest.NewServer(&s)
+	defer ts.Close()
+
+	request, err := http.NewRequest(method, ts.URL, strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("failed to create a valid HTTP request: %v", err)
 	}
+	if len(contentType) > 0 {
+		request.Header.Set("Content-Type", contentType)
+	}
+	resp, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	confirmStatusCode(t, resp.StatusCode, expectedStatusCode)
 }
 
-func TestVirtualHostHandler_validHost(t *testing.T) {
-	for _, test := range []struct {
-		name    string
-		vhosts  []string
-		valid   []string
-		invalid []string
-	}{
-		{
-			name:   "any",
-			vhosts: []string{"*"},
-			valid:  []string{"google.com", "example.com", "gochain.io"},
-		},
-		{
-			name:    "literal",
-			vhosts:  []string{"test.gochain.io"},
-			valid:   []string{"test.gochain.io"},
-			invalid: []string{"a.gochain.io", "a.test.gochain.io"},
-		},
-		{
-			name:    "subdomain",
-			vhosts:  []string{"*.gochain.io"},
-			valid:   []string{"test.gochain.io", "a.gochain.io", "a.b.gochain.io"},
-			invalid: []string{"gochain.io"},
-		},
-		{
-			name:    "multi",
-			vhosts:  []string{"*.e.d.c.b.a"},
-			valid:   []string{"f.e.d.c.b.a"},
-			invalid: []string{"e.d.c.b.a", "c.b.a", "b.a"},
-		},
-	} {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			h := newVHostHandler(test.vhosts, nil)
-			for _, host := range test.valid {
-				if !h.validHost(host) {
-					t.Errorf("expected %q to be valid", host)
-				}
-			}
-			for _, host := range test.invalid {
-				if h.validHost(host) {
-					t.Errorf("expected %q to be invalid", host)
-				}
-			}
-		})
+func TestHTTPResponseWithEmptyGet(t *testing.T) {
+	confirmHTTPRequestYieldsStatusCode(t, http.MethodGet, "", "", http.StatusOK)
+}
+
+// This checks that maxRequestContentLength is not applied to the response of a request.
+func TestHTTPRespBodyUnlimited(t *testing.T) {
+	const respLength = maxRequestContentLength * 3
+
+	s := NewServer()
+	defer s.Stop()
+	s.RegisterName("test", largeRespService{respLength})
+	ts := httptest.NewServer(s)
+	defer ts.Close()
+
+	c, err := DialHTTP(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	var r string
+	if err := c.Call(&r, "test_largeResp"); err != nil {
+		t.Fatal(err)
+	}
+	if len(r) != respLength {
+		t.Fatalf("response has wrong length %d, want %d", len(r), respLength)
 	}
 }

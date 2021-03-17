@@ -1,4 +1,4 @@
-// Copyright 2018 The go-ethereum Authors
+// Copyright 2019 The go-ethereum Authors
 // This file is part of the go-ethereum library.
 //
 // The go-ethereum library is free software: you can redistribute it and/or modify
@@ -14,24 +14,12 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// +build js
+// +build !cgo,!windows
 
 package rpc
 
-import (
-	"context"
-	"errors"
-	"net"
+var (
+	//  On Linux, sun_path is 108 bytes in size
+	// see http://man7.org/linux/man-pages/man7/unix.7.html
+	max_path_size = 108
 )
-
-var errNotSupported = errors.New("rpc: not supported")
-
-// ipcListen will create a named pipe on the given endpoint.
-func ipcListen(endpoint string) (net.Listener, error) {
-	return nil, errNotSupported
-}
-
-// newIPCConnection will connect to a named pipe with the given endpoint as name.
-func newIPCConnection(ctx context.Context, endpoint string) (net.Conn, error) {
-	return nil, errNotSupported
-}

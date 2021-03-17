@@ -13,6 +13,7 @@ require (
 	github.com/cespare/cp v1.0.0
 	github.com/cespare/xxhash v1.0.0
 	github.com/davecgh/go-spew v1.1.0
+	github.com/deckarep/golang-set v1.7.1
 	github.com/docker/docker v1.13.1
 	github.com/edsrzf/mmap-go v1.0.0
 	github.com/fatih/color v1.6.0
@@ -23,6 +24,7 @@ require (
 	github.com/golang/protobuf v1.3.1
 	github.com/golang/snappy v0.0.1
 	github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e // indirect
+	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/huin/goupnp v0.0.0-20180415215157-1395d1447324
 	github.com/influxdata/influxdb v1.6.3
@@ -48,7 +50,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rjeczalik/notify v0.9.1
 	github.com/robertkrimen/otto v0.0.0-20180305042045-6c383dd335ef
-	github.com/rs/cors v1.3.0
 	github.com/smartystreets/assertions v0.0.0-20190116191733-b6c0e53d7304 // indirect
 	github.com/smartystreets/goconvey v0.0.0-20181108003508-044398e4856c // indirect
 	github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72 // indirect
