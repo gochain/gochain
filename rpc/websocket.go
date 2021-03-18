@@ -240,55 +240,6 @@ type websocketCodec struct {
 }
 
 func newWebsocketCodec(conn *websocket.Conn) ServerCodec {
-	conn.SetReadLimit(wsMessageSizeLimit)
-	wc := &websocketCodec{
-		jsonCodec: NewFuncCodec(conn, conn.WriteJSON, conn.ReadJSON).(*jsonCodec),
-		conn:      conn,
-		pingReset: make(chan struct{}, 1),
-	}
-	wc.wg.Add(1)
-	go wc.pingLoop()
-	return wc
-}
-
-func (wc *websocketCodec) close() {
-	wc.jsonCodec.close()
-	wc.wg.Wait()
-}
-
-func (wc *websocketCodec) writeJSON(ctx context.Context, v interface{}) error {
-	err := wc.jsonCodec.writeJSON(ctx, v)
-	if err == nil {
-		// Notify pingLoop to delay the next idle ping.
-		select {
-		case wc.pingReset <- struct{}{}:
-		default:
-		}
-	}
-	return err
-}
-
-// pingLoop sends periodic ping frames when the connection is idle.
-func (wc *websocketCodec) pingLoop() {
-	var timer = time.NewTimer(wsPingInterval)
-	defer wc.wg.Done()
-	defer timer.Stop()
-
-	for {
-		select {
-		case <-wc.closed():
-			return
-		case <-wc.pingReset:
-			if !timer.Stop() {
-				<-timer.C
-			}
-			timer.Reset(wsPingInterval)
-		case <-timer.C:
-			wc.jsonCodec.encMu.Lock()
-			wc.conn.SetWriteDeadline(time.Now().Add(wsPingWriteTimeout))
-			wc.conn.WriteMessage(websocket.PingMessage, nil)
-			wc.jsonCodec.encMu.Unlock()
-			timer.Reset(wsPingInterval)
-		}
-	}
+	conn.SetReadLimit(maxRequestContentLength)
+	return NewFuncCodec(conn, conn.WriteJSON, conn.ReadJSON)
 }
