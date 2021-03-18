@@ -38,7 +38,7 @@ func generateMessageParams() (*MessageParams, error) {
 	var p MessageParams
 	p.PoW = 0.01
 	p.WorkTime = 1
-	p.TTL = uint32(mrand.Intn(1023)+1)
+	p.TTL = uint32(mrand.Intn(1019)+5)
 	p.Payload = make([]byte, sz)
 	p.KeySym = make([]byte, aesKeyLength)
 	mrand.Read(p.Payload)
