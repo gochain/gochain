@@ -37,7 +37,7 @@ func generateMessageParams() (*MessageParams, error) {
 
 	var p MessageParams
 	p.PoW = 0.01
-	p.WorkTime = 1
+	p.WorkTime = 5
 	p.TTL = uint32(mrand.Intn(1024))
 	p.Payload = make([]byte, sz)
 	p.KeySym = make([]byte, aesKeyLength)
@@ -195,7 +195,7 @@ func TestMessageSeal(t *testing.T) {
 		t.Fatalf("failed Wrap with seed %d: pow < target (%f vs. %f).", seed, pow, target)
 	}
 
-	params.WorkTime = 1
+	params.WorkTime = 5
 	params.PoW = 1000000000.0
 	env.Seal(params)
 	env.calculatePoW(0)

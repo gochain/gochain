@@ -57,7 +57,7 @@ jobs:
               - /tmp/go/cache
       - attach_workspace:
           at: .
-      - run: go test ./...
+      - run: go test -timeout 15m ./...
       - save_cache:
           key: test-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
           paths:

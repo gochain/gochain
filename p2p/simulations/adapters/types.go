@@ -21,7 +21,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"net"
 	"os"
 
 	"github.com/docker/docker/pkg/reexec"
@@ -30,6 +29,7 @@ import (
 	"github.com/gochain/gochain/v3/p2p"
 	"github.com/gochain/gochain/v3/p2p/discover"
 	"github.com/gochain/gochain/v3/rpc"
+	"github.com/gorilla/websocket"
 )
 
 // Node represents a node in a simulation network which is created by a
@@ -48,7 +48,7 @@ type Node interface {
 	Client() (*rpc.Client, error)
 
 	// ServeRPC serves RPC requests over the given connection
-	ServeRPC(net.Conn) error
+	ServeRPC(*websocket.Conn) error
 
 	// Start starts the node with the given snapshots
 	Start(snapshots map[string][]byte) error
