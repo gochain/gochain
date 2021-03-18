@@ -195,7 +195,7 @@ func TestMessageSeal(t *testing.T) {
 		t.Fatalf("failed Wrap with seed %d: pow < target (%f vs. %f).", seed, pow, target)
 	}
 
-	params.WorkTime = 1
+	params.WorkTime = 5
 	params.PoW = 1000000000.0
 	env.Seal(params)
 	env.calculatePoW(0)
