@@ -35,9 +35,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gochain/gochain/v3/console/prompt"
+
 	"github.com/gochain/gochain/v3/cmd/utils"
 	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/console"
 	"github.com/gochain/gochain/v3/crypto"
 	"github.com/gochain/gochain/v3/log"
 	"github.com/gochain/gochain/v3/p2p"
@@ -208,7 +209,7 @@ func initialize() {
 
 	if *mailServerMode {
 		if len(msPassword) == 0 {
-			msPassword, err = console.Stdin.PromptPassword("Please enter the Mail Server password: ")
+			msPassword, err = prompt.Stdin.PromptPassword("Please enter the Mail Server password: ")
 			if err != nil {
 				utils.Fatalf("Failed to read Mail Server password: %s", err)
 			}
@@ -329,7 +330,7 @@ func configureNode() {
 	if *requestMail {
 		p2pAccept = true
 		if len(msPassword) == 0 {
-			msPassword, err = console.Stdin.PromptPassword("Please enter the Mail Server password: ")
+			msPassword, err = prompt.Stdin.PromptPassword("Please enter the Mail Server password: ")
 			if err != nil {
 				utils.Fatalf("Failed to read Mail Server password: %s", err)
 			}
@@ -338,7 +339,7 @@ func configureNode() {
 
 	if !*asymmetricMode && !*forwarderMode {
 		if len(symPass) == 0 {
-			symPass, err = console.Stdin.PromptPassword("Please enter the password for symmetric encryption: ")
+			symPass, err = prompt.Stdin.PromptPassword("Please enter the password for symmetric encryption: ")
 			if err != nil {
 				utils.Fatalf("Failed to read passphrase: %v", err)
 			}

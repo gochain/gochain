@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v3/console/prompt"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/eth"
 	"github.com/gochain/gochain/v3/internal/jsre"
@@ -65,10 +66,10 @@ func (p *hookedPrompter) PromptPassword(prompt string) (string, error) {
 func (p *hookedPrompter) PromptConfirm(prompt string) (bool, error) {
 	return false, errors.New("not implemented")
 }
-func (p *hookedPrompter) SetHistory(history []string)              {}
-func (p *hookedPrompter) AppendHistory(command string)             {}
-func (p *hookedPrompter) ClearHistory()                            {}
-func (p *hookedPrompter) SetWordCompleter(completer WordCompleter) {}
+func (p *hookedPrompter) SetHistory(history []string)                     {}
+func (p *hookedPrompter) AppendHistory(command string)                    {}
+func (p *hookedPrompter) ClearHistory()                                   {}
+func (p *hookedPrompter) SetWordCompleter(completer prompt.WordCompleter) {}
 
 // tester is a console test environment for the console tests to operate on.
 type tester struct {
@@ -197,7 +198,7 @@ func TestInteractive(t *testing.T) {
 
 	go tester.console.Interactive()
 
-	// Wait for a promt and send a statement back
+	// Wait for a prompt and send a statement back
 	select {
 	case <-tester.input.scheduler:
 	case <-time.After(time.Second):
@@ -208,7 +209,7 @@ func TestInteractive(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatalf("input feedback timeout")
 	}
-	// Wait for the second promt and ensure first statement was evaluated
+	// Wait for the second prompt and ensure first statement was evaluated
 	select {
 	case <-tester.input.scheduler:
 	case <-time.After(time.Second):
@@ -245,7 +246,7 @@ func TestExecute(t *testing.T) {
 }
 
 // Tests that the JavaScript objects returned by statement executions are properly
-// pretty printed instead of just displaing "[object]".
+// pretty printed instead of just displaying "[object]".
 func TestPrettyPrint(t *testing.T) {
 	tester := newTester(t, nil)
 	defer tester.Close(t)
@@ -282,7 +283,7 @@ func TestPrettyError(t *testing.T) {
 	defer tester.Close(t)
 	tester.console.Evaluate("throw 'hello'")
 
-	want := jsre.ErrorColor("hello") + "\n"
+	want := jsre.ErrorColor("hello") + "\n\tat <eval>:1:7(1)\n\n"
 	if output := tester.output.String(); output != want {
 		t.Fatalf("pretty error mismatch: have %s, want %s", output, want)
 	}
@@ -296,7 +297,7 @@ func TestIndenting(t *testing.T) {
 	}{
 		{`var a = 1;`, 0},
 		{`"some string"`, 0},
-		{`"some string with (parentesis`, 0},
+		{`"some string with (parenthesis`, 0},
 		{`"some string with newline
 		("`, 0},
 		{`function v(a,b) {}`, 0},

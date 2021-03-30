@@ -23,41 +23,27 @@ import (
 	"strings"
 
 	"github.com/gochain/gochain/v3/cmd/utils"
-	"github.com/gochain/gochain/v3/console"
 	"github.com/gochain/gochain/v3/crypto"
 	"github.com/urfave/cli"
 )
 
-// getPassPhrase obtains a passphrase given by the user.  It first checks the
-// --passphrase command line flag and ultimately prompts the user for a
+// getPassphrase obtains a passphrase given by the user.  It first checks the
+// --passfile command line flag and ultimately prompts the user for a
 // passphrase.
-func getPassPhrase(ctx *cli.Context, confirmation bool) string {
-	// Look for the --passphrase flag.
+func getPassphrase(ctx *cli.Context, confirmation bool) string {
+	// Look for the --passwordfile flag.
 	passphraseFile := ctx.String(passphraseFlag.Name)
 	if passphraseFile != "" {
 		content, err := ioutil.ReadFile(passphraseFile)
 		if err != nil {
-			utils.Fatalf("Failed to read passphrase file '%s': %v",
+			utils.Fatalf("Failed to read password file '%s': %v",
 				passphraseFile, err)
 		}
 		return strings.TrimRight(string(content), "\r\n")
 	}
 
 	// Otherwise prompt the user for the passphrase.
-	passphrase, err := console.Stdin.PromptPassword("Passphrase: ")
-	if err != nil {
-		utils.Fatalf("Failed to read passphrase: %v", err)
-	}
-	if confirmation {
-		confirm, err := console.Stdin.PromptPassword("Repeat passphrase: ")
-		if err != nil {
-			utils.Fatalf("Failed to read passphrase confirmation: %v", err)
-		}
-		if passphrase != confirm {
-			utils.Fatalf("Passphrases do not match")
-		}
-	}
-	return passphrase
+	return utils.GetPassPhrase("", confirmation)
 }
 
 // signHash is a helper function that calculates a hash for the given message

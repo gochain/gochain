@@ -53,7 +53,7 @@ func TestConsoleWelcome(t *testing.T) {
 	geth.SetTemplateFunc("gover", runtime.Version)
 	geth.SetTemplateFunc("gethver", func() string { return params.Version })
 	geth.SetTemplateFunc("time", func() string {
-		return time.Unix(int64(core.DefaultGenesisBlock().Timestamp), 0).Format(time.RFC1123)
+		return time.Unix(int64(core.DefaultGenesisBlock().Timestamp), 0).Format("Mon Jan 02 2006 15:04:05 GMT-0700 (MST)")
 	})
 	geth.SetTemplateFunc("apis", func() string { return ipcAPIs })
 
@@ -74,7 +74,7 @@ at block: 0 ({{time}})
 
 // Tests that a console can be attached to a running node via various means.
 func TestIPCAttachWelcome(t *testing.T) {
-	// Configure the instance for IPC attachement
+	// Configure the instance for IPC attachment
 	coinbase := "0x8605cdbbdb6d264aa742e77020dcbc58fcdce182"
 	var ipc string
 	if runtime.GOOS == "windows" {
@@ -84,17 +84,18 @@ func TestIPCAttachWelcome(t *testing.T) {
 		defer os.RemoveAll(ws)
 		ipc = filepath.Join(ws, "gochain.ipc")
 	}
-	// Note: we need --shh because testAttachWelcome checks for default
-	// list of ipc modules and shh is included there.
 	geth := runGoChain(t,
 		"--port", "0", "--maxpeers", "0", "--nodiscover", "--nat", "none",
 		"--etherbase", coinbase, "--shh", "--ipcpath", ipc)
 
-	time.Sleep(2 * time.Second) // Simple way to wait for the RPC endpoint to open
+	defer func() {
+		geth.Interrupt()
+		geth.ExpectExit()
+	}()
+
+	waitForEndpoint(t, ipc, 3*time.Second)
 	testAttachWelcome(t, geth, "ipc:"+ipc, ipcAPIs)
 
-	geth.Interrupt()
-	geth.ExpectExit()
 }
 
 func TestHTTPAttachWelcome(t *testing.T) {
@@ -103,12 +104,14 @@ func TestHTTPAttachWelcome(t *testing.T) {
 	geth := runGoChain(t,
 		"--port", "0", "--maxpeers", "0", "--nodiscover", "--nat", "none",
 		"--etherbase", coinbase, "--rpc", "--rpcport", port)
+	defer func() {
+		geth.Interrupt()
+		geth.ExpectExit()
+	}()
 
-	time.Sleep(2 * time.Second) // Simple way to wait for the RPC endpoint to open
-	testAttachWelcome(t, geth, "http://localhost:"+port, httpAPIs)
-
-	geth.Interrupt()
-	geth.ExpectExit()
+	endpoint := "http://127.0.0.1:" + port
+	waitForEndpoint(t, endpoint, 3*time.Second)
+	testAttachWelcome(t, geth, endpoint, httpAPIs)
 }
 
 func TestWSAttachWelcome(t *testing.T) {
@@ -118,12 +121,14 @@ func TestWSAttachWelcome(t *testing.T) {
 	geth := runGoChain(t,
 		"--port", "0", "--maxpeers", "0", "--nodiscover", "--nat", "none",
 		"--etherbase", coinbase, "--ws", "--wsport", port)
+	defer func() {
+		geth.Interrupt()
+		geth.ExpectExit()
+	}()
 
-	time.Sleep(2 * time.Second) // Simple way to wait for the RPC endpoint to open
-	testAttachWelcome(t, geth, "ws://localhost:"+port, httpAPIs)
-
-	geth.Interrupt()
-	geth.ExpectExit()
+	endpoint := "ws://127.0.0.1:" + port
+	waitForEndpoint(t, endpoint, 3*time.Second)
+	testAttachWelcome(t, geth, endpoint, httpAPIs)
 }
 
 func testAttachWelcome(t *testing.T, geth *testgeth, endpoint, apis string) {
@@ -139,7 +144,7 @@ func testAttachWelcome(t *testing.T, geth *testgeth, endpoint, apis string) {
 	attach.SetTemplateFunc("gethver", func() string { return params.Version })
 	attach.SetTemplateFunc("etherbase", func() string { return geth.Etherbase })
 	attach.SetTemplateFunc("time", func() string {
-		return time.Unix(int64(core.DefaultGenesisBlock().Timestamp), 0).Format(time.RFC1123)
+		return time.Unix(int64(core.DefaultGenesisBlock().Timestamp), 0).Format("Mon Jan 02 2006 15:04:05 GMT-0700 (MST)")
 	})
 	attach.SetTemplateFunc("ipc", func() bool { return strings.HasPrefix(endpoint, "ipc") })
 	attach.SetTemplateFunc("datadir", func() string { return geth.Datadir })

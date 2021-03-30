@@ -25,15 +25,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gochain/gochain/v3/console/prompt"
+
 	"contrib.go.opencensus.io/exporter/stackdriver"
-	"go.opencensus.io/trace"
 	"github.com/urfave/cli"
+	"go.opencensus.io/trace"
 
 	"github.com/gochain/gochain/v3/accounts"
 	"github.com/gochain/gochain/v3/accounts/keystore"
 	"github.com/gochain/gochain/v3/cmd/utils"
 	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/console"
 	"github.com/gochain/gochain/v3/eth"
 	"github.com/gochain/gochain/v3/goclient"
 	"github.com/gochain/gochain/v3/internal/debug"
@@ -206,7 +207,7 @@ func init() {
 
 	app.After = func(ctx *cli.Context) error {
 		debug.Exit()
-		console.Stdin.Close() // Resets terminal mode.
+		prompt.Stdin.Close() // Resets terminal mode.
 		return nil
 	}
 }
@@ -294,11 +295,13 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 				status, _ := event.Wallet.Status()
 				log.Info("New wallet appeared", "url", event.Wallet.URL(), "status", status)
 
+				var derivationPaths []accounts.DerivationPath
 				if event.Wallet.URL().Scheme == "ledger" {
-					event.Wallet.SelfDerive(accounts.DefaultLedgerBaseDerivationPath, stateReader)
-				} else {
-					event.Wallet.SelfDerive(accounts.DefaultBaseDerivationPath, stateReader)
+					derivationPaths = append(derivationPaths, accounts.LegacyLedgerBaseDerivationPath)
 				}
+				derivationPaths = append(derivationPaths, accounts.DefaultBaseDerivationPath)
+
+				event.Wallet.SelfDerive(derivationPaths, stateReader)
 
 			case accounts.WalletDropped:
 				log.Info("Old wallet dropped", "url", event.Wallet.URL())

@@ -23,6 +23,7 @@ type tmplData struct {
 	Package   string                   // Name of the package to place the generated file in
 	Contracts map[string]*tmplContract // List of contracts to generate into this file
 	Libraries map[string]string        // Map the bytecode's link pattern to the library name
+	Structs   map[string]*tmplStruct   // Contract struct type definitions
 }
 
 // tmplContract contains the data needed to generate an individual contract binding.
@@ -34,10 +35,11 @@ type tmplContract struct {
 	Constructor abi.Method             // Contract constructor for deploy parametrization
 	Calls       map[string]*tmplMethod // Contract calls that only read state data
 	Transacts   map[string]*tmplMethod // Contract calls that write state data
+	Fallback    *tmplMethod            // Additional special fallback function
+	Receive     *tmplMethod            // Additional special receive function
 	Events      map[string]*tmplEvent  // Contract events accessors
 	Libraries   map[string]string      // Same as tmplData, but filtered to only keep what the contract needs
-	Structs     map[string]*tmplStruct // Contract struct type definitions
-	Library     bool
+	Library     bool                   // Indicator whether the contract is a library
 }
 
 // tmplMethod is a wrapper around an abi.Method that contains a few preprocessed
@@ -62,7 +64,7 @@ type tmplField struct {
 	SolKind abi.Type // Raw abi type information
 }
 
-// tmplStruct is a wrapper around an abi.tuple contains a auto-generated
+// tmplStruct is a wrapper around an abi.tuple contains an auto-generated
 // struct name.
 type tmplStruct struct {
 	Name   string       // Auto-generated struct name(before solidity v0.5.11) or raw name.
@@ -101,15 +103,22 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = gochain.NotFound
-	_ = abi.U256
 	_ = bind.Bind
 	_ = common.Big1
 	_ = types.BloomLookup
 	_ = event.NewSubscription
 )
 
+{{$structs := .Structs}}
+{{range $structs}}
+	// {{.Name}} is an auto generated low-level Go binding around an user-defined struct.
+	type {{.Name}} struct {
+	{{range $field := .Fields}}
+	{{$field.Name}} {{$field.Type}}{{end}}
+	}
+{{end}}
+
 {{range $contract := .Contracts}}
-	{{$structs := $contract.Structs}}
 	// {{.Type}}ABI is the input ABI used to generate the binding from.
 	const {{.Type}}ABI = "{{.InputABI}}"
 
@@ -123,7 +132,7 @@ var (
 
 	{{if .InputBin}}
 		// {{.Type}}Bin is the compiled bytecode used for deploying new contracts.
-		const {{.Type}}Bin = "0x{{.InputBin}}"
+		var {{.Type}}Bin = "0x{{.InputBin}}"
 
 		// Deploy{{.Type}} deploys a new GoChain contract, binding an instance of {{.Type}} to it.
 		func Deploy{{.Type}}(auth *bind.TransactOpts, backend bind.ContractBackend {{range .Constructor.Inputs}}, {{.Name}} {{bindtype .Type $structs}}{{end}}) (common.Address, *types.Transaction, *{{.Type}}, error) {
@@ -131,23 +140,11 @@ var (
 		  if err != nil {
 		    return common.Address{}, nil, nil, err
 		  }
-		  {{decapitalise $contract.Type}}Bin := {{$contract.Type}}Bin
-		  {{if .Libraries}}
-		  if auth.Nonce == nil {
-			if err := bind.EnsureNonce(auth, backend); err != nil {
-			  return common.Address{}, nil, nil, err
-			}
-		  }
-		  {{end}}
 		  {{range $pattern, $name := .Libraries}}
-			{{decapitalise $name}}Addr, _, _, err := Deploy{{capitalise $name}}(auth, backend)
-			if err != nil {
-			  return common.Address{}, nil, nil, err
-			}
-			auth.Nonce = auth.Nonce.Add(auth.Nonce, big.NewInt(1))
-			{{decapitalise $contract.Type}}Bin = strings.Replace({{decapitalise $contract.Type}}Bin, "__${{$pattern}}$__", {{decapitalise $name}}Addr.String()[2:], -1)
+			{{decapitalise $name}}Addr, _, _, _ := Deploy{{capitalise $name}}(auth, backend)
+			{{$contract.Type}}Bin = strings.Replace({{$contract.Type}}Bin, "__${{$pattern}}$__", {{decapitalise $name}}Addr.String()[2:], -1)
 		  {{end}}
-		  address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex({{decapitalise .Type}}Bin), backend {{range .Constructor.Inputs}}, {{.Name}}{{end}})
+		  address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex({{.Type}}Bin), backend {{range .Constructor.Inputs}}, {{.Name}}{{end}})
 		  if err != nil {
 		    return common.Address{}, nil, nil, err
 		  }
@@ -297,18 +294,10 @@ var (
 		return _{{$contract.Type}}.Contract.contract.Transact(opts, method, params...)
 	}
 
-	{{range .Structs}}
-		// {{.Name}} is an auto generated low-level Go binding around an user-defined struct.
-		type {{.Name}} struct {
-		{{range $field := .Fields}}
-		{{$field.Name}} {{$field.Type}}{{end}}
-		}
-	{{end}}
-
 	{{range .Calls}}
 		// {{.Normalized.Name}} is a free data retrieval call binding the contract method 0x{{printf "%x" .Original.ID}}.
 		//
-		// Solidity: {{formatmethod .Original $structs}}
+		// Solidity: {{.Original.String}}
 		func (_{{$contract.Type}} *{{$contract.Type}}Caller) {{.Normalized.Name}}(opts *bind.CallOpts {{range .Normalized.Inputs}}, {{.Name}} {{bindtype .Type $structs}} {{end}}) ({{if .Structured}}struct{ {{range .Normalized.Outputs}}{{.Name}} {{bindtype .Type $structs}};{{end}} },{{else}}{{range .Normalized.Outputs}}{{bindtype .Type $structs}},{{end}}{{end}} error) {
 			{{if .Structured}}ret := new(struct{
 				{{range .Normalized.Outputs}}{{.Name}} {{bindtype .Type $structs}}
@@ -327,14 +316,14 @@ var (
 
 		// {{.Normalized.Name}} is a free data retrieval call binding the contract method 0x{{printf "%x" .Original.ID}}.
 		//
-		// Solidity: {{formatmethod .Original $structs}}
+		// Solidity: {{.Original.String}}
 		func (_{{$contract.Type}} *{{$contract.Type}}Session) {{.Normalized.Name}}({{range $i, $_ := .Normalized.Inputs}}{{if ne $i 0}},{{end}} {{.Name}} {{bindtype .Type $structs}} {{end}}) ({{if .Structured}}struct{ {{range .Normalized.Outputs}}{{.Name}} {{bindtype .Type $structs}};{{end}} }, {{else}} {{range .Normalized.Outputs}}{{bindtype .Type $structs}},{{end}} {{end}} error) {
 		  return _{{$contract.Type}}.Contract.{{.Normalized.Name}}(&_{{$contract.Type}}.CallOpts {{range .Normalized.Inputs}}, {{.Name}}{{end}})
 		}
 
 		// {{.Normalized.Name}} is a free data retrieval call binding the contract method 0x{{printf "%x" .Original.ID}}.
 		//
-		// Solidity: {{formatmethod .Original $structs}}
+		// Solidity: {{.Original.String}}
 		func (_{{$contract.Type}} *{{$contract.Type}}CallerSession) {{.Normalized.Name}}({{range $i, $_ := .Normalized.Inputs}}{{if ne $i 0}},{{end}} {{.Name}} {{bindtype .Type $structs}} {{end}}) ({{if .Structured}}struct{ {{range .Normalized.Outputs}}{{.Name}} {{bindtype .Type $structs}};{{end}} }, {{else}} {{range .Normalized.Outputs}}{{bindtype .Type $structs}},{{end}} {{end}} error) {
 		  return _{{$contract.Type}}.Contract.{{.Normalized.Name}}(&_{{$contract.Type}}.CallOpts {{range .Normalized.Inputs}}, {{.Name}}{{end}})
 		}
@@ -343,23 +332,69 @@ var (
 	{{range .Transacts}}
 		// {{.Normalized.Name}} is a paid mutator transaction binding the contract method 0x{{printf "%x" .Original.ID}}.
 		//
-		// Solidity: {{formatmethod .Original $structs}}
+		// Solidity: {{.Original.String}}
 		func (_{{$contract.Type}} *{{$contract.Type}}Transactor) {{.Normalized.Name}}(opts *bind.TransactOpts {{range .Normalized.Inputs}}, {{.Name}} {{bindtype .Type $structs}} {{end}}) (*types.Transaction, error) {
 			return _{{$contract.Type}}.contract.Transact(opts, "{{.Original.Name}}" {{range .Normalized.Inputs}}, {{.Name}}{{end}})
 		}
 
 		// {{.Normalized.Name}} is a paid mutator transaction binding the contract method 0x{{printf "%x" .Original.ID}}.
 		//
-		// Solidity: {{formatmethod .Original $structs}}
+		// Solidity: {{.Original.String}}
 		func (_{{$contract.Type}} *{{$contract.Type}}Session) {{.Normalized.Name}}({{range $i, $_ := .Normalized.Inputs}}{{if ne $i 0}},{{end}} {{.Name}} {{bindtype .Type $structs}} {{end}}) (*types.Transaction, error) {
 		  return _{{$contract.Type}}.Contract.{{.Normalized.Name}}(&_{{$contract.Type}}.TransactOpts {{range $i, $_ := .Normalized.Inputs}}, {{.Name}}{{end}})
 		}
 
 		// {{.Normalized.Name}} is a paid mutator transaction binding the contract method 0x{{printf "%x" .Original.ID}}.
 		//
-		// Solidity: {{formatmethod .Original $structs}}
+		// Solidity: {{.Original.String}}
 		func (_{{$contract.Type}} *{{$contract.Type}}TransactorSession) {{.Normalized.Name}}({{range $i, $_ := .Normalized.Inputs}}{{if ne $i 0}},{{end}} {{.Name}} {{bindtype .Type $structs}} {{end}}) (*types.Transaction, error) {
 		  return _{{$contract.Type}}.Contract.{{.Normalized.Name}}(&_{{$contract.Type}}.TransactOpts {{range $i, $_ := .Normalized.Inputs}}, {{.Name}}{{end}})
+		}
+	{{end}}
+
+	{{if .Fallback}} 
+		// Fallback is a paid mutator transaction binding the contract fallback function.
+		//
+		// Solidity: {{.Fallback.Original.String}}
+		func (_{{$contract.Type}} *{{$contract.Type}}Transactor) Fallback(opts *bind.TransactOpts, calldata []byte) (*types.Transaction, error) {
+			return _{{$contract.Type}}.contract.RawTransact(opts, calldata)
+		}
+
+		// Fallback is a paid mutator transaction binding the contract fallback function.
+		//
+		// Solidity: {{.Fallback.Original.String}}
+		func (_{{$contract.Type}} *{{$contract.Type}}Session) Fallback(calldata []byte) (*types.Transaction, error) {
+		  return _{{$contract.Type}}.Contract.Fallback(&_{{$contract.Type}}.TransactOpts, calldata)
+		}
+	
+		// Fallback is a paid mutator transaction binding the contract fallback function.
+		// 
+		// Solidity: {{.Fallback.Original.String}}
+		func (_{{$contract.Type}} *{{$contract.Type}}TransactorSession) Fallback(calldata []byte) (*types.Transaction, error) {
+		  return _{{$contract.Type}}.Contract.Fallback(&_{{$contract.Type}}.TransactOpts, calldata)
+		}
+	{{end}}
+
+	{{if .Receive}} 
+		// Receive is a paid mutator transaction binding the contract receive function.
+		//
+		// Solidity: {{.Receive.Original.String}}
+		func (_{{$contract.Type}} *{{$contract.Type}}Transactor) Receive(opts *bind.TransactOpts) (*types.Transaction, error) {
+			return _{{$contract.Type}}.contract.RawTransact(opts, nil) // calldata is disallowed for receive function
+		}
+
+		// Receive is a paid mutator transaction binding the contract receive function.
+		//
+		// Solidity: {{.Receive.Original.String}}
+		func (_{{$contract.Type}} *{{$contract.Type}}Session) Receive() (*types.Transaction, error) {
+		  return _{{$contract.Type}}.Contract.Receive(&_{{$contract.Type}}.TransactOpts)
+		}
+	
+		// Receive is a paid mutator transaction binding the contract receive function.
+		// 
+		// Solidity: {{.Receive.Original.String}}
+		func (_{{$contract.Type}} *{{$contract.Type}}TransactorSession) Receive() (*types.Transaction, error) {
+		  return _{{$contract.Type}}.Contract.Receive(&_{{$contract.Type}}.TransactOpts)
 		}
 	{{end}}
 
@@ -436,7 +471,7 @@ var (
 
 		// Filter{{.Normalized.Name}} is a free log retrieval operation binding the contract event 0x{{printf "%x" .Original.ID}}.
 		//
-		// Solidity: {{formatevent .Original $structs}}
+		// Solidity: {{.Original.String}}
  		func (_{{$contract.Type}} *{{$contract.Type}}Filterer) Filter{{.Normalized.Name}}(opts *bind.FilterOpts{{range .Normalized.Inputs}}{{if .Indexed}}, {{.Name}} []{{bindtype .Type $structs}}{{end}}{{end}}) (*{{$contract.Type}}{{.Normalized.Name}}Iterator, error) {
 			{{range .Normalized.Inputs}}
 			{{if .Indexed}}var {{.Name}}Rule []interface{}
@@ -453,7 +488,7 @@ var (
 
 		// Watch{{.Normalized.Name}} is a free log subscription operation binding the contract event 0x{{printf "%x" .Original.ID}}.
 		//
-		// Solidity: {{formatevent .Original $structs}}
+		// Solidity: {{.Original.String}}
 		func (_{{$contract.Type}} *{{$contract.Type}}Filterer) Watch{{.Normalized.Name}}(opts *bind.WatchOpts, sink chan<- *{{$contract.Type}}{{.Normalized.Name}}{{range .Normalized.Inputs}}{{if .Indexed}}, {{.Name}} []{{bindtype .Type $structs}}{{end}}{{end}}) (event.Subscription, error) {
 			{{range .Normalized.Inputs}}
 			{{if .Indexed}}var {{.Name}}Rule []interface{}
@@ -495,7 +530,7 @@ var (
 
 		// Parse{{.Normalized.Name}} is a log parse operation binding the contract event 0x{{printf "%x" .Original.ID}}.
 		//
-		// Solidity: {{formatevent .Original $structs}}
+		// Solidity: {{.Original.String}}
 		func (_{{$contract.Type}} *{{$contract.Type}}Filterer) Parse{{.Normalized.Name}}(log types.Log) (*{{$contract.Type}}{{.Normalized.Name}}, error) {
 			event := new({{$contract.Type}}{{.Normalized.Name}})
 			if err := _{{$contract.Type}}.contract.UnpackLog(event, "{{.Original.Name}}", log); err != nil {
@@ -519,8 +554,8 @@ package {{.Package}};
 import org.ethereum.geth.*;
 import java.util.*;
 
+{{$structs := .Structs}}
 {{range $contract := .Contracts}}
-{{$structs := $contract.Structs}}
 {{if not .Library}}public {{end}}class {{.Type}} {
 	// ABI is the input ABI used to generate the binding from.
 	public final static String ABI = "{{.InputABI}}";
@@ -589,7 +624,7 @@ import java.util.*;
 	// {{.Normalized.Name}} is a free data retrieval call binding the contract method 0x{{printf "%x" .Original.ID}}.
 	//
 	// Solidity: {{.Original.String}}
-	public {{if gt (len .Normalized.Outputs) 1}}{{capitalise .Normalized.Name}}Results{{else}}{{range .Normalized.Outputs}}{{bindtype .Type $structs}}{{end}}{{end}} {{.Normalized.Name}}(CallOpts opts{{range .Normalized.Inputs}}, {{bindtype .Type $structs}} {{.Name}}{{end}}) throws Exception {
+	public {{if gt (len .Normalized.Outputs) 1}}{{capitalise .Normalized.Name}}Results{{else if eq (len .Normalized.Outputs) 0}}void{{else}}{{range .Normalized.Outputs}}{{bindtype .Type $structs}}{{end}}{{end}} {{.Normalized.Name}}(CallOpts opts{{range .Normalized.Inputs}}, {{bindtype .Type $structs}} {{.Name}}{{end}}) throws Exception {
 		Interfaces args = Geth.newInterfaces({{(len .Normalized.Inputs)}});
 		{{range $index, $item := .Normalized.Inputs}}Interface arg{{$index}} = Geth.newInterface();arg{{$index}}.set{{namedtype (bindtype .Type $structs) .Type}}({{.Name}});args.set({{$index}},arg{{$index}});
 		{{end}}
@@ -623,6 +658,24 @@ import java.util.*;
 		return this.Contract.transact(opts, "{{.Original.Name}}"	, args);
 	}
 	{{end}}
+
+    {{if .Fallback}}
+	// Fallback is a paid mutator transaction binding the contract fallback function.
+	//
+	// Solidity: {{.Fallback.Original.String}}
+	public Transaction Fallback(TransactOpts opts, byte[] calldata) throws Exception { 
+		return this.Contract.rawTransact(opts, calldata);
+	}
+    {{end}}
+
+    {{if .Receive}}
+	// Receive is a paid mutator transaction binding the contract receive function.
+	//
+	// Solidity: {{.Receive.Original.String}}
+	public Transaction Receive(TransactOpts opts) throws Exception { 
+		return this.Contract.rawTransact(opts, null);
+	}
+    {{end}}
 }
 {{end}}
 `
