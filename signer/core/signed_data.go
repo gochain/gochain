@@ -603,11 +603,30 @@ func (typedData *TypedData) EncodePrimitiveValue(encType string, encValue interf
 		}
 	}
 	if strings.HasPrefix(encType, "int") || strings.HasPrefix(encType, "uint") {
-		b, err := parseInteger(encType, encValue)
-		if err != nil {
-			return nil, err
+		length := 0
+		if encType == "int" || encType == "uint" {
+			length = 256
+		} else {
+			lengthStr := ""
+			if strings.HasPrefix(encType, "uint") {
+				lengthStr = strings.TrimPrefix(encType, "uint")
+			} else {
+				lengthStr = strings.TrimPrefix(encType, "int")
+			}
+			atoiSize, err := strconv.Atoi(lengthStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid size on integer: %v", lengthStr)
+			}
+			length = atoiSize
 		}
-		return math.U256Bytes(b), nil
+		bigIntValue, ok := encValue.(*big.Int)
+		if bigIntValue.BitLen() > length {
+			return nil, fmt.Errorf("integer larger than '%v'", encType)
+		}
+		if !ok {
+			return nil, dataMismatchError(encType, encValue)
+		}
+		return math.U256Bytes(bigIntValue), nil
 	}
 	return nil, fmt.Errorf("unrecognized type '%s'", encType)
 

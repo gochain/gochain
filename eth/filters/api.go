@@ -268,7 +268,7 @@ func (api *PublicFilterAPI) Logs(ctx context.Context, crit FilterCriteria) (*rpc
 }
 
 // FilterCriteria represents a request to create a new filter.
-// Same as ethereum.FilterQuery but with UnmarshalJSON() method.
+// Same as gochain.FilterQuery but with UnmarshalJSON() method.
 type FilterCriteria gochain.FilterQuery
 
 // NewFilter creates a new filter and returns the filter id. It can be
