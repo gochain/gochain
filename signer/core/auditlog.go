@@ -18,6 +18,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/gochain/gochain/v3/common"
 	"github.com/gochain/gochain/v3/common/hexutil"
@@ -61,8 +62,9 @@ func (l *AuditLogger) SignTransaction(ctx context.Context, args SendTxArgs, meth
 }
 
 func (l *AuditLogger) SignData(ctx context.Context, contentType string, addr common.MixedcaseAddress, data interface{}) (hexutil.Bytes, error) {
+	marshalledData, _ := json.Marshal(data) // can ignore error, marshalling what we just unmarshalled
 	l.log.Info("SignData", "type", "request", "metadata", MetadataFromContext(ctx).String(),
-		"addr", addr.String(), "data", data, "content-type", contentType)
+		"addr", addr.String(), "data", marshalledData, "content-type", contentType)
 	b, e := l.api.SignData(ctx, contentType, addr, data)
 	l.log.Info("SignData", "type", "response", "data", common.Bytes2Hex(b), "error", e)
 	return b, e
