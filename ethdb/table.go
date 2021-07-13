@@ -114,16 +114,11 @@ func (t *Table) Open() error {
 func (t *Table) Close() error {
 	for _, segment := range t.ldbSegments {
 		if err := segment.Close(); err != nil {
-			return err
+			log.Error("Failed to close leveldb segment", "path", segment.Path(), "name", segment.Name(), "error", err)
 		}
 	}
 	if t.segments != nil {
-		for _, segment := range t.segments.Slice() {
-			if err := segment.Close(); err != nil {
-				return err
-			}
-			t.segments.Remove(segment.Name())
-		}
+		t.segments.Close()
 	}
 	return nil
 }
@@ -215,7 +210,7 @@ func (t *Table) ldbSegmentSlice() []*LDBSegment {
 
 // CreateSegmentIfNotExists returns a mutable segment by name.
 // Creates a new segment if it does not exist.
-func (t *Table) CreateSegmentIfNotExists(name string) (*LDBSegment, error) {
+func (t *Table) CreateSegmentIfNotExists(ctx context.Context, name string) (*LDBSegment, error) {
 	t.mu.RLock()
 	if s := t.ldbSegments[name]; s != nil {
 		t.mu.RUnlock()
@@ -233,7 +228,7 @@ func (t *Table) CreateSegmentIfNotExists(name string) (*LDBSegment, error) {
 
 	// Uncompact segment if it has already become compacted.
 	if t.segments.Contains(name) {
-		return t.uncompact(context.TODO(), name)
+		return t.uncompact(ctx, name)
 	}
 
 	// Ensure segment name can become active.
@@ -254,7 +249,7 @@ func (t *Table) CreateSegmentIfNotExists(name string) (*LDBSegment, error) {
 
 	// Compact under lock.
 	// TODO(benbjohnson): Run compaction in background if too slow.
-	if err := t.compact(context.TODO()); err != nil {
+	if err := t.compact(ctx); err != nil {
 		return nil, err
 	}
 
@@ -296,7 +291,7 @@ func (t *Table) Put(key, value []byte) error {
 		return nil
 	}
 
-	s, err := t.CreateSegmentIfNotExists(t.Partitioner.Partition(key))
+	s, err := t.CreateSegmentIfNotExists(context.TODO(), t.Partitioner.Partition(key))
 	if err != nil {
 		return err
 	}
@@ -376,7 +371,7 @@ func (t *Table) uncompact(ctx context.Context, name string) (*LDBSegment, error)
 		return nil, err
 	}
 	t.ldbSegments[name] = ldbSegment
-	t.segments.Remove(name)
+	t.segments.Remove(ctx, name)
 
 	log.Info("Uncompacted segment", "table", t.Name, "name", name, "elapsed", time.Since(startTime))
 
@@ -398,7 +393,7 @@ func (b *tableBatch) Put(key, value []byte) error {
 	}
 
 	name := b.table.Partitioner.Partition(key)
-	ldbSegment, err := b.table.CreateSegmentIfNotExists(name)
+	ldbSegment, err := b.table.CreateSegmentIfNotExists(context.TODO(), name)
 	if err != nil {
 		log.Error("tableBatch.Put: error", "table", b.table.Name, "segment", name, "key", fmt.Sprintf("%x", key))
 		return err
@@ -425,7 +420,7 @@ func (b *tableBatch) Delete(key []byte) error {
 	}
 
 	name := b.table.Partitioner.Partition(key)
-	ldbSegment, err := b.table.CreateSegmentIfNotExists(name)
+	ldbSegment, err := b.table.CreateSegmentIfNotExists(context.TODO(), name)
 	if err != nil {
 		log.Error("tableBatch.Delete: error", "table", b.table.Name, "segment", name, "key", fmt.Sprintf("%x", key))
 		return err

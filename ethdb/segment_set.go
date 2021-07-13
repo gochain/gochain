@@ -2,10 +2,11 @@ package ethdb
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/gochain/gochain/v3/log"
-	"github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -56,12 +57,14 @@ func (ss *SegmentSet) Contains(name string) bool {
 }
 
 // Remove removes the segment with the given name from the set.
-func (ss *SegmentSet) Remove(name string) {
+func (ss *SegmentSet) Remove(ctx context.Context, name string) {
 	ss.mu.Lock()
 	delete(ss.segments, name)
 	ss.mu.Unlock()
 
-	ss.semaphore.Acquire(context.Background(), 1)
+	if ss.semaphore.Acquire(ctx, 1) != nil {
+		return // cache Purge will Remove this segment
+	}
 	ss.cache.Remove(name)
 	ss.semaphore.Release(1)
 }
@@ -114,16 +117,32 @@ func (ss *SegmentSet) onEvicted(key, value interface{}) {
 		return
 	}
 
+	var err error
+	var action string
 	switch s := s.(type) {
 	case interface {
 		Segment
 		Purge() error
 	}:
-		log.Info("Purge local segment", "path", s.Path())
-		s.Purge()
+		log.Info("Purge local segment", "name", s.Name(), "path", s.Path())
+		err = s.Purge()
+		action = "purge"
 	default:
-		s.Close()
+		err = s.Close()
+		action = "close"
 	}
+	if err != nil {
+		log.Error(fmt.Sprintf("Failed to %s segment", action), "name", s.Name(), "path", s.Path(), "error", err)
+	}
+}
+
+func (ss *SegmentSet) Close() error {
+	ss.mu.Lock()
+	ss.segments = map[string]Segment{}
+	ss.mu.Unlock()
+	// Evict all
+	ss.cache.Purge()
+	return nil
 }
 
 // Slice returns a slice of all segments.
