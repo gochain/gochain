@@ -114,7 +114,7 @@ func (t *Table) Open() error {
 func (t *Table) Close() error {
 	for _, segment := range t.ldbSegments {
 		if err := segment.Close(); err != nil {
-			return err
+			log.Error("Failed to close leveldb segment", "path", segment.Path(), "name", segment.Name(), "error", err)
 		}
 	}
 	if t.segments != nil {
