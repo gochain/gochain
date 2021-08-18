@@ -1,5 +1,5 @@
 # Build GoChain in a stock Go builder container
-FROM golang:1.16-alpine3.13 as builder
+FROM golang:1.17-alpine3.13 as builder
 
 RUN apk --no-cache add build-base git mercurial gcc linux-headers
 ENV D=/gochain
