@@ -210,7 +210,9 @@ func makeExtraData(extra []byte) []byte {
 	if len(extra) == 0 {
 		defaultExtraDataOnce.Do(func() {
 			defaultExtraData = []byte(fmt.Sprintf("%s/%s-%s/%s", params.Version, runtime.GOOS, runtime.GOARCH, runtime.Version()))
-			defaultExtraData = defaultExtraData[:params.MaximumExtraDataSize]
+			if uint64(len(defaultExtraData)) > params.MaximumExtraDataSize {
+				defaultExtraData = defaultExtraData[:params.MaximumExtraDataSize]
+			}
 		})
 		return defaultExtraData
 	}

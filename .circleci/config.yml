@@ -3,7 +3,7 @@ version: 2.0
 defaults: &defaults
   working_directory: /go/src/github.com/gochain/gochain
   docker:
-    - image: circleci/golang:1.16
+    - image: circleci/golang:1.17
   environment: # apparently expansion doesn't work here yet: https://discuss.circleci.com/t/environment-variable-expansion-in-working-directory/11322
     - OS=linux
     - ARCH=amd64
@@ -120,8 +120,8 @@ jobs:
       - run:
           name: install dependencies
           command: |
-            wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-204.0.0-linux-x86_64.tar.gz --directory-prefix=tmp
-            tar -xvzf tmp/google-cloud-sdk-204.0.0-linux-x86_64.tar.gz -C tmp
+            wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-353.0.0-linux-x86_64.tar.gz --directory-prefix=tmp
+            tar -xvzf tmp/google-cloud-sdk-353.0.0-linux-x86_64.tar.gz -C tmp
             ./tmp/google-cloud-sdk/install.sh -q
       - deploy:
           command: |
