@@ -120,8 +120,8 @@ jobs:
       - run:
           name: install dependencies
           command: |
-            wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-204.0.0-linux-x86_64.tar.gz --directory-prefix=tmp
-            tar -xvzf tmp/google-cloud-sdk-204.0.0-linux-x86_64.tar.gz -C tmp
+            wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-353.0.0-linux-x86_64.tar.gz --directory-prefix=tmp
+            tar -xvzf tmp/google-cloud-sdk-353.0.0-linux-x86_64.tar.gz -C tmp
             ./tmp/google-cloud-sdk/install.sh -q
       - deploy:
           command: |
