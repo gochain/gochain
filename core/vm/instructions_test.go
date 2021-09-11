@@ -26,13 +26,67 @@ import (
 	"github.com/gochain/gochain/v3/params"
 )
 
-type twoOperandTest struct {
-	x        string
-	y        string
-	expected string
+type TwoOperandTestcase struct {
+	X        string
+	Y        string
+	Expected string
 }
 
-func testTwoOperandOp(t *testing.T, tests []twoOperandTest, opFn func(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error)) {
+type twoOperandParams struct {
+	x string
+	y string
+}
+
+var alphabetSoup = "ABCDEF090807060504030201ffffffffffffffffffffffffffffffffffffffff"
+var commonParams []*twoOperandParams
+var twoOpMethods map[string]executionFunc
+
+func init() {
+
+	// Params is a list of common edgecases that should be used for some common tests
+	params := []string{
+		"0000000000000000000000000000000000000000000000000000000000000000", // 0
+		"0000000000000000000000000000000000000000000000000000000000000001", // +1
+		"0000000000000000000000000000000000000000000000000000000000000005", // +5
+		"7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe", // + max -1
+		"7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // + max
+		"8000000000000000000000000000000000000000000000000000000000000000", // - max
+		"8000000000000000000000000000000000000000000000000000000000000001", // - max+1
+		"fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffb", // - 5
+		"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // - 1
+	}
+	// Params are combined so each param is used on each 'side'
+	commonParams = make([]*twoOperandParams, len(params)*len(params))
+	for i, x := range params {
+		for j, y := range params {
+			commonParams[i*len(params)+j] = &twoOperandParams{x, y}
+		}
+	}
+	twoOpMethods = map[string]executionFunc{
+		"add":     opAdd,
+		"sub":     opSub,
+		"mul":     opMul,
+		"div":     opDiv,
+		"sdiv":    opSdiv,
+		"mod":     opMod,
+		"smod":    opSmod,
+		"exp":     opExp,
+		"signext": opSignExtend,
+		"lt":      opLt,
+		"gt":      opGt,
+		"slt":     opSlt,
+		"sgt":     opSgt,
+		"eq":      opEq,
+		"and":     opAnd,
+		"or":      opOr,
+		"xor":     opXor,
+		"byte":    opByte,
+		"shl":     opSHL,
+		"shr":     opSHR,
+		"sar":     opSAR,
+	}
+}
+func testTwoOperandOp(t *testing.T, tests []TwoOperandTestcase, opFn func(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error)) {
 	var (
 		env            = NewEVM(Context{}, nil, params.TestChainConfig, Config{})
 		stack          = newstack()
@@ -43,9 +97,9 @@ func testTwoOperandOp(t *testing.T, tests []twoOperandTest, opFn func(pc *uint64
 	env.interpreter = evmInterpreter
 	evmInterpreter.intPool = poolOfIntPools.get()
 	for i, test := range tests {
-		x := new(big.Int).SetBytes(common.Hex2Bytes(test.x))
-		shift := new(big.Int).SetBytes(common.Hex2Bytes(test.y))
-		expected := new(big.Int).SetBytes(common.Hex2Bytes(test.expected))
+		x := new(big.Int).SetBytes(common.Hex2Bytes(test.X))
+		shift := new(big.Int).SetBytes(common.Hex2Bytes(test.Y))
+		expected := new(big.Int).SetBytes(common.Hex2Bytes(test.Expected))
 		stack.push(x)
 		stack.push(shift)
 		opFn(&pc, evmInterpreter, nil, nil, stack)
@@ -113,7 +167,7 @@ func TestByteOp(t *testing.T) {
 
 func TestSHL(t *testing.T) {
 	// Testcases from https://github.com/ethereum/EIPs/blob/master/EIPS/eip-145.md#shl-shift-left
-	tests := []twoOperandTest{
+	tests := []TwoOperandTestcase{
 		{"0000000000000000000000000000000000000000000000000000000000000001", "00", "0000000000000000000000000000000000000000000000000000000000000001"},
 		{"0000000000000000000000000000000000000000000000000000000000000001", "01", "0000000000000000000000000000000000000000000000000000000000000002"},
 		{"0000000000000000000000000000000000000000000000000000000000000001", "ff", "8000000000000000000000000000000000000000000000000000000000000000"},
@@ -131,7 +185,7 @@ func TestSHL(t *testing.T) {
 
 func TestSHR(t *testing.T) {
 	// Testcases from https://github.com/ethereum/EIPs/blob/master/EIPS/eip-145.md#shr-logical-shift-right
-	tests := []twoOperandTest{
+	tests := []TwoOperandTestcase{
 		{"0000000000000000000000000000000000000000000000000000000000000001", "00", "0000000000000000000000000000000000000000000000000000000000000001"},
 		{"0000000000000000000000000000000000000000000000000000000000000001", "01", "0000000000000000000000000000000000000000000000000000000000000000"},
 		{"8000000000000000000000000000000000000000000000000000000000000000", "01", "4000000000000000000000000000000000000000000000000000000000000000"},
@@ -149,7 +203,7 @@ func TestSHR(t *testing.T) {
 
 func TestSAR(t *testing.T) {
 	// Testcases from https://github.com/ethereum/EIPs/blob/master/EIPS/eip-145.md#sar-arithmetic-shift-right
-	tests := []twoOperandTest{
+	tests := []TwoOperandTestcase{
 		{"0000000000000000000000000000000000000000000000000000000000000001", "00", "0000000000000000000000000000000000000000000000000000000000000001"},
 		{"0000000000000000000000000000000000000000000000000000000000000001", "01", "0000000000000000000000000000000000000000000000000000000000000000"},
 		{"8000000000000000000000000000000000000000000000000000000000000000", "01", "c000000000000000000000000000000000000000000000000000000000000000"},
@@ -172,7 +226,7 @@ func TestSAR(t *testing.T) {
 }
 
 func TestSGT(t *testing.T) {
-	tests := []twoOperandTest{
+	tests := []TwoOperandTestcase{
 
 		{"0000000000000000000000000000000000000000000000000000000000000001", "0000000000000000000000000000000000000000000000000000000000000001", "0000000000000000000000000000000000000000000000000000000000000000"},
 		{"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "0000000000000000000000000000000000000000000000000000000000000000"},
@@ -191,7 +245,7 @@ func TestSGT(t *testing.T) {
 }
 
 func TestSLT(t *testing.T) {
-	tests := []twoOperandTest{
+	tests := []TwoOperandTestcase{
 		{"0000000000000000000000000000000000000000000000000000000000000001", "0000000000000000000000000000000000000000000000000000000000000001", "0000000000000000000000000000000000000000000000000000000000000000"},
 		{"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "0000000000000000000000000000000000000000000000000000000000000000"},
 		{"7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "0000000000000000000000000000000000000000000000000000000000000000"},
