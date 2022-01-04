@@ -1,178 +1,26 @@
-version: 2.0
+# Use the latest 2.1 version of CircleCI pipeline process engine.
+# See: https://circleci.com/docs/2.0/configuration-reference
+version: 2.1
 
-defaults: &defaults
-  working_directory: /go/src/github.com/gochain/gochain
-  docker:
-    - image: circleci/golang:1.17
-  environment: # apparently expansion doesn't work here yet: https://discuss.circleci.com/t/environment-variable-expansion-in-working-directory/11322
-    - OS=linux
-    - ARCH=amd64
-    - GOCACHE=/tmp/go/cache
-
+# Define a job to be invoked later in a workflow.
+# See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
-  prepare:
-    <<: *defaults
+  say-hello:
+    # Specify the execution environment. You can specify an image from Dockerhub or use one of our Convenience Images from CircleCI's Developer Hub.
+    # See: https://circleci.com/docs/2.0/configuration-reference/#docker-machine-macos-windows-executor
+    docker:
+      - image: cimg/base:stable
+    # Add steps to the job
+    # See: https://circleci.com/docs/2.0/configuration-reference/#steps
     steps:
       - checkout
-      - restore_cache:
-          key: go-mod-v1-{{ checksum "go.sum" }}
-          paths:
-              - /go/pkg/mod
-      - run: go mod download
-      - save_cache:
-          key: go-mod-v1-{{ checksum "go.sum" }}
-          paths:
-            - /go/pkg/mod
-      - persist_to_workspace:
-          root: .
-          paths:
-            - .
-  build:
-    <<: *defaults
-    steps:
-      - restore_cache:
-          keys:
-              - build-cache-{{ .Branch }}-{{ .Environment.CIRCLE_PREVIOUS_BUILD_NUM }}
-              - build-cache-{{ .Branch }}-
-              - build-cache-
-          paths:
-              - /tmp/go/cache
-      - attach_workspace:
-          at: .
-      - run: make all
-      - save_cache:
-          key: build-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
-          paths:
-              - /tmp/go/cache
-
-  test:
-    <<: *defaults
-    steps:
-      - restore_cache:
-          keys:
-              - test-cache-{{ .Branch }}-{{ .Environment.CIRCLE_PREVIOUS_BUILD_NUM }}
-              - test-cache-{{ .Branch }}-
-              - test-cache-
-          paths:
-              - /tmp/go/cache
-      - attach_workspace:
-          at: .
-      - run: go test -timeout 15m ./...
-      - save_cache:
-          key: test-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
-          paths:
-              - /tmp/go/cache
-
-  race:
-    <<: *defaults
-    steps:
-      - restore_cache:
-          keys:
-              - race-cache-{{ .Branch }}-{{ .Environment.CIRCLE_PREVIOUS_BUILD_NUM }}
-              - race-cache-{{ .Branch }}-
-              - race-cache-
-          paths:
-              - /tmp/go/cache
-      - attach_workspace:
-          at: .
-      - run: go test -race ./core/...
-      - save_cache:
-          key: race-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
-          paths:
-              - /tmp/go/cache
-
-  release-master:
-    <<: *defaults
-    steps:
-      - setup_remote_docker
-      - attach_workspace:
-          at: .
       - run:
-          name: install dependencies
-          command: |
-            wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-353.0.0-linux-x86_64.tar.gz --directory-prefix=tmp
-            tar -xvzf tmp/google-cloud-sdk-353.0.0-linux-x86_64.tar.gz -C tmp
-            ./tmp/google-cloud-sdk/install.sh -q
-      - run:
-          name: add github ssh
-          command: |
-            echo '
-            github.com ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAq2A7hRGmdnm9tUDbO9IDSwBK6TbQa+PXYPCPy6rbTrTtw7PHkccKrpp0yVhp5HdEIcKr6pLlVDBfOLX9QUsyCOV0wzfjIJNlGEYsdlLJizHhbn2mUjvSAHQqZETYP81eFzLQNnPHt4EVVUh7VfDESU84KezmD5QlWpXLmvU31/yMf+Se8xhHTvKSCZIFImWwoG6mbUoWf9nzpIoaSjB+weqqUUmpaaasXVal72J+UX2B+2RPW3RcT0eOzQgqlJL3RKrTJvdsjE3JEAvGq3lGHSZXy28G3skua2SmVi/w4yCE6gbODqnTWlg7+wC604ydGXA8VJiS5ap43JXiUFFAaQ==
-            ' >> ~/.ssh/known_hosts
-      - deploy:
-          command: |
-            if [[ "${CIRCLE_BRANCH}" == "master" && -z "${CIRCLE_PR_REPONAME}" ]]; then
-              git config --global user.email "ci@gochain.io"
-              git config --global user.name "CI"
-              git branch --set-upstream-to=origin/${CIRCLE_BRANCH} ${CIRCLE_BRANCH}
-              echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-              echo $GOOGLE_AUTH > ${HOME}/gcloud-service-key.json
-              echo $GOOGLE_AUTH | docker login -u _json_key --password-stdin https://gcr.io
-              ./release.sh
-            fi
+          name: "Say hello"
+          command: "echo Hello, World!"
 
-  docker:
-    <<: *defaults
-    steps:
-      - setup_remote_docker
-      - attach_workspace:
-          at: .
-      - run:
-          name: install dependencies
-          command: |
-            wget https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-353.0.0-linux-x86_64.tar.gz --directory-prefix=tmp
-            tar -xvzf tmp/google-cloud-sdk-353.0.0-linux-x86_64.tar.gz -C tmp
-            ./tmp/google-cloud-sdk/install.sh -q
-      - deploy:
-          command: |
-            echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-            docker build . -t gochain/gochain:${CIRCLE_BRANCH}
-            docker push gochain/gochain:${CIRCLE_BRANCH}
-            echo $GOOGLE_AUTH > ${HOME}/gcloud-service-key.json
-            echo $GOOGLE_AUTH | docker login -u _json_key --password-stdin https://gcr.io
-            ./tmp/google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
-            docker tag gochain/gochain:${CIRCLE_BRANCH} gcr.io/gochain-core/gochain:${CIRCLE_BRANCH}
-            docker push gcr.io/gochain-core/gochain:${CIRCLE_BRANCH}
-
+# Invoke jobs via workflows
+# See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
-  version: 2
-  prepare-accept-deploy:
+  say-hello-workflow:
     jobs:
-      - prepare
-      - build:
-          requires:
-            - prepare
-
-      - test:
-          requires:
-            - prepare
-      - race:
-          requires:
-            - prepare
-
-      - release-master:
-          filters:
-            branches:
-              only: master
-          requires:
-            - build
-            - test
-            - race
-
-      - approve-docker:
-          type: approval
-          filters:
-            branches:
-              ignore:
-              - master
-              - stable
-              - testnet
-              - latest
-          requires:
-            - test
-            - build
-            - race
-
-      - docker:
-          requires:
-            - approve-docker
+      - say-hello
