@@ -150,7 +150,7 @@ func (c *ChainConfig) String() string {
 		engine = "unknown"
 	}
 	return fmt.Sprintf("{ChainID: %v Homestead: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople:"+
-		" %v ConstantinopleFix: %v Darvaza: %v EWASM: %v Engine: %v}",
+		" %v ConstantinopleFix: %v Darvaza: %v Hafthor: %v EWASM: %v Engine: %v}",
 		c.ChainId,
 		c.HomesteadBlock,
 		c.EIP150Block,
@@ -160,6 +160,7 @@ func (c *ChainConfig) String() string {
 		c.ConstantinopleBlock,
 		c.PetersburgBlock,
 		c.DarvazaBlock,
+		c.HafthorBlock,
 		c.EWASMBlock,
 		engine,
 	)
@@ -282,7 +283,6 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 	if isForkIncompatible(c.DarvazaBlock, newcfg.DarvazaBlock, head) {
 		return newCompatError("Darvaza fork block", c.DarvazaBlock, newcfg.DarvazaBlock)
 	}
-	//TODO
 	if isForkIncompatible(c.EWASMBlock, newcfg.EWASMBlock, head) {
 		return newCompatError("ewasm fork block", c.EWASMBlock, newcfg.EWASMBlock)
 	}
