@@ -47,8 +47,8 @@ var (
 		PetersburgBlock:     nil,
 		DarvazaBlock:        big.NewInt(17_900_000),
 		DarvazaDefaultGas:   new(big.Int).SetUint64(2_000 * Shannon),
-		//TODO HafthorBlock:        big.NewInt(23_400_000), // ~2022-02-01?
-		//TODO HafthorStakeAddress: common.HexToAddress("0xT0D0"), // staking contract
+		HafthorBlock:        big.NewInt(23_817_200),                                            // 2022-02-23
+        HafthorStakeAddress: common.HexToAddress("0x4281Cabd60bB91A6A8B0C60842440669DEA3F541"),
 
 		Clique: DefaultCliqueConfig(),
 	}
