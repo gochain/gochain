@@ -11,7 +11,7 @@
     "darvazaBlock": 17900000,
     "darvazaDefaultGas": 2000000000000,
     "hafthorBlock": 23817200,
-    "hafthorStakeAddress": "0x4281Cabd60bB91A6A8B0C60842440669DEA3F541",
+    "hafthorStakeAddress": "0x4281cabd60bb91a6a8b0c60842440669dea3f541",
     "clique": {
       "period": 5,
       "epoch": 3000
