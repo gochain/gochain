@@ -43,11 +43,14 @@ var (
 		EIP155Block:         big.NewInt(0),
 		EIP158Block:         big.NewInt(0),
 		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(5100000),
+		ConstantinopleBlock: big.NewInt(5_100_000),
 		PetersburgBlock:     nil,
-		DarvazaBlock:        big.NewInt(17900000),
-		DarvazaDefaultGas:   new(big.Int).SetUint64(2000 * Shannon),
-		Clique:              DefaultCliqueConfig(),
+		DarvazaBlock:        big.NewInt(17_900_000),
+		DarvazaDefaultGas:   new(big.Int).SetUint64(2_000 * Shannon),
+		HafthorBlock:        big.NewInt(23_817_200),                                            // 2022-02-23
+        HafthorStakeAddress: common.HexToAddress("0x4281Cabd60bB91A6A8B0C60842440669DEA3F541"),
+
+		Clique: DefaultCliqueConfig(),
 	}
 
 	// TestnetChainConfig contains the chain parameters to run a node on the test network.
@@ -59,10 +62,12 @@ var (
 		EIP155Block:         big.NewInt(0),
 		EIP158Block:         big.NewInt(0),
 		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(4081350),
+		ConstantinopleBlock: big.NewInt(4_081_350),
 		PetersburgBlock:     nil,
-		DarvazaBlock:        big.NewInt(16811000),
-		DarvazaDefaultGas:   new(big.Int).SetUint64(2000 * Shannon),
+		DarvazaBlock:        big.NewInt(16_811_000),
+		DarvazaDefaultGas:   new(big.Int).SetUint64(2_000 * Shannon),
+		HafthorBlock:        big.NewInt(22_400_000),                                            // 2022-01-15
+		HafthorStakeAddress: common.HexToAddress("0x2fe70f1df222c85ad6dd24a3376eb5ac32136978"), // recycle to genesis alloc
 
 		Clique: DefaultCliqueConfig(),
 	}
@@ -100,12 +105,14 @@ type ChainConfig struct {
 	EIP155Block *big.Int `json:"eip155Block,omitempty"` // EIP155 HF block
 	EIP158Block *big.Int `json:"eip158Block,omitempty"` // EIP158 HF block
 
-	ByzantiumBlock      *big.Int `json:"byzantiumBlock,omitempty"`      // Byzantium switch block (nil = no fork, 0 = already on byzantium)
-	ConstantinopleBlock *big.Int `json:"constantinopleBlock,omitempty"` // Constantinople switch block (nil = no fork, 0 = already activated)
-	PetersburgBlock     *big.Int `json:"petersburgBlock,omitempty"`     // Petersburg switch block (nil = same as Constantinople)
-	DarvazaBlock        *big.Int `json:"darvazaBlock,omitempty"`        // Darvaza switch block (nil = no fork, 0 = already activated)
-	DarvazaDefaultGas   *big.Int `json:"darvazaDefaultGas,omitempty"`   // Darvaza default gas value (nil = no change)
-	EWASMBlock          *big.Int `json:"ewasmBlock,omitempty"`          // EWASM switch block (nil = no fork, 0 = already activated)
+	ByzantiumBlock      *big.Int       `json:"byzantiumBlock,omitempty"`      // Byzantium switch block (nil = no fork, 0 = already on byzantium)
+	ConstantinopleBlock *big.Int       `json:"constantinopleBlock,omitempty"` // Constantinople switch block (nil = no fork, 0 = already activated)
+	PetersburgBlock     *big.Int       `json:"petersburgBlock,omitempty"`     // Petersburg switch block (nil = same as Constantinople)
+	DarvazaBlock        *big.Int       `json:"darvazaBlock,omitempty"`        // Darvaza switch block (nil = no fork, 0 = already activated)
+	DarvazaDefaultGas   *big.Int       `json:"darvazaDefaultGas,omitempty"`   // Darvaza default gas value (nil = no change)
+	HafthorBlock        *big.Int       `json:"hafthorBlock,omitempty"`        // Hafthor switch block (nil = no fork, 0 = already activated)
+	HafthorStakeAddress common.Address `json:"hafthorStakeAddress"`           // Hafthor stake address to send rewards
+	EWASMBlock          *big.Int       `json:"ewasmBlock,omitempty"`          // EWASM switch block (nil = no fork, 0 = already activated)
 
 	// Various consensus engines
 	Ethash *EthashConfig `json:"ethash,omitempty"`
@@ -143,7 +150,7 @@ func (c *ChainConfig) String() string {
 		engine = "unknown"
 	}
 	return fmt.Sprintf("{ChainID: %v Homestead: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople:"+
-		" %v ConstantinopleFix: %v Darvaza: %v EWASM: %v Engine: %v}",
+		" %v ConstantinopleFix: %v Darvaza: %v Hafthor: %v EWASM: %v Engine: %v}",
 		c.ChainId,
 		c.HomesteadBlock,
 		c.EIP150Block,
@@ -153,6 +160,7 @@ func (c *ChainConfig) String() string {
 		c.ConstantinopleBlock,
 		c.PetersburgBlock,
 		c.DarvazaBlock,
+		c.HafthorBlock,
 		c.EWASMBlock,
 		engine,
 	)
@@ -198,6 +206,11 @@ func (c *ChainConfig) IsPetersburg(num *big.Int) bool {
 // IsDarvaza returns whether num is either equal to the Darvaza fork block or greater.
 func (c *ChainConfig) IsDarvaza(num *big.Int) bool {
 	return isForked(c.DarvazaBlock, num)
+}
+
+// IsHafthor returns whether num is either equal to the Hafthor fork block or greater.
+func (c *ChainConfig) IsHafthor(num *big.Int) bool {
+	return isForked(c.HafthorBlock, num)
 }
 
 // IsEWASM returns whether num represents a block number after the EWASM fork
@@ -340,6 +353,7 @@ type Rules struct {
 	ChainId                                     *big.Int
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158   bool
 	IsByzantium, IsConstantinople, IsPetersburg bool
+	IsDarvaza, IsHafthor                        bool
 	IsEWASM                                     bool
 }
 
@@ -358,6 +372,8 @@ func (c *ChainConfig) Rules(num *big.Int) Rules {
 		IsByzantium:      c.IsByzantium(num),
 		IsConstantinople: c.IsConstantinople(num),
 		IsPetersburg:     c.IsPetersburg(num),
+		IsDarvaza:        c.IsDarvaza(num),
+		IsHafthor:        c.IsHafthor(num),
 		IsEWASM:          c.IsEWASM(num),
 	}
 }
