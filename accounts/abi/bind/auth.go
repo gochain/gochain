@@ -21,6 +21,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"math/big"
 
 	"github.com/gochain/gochain/v3/accounts"
 	"github.com/gochain/gochain/v3/accounts/external"
@@ -97,6 +98,29 @@ func NewKeyedTransactor(key *ecdsa.PrivateKey) *TransactOpts {
 			return tx.WithSignature(signer, signature)
 		},
 	}
+}
+
+// NewKeyedTransactorWithChainID is a utility method to easily create a transaction signer
+// from a single private key and chainId
+func NewKeyedTransactorWithChainID(key *ecdsa.PrivateKey, chainID *big.Int) (*TransactOpts, error) {
+	keyAddr := crypto.PubkeyToAddress(key.PublicKey)
+	if chainID == nil {
+		return nil, ErrNoChainID
+	}
+	signer := types.NewEIP155Signer(chainID)
+	return &TransactOpts{
+		From: keyAddr,
+		Signer: func(address common.Address, tx *types.Transaction) (*types.Transaction, error) {
+			if address != keyAddr {
+				return nil, ErrNotAuthorized
+			}
+			signature, err := crypto.Sign(signer.Hash(tx).Bytes(), key)
+			if err != nil {
+				return nil, err
+			}
+			return tx.WithSignature(signer, signature)
+		},
+	}, nil
 }
 
 // NewClefTransactor is a utility method to easily create a transaction signer
