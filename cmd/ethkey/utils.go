@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/gochain/gochain/v3/cmd/utils"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/crypto"
 	"github.com/urfave/cli"
 )
 

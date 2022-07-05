@@ -20,7 +20,7 @@ import (
 	"container/ring"
 	"sync"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/core/types"
 	"github.com/gochain/gochain/v3/log"
 )

@@ -23,7 +23,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/gochain/gochain/v3/common/mclock"
+	"github.com/gochain/common/mclock"
 	"github.com/gochain/gochain/v3/log"
 )
 

@@ -26,11 +26,11 @@ import (
 	"github.com/gochain/gochain/v3"
 	"github.com/gochain/gochain/v3/accounts/abi"
 	"github.com/gochain/gochain/v3/accounts/abi/bind"
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/hexutil"
+	"github.com/gochain/common"
+	"github.com/gochain/common/hexutil"
 	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/crypto"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/crypto"
+	"github.com/gochain/rlp"
 )
 
 type mockCaller struct {

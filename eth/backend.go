@@ -25,9 +25,9 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/accounts"
 	"github.com/gochain/gochain/v3/accounts/keystore"
-	"github.com/gochain/gochain/v3/common"
 	"github.com/gochain/gochain/v3/consensus"
 	"github.com/gochain/gochain/v3/consensus/clique"
 	"github.com/gochain/gochain/v3/core"

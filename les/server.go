@@ -23,7 +23,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/rawdb"
 	"github.com/gochain/gochain/v3/core/types"
@@ -33,7 +33,7 @@ import (
 	"github.com/gochain/gochain/v3/log"
 	"github.com/gochain/gochain/v3/p2p"
 	"github.com/gochain/gochain/v3/p2p/discv5"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/rlp"
 )
 
 type LesServer struct {

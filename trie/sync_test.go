@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/ethdb"
 )
 

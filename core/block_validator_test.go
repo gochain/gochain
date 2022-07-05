@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v3/common/hexutil"
+	"github.com/gochain/common/hexutil"
 	"github.com/gochain/gochain/v3/consensus/clique"
 	"github.com/gochain/gochain/v3/core/types"
 	"github.com/gochain/gochain/v3/core/vm"

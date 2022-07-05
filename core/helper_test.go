@@ -19,7 +19,7 @@ package core
 import (
 	"container/list"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/core/types"
 	"github.com/gochain/gochain/v3/ethdb"
 )

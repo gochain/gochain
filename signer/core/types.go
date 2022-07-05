@@ -22,8 +22,8 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/hexutil"
+	"github.com/gochain/common"
+	"github.com/gochain/common/hexutil"
 	"github.com/gochain/gochain/v3/core/types"
 )
 

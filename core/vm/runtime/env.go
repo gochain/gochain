@@ -17,7 +17,7 @@
 package runtime
 
 import (
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/vm"
 )

@@ -22,14 +22,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/rawdb"
 	"github.com/gochain/gochain/v3/core/state"
 	"github.com/gochain/gochain/v3/core/types"
 	"github.com/gochain/gochain/v3/log"
 	"github.com/gochain/gochain/v3/params"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/rlp"
 )
 
 const (

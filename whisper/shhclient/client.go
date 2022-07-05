@@ -19,8 +19,8 @@ package shhclient
 import (
 	"context"
 
+	"github.com/gochain/common/hexutil"
 	"github.com/gochain/gochain/v3"
-	"github.com/gochain/gochain/v3/common/hexutil"
 	"github.com/gochain/gochain/v3/rpc"
 	whisper "github.com/gochain/gochain/v3/whisper/whisperv6"
 )

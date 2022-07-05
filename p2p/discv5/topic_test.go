@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/mclock"
+	"github.com/gochain/common"
+	"github.com/gochain/common/mclock"
 )
 
 func TestTopicRadius(t *testing.T) {

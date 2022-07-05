@@ -20,9 +20,9 @@ import (
 	"context"
 	"math/big"
 
+	"github.com/gochain/common"
+	"github.com/gochain/common/math"
 	"github.com/gochain/gochain/v3/accounts"
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/math"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/bloombits"
 	"github.com/gochain/gochain/v3/core/state"

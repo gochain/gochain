@@ -19,9 +19,9 @@ package types
 import (
 	"io"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/hexutil"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/common"
+	"github.com/gochain/common/hexutil"
+	"github.com/gochain/rlp"
 )
 
 //go:generate gencodec -type Log -field-override logMarshaling -out gen_log_json.go

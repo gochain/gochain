@@ -31,13 +31,13 @@ import (
 	"unicode"
 
 	"github.com/gochain/gochain/v3/accounts"
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/hexutil"
-	"github.com/gochain/gochain/v3/common/math"
+	"github.com/gochain/common"
+	"github.com/gochain/common/hexutil"
+	"github.com/gochain/common/math"
 	"github.com/gochain/gochain/v3/consensus/clique"
 	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/crypto"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/crypto"
+	"github.com/gochain/rlp"
 )
 
 type SigFormat struct {

@@ -19,8 +19,8 @@ package eth
 import (
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/bitutil"
+	"github.com/gochain/common"
+	"github.com/gochain/common/bitutil"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/bloombits"
 	"github.com/gochain/gochain/v3/core/rawdb"

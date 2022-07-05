@@ -25,8 +25,8 @@ import (
 
 	"golang.org/x/crypto/sha3"
 
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3"
-	"github.com/gochain/gochain/v3/common"
 	"github.com/gochain/gochain/v3/core/types"
 	"github.com/gochain/gochain/v3/log"
 )

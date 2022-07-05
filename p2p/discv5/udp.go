@@ -24,12 +24,12 @@ import (
 	"net"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/common"
+	"github.com/gochain/crypto"
 	"github.com/gochain/gochain/v3/log"
 	"github.com/gochain/gochain/v3/p2p/nat"
 	"github.com/gochain/gochain/v3/p2p/netutil"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/rlp"
 )
 
 const Version = 4

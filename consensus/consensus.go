@@ -20,8 +20,8 @@ package consensus
 import (
 	"time"
 
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/accounts"
-	"github.com/gochain/gochain/v3/common"
 	"github.com/gochain/gochain/v3/core/state"
 	"github.com/gochain/gochain/v3/core/types"
 	"github.com/gochain/gochain/v3/params"

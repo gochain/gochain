@@ -23,7 +23,7 @@ import (
 	"github.com/gochain/gochain/v3/accounts"
 	"github.com/gochain/gochain/v3/accounts/keystore"
 	"github.com/gochain/gochain/v3/cmd/utils"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/crypto"
 	"github.com/gochain/gochain/v3/log"
 	"github.com/urfave/cli"
 )

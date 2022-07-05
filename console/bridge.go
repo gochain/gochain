@@ -25,9 +25,9 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"github.com/gochain/common/hexutil"
 	"github.com/gochain/gochain/v3/accounts/scwallet"
 	"github.com/gochain/gochain/v3/accounts/usbwallet"
-	"github.com/gochain/gochain/v3/common/hexutil"
 	"github.com/gochain/gochain/v3/console/prompt"
 	"github.com/gochain/gochain/v3/internal/jsre"
 	"github.com/gochain/gochain/v3/rpc"

@@ -22,8 +22,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/mclock"
+	"github.com/gochain/common"
+	"github.com/gochain/common/mclock"
 	"github.com/gochain/gochain/v3/consensus"
 	"github.com/gochain/gochain/v3/core/rawdb"
 	"github.com/gochain/gochain/v3/core/types"

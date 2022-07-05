@@ -26,8 +26,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/accounts"
-	"github.com/gochain/gochain/v3/common"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/ethdb"
 	"github.com/gochain/gochain/v3/ethdb/s3"

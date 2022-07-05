@@ -24,9 +24,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/consensus"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/rawdb"
@@ -34,7 +34,7 @@ import (
 	"github.com/gochain/gochain/v3/core/types"
 	"github.com/gochain/gochain/v3/log"
 	"github.com/gochain/gochain/v3/params"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/rlp"
 )
 
 var (

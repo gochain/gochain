@@ -25,7 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/consensus"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/types"
@@ -35,7 +35,7 @@ import (
 	"github.com/gochain/gochain/v3/p2p"
 	"github.com/gochain/gochain/v3/p2p/discover"
 	"github.com/gochain/gochain/v3/params"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/rlp"
 )
 
 const (

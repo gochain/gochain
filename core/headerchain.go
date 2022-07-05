@@ -26,13 +26,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/consensus"
 	"github.com/gochain/gochain/v3/core/rawdb"
 	"github.com/gochain/gochain/v3/core/types"
 	"github.com/gochain/gochain/v3/log"
 	"github.com/gochain/gochain/v3/params"
-	"github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 const (

@@ -33,7 +33,7 @@ import (
 	"github.com/gochain/gochain/v3/internal/debug"
 	"github.com/gochain/gochain/v3/log"
 	"github.com/gochain/gochain/v3/node"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/rlp"
 )
 
 const (

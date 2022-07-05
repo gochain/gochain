@@ -22,8 +22,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gochain/gochain/v3/common/hexutil"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/common/hexutil"
+	"github.com/gochain/crypto"
 	"github.com/gochain/gochain/v3/log"
 	"github.com/gochain/gochain/v3/metrics"
 	"github.com/gochain/gochain/v3/p2p"

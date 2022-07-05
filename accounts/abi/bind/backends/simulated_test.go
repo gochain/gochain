@@ -21,13 +21,13 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3"
 	"github.com/gochain/gochain/v3/accounts/abi/bind"
 	"github.com/gochain/gochain/v3/accounts/abi/bind/backends"
-	"github.com/gochain/gochain/v3/common"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/crypto"
 )
 
 func TestSimulatedBackend(t *testing.T) {

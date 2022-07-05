@@ -23,12 +23,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/consensus/clique"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/rawdb"
 	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/crypto"
 	"github.com/gochain/gochain/v3/ethdb"
 	"github.com/gochain/gochain/v3/params"
 )

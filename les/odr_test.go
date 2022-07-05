@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/math"
+	"github.com/gochain/common"
+	"github.com/gochain/common/math"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/rawdb"
 	"github.com/gochain/gochain/v3/core/state"
@@ -34,7 +34,7 @@ import (
 	"github.com/gochain/gochain/v3/ethdb"
 	"github.com/gochain/gochain/v3/light"
 	"github.com/gochain/gochain/v3/params"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/rlp"
 )
 
 type odrTestFn func(ctx context.Context, db common.Database, config *params.ChainConfig, bc *core.BlockChain, lc *light.LightChain, bhash common.Hash) []byte

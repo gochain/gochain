@@ -32,8 +32,8 @@ import (
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/mclock"
+	"github.com/gochain/common"
+	"github.com/gochain/common/mclock"
 	"github.com/gochain/gochain/v3/consensus"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/types"

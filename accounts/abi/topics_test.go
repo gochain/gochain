@@ -21,8 +21,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/common"
+	"github.com/gochain/crypto"
 )
 
 func TestMakeTopics(t *testing.T) {

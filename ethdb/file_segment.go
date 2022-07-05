@@ -15,7 +15,7 @@ import (
 
 	"github.com/cespare/xxhash"
 	"github.com/edsrzf/mmap-go"
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/log"
 )
 

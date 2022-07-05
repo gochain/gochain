@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gochain/gochain/v3/common/hexutil"
+	"github.com/gochain/common/hexutil"
 	"github.com/gochain/gochain/v3/rpc"
 )
 

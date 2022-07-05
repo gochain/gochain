@@ -21,7 +21,7 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/core/vm"
 	"github.com/gochain/gochain/v3/log"
 	"github.com/gochain/gochain/v3/params"

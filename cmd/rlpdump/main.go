@@ -26,7 +26,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/rlp"
 )
 
 var (

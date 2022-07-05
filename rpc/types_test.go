@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/math"
+	"github.com/gochain/common"
+	"github.com/gochain/common/math"
 )
 
 func TestBlockNumberJSONUnmarshal(t *testing.T) {

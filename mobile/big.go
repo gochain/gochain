@@ -22,7 +22,7 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 )
 
 // A BigInt represents a signed multi-precision integer.

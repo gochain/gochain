@@ -22,13 +22,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/consensus"
 	"github.com/gochain/gochain/v3/consensus/clique"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/types"
 	"github.com/gochain/gochain/v3/core/vm"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/crypto"
 	"github.com/gochain/gochain/v3/ethdb"
 	"github.com/gochain/gochain/v3/params"
 )
@@ -208,7 +208,7 @@ func testEmptyWork(t *testing.T, chainConfig *params.ChainConfig, engine consens
 	for i := 0; i < 2; i += 1 {
 		select {
 		case <-taskCh:
-		case <-time.After(10*time.Second):
+		case <-time.After(10 * time.Second):
 			t.Error("new task timeout")
 		}
 	}

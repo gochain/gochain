@@ -24,8 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/common"
+	"github.com/gochain/crypto"
 	whisper "github.com/gochain/gochain/v3/whisper/whisperv6"
 )
 

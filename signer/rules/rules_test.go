@@ -22,9 +22,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gochain/common"
+	"github.com/gochain/common/hexutil"
 	"github.com/gochain/gochain/v3/accounts"
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/hexutil"
 	"github.com/gochain/gochain/v3/core/types"
 	"github.com/gochain/gochain/v3/internal/ethapi"
 	"github.com/gochain/gochain/v3/signer/core"

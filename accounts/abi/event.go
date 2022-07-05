@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/common"
+	"github.com/gochain/crypto"
 )
 
 // Event is an event potentially triggered by the EVM's LOG mechanism. The Event

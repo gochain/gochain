@@ -28,8 +28,8 @@ import (
 
 	"github.com/gochain/gochain/v3/console/prompt"
 
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/cmd/utils"
-	"github.com/gochain/gochain/v3/common"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/state"
 	"github.com/gochain/gochain/v3/core/types"

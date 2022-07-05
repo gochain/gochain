@@ -22,7 +22,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gochain/gochain/v3/common/math"
+	"github.com/gochain/common/math"
 	"github.com/gochain/gochain/v3/core/vm"
 )
 

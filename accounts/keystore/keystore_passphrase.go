@@ -38,10 +38,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/gochain/common"
+	"github.com/gochain/common/math"
 	"github.com/gochain/gochain/v3/accounts"
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/math"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/crypto"
 	"github.com/pborman/uuid"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/crypto/scrypt"

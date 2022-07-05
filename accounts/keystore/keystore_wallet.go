@@ -23,7 +23,7 @@ import (
 
 	"github.com/gochain/gochain/v3/accounts"
 	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/crypto"
 )
 
 // keystoreWallet implements the accounts.Wallet interface for the original

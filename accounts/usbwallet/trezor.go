@@ -27,10 +27,10 @@ import (
 	"io"
 	"math/big"
 
+	"github.com/gochain/common"
+	"github.com/gochain/common/hexutil"
 	"github.com/gochain/gochain/v3/accounts"
 	"github.com/gochain/gochain/v3/accounts/usbwallet/trezor"
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/hexutil"
 	"github.com/gochain/gochain/v3/core/types"
 	"github.com/gochain/gochain/v3/log"
 	"github.com/golang/protobuf/proto"

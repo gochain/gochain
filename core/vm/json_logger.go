@@ -22,8 +22,8 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/math"
+	"github.com/gochain/common"
+	"github.com/gochain/common/math"
 )
 
 type JSONLogger struct {

@@ -28,11 +28,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/mclock"
-	"github.com/gochain/gochain/v3/common/prque"
+	"github.com/gochain/common"
+	"github.com/gochain/common/mclock"
+	"github.com/gochain/common/prque"
 	"github.com/gochain/gochain/v3/consensus"
 	"github.com/gochain/gochain/v3/core/rawdb"
 	"github.com/gochain/gochain/v3/core/state"
@@ -42,8 +42,8 @@ import (
 	"github.com/gochain/gochain/v3/log"
 	"github.com/gochain/gochain/v3/metrics"
 	"github.com/gochain/gochain/v3/params"
-	"github.com/gochain/gochain/v3/rlp"
 	"github.com/gochain/gochain/v3/trie"
+	"github.com/gochain/rlp"
 )
 
 var (

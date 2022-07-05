@@ -24,10 +24,10 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/gochain/common/compiler"
 	"github.com/gochain/gochain/v3/accounts/abi/bind"
 	"github.com/gochain/gochain/v3/cmd/utils"
-	"github.com/gochain/gochain/v3/common/compiler"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/crypto"
 	"github.com/gochain/gochain/v3/internal/flags"
 	"github.com/gochain/gochain/v3/log"
 	"github.com/urfave/cli"

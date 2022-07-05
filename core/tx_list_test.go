@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/crypto"
 )
 
 // Tests that transactions can be added to strict lists and list contents and

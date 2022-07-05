@@ -26,9 +26,9 @@ import (
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/hexutil"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/common"
+	"github.com/gochain/common/hexutil"
+	"github.com/gochain/crypto"
 	"github.com/gochain/gochain/v3/log"
 	"github.com/gochain/gochain/v3/p2p/discover"
 	"github.com/gochain/gochain/v3/rpc"

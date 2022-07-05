@@ -27,13 +27,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/mclock"
+	"github.com/gochain/common"
+	"github.com/gochain/common/mclock"
 	"github.com/gochain/gochain/v3/log"
 	"github.com/gochain/gochain/v3/p2p"
 	"github.com/gochain/gochain/v3/p2p/discover"
 	"github.com/gochain/gochain/v3/p2p/discv5"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/rlp"
 )
 
 const (

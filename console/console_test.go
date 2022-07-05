@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/console/prompt"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/eth"

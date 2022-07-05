@@ -8,9 +8,9 @@ import (
 
 	"math/rand"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/crypto"
 	"github.com/gochain/gochain/v3/params"
 	"github.com/gochain/gochain/v3/rpc"
 )

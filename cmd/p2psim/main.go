@@ -45,7 +45,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/crypto"
 	"github.com/gochain/gochain/v3/p2p"
 	"github.com/gochain/gochain/v3/p2p/discover"
 	"github.com/gochain/gochain/v3/p2p/simulations"

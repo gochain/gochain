@@ -22,8 +22,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/accounts/abi"
-	"github.com/gochain/gochain/v3/common"
 )
 
 func verify(t *testing.T, jsondata, calldata string, exp []interface{}) {

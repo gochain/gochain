@@ -25,9 +25,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/mclock"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/common"
+	"github.com/gochain/common/mclock"
+	"github.com/gochain/crypto"
 	"github.com/gochain/gochain/v3/log"
 )
 

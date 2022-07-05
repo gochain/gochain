@@ -17,8 +17,8 @@
 package vm
 
 import (
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/math"
+	"github.com/gochain/common"
+	"github.com/gochain/common/math"
 	"github.com/gochain/gochain/v3/params"
 )
 

@@ -23,10 +23,10 @@ import (
 	"fmt"
 
 	"github.com/gochain/gochain/v3/cmd/utils"
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/common"
+	"github.com/gochain/crypto"
 	"github.com/gochain/gochain/v3/log"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/rlp"
 	whisper "github.com/gochain/gochain/v3/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"

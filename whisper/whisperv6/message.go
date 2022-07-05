@@ -28,9 +28,9 @@ import (
 	mrand "math/rand"
 	"strconv"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/crypto"
-	"github.com/gochain/gochain/v3/crypto/ecies"
+	"github.com/gochain/common"
+	"github.com/gochain/crypto"
+	"github.com/gochain/crypto/ecies"
 	"github.com/gochain/gochain/v3/log"
 )
 

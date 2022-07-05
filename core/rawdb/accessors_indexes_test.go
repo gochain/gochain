@@ -20,10 +20,10 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/core/types"
 	"github.com/gochain/gochain/v3/ethdb"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/rlp"
 )
 
 // Tests that positional lookup metadata can be stored and retrieved.

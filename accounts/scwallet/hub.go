@@ -42,8 +42,8 @@ import (
 	"time"
 
 	pcsc "github.com/gballet/go-libpcsclite"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/accounts"
-	"github.com/gochain/gochain/v3/common"
 	"github.com/gochain/gochain/v3/event"
 	"github.com/gochain/gochain/v3/log"
 )

@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain/gochain/v3/common/mclock"
+	"github.com/gochain/common/mclock"
 )
 
 // Subscription represents a stream of events. The carrier of the events is typically a

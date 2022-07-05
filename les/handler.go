@@ -27,7 +27,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/rawdb"
 	"github.com/gochain/gochain/v3/core/state"
@@ -39,8 +39,8 @@ import (
 	"github.com/gochain/gochain/v3/p2p/discover"
 	"github.com/gochain/gochain/v3/p2p/discv5"
 	"github.com/gochain/gochain/v3/params"
-	"github.com/gochain/gochain/v3/rlp"
 	"github.com/gochain/gochain/v3/trie"
+	"github.com/gochain/rlp"
 )
 
 const (

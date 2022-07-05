@@ -25,8 +25,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3"
-	"github.com/gochain/gochain/v3/common"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/rawdb"
 	"github.com/gochain/gochain/v3/core/types"

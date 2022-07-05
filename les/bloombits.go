@@ -19,7 +19,7 @@ package les
 import (
 	"time"
 
-	"github.com/gochain/gochain/v3/common/bitutil"
+	"github.com/gochain/common/bitutil"
 	"github.com/gochain/gochain/v3/light"
 )
 

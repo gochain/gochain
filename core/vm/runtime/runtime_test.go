@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/accounts/abi"
-	"github.com/gochain/gochain/v3/common"
 	"github.com/gochain/gochain/v3/core/state"
 	"github.com/gochain/gochain/v3/core/vm"
 	"github.com/gochain/gochain/v3/ethdb"

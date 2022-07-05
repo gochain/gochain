@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/gochain/gochain/v3/p2p/discover"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/rlp"
 )
 
 // eth protocol message codes

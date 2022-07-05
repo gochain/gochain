@@ -24,7 +24,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/crypto"
 	"github.com/gochain/gochain/v3/p2p"
 )
 

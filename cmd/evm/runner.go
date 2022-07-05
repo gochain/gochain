@@ -27,9 +27,9 @@ import (
 	"runtime/pprof"
 	"time"
 
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/cmd/evm/internal/compiler"
 	"github.com/gochain/gochain/v3/cmd/utils"
-	"github.com/gochain/gochain/v3/common"
 	"github.com/gochain/gochain/v3/core"
 	"github.com/gochain/gochain/v3/core/state"
 	"github.com/gochain/gochain/v3/core/vm"

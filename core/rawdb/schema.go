@@ -20,7 +20,7 @@ package rawdb
 import (
 	"encoding/binary"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 )
 
 const (

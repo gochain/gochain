@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/hexutil"
+	"github.com/gochain/common"
+	"github.com/gochain/common/hexutil"
 )
 
 var _ = (*logMarshaling)(nil)

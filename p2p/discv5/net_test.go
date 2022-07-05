@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/common"
+	"github.com/gochain/crypto"
 )
 
 func TestNetwork_Lookup(t *testing.T) {

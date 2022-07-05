@@ -19,9 +19,9 @@ package types
 import (
 	"bytes"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/common"
 	"github.com/gochain/gochain/v3/trie"
+	"github.com/gochain/rlp"
 )
 
 type DerivableList interface {

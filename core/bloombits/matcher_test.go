@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/common"
 )
 
 const testSectionSize = 4096
