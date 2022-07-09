@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v4/log"
 )
 
 // fileCache is a cache of files seen during scan of keystore.

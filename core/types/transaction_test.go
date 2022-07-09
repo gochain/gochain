@@ -23,9 +23,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/crypto"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/crypto"
+	"github.com/gochain/gochain/v4/rlp"
 )
 
 // The values in those tests are from the Transaction Tests

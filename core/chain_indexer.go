@@ -23,10 +23,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/core/rawdb"
-	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/core/rawdb"
+	"github.com/gochain/gochain/v4/core/types"
+	"github.com/gochain/gochain/v4/log"
 )
 
 // ChainIndexerBackend defines the methods needed to process chain segments in

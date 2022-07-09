@@ -20,12 +20,12 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/hexutil"
-	"github.com/gochain/gochain/v3/core"
-	"github.com/gochain/gochain/v3/eth/downloader"
-	"github.com/gochain/gochain/v3/eth/gasprice"
-	"github.com/gochain/gochain/v3/params"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/common/hexutil"
+	"github.com/gochain/gochain/v4/core"
+	"github.com/gochain/gochain/v4/eth/downloader"
+	"github.com/gochain/gochain/v4/eth/gasprice"
+	"github.com/gochain/gochain/v4/params"
 )
 
 // DefaultConfig contains default settings for use on the GoChain main net.

@@ -33,7 +33,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v4/log"
 )
 
 // Handler is the global debugging handler.

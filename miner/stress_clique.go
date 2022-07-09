@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
+//go:build none
 // +build none
 
 // This file contains a miner stress test based on the Clique consensus engine.
@@ -29,19 +30,19 @@ import (
 	"os"
 	"time"
 
-	"github.com/gochain/gochain/v3/accounts/keystore"
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/fdlimit"
-	"github.com/gochain/gochain/v3/core"
-	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/crypto"
-	"github.com/gochain/gochain/v3/eth"
-	"github.com/gochain/gochain/v3/eth/downloader"
-	"github.com/gochain/gochain/v3/log"
-	"github.com/gochain/gochain/v3/node"
-	"github.com/gochain/gochain/v3/p2p"
-	"github.com/gochain/gochain/v3/p2p/discover"
-	"github.com/gochain/gochain/v3/params"
+	"github.com/gochain/gochain/v4/accounts/keystore"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/common/fdlimit"
+	"github.com/gochain/gochain/v4/core"
+	"github.com/gochain/gochain/v4/core/types"
+	"github.com/gochain/gochain/v4/crypto"
+	"github.com/gochain/gochain/v4/eth"
+	"github.com/gochain/gochain/v4/eth/downloader"
+	"github.com/gochain/gochain/v4/log"
+	"github.com/gochain/gochain/v4/node"
+	"github.com/gochain/gochain/v4/p2p"
+	"github.com/gochain/gochain/v4/p2p/discover"
+	"github.com/gochain/gochain/v4/params"
 )
 
 func main() {

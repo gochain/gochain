@@ -19,11 +19,11 @@ package keystore
 import (
 	"math/big"
 
-	"github.com/gochain/gochain/v3"
+	"github.com/gochain/gochain/v4"
 
-	"github.com/gochain/gochain/v3/accounts"
-	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/gochain/v4/accounts"
+	"github.com/gochain/gochain/v4/core/types"
+	"github.com/gochain/gochain/v4/crypto"
 )
 
 // keystoreWallet implements the accounts.Wallet interface for the original

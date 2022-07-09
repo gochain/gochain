@@ -19,7 +19,7 @@ package trie
 import (
 	"fmt"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v4/common"
 )
 
 // MissingNodeError is returned by the trie functions (TryGet, TryUpdate, TryDelete)

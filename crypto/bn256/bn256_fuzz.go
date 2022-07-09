@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be found
 // in the LICENSE file.
 
+//go:build gofuzz
 // +build gofuzz
 
 package bn256
@@ -10,8 +11,8 @@ import (
 	"bytes"
 	"math/big"
 
-	cloudflare "github.com/gochain/gochain/v3/crypto/bn256/cloudflare"
-	google "github.com/gochain/gochain/v3/crypto/bn256/google"
+	cloudflare "github.com/gochain/gochain/v4/crypto/bn256/cloudflare"
+	google "github.com/gochain/gochain/v4/crypto/bn256/google"
 )
 
 // FuzzAdd fuzzez bn256 addition between the Google and Cloudflare libraries.

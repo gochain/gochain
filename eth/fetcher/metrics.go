@@ -19,7 +19,7 @@
 package fetcher
 
 import (
-	"github.com/gochain/gochain/v3/metrics"
+	"github.com/gochain/gochain/v4/metrics"
 )
 
 var (

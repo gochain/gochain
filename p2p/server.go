@@ -25,13 +25,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/mclock"
-	"github.com/gochain/gochain/v3/log"
-	"github.com/gochain/gochain/v3/p2p/discover"
-	"github.com/gochain/gochain/v3/p2p/discv5"
-	"github.com/gochain/gochain/v3/p2p/nat"
-	"github.com/gochain/gochain/v3/p2p/netutil"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/common/mclock"
+	"github.com/gochain/gochain/v4/log"
+	"github.com/gochain/gochain/v4/p2p/discover"
+	"github.com/gochain/gochain/v4/p2p/discv5"
+	"github.com/gochain/gochain/v4/p2p/nat"
+	"github.com/gochain/gochain/v4/p2p/netutil"
 )
 
 const (

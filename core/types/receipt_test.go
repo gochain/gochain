@@ -23,10 +23,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/crypto"
-	"github.com/gochain/gochain/v3/params"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/crypto"
+	"github.com/gochain/gochain/v4/params"
+	"github.com/gochain/gochain/v4/rlp"
 )
 
 func TestLegacyReceiptDecoding(t *testing.T) {

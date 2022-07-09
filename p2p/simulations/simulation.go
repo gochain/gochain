@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/gochain/gochain/v3/p2p/discover"
+	"github.com/gochain/gochain/v4/p2p/discover"
 )
 
 // Simulation provides a framework for running actions in a simulated network

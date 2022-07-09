@@ -28,8 +28,8 @@ import (
 	"testing/quick"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/crypto"
 )
 
 func ExampleNewNode() {

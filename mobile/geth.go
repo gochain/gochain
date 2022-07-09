@@ -25,17 +25,17 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/gochain/gochain/v3/core"
-	"github.com/gochain/gochain/v3/eth"
-	"github.com/gochain/gochain/v3/eth/downloader"
-	"github.com/gochain/gochain/v3/goclient"
-	"github.com/gochain/gochain/v3/les"
-	"github.com/gochain/gochain/v3/netstats"
-	"github.com/gochain/gochain/v3/node"
-	"github.com/gochain/gochain/v3/p2p"
-	"github.com/gochain/gochain/v3/p2p/nat"
-	"github.com/gochain/gochain/v3/params"
-	whisper "github.com/gochain/gochain/v3/whisper/whisperv6"
+	"github.com/gochain/gochain/v4/core"
+	"github.com/gochain/gochain/v4/eth"
+	"github.com/gochain/gochain/v4/eth/downloader"
+	"github.com/gochain/gochain/v4/goclient"
+	"github.com/gochain/gochain/v4/les"
+	"github.com/gochain/gochain/v4/netstats"
+	"github.com/gochain/gochain/v4/node"
+	"github.com/gochain/gochain/v4/p2p"
+	"github.com/gochain/gochain/v4/p2p/nat"
+	"github.com/gochain/gochain/v4/params"
+	whisper "github.com/gochain/gochain/v4/whisper/whisperv6"
 )
 
 // NodeConfig represents the collection of configuration values to fine tune the GoChain

@@ -25,13 +25,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gochain/gochain/v3/log"
-	"github.com/gochain/gochain/v3/node"
-	"github.com/gochain/gochain/v3/p2p"
-	"github.com/gochain/gochain/v3/p2p/discover"
-	"github.com/gochain/gochain/v3/p2p/simulations"
-	"github.com/gochain/gochain/v3/p2p/simulations/adapters"
-	"github.com/gochain/gochain/v3/rpc"
+	"github.com/gochain/gochain/v4/log"
+	"github.com/gochain/gochain/v4/node"
+	"github.com/gochain/gochain/v4/p2p"
+	"github.com/gochain/gochain/v4/p2p/discover"
+	"github.com/gochain/gochain/v4/p2p/simulations"
+	"github.com/gochain/gochain/v4/p2p/simulations/adapters"
+	"github.com/gochain/gochain/v4/rpc"
 )
 
 var adapterType = flag.String("adapter", "sim", `node adapter to use (one of "sim", "exec" or "docker")`)

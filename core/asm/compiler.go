@@ -22,8 +22,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gochain/gochain/v3/common/math"
-	"github.com/gochain/gochain/v3/core/vm"
+	"github.com/gochain/gochain/v4/common/math"
+	"github.com/gochain/gochain/v4/core/vm"
 )
 
 // Compiler contains information about the parsed source

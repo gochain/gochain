@@ -19,7 +19,6 @@ package types
 
 import (
 	"encoding/binary"
-	"golang.org/x/crypto/sha3"
 	"io"
 	"math/big"
 	"reflect"
@@ -27,9 +26,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/hexutil"
-	"github.com/gochain/gochain/v3/rlp"
+	"golang.org/x/crypto/sha3"
+
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/common/hexutil"
+	"github.com/gochain/gochain/v4/rlp"
 )
 
 var (

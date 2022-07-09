@@ -27,19 +27,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/gochain/gochain/v3/accounts"
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/hexutil"
-	"github.com/gochain/gochain/v3/consensus"
-	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/crypto"
-	"github.com/gochain/gochain/v3/log"
-	"github.com/gochain/gochain/v3/params"
-	"github.com/gochain/gochain/v3/rlp"
-	"github.com/gochain/gochain/v3/rpc"
+	"github.com/gochain/gochain/v4/accounts"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/common/hexutil"
+	"github.com/gochain/gochain/v4/consensus"
+	"github.com/gochain/gochain/v4/core/types"
+	"github.com/gochain/gochain/v4/crypto"
+	"github.com/gochain/gochain/v4/log"
+	"github.com/gochain/gochain/v4/params"
+	"github.com/gochain/gochain/v4/rlp"
+	"github.com/gochain/gochain/v4/rpc"
 )
 
 const (

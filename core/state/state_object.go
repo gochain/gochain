@@ -22,9 +22,9 @@ import (
 	"io"
 	"math/big"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/crypto"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/crypto"
+	"github.com/gochain/gochain/v4/rlp"
 )
 
 var (

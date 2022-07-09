@@ -29,8 +29,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/log"
 )
 
 const (

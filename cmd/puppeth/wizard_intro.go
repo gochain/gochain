@@ -26,7 +26,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v4/log"
 )
 
 // makeWizard creates and returns a new puppeth wizard.

@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain/gochain/v3/common/mclock"
+	"github.com/gochain/gochain/v4/common/mclock"
 )
 
 const rcConst = 1000000

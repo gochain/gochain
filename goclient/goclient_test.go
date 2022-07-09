@@ -22,8 +22,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gochain/gochain/v3"
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v4"
+	"github.com/gochain/gochain/v4/common"
 )
 
 // Verify that Client implements the gochain interfaces.

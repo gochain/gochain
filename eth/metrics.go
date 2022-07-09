@@ -17,8 +17,8 @@
 package eth
 
 import (
-	"github.com/gochain/gochain/v3/metrics"
-	"github.com/gochain/gochain/v3/p2p"
+	"github.com/gochain/gochain/v4/metrics"
+	"github.com/gochain/gochain/v4/p2p"
 )
 
 var (

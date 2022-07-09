@@ -33,10 +33,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/crypto"
-	"github.com/gochain/gochain/v3/log"
-	"github.com/gochain/gochain/v3/p2p/netutil"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/crypto"
+	"github.com/gochain/gochain/v4/log"
+	"github.com/gochain/gochain/v4/p2p/netutil"
 )
 
 const (

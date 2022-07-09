@@ -32,7 +32,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v4/log"
 )
 
 func TestClientRequest(t *testing.T) {

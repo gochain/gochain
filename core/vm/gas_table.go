@@ -17,9 +17,9 @@
 package vm
 
 import (
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/math"
-	"github.com/gochain/gochain/v3/params"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/common/math"
+	"github.com/gochain/gochain/v4/params"
 )
 
 // memoryGasCost calculates the quadratic gas for memory expansion. It does so

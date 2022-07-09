@@ -21,12 +21,12 @@ import (
 	"io"
 	"math/big"
 
-	"github.com/gochain/gochain/v3/p2p"
+	"github.com/gochain/gochain/v4/p2p"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/core"
-	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/core"
+	"github.com/gochain/gochain/v4/core/types"
+	"github.com/gochain/gochain/v4/rlp"
 )
 
 // Constants to match up protocol versions and messages

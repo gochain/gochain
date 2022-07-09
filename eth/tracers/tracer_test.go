@@ -24,10 +24,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/core/state"
-	"github.com/gochain/gochain/v3/core/vm"
-	"github.com/gochain/gochain/v3/params"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/core/state"
+	"github.com/gochain/gochain/v4/core/vm"
+	"github.com/gochain/gochain/v4/params"
 )
 
 type account struct{}

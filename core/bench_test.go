@@ -23,16 +23,16 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/hexutil"
-	"github.com/gochain/gochain/v3/common/math"
-	"github.com/gochain/gochain/v3/consensus/clique"
-	"github.com/gochain/gochain/v3/core/rawdb"
-	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/core/vm"
-	"github.com/gochain/gochain/v3/crypto"
-	"github.com/gochain/gochain/v3/ethdb"
-	"github.com/gochain/gochain/v3/params"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/common/hexutil"
+	"github.com/gochain/gochain/v4/common/math"
+	"github.com/gochain/gochain/v4/consensus/clique"
+	"github.com/gochain/gochain/v4/core/rawdb"
+	"github.com/gochain/gochain/v4/core/types"
+	"github.com/gochain/gochain/v4/core/vm"
+	"github.com/gochain/gochain/v4/crypto"
+	"github.com/gochain/gochain/v4/ethdb"
+	"github.com/gochain/gochain/v4/params"
 )
 
 func BenchmarkInsertChain_empty_memdb(b *testing.B) {

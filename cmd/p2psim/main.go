@@ -45,12 +45,12 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/gochain/gochain/v3/crypto"
-	"github.com/gochain/gochain/v3/p2p"
-	"github.com/gochain/gochain/v3/p2p/discover"
-	"github.com/gochain/gochain/v3/p2p/simulations"
-	"github.com/gochain/gochain/v3/p2p/simulations/adapters"
-	"github.com/gochain/gochain/v3/rpc"
+	"github.com/gochain/gochain/v4/crypto"
+	"github.com/gochain/gochain/v4/p2p"
+	"github.com/gochain/gochain/v4/p2p/discover"
+	"github.com/gochain/gochain/v4/p2p/simulations"
+	"github.com/gochain/gochain/v4/p2p/simulations/adapters"
+	"github.com/gochain/gochain/v4/rpc"
 	"github.com/urfave/cli"
 )
 

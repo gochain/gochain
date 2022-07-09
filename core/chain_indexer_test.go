@@ -23,10 +23,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/core/rawdb"
-	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/ethdb"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/core/rawdb"
+	"github.com/gochain/gochain/v4/core/types"
+	"github.com/gochain/gochain/v4/ethdb"
 )
 
 // Runs multiple tests with randomized parameters.

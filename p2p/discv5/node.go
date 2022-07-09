@@ -30,8 +30,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/crypto"
 )
 
 // Node represents a host on the network.
