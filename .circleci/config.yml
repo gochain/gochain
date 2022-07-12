@@ -15,12 +15,12 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: go-mod-v1-{{ checksum "go.sum" }}
+          key: go-mod-v2-{{ checksum "go.sum" }}
           paths:
               - /go/pkg/mod
       - run: go mod download
       - save_cache:
-          key: go-mod-v1-{{ checksum "go.sum" }}
+          key: go-mod-v2-{{ checksum "go.sum" }}
           paths:
             - /go/pkg/mod
       - persist_to_workspace:
