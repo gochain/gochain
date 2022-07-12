@@ -3,7 +3,7 @@ version: 2.0
 defaults: &defaults
   working_directory: /go/src/github.com/gochain/gochain
   docker:
-    - image: circleci/golang:1.18
+    - image: cimg/go:1.18
   environment: # apparently expansion doesn't work here yet: https://discuss.circleci.com/t/environment-variable-expansion-in-working-directory/11322
     - OS=linux
     - ARCH=amd64
