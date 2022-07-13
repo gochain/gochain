@@ -49,7 +49,6 @@ jobs:
     <<: *defaults
     steps:
       - restore_cache:
-      NEED TO CHANGE ALL THESE CACHE KEYS
           keys:
               - v2-test-cache-{{ .Branch }}-{{ .Environment.CIRCLE_PREVIOUS_BUILD_NUM }}
               - v2-test-cache-{{ .Branch }}-
