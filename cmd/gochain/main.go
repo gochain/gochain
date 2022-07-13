@@ -25,22 +25,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gochain/gochain/v3/console/prompt"
+	"github.com/gochain/gochain/v4/console/prompt"
 
 	"contrib.go.opencensus.io/exporter/stackdriver"
 	"github.com/urfave/cli"
 	"go.opencensus.io/trace"
 
-	"github.com/gochain/gochain/v3/accounts"
-	"github.com/gochain/gochain/v3/accounts/keystore"
-	"github.com/gochain/gochain/v3/cmd/utils"
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/eth"
-	"github.com/gochain/gochain/v3/goclient"
-	"github.com/gochain/gochain/v3/internal/debug"
-	"github.com/gochain/gochain/v3/log"
-	"github.com/gochain/gochain/v3/metrics"
-	"github.com/gochain/gochain/v3/node"
+	"github.com/gochain/gochain/v4/accounts"
+	"github.com/gochain/gochain/v4/accounts/keystore"
+	"github.com/gochain/gochain/v4/cmd/utils"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/eth"
+	"github.com/gochain/gochain/v4/goclient"
+	"github.com/gochain/gochain/v4/internal/debug"
+	"github.com/gochain/gochain/v4/log"
+	"github.com/gochain/gochain/v4/metrics"
+	"github.com/gochain/gochain/v4/node"
 )
 
 const (

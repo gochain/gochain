@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v4/common"
 )
 
 var (
@@ -47,8 +47,8 @@ var (
 		PetersburgBlock:     nil,
 		DarvazaBlock:        big.NewInt(17_900_000),
 		DarvazaDefaultGas:   new(big.Int).SetUint64(2_000 * Shannon),
-		HafthorBlock:        big.NewInt(23_817_200),                                            // 2022-02-23
-        HafthorStakeAddress: common.HexToAddress("0x4281Cabd60bB91A6A8B0C60842440669DEA3F541"),
+		HafthorBlock:        big.NewInt(23_817_200), // 2022-02-23
+		HafthorStakeAddress: common.HexToAddress("0x4281Cabd60bB91A6A8B0C60842440669DEA3F541"),
 
 		Clique: DefaultCliqueConfig(),
 	}

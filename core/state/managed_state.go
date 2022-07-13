@@ -19,8 +19,8 @@ package state
 import (
 	"sync"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/log"
 )
 
 type account struct {

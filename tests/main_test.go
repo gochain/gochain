@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gochain/gochain/v3/cmd/utils"
-	"github.com/gochain/gochain/v3/core/vm"
+	"github.com/gochain/gochain/v4/cmd/utils"
+	"github.com/gochain/gochain/v4/core/vm"
 )
 
 var vmConfig vm.Config

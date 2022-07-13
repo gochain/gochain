@@ -15,8 +15,8 @@ import (
 
 	"github.com/cespare/xxhash"
 	"github.com/edsrzf/mmap-go"
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/log"
 )
 
 var (
@@ -55,9 +55,9 @@ var _ Segment = (*FileSegment)(nil)
 
 // FileSegment represents an immutable key/value file segment for a table.
 type FileSegment struct {
-	name string // segment name
-	path string // on-disk path
-	data []byte // memory-mapped data
+	name string   // segment name
+	path string   // on-disk path
+	data []byte   // memory-mapped data
 	file *os.File // file backing data
 }
 

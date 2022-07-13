@@ -21,8 +21,8 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/core/types"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/core/types"
 )
 
 // senderFromServer is a types.Signer that remembers the sender address returned by the RPC

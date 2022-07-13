@@ -20,7 +20,7 @@ package utils
 import (
 	"fmt"
 
-	"github.com/gochain/gochain/v3/console/prompt"
+	"github.com/gochain/gochain/v4/console/prompt"
 )
 
 // GetPassPhrase displays the given text(prompt) to the user and requests some textual

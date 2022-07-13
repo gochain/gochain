@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/gochain/gochain/v3/metrics"
+	"github.com/gochain/gochain/v4/metrics"
 )
 
 type exp struct {

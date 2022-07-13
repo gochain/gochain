@@ -21,8 +21,8 @@ package geth
 import (
 	"errors"
 
-	"github.com/gochain/gochain/v3"
-	"github.com/gochain/gochain/v3/common"
+	"github.com/gochain/gochain/v4"
+	"github.com/gochain/gochain/v4/common"
 )
 
 // Subscription represents an event subscription where events are

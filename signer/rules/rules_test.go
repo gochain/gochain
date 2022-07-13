@@ -22,13 +22,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gochain/gochain/v3/accounts"
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/common/hexutil"
-	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/internal/ethapi"
-	"github.com/gochain/gochain/v3/signer/core"
-	"github.com/gochain/gochain/v3/signer/storage"
+	"github.com/gochain/gochain/v4/accounts"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/common/hexutil"
+	"github.com/gochain/gochain/v4/core/types"
+	"github.com/gochain/gochain/v4/internal/ethapi"
+	"github.com/gochain/gochain/v4/signer/core"
+	"github.com/gochain/gochain/v4/signer/storage"
 )
 
 const JS = `

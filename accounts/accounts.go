@@ -25,10 +25,10 @@ import (
 
 	"golang.org/x/crypto/sha3"
 
-	"github.com/gochain/gochain/v3"
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v4"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/core/types"
+	"github.com/gochain/gochain/v4/log"
 )
 
 // Account represents an Ethereum account located at a specific location defined

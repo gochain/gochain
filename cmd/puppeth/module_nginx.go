@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v4/log"
 )
 
 // nginxDockerfile is theis the Dockerfile required to build an nginx reverse-

@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/gochain/gochain/v3/core/asm"
+	"github.com/gochain/gochain/v4/core/asm"
 )
 
 func Compile(fn string, src []byte, debug bool) (string, error) {

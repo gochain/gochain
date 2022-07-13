@@ -22,8 +22,8 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/gochain/gochain/v3/cmd/utils"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/gochain/v4/cmd/utils"
+	"github.com/gochain/gochain/v4/crypto"
 	"github.com/urfave/cli"
 )
 

@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/log"
 )
 
 // Table represents key/value storage for a particular data type.

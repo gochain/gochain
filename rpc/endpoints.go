@@ -20,7 +20,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v4/log"
 )
 
 // StartIPCEndpoint starts an IPC endpoint.

@@ -22,12 +22,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/crypto"
-	"github.com/gochain/gochain/v3/eth/downloader"
-	"github.com/gochain/gochain/v3/p2p"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/core/types"
+	"github.com/gochain/gochain/v4/crypto"
+	"github.com/gochain/gochain/v4/eth/downloader"
+	"github.com/gochain/gochain/v4/p2p"
+	"github.com/gochain/gochain/v4/rlp"
 )
 
 func init() {

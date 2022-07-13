@@ -25,12 +25,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain/gochain/v3"
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/core"
-	"github.com/gochain/gochain/v3/core/rawdb"
-	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/rpc"
+	"github.com/gochain/gochain/v4"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/core"
+	"github.com/gochain/gochain/v4/core/rawdb"
+	"github.com/gochain/gochain/v4/core/types"
+	"github.com/gochain/gochain/v4/rpc"
 )
 
 // Type determines the kind of filter and is used to put the filter in to

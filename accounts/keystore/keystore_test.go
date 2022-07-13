@@ -29,9 +29,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v3/accounts"
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/crypto"
+	"github.com/gochain/gochain/v4/accounts"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/crypto"
 )
 
 var testSigData = make([]byte, 32)

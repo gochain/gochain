@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gochain/gochain/v3/common/hexutil"
-	"github.com/gochain/gochain/v3/rpc"
+	"github.com/gochain/gochain/v4/common/hexutil"
+	"github.com/gochain/gochain/v4/rpc"
 )
 
 // In this example, our client wishes to track the latest 'block number'

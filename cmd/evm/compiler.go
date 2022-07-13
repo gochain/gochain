@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/gochain/gochain/v3/cmd/evm/internal/compiler"
+	"github.com/gochain/gochain/v4/cmd/evm/internal/compiler"
 
 	cli "github.com/urfave/cli"
 )

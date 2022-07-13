@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package s3_test
@@ -14,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v3/ethdb"
-	"github.com/gochain/gochain/v3/ethdb/s3"
+	"github.com/gochain/gochain/v4/ethdb"
+	"github.com/gochain/gochain/v4/ethdb/s3"
 )
 
 var (

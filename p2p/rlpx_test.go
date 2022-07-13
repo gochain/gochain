@@ -33,10 +33,10 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/gochain/gochain/v3/crypto"
-	"github.com/gochain/gochain/v3/crypto/ecies"
-	"github.com/gochain/gochain/v3/p2p/discover"
-	"github.com/gochain/gochain/v3/rlp"
+	"github.com/gochain/gochain/v4/crypto"
+	"github.com/gochain/gochain/v4/crypto/ecies"
+	"github.com/gochain/gochain/v4/p2p/discover"
+	"github.com/gochain/gochain/v4/rlp"
 )
 
 func TestSharedSecret(t *testing.T) {

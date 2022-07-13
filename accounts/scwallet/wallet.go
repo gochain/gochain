@@ -34,12 +34,12 @@ import (
 	"time"
 
 	pcsc "github.com/gballet/go-libpcsclite"
-	ethereum "github.com/gochain/gochain/v3"
-	"github.com/gochain/gochain/v3/accounts"
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/core/types"
-	"github.com/gochain/gochain/v3/crypto"
-	"github.com/gochain/gochain/v3/log"
+	ethereum "github.com/gochain/gochain/v4"
+	"github.com/gochain/gochain/v4/accounts"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/core/types"
+	"github.com/gochain/gochain/v4/crypto"
+	"github.com/gochain/gochain/v4/log"
 	"github.com/status-im/keycard-go/derivationpath"
 )
 

@@ -21,7 +21,7 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/gochain/gochain/v3/core/types"
+	"github.com/gochain/gochain/v4/core/types"
 )
 
 // nonceHeap is a heap.Interface implementation over 64bit unsigned integers for

@@ -19,7 +19,7 @@ package downloader
 import (
 	"fmt"
 
-	"github.com/gochain/gochain/v3/core/types"
+	"github.com/gochain/gochain/v4/core/types"
 )
 
 // peerDropFn is a callback type for dropping a peer detected as malicious.

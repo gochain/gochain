@@ -22,7 +22,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/gochain/gochain/v3/log"
+	"github.com/gochain/gochain/v4/log"
 )
 
 func init() {

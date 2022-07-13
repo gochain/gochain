@@ -26,12 +26,12 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
-	"github.com/gochain/gochain/v3/common"
-	"github.com/gochain/gochain/v3/consensus/clique"
-	"github.com/gochain/gochain/v3/core/rawdb"
-	"github.com/gochain/gochain/v3/core/vm"
-	"github.com/gochain/gochain/v3/ethdb"
-	"github.com/gochain/gochain/v3/params"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/consensus/clique"
+	"github.com/gochain/gochain/v4/core/rawdb"
+	"github.com/gochain/gochain/v4/core/vm"
+	"github.com/gochain/gochain/v4/ethdb"
+	"github.com/gochain/gochain/v4/params"
 )
 
 func TestDefaultGenesisBlockHash(t *testing.T) {
