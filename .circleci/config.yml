@@ -1,4 +1,4 @@
-version: 2.0
+version: 4.0.0
 
 defaults: &defaults
   working_directory: /home/circleci/go/src/github.com/gochain/gochain
@@ -15,12 +15,12 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: go-mod-v2-{{ checksum "go.sum" }}
+          key: v2-go-mod-{{ checksum "go.sum" }}
           paths:
               - /home/circleci/go/pkg/mod
       - run: go mod download
       - save_cache:
-          key: go-mod-v2-{{ checksum "go.sum" }}
+          key: v2-go-mod-{{ checksum "go.sum" }}
           paths:
             - /home/circleci/go/pkg/mod
       - persist_to_workspace:
@@ -32,16 +32,16 @@ jobs:
     steps:
       - restore_cache:
           keys:
-              - build-cache-{{ .Branch }}-{{ .Environment.CIRCLE_PREVIOUS_BUILD_NUM }}
-              - build-cache-{{ .Branch }}-
-              - build-cache-
+              - v2-build-cache-{{ .Branch }}-{{ .Environment.CIRCLE_PREVIOUS_BUILD_NUM }}
+              - v2-build-cache-{{ .Branch }}-
+              - v2-build-cache-
           paths:
               - /tmp/go/cache
       - attach_workspace:
           at: .
       - run: make all
       - save_cache:
-          key: build-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
+          key: v2-build-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
           paths:
               - /tmp/go/cache
 
@@ -49,17 +49,18 @@ jobs:
     <<: *defaults
     steps:
       - restore_cache:
+      NEED TO CHANGE ALL THESE CACHE KEYS
           keys:
-              - test-cache-{{ .Branch }}-{{ .Environment.CIRCLE_PREVIOUS_BUILD_NUM }}
-              - test-cache-{{ .Branch }}-
-              - test-cache-
+              - v2-test-cache-{{ .Branch }}-{{ .Environment.CIRCLE_PREVIOUS_BUILD_NUM }}
+              - v2-test-cache-{{ .Branch }}-
+              - v2-test-cache-
           paths:
               - /tmp/go/cache
       - attach_workspace:
           at: .
       - run: go test -timeout 15m ./...
       - save_cache:
-          key: test-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
+          key: v2-test-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
           paths:
               - /tmp/go/cache
 
@@ -68,16 +69,16 @@ jobs:
     steps:
       - restore_cache:
           keys:
-              - race-cache-{{ .Branch }}-{{ .Environment.CIRCLE_PREVIOUS_BUILD_NUM }}
-              - race-cache-{{ .Branch }}-
-              - race-cache-
+              - v2-race-cache-{{ .Branch }}-{{ .Environment.CIRCLE_PREVIOUS_BUILD_NUM }}
+              - v2-race-cache-{{ .Branch }}-
+              - v2-race-cache-
           paths:
               - /tmp/go/cache
       - attach_workspace:
           at: .
       - run: go test -race ./core/...
       - save_cache:
-          key: race-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
+          key: v2-race-cache-{{ .Branch }}-{{ .Environment.CIRCLE_BUILD_NUM }}
           paths:
               - /tmp/go/cache
 
