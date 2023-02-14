@@ -6,7 +6,7 @@ require (
 	contrib.go.opencensus.io/exporter/stackdriver v0.6.0
 	github.com/allegro/bigcache v1.2.1
 	github.com/aristanetworks/goarista v0.0.0-20180424004133-70dca2f27708
-	github.com/aws/aws-sdk-go v1.25.48 // indirect
+	github.com/aws/aws-sdk-go v1.34.0 // indirect
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/cespare/cp v1.0.0
 	github.com/cespare/xxhash v1.1.0
@@ -73,7 +73,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7 // indirect
 	github.com/google/go-cmp v0.4.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
-	github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af // indirect
+	github.com/jmespath/go-jmespath v0.3.0 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/kr/text v0.1.0 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
