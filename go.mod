@@ -57,10 +57,10 @@ require (
 	github.com/wsddn/go-ecdh v0.0.0-20161211032359-48726bab9208
 	go.opencensus.io v0.22.2
 	golang.org/x/crypto v0.1.0
-	golang.org/x/net v0.1.0
+	golang.org/x/net v0.7.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.1.0
-	golang.org/x/text v0.4.0
+	golang.org/x/sys v0.5.0
+	golang.org/x/text v0.7.0
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/ini.v1 v1.51.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
@@ -82,7 +82,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d // indirect
-	golang.org/x/term v0.1.0 // indirect
+	golang.org/x/term v0.5.0 // indirect
 	google.golang.org/api v0.15.0 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/genproto v0.0.0-20200108215221-bd8f9a0ef82f // indirect
