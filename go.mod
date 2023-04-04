@@ -1,6 +1,6 @@
 module github.com/gochain/gochain/v4
 
-go 1.18
+go 1.20
 
 require (
 	contrib.go.opencensus.io/exporter/stackdriver v0.6.0
