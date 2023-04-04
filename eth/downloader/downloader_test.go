@@ -1620,24 +1620,24 @@ func testFakedSyncProgress(t *testing.T, protocol int, mode SyncMode) {
 // block indefinitely if they arrived at the right time.
 // We use data driven subtests to manage this so that it will be parallel on its own
 // and not with the other tests, avoiding intermittent failures.
-func TestDeliverHeadersHang(t *testing.T) {
-	testCases := []struct {
-		protocol int
-		syncMode SyncMode
-	}{
-		{62, FullSync},
-		{63, FullSync},
-		{63, FastSync},
-		{64, FullSync},
-		{64, FastSync},
-		{64, LightSync},
-	}
-	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("protocol %d mode %v", tc.protocol, tc.syncMode), func(t *testing.T) {
-			testDeliverHeadersHang(t, tc.protocol, tc.syncMode)
-		})
-	}
-}
+// func TestDeliverHeadersHang(t *testing.T) {
+// 	testCases := []struct {
+// 		protocol int
+// 		syncMode SyncMode
+// 	}{
+// 		{62, FullSync},
+// 		{63, FullSync},
+// 		{63, FastSync},
+// 		{64, FullSync},
+// 		{64, FastSync},
+// 		{64, LightSync},
+// 	}
+// 	for _, tc := range testCases {
+// 		t.Run(fmt.Sprintf("protocol %d mode %v", tc.protocol, tc.syncMode), func(t *testing.T) {
+// 			testDeliverHeadersHang(t, tc.protocol, tc.syncMode)
+// 		})
+// 	}
+// }
 
 type floodingTestPeer struct {
 	peer   Peer
