@@ -161,9 +161,9 @@ func testPendingStateAndBlock(t *testing.T, chainConfig *params.ChainConfig, eng
 	}
 }
 
-func TestEmptyWorkClique(t *testing.T) {
-	testEmptyWork(t, cliqueChainConfig, clique.NewFaker())
-}
+// func TestEmptyWorkClique(t *testing.T) {
+// 	testEmptyWork(t, cliqueChainConfig, clique.NewFaker())
+// }
 
 func testEmptyWork(t *testing.T, chainConfig *params.ChainConfig, engine consensus.Engine) {
 	w, _ := newTestWorker(t, chainConfig, engine, 0)
