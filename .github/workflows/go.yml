@@ -33,6 +33,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
+    needs: [build]
     steps:
     - name: Docker Push
       run: |
