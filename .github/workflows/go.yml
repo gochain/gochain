@@ -30,8 +30,11 @@ jobs:
     - name: Race
       run: go test -race ./core/...
 
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    steps:
     - name: Docker Push
-      if: github.ref == 'refs/heads/master'
       run: |
         echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
         docker build . -t gochain/gochain:${GITHUB_REF_NAME}
