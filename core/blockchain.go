@@ -880,7 +880,7 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 	}
 	bc.mu.Unlock()
 
-	log.Info("Imported new block receipts",
+	log.Debug("Imported new block receipts",
 		"count", stats.processed,
 		"elapsed", common.PrettyDuration(time.Since(start)),
 		"number", head.Number(),
@@ -1023,10 +1023,11 @@ type chainHead struct {
 
 // reorg returns true if the external chainHead should be used instead of local.
 // Cases include:
-//  - higher total difficulty
-//  - same total difficulty and lesser number
-//  - same total difficulty and number, more gas used
-//  - same total difficulty, number, and gas used, random 50/50 chance
+//   - higher total difficulty
+//   - same total difficulty and lesser number
+//   - same total difficulty and number, more gas used
+//   - same total difficulty, number, and gas used, random 50/50 chance
+//
 // Please refer to http://www.cs.cornell.edu/~ie53/publications/btcProcFC.pdf
 func reorg(local, external chainHead) bool {
 	cmp := external.totalDifficulty.Cmp(local.totalDifficulty)
@@ -1266,7 +1267,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 		noParentState = false
 		switch status {
 		case CanonStatTy:
-			log.Info("Inserted new block", "number", block.Number(), "hash", block.Hash(), "diff", block.Difficulty(),
+			log.Debug("Inserted new block", "number", block.Number(), "hash", block.Hash(), "diff", block.Difficulty(),
 				"txs", len(block.Transactions()), "parent", block.ParentHash(), "gas", block.GasUsed(), "elapsed", common.PrettyDuration(time.Since(bstart)))
 
 			coalescedLogs = append(coalescedLogs, logs...)
@@ -1278,7 +1279,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			bc.gcproc += proctime
 
 		case SideStatTy:
-			log.Info("Inserted forked block", "number", block.Number(), "hash", block.Hash(), "diff", block.Difficulty(),
+			log.Debug("Inserted forked block", "number", block.Number(), "hash", block.Hash(), "diff", block.Difficulty(),
 				"txs", len(block.Transactions()), "parent", block.ParentHash(), "gas", block.GasUsed(), "elapsed", common.PrettyDuration(time.Since(bstart)))
 
 			blockInsertTimer.UpdateSince(bstart)
@@ -1334,7 +1335,7 @@ func (st *insertStats) report(chain []*types.Block, index int, cache common.Stor
 		if st.ignored > 0 {
 			context = append(context, []interface{}{"ignored", st.ignored}...)
 		}
-		log.Info("Imported new chain segment", context...)
+		log.Debug("Imported new chain segment", context...)
 
 		*st = insertStats{startTime: now, lastIndex: index + 1}
 	}

@@ -474,7 +474,7 @@ func (s *stateSync) updateStats(written, duplicate, unexpected int, duration tim
 	s.d.syncStatsState.unexpected += uint64(unexpected)
 
 	if written > 0 || duplicate > 0 || unexpected > 0 {
-		log.Info("Imported new state entries", "count", written, "elapsed", common.PrettyDuration(duration), "processed", s.d.syncStatsState.processed, "pending", s.d.syncStatsState.pending, "retry", len(s.tasks), "duplicate", s.d.syncStatsState.duplicate, "unexpected", s.d.syncStatsState.unexpected)
+		log.Debug("Imported new state entries", "count", written, "elapsed", common.PrettyDuration(duration), "processed", s.d.syncStatsState.processed, "pending", s.d.syncStatsState.pending, "retry", len(s.tasks), "duplicate", s.d.syncStatsState.duplicate, "unexpected", s.d.syncStatsState.unexpected)
 	}
 	if written > 0 {
 		rawdb.WriteFastTrieProgress(s.d.stateDB.GlobalTable(), s.d.syncStatsState.processed)

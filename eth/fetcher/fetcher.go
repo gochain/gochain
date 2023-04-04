@@ -645,7 +645,7 @@ func (f *Fetcher) insert(peer string, block *types.Block) {
 	hash := block.Hash()
 	defer func() { f.done <- hash }()
 
-	log.Info("Importing propagated block", "peer", peer, "number", block.Number(), "hash", hash)
+	log.Debug("Importing propagated block", "peer", peer, "number", block.Number(), "hash", hash)
 
 	// If the parent's unknown, abort insertion
 	parent := f.getBlock(block.ParentHash())

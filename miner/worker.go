@@ -907,7 +907,7 @@ func (w *worker) commit(delay bool, update bool, start time.Time) error {
 			}
 			feesEth := new(big.Float).Quo(new(big.Float).SetInt(feesWei), new(big.Float).SetInt(big.NewInt(params.Ether)))
 
-			log.Info("Commit new mining work", "number", block.Number(), "diff", block.Difficulty(), "parent", block.ParentHash(),
+			log.Debug("Commit new mining work", "number", block.Number(), "diff", block.Difficulty(), "parent", block.ParentHash(),
 				"txs", w.current.tcount, "gas", block.GasUsed(), "fees", feesEth, "elapsed", common.PrettyDuration(time.Since(start)))
 
 		case <-w.exitCh:
