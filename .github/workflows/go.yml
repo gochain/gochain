@@ -61,7 +61,7 @@ jobs:
       uses: docker/build-push-action@v4
       with:
         push: true
-        tags: ghcr.io/gochain/gochain:${{ secrets.sha }}
+        tags: ghcr.io/gochain/gochain:${{ github.sha }}
     # - name: Docker Push
     #   run: |
     #     echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
