@@ -124,7 +124,7 @@ One of the quickest ways to get GoChain up and running on your machine is by usi
 ```sh
 docker run -d --name gochain-node -v /Users/alice/GoChain:/root \
            -p 8545:8545 -p 30303:30303 \
-           gochain/gochain
+           ghcr.io/gochain/gochain
 ```
 
 This will start GoChain in fast-sync mode with a DB memory allowance of 1GB just as the above command does.  It will also create a persistent volume in your home directory for saving your blockchain as well as map the default ports.
