@@ -35,13 +35,24 @@ jobs:
     if: github.ref == 'refs/heads/master'
     needs: [build]
     steps:
-    - name: Docker Push
-      run: |
-        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
-        docker build . -t gochain/gochain:${GITHUB_REF_NAME}
-        docker push gochain/gochain:${GITHUB_REF_NAME}
-        echo $GOOGLE_AUTH > ${GITHUB_WORKSPACE}/gcloud-service-key.json
-        echo $GOOGLE_AUTH | docker login -u _json_key --password-stdin https://gcr.io
-        ./tmp/google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=${GITHUB_WORKSPACE}/gcloud-service-key.json
-        docker tag gochain/gochain:${GITHUB_REF_NAME} gcr.io/gochain-core/gochain:${GITHUB_REF_NAME}
-        docker push gcr.io/gochain-core/gochain:${GITHUB_REF_NAME}
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Build and push
+      uses: docker/build-push-action@v4
+      with:
+        push: true
+        tags: gochain/gochain:newtmp
+    # - name: Docker Push
+    #   run: |
+    #     echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+    #     docker build . -t gochain/gochain:${GITHUB_REF_NAME}
+    #     docker push gochain/gochain:${GITHUB_REF_NAME}
+    #     echo $GOOGLE_AUTH > ${GITHUB_WORKSPACE}/gcloud-service-key.json
+    #     echo $GOOGLE_AUTH | docker login -u _json_key --password-stdin https://gcr.io
+    #     ./tmp/google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=${GITHUB_WORKSPACE}/gcloud-service-key.json
+    #     docker tag gochain/gochain:${GITHUB_REF_NAME} gcr.io/gochain-core/gochain:${GITHUB_REF_NAME}
+    #     docker push gcr.io/gochain-core/gochain:${GITHUB_REF_NAME}
