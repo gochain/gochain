@@ -32,7 +32,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
-    # needs: [build]
+    needs: [build]
     steps:
     - uses: actions/checkout@v3
     - name: Login to GitHub Container Registry
