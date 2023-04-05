@@ -60,4 +60,4 @@ jobs:
       uses: docker/build-push-action@v4
       with:
         push: true
-        tags: ghcr.io/gochain/gochain:${{ github.sha }},ghcr.io/gochain/gochain:latest,ghcr.io/gochain/gochain:4
+        tags: ghcr.io/gochain/gochain:${{ github.sha }},ghcr.io/gochain/gochain:latest,ghcr.io/gochain/gochain:stable,ghcr.io/gochain/gochain:4
