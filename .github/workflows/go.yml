@@ -44,6 +44,8 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
     - name: Bump version
       run: |
+        git config --global user.email "ci@gochain.io"
+        git config --global user.name "CI"
         version_file="params/version.go"
         # Bump version, patch by default - also checks if previous commit message contains `[bump X]`, and if so, bumps the appropriate semver number - https://github.com/treeder/dockers/tree/master/bump
         docker run --rm -v $PWD:/app -w /app treeder/bump --filename $version_file "$(git log -1 --pretty=%B)"
@@ -58,7 +60,7 @@ jobs:
       uses: docker/build-push-action@v4
       with:
         push: true
-        tags: ghcr.io/gochain/gochain:newtmp
+        tags: ghcr.io/gochain/gochain:$version
     # - name: Docker Push
     #   run: |
     #     echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
