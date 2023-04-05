@@ -10,8 +10,6 @@ https://camo.githubusercontent.com/915b7be44ada53c290eb157634330494ebe3e30a/6874
 
 Mainnet: [Live Stats](https://stats.gochain.io/) | [Block Explorer](https://explorer.gochain.io/) | [Public RPC Endpoint](https://rpc.gochain.io/)
 
-Testnet: [Live Stats](https://testnet-stats.gochain.io/) | [Block Explorer](https://testnet-explorer.gochain.io/) | [Public RPC Endpoint](https://testnet-rpc.gochain.io/)
-
 ## General Documentation
 
 If you are looking to build DApps, deploy smart contracts, setup a private network or run a node, please see
