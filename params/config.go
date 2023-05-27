@@ -117,6 +117,9 @@ type ChainConfig struct {
 	// Various consensus engines
 	Ethash *EthashConfig `json:"ethash,omitempty"`
 	Clique *CliqueConfig `json:"clique,omitempty"`
+
+	// London fork
+	LondonBlock *big.Int `json:"londonBlock,omitempty"` // London switch block (nil = no fork, 0 = already activated)
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.
@@ -164,6 +167,16 @@ func (c *ChainConfig) String() string {
 		c.EWASMBlock,
 		engine,
 	)
+}
+
+// IsLondon returns whether num is either equal to the London fork block or greater.
+func (c *ChainConfig) IsLondon(num *big.Int) bool {
+	return isForked(c.LondonBlock, num)
+}
+
+// IsCancun returns whether num is either equal to the Cancun fork block or greater.
+func (c *ChainConfig) IsCancun(num *big.Int) bool {
+	return c.IsLondon(num)
 }
 
 // IsHomestead returns whether num is either equal to the homestead block or greater.

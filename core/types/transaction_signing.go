@@ -42,6 +42,10 @@ type sigCache struct {
 func MakeSigner(config *params.ChainConfig, blockNumber *big.Int) Signer {
 	var signer Signer
 	switch {
+	case config.IsLondon(blockNumber):
+		signer = NewLondonSigner(config.ChainId)
+	case config.IsCancun(blockNumber):
+		signer = NewCancunSigner(config.ChainId)
 	case config.IsEIP155(blockNumber):
 		signer = NewEIP155Signer(config.ChainId)
 	case config.IsHomestead(blockNumber):
@@ -106,6 +110,27 @@ type Signer interface {
 // EIP155Transaction implements Signer using the EIP155 rules.
 type EIP155Signer struct {
 	chainId, chainIdMul *big.Int
+}
+
+type londonSigner struct{ EIP155Signer }
+
+// NewLondonSigner returns a signer that accepts
+// - EIP-155 replay protected transactions, and
+// - legacy Homestead transactions.
+func NewLondonSigner(chainId *big.Int) Signer {
+	return londonSigner{NewEIP155Signer(chainId)}
+}
+
+type cancunSigner struct{ londonSigner }
+
+// NewCancunSigner returns a signer that accepts
+// - EIP-4844 blob transactions
+// - EIP-1559 dynamic fee transactions
+// - EIP-2930 access list transactions,
+// - EIP-155 replay protected transactions, and
+// - legacy Homestead transactions.
+func NewCancunSigner(chainId *big.Int) Signer {
+	return cancunSigner{londonSigner{NewEIP155Signer(chainId)}}
 }
 
 func NewEIP155Signer(chainId *big.Int) EIP155Signer {
