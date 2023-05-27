@@ -1,4 +1,4 @@
-module github.com/gochain/gochain/v4
+module github.com/gochain/gochain/v4.1.0
 
 go 1.20
 
