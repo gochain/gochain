@@ -27,7 +27,7 @@ require (
 	github.com/golang/snappy v0.0.4
 	github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e // indirect
 	github.com/gorilla/websocket v1.4.2
-	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
+	github.com/hashicorp/golang-lru v1.0.2
 	github.com/huin/goupnp v1.0.1-0.20200620063722-49508fba0031
 	github.com/influxdata/influxdb v1.8.3
 	github.com/jackpal/go-nat-pmp v1.0.2-0.20160603034137-1fa385a6f458
@@ -57,7 +57,7 @@ require (
 	go.opencensus.io v0.24.0
 	golang.org/x/crypto v0.14.0
 	golang.org/x/net v0.17.0
-	golang.org/x/sync v0.1.0
+	golang.org/x/sync v0.4.0
 	golang.org/x/sys v0.13.0
 	golang.org/x/text v0.13.0
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
@@ -67,11 +67,14 @@ require (
 	gopkg.in/urfave/cli.v1 v1.20.0
 )
 
+require github.com/btcsuite/btcd/btcec/v2 v2.3.2
+
 require (
 	cloud.google.com/go/compute v1.19.1 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/monitoring v1.13.0 // indirect
 	cloud.google.com/go/trace v1.9.0 // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
