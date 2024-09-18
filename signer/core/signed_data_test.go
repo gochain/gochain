@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"strings"
 	"testing"
@@ -351,7 +352,7 @@ func sign(typedData core.TypedData) ([]byte, []byte, error) {
 }
 
 func TestJsonFiles(t *testing.T) {
-	testfiles, err := ioutil.ReadDir("testdata/")
+	testfiles, err := os.ReadDir("testdata/")
 	if err != nil {
 		t.Fatalf("failed reading files: %v", err)
 	}
@@ -360,7 +361,7 @@ func TestJsonFiles(t *testing.T) {
 			continue
 		}
 		expectedFailure := strings.HasPrefix(fInfo.Name(), "expfail")
-		data, err := ioutil.ReadFile(path.Join("testdata", fInfo.Name()))
+		data, err := os.ReadFile(path.Join("testdata", fInfo.Name()))
 		if err != nil {
 			t.Errorf("Failed to read file %v: %v", fInfo.Name(), err)
 			continue
