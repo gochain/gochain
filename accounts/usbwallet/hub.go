@@ -84,16 +84,6 @@ func NewLedgerHub() (*Hub, error) {
 	}, 0xffa0, 0, newLedgerDriver)
 }
 
-// NewTrezorHubWithHID creates a new hardware wallet manager for Trezor devices.
-func NewTrezorHubWithHID() (*Hub, error) {
-	return newHub(TrezorScheme, 0x534c, []uint16{0x0001 /* Trezor HID */}, 0xff00, 0, newTrezorDriver)
-}
-
-// NewTrezorHubWithWebUSB creates a new hardware wallet manager for Trezor devices with
-// firmware version > 1.8.0
-func NewTrezorHubWithWebUSB() (*Hub, error) {
-	return newHub(TrezorScheme, 0x1209, []uint16{0x53c1 /* Trezor WebUSB */}, 0xffff /* No usage id on webusb, don't match unset (0) */, 0, newTrezorDriver)
-}
 
 // newHub creates a new hardware wallet manager for generic USB devices.
 func newHub(scheme string, vendorID uint16, productIDs []uint16, usageID uint16, endpointID int, makeDriver func(log.Logger) driver) (*Hub, error) {

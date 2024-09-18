@@ -462,18 +462,6 @@ func makeAccountManager(conf *Config) (*accounts.Manager, string, error) {
 			} else {
 				backends = append(backends, ledgerhub)
 			}
-			// Start a USB hub for Trezor hardware wallets (HID version)
-			if trezorhub, err := usbwallet.NewTrezorHubWithHID(); err != nil {
-				log.Warn(fmt.Sprintf("Failed to start HID Trezor hub, disabling: %v", err))
-			} else {
-				backends = append(backends, trezorhub)
-			}
-			// Start a USB hub for Trezor hardware wallets (WebUSB version)
-			if trezorhub, err := usbwallet.NewTrezorHubWithWebUSB(); err != nil {
-				log.Warn(fmt.Sprintf("Failed to start WebUSB Trezor hub, disabling: %v", err))
-			} else {
-				backends = append(backends, trezorhub)
-			}
 		}
 		if len(conf.SmartCardDaemonPath) > 0 {
 			// Start a smart card hub
