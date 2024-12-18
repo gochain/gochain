@@ -71,7 +71,7 @@ type Trie struct {
 	// Cache generation values.
 	// cachegen increases by one with each commit operation.
 	// new nodes are tagged with the current generation and unloaded
-	// when their generation is older than than cachegen-cachelimit.
+	// when their generation is older than cachegen-cachelimit.
 	cachegen, cachelimit uint16
 }
 
