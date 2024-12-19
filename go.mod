@@ -1,6 +1,6 @@
 module github.com/gochain/gochain/v4
 
-go 1.22
+go 1.23
 
 require (
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.14
@@ -15,9 +15,9 @@ require (
 	github.com/dlclark/regexp2 v1.2.1 // indirect
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/dop251/goja v0.0.0-20200721192441-a695b0cdd498
-	github.com/edsrzf/mmap-go v1.1.0
+	github.com/edsrzf/mmap-go v1.2.0
 	github.com/fatih/color v1.13.0
-	github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5
+	github.com/fjl/memsize v0.0.2
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08
 	github.com/gizak/termui v2.2.0+incompatible
 	github.com/go-ini/ini v1.36.0 // indirect
@@ -54,7 +54,7 @@ require (
 	github.com/wsddn/go-ecdh v0.0.0-20161211032359-48726bab9208
 	go.opencensus.io v0.24.0
 	golang.org/x/crypto v0.31.0
-	golang.org/x/net v0.23.0
+	golang.org/x/net v0.33.0
 	golang.org/x/sync v0.10.0
 	golang.org/x/sys v0.28.0
 	golang.org/x/text v0.21.0
