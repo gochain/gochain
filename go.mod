@@ -17,7 +17,6 @@ require (
 	github.com/dop251/goja v0.0.0-20200721192441-a695b0cdd498
 	github.com/edsrzf/mmap-go v1.2.0
 	github.com/fatih/color v1.13.0
-	github.com/fjl/memsize v0.0.2
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08
 	github.com/gizak/termui v2.2.0+incompatible
 	github.com/go-ini/ini v1.36.0 // indirect

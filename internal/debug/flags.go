@@ -24,7 +24,6 @@ import (
 	"os"
 	"runtime"
 
-	// "github.com/fjl/memsize/memsizeui"
 	"github.com/gochain/gochain/v4/log"
 	"github.com/gochain/gochain/v4/log/term"
 	"github.com/gochain/gochain/v4/metrics"
@@ -32,8 +31,6 @@ import (
 	"github.com/mattn/go-colorable"
 	"github.com/urfave/cli"
 )
-
-// var Memsize memsizeui.Handler
 
 var (
 	verbosityFlag = cli.IntFlag{
@@ -158,7 +155,6 @@ func StartPProf(address string) {
 	// Hook go-metrics into expvar on any /debug/metrics request, load all vars
 	// from the registry into expvar, and execute regular expvar handler.
 	exp.Exp(metrics.DefaultRegistry)
-	// http.Handle("/memsize/", http.StripPrefix("/memsize", &Memsize))
 	log.Info("Starting pprof server", "addr", fmt.Sprintf("http://%s/debug/pprof", address))
 	go func() {
 		if err := http.ListenAndServe(address, nil); err != nil {
