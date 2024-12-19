@@ -1,8 +1,6 @@
 module github.com/gochain/gochain/v4
 
-go 1.23.0
-
-toolchain go1.24.1
+go 1.22
 
 require (
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.14
@@ -17,9 +15,9 @@ require (
 	github.com/dlclark/regexp2 v1.2.1 // indirect
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/dop251/goja v0.0.0-20200721192441-a695b0cdd498
-	github.com/edsrzf/mmap-go v1.1.0
+	github.com/edsrzf/mmap-go v1.2.0
 	github.com/fatih/color v1.13.0
-	github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5
+	github.com/fjl/memsize v0.0.2
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08
 	github.com/gizak/termui v2.2.0+incompatible
 	github.com/go-ini/ini v1.36.0 // indirect
