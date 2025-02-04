@@ -179,7 +179,7 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 	if config.TxPool.Journal != "" {
 		config.TxPool.Journal = sctx.ResolvePath(config.TxPool.Journal)
 	}
-	eth.txPool = core.NewTxPool(config.TxPool, eth.chainConfig, eth.blockchain)
+	eth.txPool = core.NewTxPool(config.TxPool, eth.chainConfig, eth.blockchain, eth.ApiBackend)
 
 	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.SyncMode, config.NetworkId, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb); err != nil {
 		return nil, err

@@ -22,30 +22,29 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/gochain/gochain/v4/log"
-
 	"github.com/gochain/gochain/v4/common"
 	"github.com/gochain/gochain/v4/core/types"
+	"github.com/gochain/gochain/v4/log"
 	"github.com/gochain/gochain/v4/params"
 	"github.com/gochain/gochain/v4/rpc"
 )
 
 var (
-	// Deprecated: use DefaultFn
-	Default         = new(big.Int).SetUint64(2 * params.Shannon)
+	// Deprecated: GasPricer.GasPrice()
+	Default         = new(big.Int).SetUint64(2000 * params.Shannon)
 	DefaultMaxPrice = big.NewInt(500000 * params.Shannon)
 )
 
-// DefaultFn returns a function to return the default gas price at a given block.
-func DefaultFn(config *params.ChainConfig) func(*big.Int) *big.Int {
-	return func(num *big.Int) *big.Int {
-		if config.IsDarvaza(num) {
-			if g := config.DarvazaDefaultGas; g != nil {
-				return g
-			}
-		}
-		return Default
-	}
+// For testing purposes
+type DefaultPricer struct {
+}
+
+func (d *DefaultPricer) GasPrice(ctx context.Context) (*big.Int, error) {
+	return Default, nil
+}
+
+func (d *DefaultPricer) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
+	return Default, nil
 }
 
 type Config struct {
@@ -118,7 +117,7 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 
 // SuggestPrice returns a gasprice so that newly created transaction can
 // have a very high chance to be included in the following blocks.
-func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
+func (gpo *Oracle) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 	head, _ := gpo.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	headHash := head.Hash()
 
@@ -182,7 +181,7 @@ func (gpo *Oracle) minPrice(num *big.Int) *big.Int {
 		return gpo.defaultPrice
 	}
 	const blockOffset = 60 * 12 // look ~1 hour ahead, since we are suggesting gas for near-future txs
-	return DefaultFn(gpo.backend.ChainConfig())(new(big.Int).Add(big.NewInt(blockOffset), num))
+	return Default
 }
 
 type result struct {

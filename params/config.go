@@ -112,6 +112,7 @@ type ChainConfig struct {
 	DarvazaDefaultGas   *big.Int       `json:"darvazaDefaultGas,omitempty"`   // Darvaza default gas value (nil = no change)
 	HafthorBlock        *big.Int       `json:"hafthorBlock,omitempty"`        // Hafthor switch block (nil = no fork, 0 = already activated)
 	HafthorStakeAddress common.Address `json:"hafthorStakeAddress"`           // Hafthor stake address to send rewards
+	EzioBlock           *big.Int       `json:"ezioBlock,omitempty"`           // Ezio switch block (nil = no fork, 0 = already activated)
 	EWASMBlock          *big.Int       `json:"ewasmBlock,omitempty"`          // EWASM switch block (nil = no fork, 0 = already activated)
 
 	// Various consensus engines
@@ -211,6 +212,11 @@ func (c *ChainConfig) IsDarvaza(num *big.Int) bool {
 // IsHafthor returns whether num is either equal to the Hafthor fork block or greater.
 func (c *ChainConfig) IsHafthor(num *big.Int) bool {
 	return isForked(c.HafthorBlock, num)
+}
+
+// IsEzio returns whether num is either equal to the Ezio fork block or greater.
+func (c *ChainConfig) IsEzio(num *big.Int) bool {
+	return isForked(c.EzioBlock, num)
 }
 
 // IsEWASM returns whether num represents a block number after the EWASM fork

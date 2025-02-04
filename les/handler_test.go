@@ -30,6 +30,7 @@ import (
 	"github.com/gochain/gochain/v4/core/types"
 	"github.com/gochain/gochain/v4/crypto"
 	"github.com/gochain/gochain/v4/eth/downloader"
+	"github.com/gochain/gochain/v4/eth/gasprice"
 	"github.com/gochain/gochain/v4/ethdb"
 	"github.com/gochain/gochain/v4/light"
 	"github.com/gochain/gochain/v4/p2p"
@@ -497,7 +498,7 @@ func TestTransactionStatusLes2(t *testing.T) {
 	chain := pm.blockchain.(*core.BlockChain)
 	config := core.DefaultTxPoolConfig
 	config.Journal = ""
-	txpool := core.NewTxPool(config, params.TestChainConfig, chain)
+	txpool := core.NewTxPool(config, params.TestChainConfig, chain, &gasprice.DefaultPricer{})
 	pm.txpool = txpool
 	peer, _ := newTestPeer(t, "peer", 2, pm, true)
 	defer peer.close()

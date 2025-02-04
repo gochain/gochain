@@ -41,27 +41,6 @@ var (
 	ErrNoCodeAfterDeploy = errors.New("no contract code after deployment")
 )
 
-// ContractCaller defines the methods needed to allow operating with a contract on a read
-// only basis.
-type ContractCaller interface {
-	// CodeAt returns the code of the given account. This is needed to differentiate
-	// between contract internal errors and the local chain being out of sync.
-	CodeAt(ctx context.Context, contract common.Address, blockNumber *big.Int) ([]byte, error)
-	// ContractCall executes an GoChain contract call with the specified data as the
-	// input.
-	CallContract(ctx context.Context, call gochain.CallMsg, blockNumber *big.Int) ([]byte, error)
-}
-
-// PendingContractCaller defines methods to perform contract calls on the pending state.
-// Call will try to discover this interface when access to the pending state is requested.
-// If the backend does not support the pending state, Call returns ErrNoPendingState.
-type PendingContractCaller interface {
-	// PendingCodeAt returns the code of the given account in the pending state.
-	PendingCodeAt(ctx context.Context, contract common.Address) ([]byte, error)
-	// PendingCallContract executes an GoChain contract call against the pending state.
-	PendingCallContract(ctx context.Context, call gochain.CallMsg) ([]byte, error)
-}
-
 // ContractTransactor defines the methods needed to allow operating with a contract
 // on a write only basis. Besides the transacting method, the remainder are helpers
 // used when the user does not provide some needed values, but rather leaves it up
@@ -106,7 +85,7 @@ type DeployBackend interface {
 
 // ContractBackend defines the methods needed to work with contracts on a read-write basis.
 type ContractBackend interface {
-	ContractCaller
+	gochain.ContractCaller
 	ContractTransactor
 	ContractFilterer
 }
