@@ -31,7 +31,7 @@ import (
 
 var (
 	// Deprecated: GasPricer.GasPrice()
-	Default         = new(big.Int).SetUint64(2000 * params.Shannon)
+	Default         = new(big.Int).SetUint64(1000 * params.Shannon)
 	DefaultMaxPrice = big.NewInt(500000 * params.Shannon)
 )
 
@@ -48,10 +48,11 @@ func (d *DefaultPricer) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 }
 
 type Config struct {
-	Blocks     int
-	Percentile int
-	Default    *big.Int `toml:",omitempty"` // nil for default/dynamic
-	MaxPrice   *big.Int `toml:",omitempty"`
+	Blocks      int
+	Percentile  int
+	Default     *big.Int `toml:",omitempty"` // nil for default/dynamic
+	MaxPrice    *big.Int `toml:",omitempty"`
+	GasContract string   `toml:",omitempty"` // address of the GIP-38 contract
 }
 
 // OracleBackend includes all necessary background APIs for oracle.
@@ -69,6 +70,7 @@ type Oracle struct {
 	defaultPrice *big.Int // optional user-configured default/min
 	lastPrice    *big.Int
 	maxPrice     *big.Int
+	gasContract  string // address to ask for price
 	cacheLock    sync.RWMutex
 	fetchLock    sync.Mutex
 
@@ -112,6 +114,7 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 		maxPrice:     maxPrice,
 		checkBlocks:  blocks,
 		percentile:   percent,
+		gasContract:  params.GasContract,
 	}
 }
 
@@ -177,6 +180,9 @@ func (gpo *Oracle) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 }
 
 func (gpo *Oracle) minPrice(num *big.Int) *big.Int {
+	if gpo.gasContract != "" {
+		// TODO: CALL CONTRACT!!
+	}
 	if gpo.defaultPrice != nil {
 		return gpo.defaultPrice
 	}
