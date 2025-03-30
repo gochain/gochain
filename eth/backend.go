@@ -198,6 +198,7 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 		gpoParams.Default = config.MinerGasPrice
 	}
 	eth.ApiBackend.gpo = gasprice.NewOracle(eth.ApiBackend, gpoParams)
+	eth.ApiBackend.gpo.SetBlockchain(eth.blockchain)
 
 	return eth, nil
 }

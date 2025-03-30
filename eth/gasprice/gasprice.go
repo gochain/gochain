@@ -23,7 +23,9 @@ import (
 	"sync"
 
 	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/core"
 	"github.com/gochain/gochain/v4/core/types"
+	"github.com/gochain/gochain/v4/eth/contracts"
 	"github.com/gochain/gochain/v4/log"
 	"github.com/gochain/gochain/v4/params"
 	"github.com/gochain/gochain/v4/rpc"
@@ -65,6 +67,7 @@ type OracleBackend interface {
 // Oracle recommends gas prices based on the content of recent
 // blocks. Suitable for both light and full clients.
 type Oracle struct {
+	blockchain   *core.BlockChain
 	backend      OracleBackend
 	lastHead     common.Hash
 	defaultPrice *big.Int // optional user-configured default/min
@@ -116,6 +119,12 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 		percentile:   percent,
 		gasContract:  params.GasContract,
 	}
+}
+
+// Do not break/change code which doesn't use contract to fetch minGasPrice
+func (gpo *Oracle) SetBlockchain(blockchain *core.BlockChain) {
+	gpo.blockchain = blockchain
+	contracts.InitContract("gasPrice", gpo.gasContract)
 }
 
 // SuggestPrice returns a gasprice so that newly created transaction can
@@ -181,7 +190,14 @@ func (gpo *Oracle) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 
 func (gpo *Oracle) minPrice(num *big.Int) *big.Int {
 	if gpo.gasContract != "" {
-		// TODO: CALL CONTRACT!!
+		res, err := contracts.CallViewContract(gpo.blockchain, "gasPrice", "gasPrice")
+		if err != nil {
+			log.Error("Failed to fetch gasPrice from contract", "err", err)
+		} else {
+			val := res[0].(*big.Int)
+			log.Info("MIN GAS PRICE", "v", val)
+			return val
+		}
 	}
 	if gpo.defaultPrice != nil {
 		return gpo.defaultPrice
