@@ -3,7 +3,7 @@ package contracts
 import (
 	"fmt"
 	"math/big"
-	"os"
+	"strings"
 
 	"github.com/gochain/gochain/v4/accounts/abi"
 	"github.com/gochain/gochain/v4/common"
@@ -31,16 +31,10 @@ func (c Caller) Address() common.Address {
 	return c.address
 }
 
-func InitContract(contract string, address string) error {
-	abiFName := fmt.Sprintf("%s.abi", contract)
-	abiFile, err := os.Open(abiFName)
+func InitContract(contract string, abiDeclaration string, address string) error {
+	abiData, err := abi.JSON(strings.NewReader(abiDeclaration))
 	if err != nil {
-		log.Error("Failed to open contract abi", "fname", abiFName, "err", err)
-		return fmt.Errorf("failed to open contact %s", contract)
-	}
-	abiData, err := abi.JSON(abiFile)
-	if err != nil {
-		log.Error("Failed to parse contract abi", "fname", abiFName, "err", err)
+		log.Error("Failed to parse contract abi", "contract", contract, "err", err)
 		return fmt.Errorf("failed to parse contact %s", contract)
 	}
 	contracts[contract] = ContarctData{

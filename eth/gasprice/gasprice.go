@@ -37,6 +37,22 @@ var (
 	DefaultMaxPrice = big.NewInt(500000 * params.Shannon)
 )
 
+const abiDeclaration = `[
+  {
+    "inputs": [],
+    "name": "gasPrice",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]`
+
 // For testing purposes
 type DefaultPricer struct {
 }
@@ -124,7 +140,7 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 // Do not break/change code which doesn't use contract to fetch minGasPrice
 func (gpo *Oracle) SetBlockchain(blockchain *core.BlockChain) {
 	gpo.blockchain = blockchain
-	contracts.InitContract("gasPrice", gpo.gasContract)
+	contracts.InitContract("gasPrice", abiDeclaration, gpo.gasContract)
 }
 
 // SuggestPrice returns a gasprice so that newly created transaction can
