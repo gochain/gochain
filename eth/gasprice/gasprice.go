@@ -189,13 +189,12 @@ func (gpo *Oracle) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 }
 
 func (gpo *Oracle) minPrice(num *big.Int) *big.Int {
-	if gpo.gasContract != "" {
+	if gpo.blockchain != nil && gpo.gasContract != "" {
 		res, err := contracts.CallViewContract(gpo.blockchain, "gasPrice", "gasPrice")
 		if err != nil {
 			log.Error("Failed to fetch gasPrice from contract", "err", err)
 		} else {
 			val := res[0].(*big.Int)
-			log.Info("MIN GAS PRICE", "v", val)
 			return val
 		}
 	}

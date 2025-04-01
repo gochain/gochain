@@ -18,14 +18,10 @@ package eth
 
 import (
 	"context"
-	"fmt"
 	"math/big"
-	"os"
 
 	"github.com/gochain/gochain/v4"
 	"github.com/gochain/gochain/v4/accounts"
-	"github.com/gochain/gochain/v4/accounts/abi"
-	"github.com/gochain/gochain/v4/accounts/abi/bind"
 	"github.com/gochain/gochain/v4/common"
 	"github.com/gochain/gochain/v4/common/math"
 	"github.com/gochain/gochain/v4/core"
@@ -245,46 +241,7 @@ func (b *EthApiBackend) ProtocolVersion() int {
 }
 
 func (b *EthApiBackend) GasPrice(ctx context.Context) (*big.Int, error) {
-
-	// TODO: Need to deploy gasPrice.sol contract prior to this fork, then we can use it here.
-	address := common.HexToAddress("0x0000000000000000000000000000000000008005")
-	fmt.Println(address)
-	// TODO: Do this on node startup
-	abiFile, err := os.Open("../../contracts/gasPrice.abi")
-	if err != nil {
-		log.Error("Failed to open gasPrice.abi", "err", err)
-		return gasprice.Default, err
-	}
-
-	abi2, err := abi.JSON(abiFile)
-	if err != nil {
-		log.Error("Failed to parse gasPrice.abi", "err", err)
-		return gasprice.Default, err
-	}
-	fmt.Println(abi2)
-
-	c := bind.NewBoundContract(address, abi2, b, nil, nil)
-
-	// input, err := abi2.Pack("", params...)
-	// if err != nil {
-	// 	return common.Address{}, nil, nil, err
-	// }
-	// tx, err := c.transact(opts, nil, append(bytecode, input...))
-	// if err != nil {
-	// 	return common.Address{}, nil, nil, err
-	// }
-	// c.address = crypto.CreateAddress(opts.From, tx.Nonce())
-	results := []any{}
-	err = c.Call(nil, &results, "gasPrice", nil)
-	if err != nil {
-		log.Error("Failed to read gas price from ABC smart contract", "err", err)
-		return gasprice.Default, err
-	}
-	fmt.Printf("results: %+v", results)
-	// TODO: set gas price from results
-	gasPrice := new(big.Int) //.SetBytes(results[0])
-	log.Debug("Read gas price from ABC smart contract", "gasPrice", gasPrice)
-	return gasPrice, nil
+	return b.gpo.SuggestGasPrice(ctx)
 }
 
 func (b *EthApiBackend) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
