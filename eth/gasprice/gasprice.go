@@ -124,7 +124,7 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 // Do not break/change code which doesn't use contract to fetch minGasPrice
 func (gpo *Oracle) SetBlockchain(blockchain *core.BlockChain) {
 	gpo.blockchain = blockchain
-	contracts.InitContract("gasPrice", gpo.gasContract)
+	contracts.InitContract("gasPrice", "./contracts/gasPrice.abi", gpo.gasContract)
 }
 
 // SuggestPrice returns a gasprice so that newly created transaction can

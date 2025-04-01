@@ -13,7 +13,7 @@ import (
 	"github.com/gochain/gochain/v4/log"
 )
 
-type ContarctData struct {
+type ContractData struct {
 	abi     abi.ABI
 	address common.Address
 }
@@ -22,7 +22,7 @@ type Caller struct {
 	address common.Address
 }
 
-var contracts map[string]ContarctData = make(map[string]ContarctData)
+var contracts map[string]ContractData = make(map[string]ContractData)
 var viewCaller Caller = Caller{
 	address: common.Address{},
 }
@@ -31,19 +31,18 @@ func (c Caller) Address() common.Address {
 	return c.address
 }
 
-func InitContract(contract string, address string) error {
-	abiFName := fmt.Sprintf("%s.abi", contract)
-	abiFile, err := os.Open(abiFName)
+func InitContract(name, abiFilename, address string) error {
+	abiFile, err := os.Open(abiFilename)
 	if err != nil {
-		log.Error("Failed to open contract abi", "fname", abiFName, "err", err)
-		return fmt.Errorf("failed to open contact %s", contract)
+		log.Error("Failed to open contract abi", "fname", abiFilename, "err", err)
+		return fmt.Errorf("failed to open contact %s", name)
 	}
 	abiData, err := abi.JSON(abiFile)
 	if err != nil {
-		log.Error("Failed to parse contract abi", "fname", abiFName, "err", err)
-		return fmt.Errorf("failed to parse contact %s", contract)
+		log.Error("Failed to parse contract abi", "fname", abiFilename, "err", err)
+		return fmt.Errorf("failed to parse contact %s", name)
 	}
-	contracts[contract] = ContarctData{
+	contracts[name] = ContractData{
 		abi:     abiData,
 		address: common.HexToAddress(address),
 	}
