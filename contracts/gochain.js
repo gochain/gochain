@@ -10,7 +10,7 @@ export const gochain = defineChain({
     },
     rpcUrls: {
         default: {
-            http: ['https://localhost:8545'],
+            http: ['http://localhost:8545'],
             // webSocket: ['wss://rpc.zora.energy'],
         },
     },

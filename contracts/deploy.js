@@ -11,14 +11,15 @@ const publicClient = createPublicClient({
 })
 
 const wallet = createWalletClient({
-    account,
+    account: account,
     chain: gochain,
     transport: http()
 })
 
 const hash = await wallet.deployContract({
     abi: GasPrice.abi,
-    account: wallet,
-    // args: [69420],
+    account: account,
     bytecode: GasPrice.bytecode,
 })
+
+console.log(hash)
