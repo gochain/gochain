@@ -19,7 +19,8 @@ const wallet = createWalletClient({
 const hash = await wallet.deployContract({
     abi: GasPrice.abi,
     account: account,
-    bytecode: GasPrice.bytecode,
+    args: [],
+    bytecode: '0x' + GasPrice.bytecode,
 })
 
 console.log(hash)
