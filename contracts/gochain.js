@@ -1,8 +1,9 @@
 import { defineChain } from 'viem'
 
 export const gochain = defineChain({
-    id: 60,
+    id: 1331747801,
     name: 'GoChain',
+    type: 'legacy',
     nativeCurrency: {
         decimals: 18,
         name: 'GO',

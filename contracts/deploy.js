@@ -21,6 +21,7 @@ const hash = await wallet.deployContract({
     account: account,
     args: [],
     bytecode: '0x' + GasPrice.bytecode,
+    gas: 100000000,
 })
 
 console.log(hash)
