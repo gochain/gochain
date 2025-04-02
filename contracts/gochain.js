@@ -1,7 +1,7 @@
 import { defineChain } from 'viem'
 
 export const gochain = defineChain({
-    id: 1331747801,
+    id: 60, // replace with your local chain id when testing
     name: 'GoChain',
     type: 'legacy',
     nativeCurrency: {
@@ -11,8 +11,7 @@ export const gochain = defineChain({
     },
     rpcUrls: {
         default: {
-            http: ['http://localhost:8545'],
-            // webSocket: ['wss://rpc.zora.energy'],
+            http: ['http://localhost:8545'], // need to set to https for prod 
         },
     },
     blockExplorers: {
