@@ -13,7 +13,7 @@ import (
 	"github.com/gochain/gochain/v4/log"
 )
 
-type ContarctData struct {
+type ContractData struct {
 	abi     abi.ABI
 	address common.Address
 }
@@ -22,7 +22,7 @@ type Caller struct {
 	address common.Address
 }
 
-var contracts map[string]ContarctData = make(map[string]ContarctData)
+var contracts map[string]ContractData = make(map[string]ContractData)
 var viewCaller Caller = Caller{
 	address: common.Address{},
 }
@@ -37,7 +37,7 @@ func InitContract(contract string, abiDeclaration string, address string) error 
 		log.Error("Failed to parse contract abi", "contract", contract, "err", err)
 		return fmt.Errorf("failed to parse contact %s", contract)
 	}
-	contracts[contract] = ContarctData{
+	contracts[contract] = ContractData{
 		abi:     abiData,
 		address: common.HexToAddress(address),
 	}

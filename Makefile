@@ -28,6 +28,9 @@ gochain:
 
 build: gochain
 
+run: gochain
+	./bin/gochain
+
 bootnode:
 	cd cmd/bootnode; go build -o ../../bin/gochain-bootnode
 	@echo "Done building."
