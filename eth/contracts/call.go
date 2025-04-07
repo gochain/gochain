@@ -44,7 +44,7 @@ func InitContract(contract string, abiDeclaration string, address string) error 
 	return nil
 }
 
-func CallViewContract(gc *core.BlockChain, contract string, function string, args ...interface{}) ([]interface{}, error) {
+func CallStaticContract(gc *core.BlockChain, contract string, function string, args ...interface{}) ([]interface{}, error) {
 	header := gc.CurrentHeader()
 	statedb, err := gc.StateAt(header.Root)
 	if err != nil {
@@ -62,8 +62,8 @@ func CallViewContract(gc *core.BlockChain, contract string, function string, arg
 		&contractData.address,
 		0,
 		big.NewInt(0),
-		1000,
-		big.NewInt(1000),
+		0,
+		big.NewInt(0),
 		data,
 		false,
 	)
@@ -71,7 +71,7 @@ func CallViewContract(gc *core.BlockChain, contract string, function string, arg
 	evmContext := core.NewEVMContext(msg, header, gc, nil)
 	evm := vm.NewEVM(evmContext, statedb, gc.Config(), vm.Config{})
 
-	result, _, err := evm.StaticCall(viewCaller, contractData.address, data, 1000)
+	result, _, err := evm.StaticCall(viewCaller, contractData.address, data, 10000)
 	if err != nil {
 		return nil, fmt.Errorf("vm call error: %w", err)
 	}

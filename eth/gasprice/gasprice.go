@@ -33,8 +33,8 @@ import (
 
 var (
 	// Deprecated: GasPricer.GasPrice()
-	Default         = new(big.Int).SetUint64(1000 * params.Shannon)
-	DefaultMaxPrice = big.NewInt(500000 * params.Shannon)
+	Default            = new(big.Int).SetUint64(2 * params.Shannon)
+	maxPriceMultiplier = big.NewInt(1000)
 )
 
 const abiDeclaration = `[
@@ -69,7 +69,6 @@ type Config struct {
 	Blocks      int
 	Percentile  int
 	Default     *big.Int `toml:",omitempty"` // nil for default/dynamic
-	MaxPrice    *big.Int `toml:",omitempty"`
 	GasContract string   `toml:",omitempty"` // address of the GIP-38 contract
 }
 
@@ -88,7 +87,6 @@ type Oracle struct {
 	lastHead     common.Hash
 	defaultPrice *big.Int // optional user-configured default/min
 	lastPrice    *big.Int
-	maxPrice     *big.Int
 	gasContract  string // address to ask for price
 	cacheLock    sync.RWMutex
 	fetchLock    sync.Mutex
@@ -114,23 +112,9 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 		percent = 100
 		log.Warn("Sanitizing invalid gasprice oracle sample percentile", "provided", params.Percentile, "updated", percent)
 	}
-	maxPrice := params.MaxPrice
-	if maxPrice == nil || maxPrice.Int64() <= 0 {
-		maxPrice = DefaultMaxPrice
-		log.Warn("Sanitizing invalid gasprice oracle price cap", "provided", params.MaxPrice, "updated", maxPrice)
-	}
-	lastPrice := params.Default
-	if lastPrice == nil {
-		lastPrice = Default
-	} else if maxPrice.Int64() <= 0 {
-		lastPrice = Default
-		log.Warn("Sanitizing invalid gasprice oracle price default", "provided", params.Default, "updated", lastPrice)
-	}
 	return &Oracle{
 		backend:      backend,
 		defaultPrice: params.Default,
-		lastPrice:    lastPrice,
-		maxPrice:     maxPrice,
 		checkBlocks:  blocks,
 		percentile:   percent,
 		gasContract:  params.GasContract,
@@ -146,6 +130,12 @@ func (gpo *Oracle) SetBlockchain(blockchain *core.BlockChain) {
 // SuggestPrice returns a gasprice so that newly created transaction can
 // have a very high chance to be included in the following blocks.
 func (gpo *Oracle) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
+	gpo.cacheLock.RLock()
+	if gpo.lastPrice == nil {
+		gpo.lastPrice = gpo.minPrice()
+	}
+	gpo.cacheLock.RUnlock()
+
 	head, _ := gpo.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
 	headHash := head.Hash()
 
@@ -192,10 +182,13 @@ func (gpo *Oracle) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 	}
 	sort.Sort(bigIntArray(blockPrices))
 	price := blockPrices[(len(blockPrices)-1)*gpo.percentile/100]
-	if price.Cmp(gpo.maxPrice) > 0 {
-		price = new(big.Int).Set(gpo.maxPrice)
-	} else if min := gpo.minPrice(head.Number); price.Cmp(min) < 0 {
-		price = min
+	minPrice := gpo.minPrice()
+	maxPrice := big.NewInt(0)
+	maxPrice.Mul(minPrice, maxPriceMultiplier)
+	if price.Cmp(maxPrice) > 0 {
+		price = maxPrice
+	} else if price.Cmp(minPrice) < 0 {
+		price = minPrice
 	}
 	gpo.cacheLock.Lock()
 	gpo.lastHead = headHash
@@ -204,9 +197,9 @@ func (gpo *Oracle) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 	return price, nil
 }
 
-func (gpo *Oracle) minPrice(num *big.Int) *big.Int {
+func (gpo *Oracle) minPrice() *big.Int {
 	if gpo.blockchain != nil && gpo.gasContract != "" {
-		res, err := contracts.CallViewContract(gpo.blockchain, "gasPrice", "gasPrice")
+		res, err := contracts.CallStaticContract(gpo.blockchain, "gasPrice", "gasPrice")
 		if err != nil {
 			log.Error("Failed to fetch gasPrice from contract", "err", err)
 		} else {
@@ -217,7 +210,6 @@ func (gpo *Oracle) minPrice(num *big.Int) *big.Int {
 	if gpo.defaultPrice != nil {
 		return gpo.defaultPrice
 	}
-	const blockOffset = 60 * 12 // look ~1 hour ahead, since we are suggesting gas for near-future txs
 	return Default
 }
 

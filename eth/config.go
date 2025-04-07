@@ -45,8 +45,7 @@ var DefaultConfig = Config{
 	GPO: gasprice.Config{
 		Blocks:      20,
 		Percentile:  60,
-		MaxPrice:    gasprice.DefaultMaxPrice,
-		GasContract: "0xABC", // can hardcode this for mainnet, sinc eit doesn't change.
+		GasContract: "", // can hardcode this for mainnet, since it doesn't change.
 	},
 }
 
