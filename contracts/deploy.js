@@ -1,4 +1,4 @@
-import { createPublicClient, createWalletClient, http } from 'viem'
+import { createPublicClient, createWalletClient, getContractAddress, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { gochain } from './gochain.js'
 import GasPrice from './gasPrice.json' with { type: 'json' }
@@ -17,11 +17,11 @@ const wallet = createWalletClient({
 })
 
 const hash = await wallet.deployContract({
-    abi: GasPrice.abi,
     account: account,
-    args: [],
+    abi: GasPrice.abi,
     bytecode: '0x' + GasPrice.bytecode,
-    gas: 100000000,
+    args: [],
+    gas: 1000000,
 })
-
-console.log(hash)
+const receipt = await publicClient.waitForTransactionReceipt({ hash })
+console.log(receipt)

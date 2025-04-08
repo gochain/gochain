@@ -45,8 +45,6 @@ var (
 		ByzantiumBlock:      big.NewInt(0),
 		ConstantinopleBlock: big.NewInt(5_100_000),
 		PetersburgBlock:     nil,
-		DarvazaBlock:        big.NewInt(17_900_000),
-		DarvazaDefaultGas:   new(big.Int).SetUint64(2_000 * Shannon),
 		HafthorBlock:        big.NewInt(23_817_200), // 2022-02-23
 		HafthorStakeAddress: common.HexToAddress("0x4281Cabd60bB91A6A8B0C60842440669DEA3F541"),
 
@@ -64,8 +62,6 @@ var (
 		ByzantiumBlock:      big.NewInt(0),
 		ConstantinopleBlock: big.NewInt(4_081_350),
 		PetersburgBlock:     nil,
-		DarvazaBlock:        big.NewInt(16_811_000),
-		DarvazaDefaultGas:   new(big.Int).SetUint64(2_000 * Shannon),
 		HafthorBlock:        big.NewInt(22_400_000),                                            // 2022-01-15
 		HafthorStakeAddress: common.HexToAddress("0x2fe70f1df222c85ad6dd24a3376eb5ac32136978"), // recycle to genesis alloc
 
@@ -77,7 +73,7 @@ var (
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllCliqueProtocolChanges = &ChainConfig{ChainId: big.NewInt(1337), HomesteadBlock: big.NewInt(0),
+	AllCliqueProtocolChanges = &ChainConfig{ChainId: big.NewInt(60), HomesteadBlock: big.NewInt(0),
 		EIP150Block: big.NewInt(0), EIP155Block: big.NewInt(0), EIP158Block: big.NewInt(0),
 		ByzantiumBlock: big.NewInt(0), ConstantinopleBlock: big.NewInt(0), Clique: DefaultCliqueConfig()}
 
@@ -108,8 +104,6 @@ type ChainConfig struct {
 	ByzantiumBlock      *big.Int       `json:"byzantiumBlock,omitempty"`      // Byzantium switch block (nil = no fork, 0 = already on byzantium)
 	ConstantinopleBlock *big.Int       `json:"constantinopleBlock,omitempty"` // Constantinople switch block (nil = no fork, 0 = already activated)
 	PetersburgBlock     *big.Int       `json:"petersburgBlock,omitempty"`     // Petersburg switch block (nil = same as Constantinople)
-	DarvazaBlock        *big.Int       `json:"darvazaBlock,omitempty"`        // Darvaza switch block (nil = no fork, 0 = already activated)
-	DarvazaDefaultGas   *big.Int       `json:"darvazaDefaultGas,omitempty"`   // Darvaza default gas value (nil = no change)
 	HafthorBlock        *big.Int       `json:"hafthorBlock,omitempty"`        // Hafthor switch block (nil = no fork, 0 = already activated)
 	HafthorStakeAddress common.Address `json:"hafthorStakeAddress"`           // Hafthor stake address to send rewards
 	EzioBlock           *big.Int       `json:"ezioBlock,omitempty"`           // Ezio switch block (nil = no fork, 0 = already activated)
@@ -151,7 +145,7 @@ func (c *ChainConfig) String() string {
 		engine = "unknown"
 	}
 	return fmt.Sprintf("{ChainID: %v Homestead: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople:"+
-		" %v ConstantinopleFix: %v Darvaza: %v Hafthor: %v EWASM: %v Engine: %v}",
+		" %v ConstantinopleFix: %v Hafthor: %v EWASM: %v Engine: %v}",
 		c.ChainId,
 		c.HomesteadBlock,
 		c.EIP150Block,
@@ -160,7 +154,6 @@ func (c *ChainConfig) String() string {
 		c.ByzantiumBlock,
 		c.ConstantinopleBlock,
 		c.PetersburgBlock,
-		c.DarvazaBlock,
 		c.HafthorBlock,
 		c.EWASMBlock,
 		engine,
@@ -202,11 +195,6 @@ func (c *ChainConfig) IsConstantinople(num *big.Int) bool {
 // - OR is nil, and Constantinople is active
 func (c *ChainConfig) IsPetersburg(num *big.Int) bool {
 	return isForked(c.PetersburgBlock, num) || c.PetersburgBlock == nil && isForked(c.ConstantinopleBlock, num)
-}
-
-// IsDarvaza returns whether num is either equal to the Darvaza fork block or greater.
-func (c *ChainConfig) IsDarvaza(num *big.Int) bool {
-	return isForked(c.DarvazaBlock, num)
 }
 
 // IsHafthor returns whether num is either equal to the Hafthor fork block or greater.
@@ -286,9 +274,6 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 	if isForkIncompatible(c.PetersburgBlock, newcfg.PetersburgBlock, head) {
 		return newCompatError("ConstantinopleFix fork block", c.PetersburgBlock, newcfg.PetersburgBlock)
 	}
-	if isForkIncompatible(c.DarvazaBlock, newcfg.DarvazaBlock, head) {
-		return newCompatError("Darvaza fork block", c.DarvazaBlock, newcfg.DarvazaBlock)
-	}
 	if isForkIncompatible(c.EWASMBlock, newcfg.EWASMBlock, head) {
 		return newCompatError("ewasm fork block", c.EWASMBlock, newcfg.EWASMBlock)
 	}
@@ -359,7 +344,7 @@ type Rules struct {
 	ChainId                                     *big.Int
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158   bool
 	IsByzantium, IsConstantinople, IsPetersburg bool
-	IsDarvaza, IsHafthor                        bool
+	IsHafthor                                   bool
 	IsEWASM                                     bool
 }
 
@@ -378,7 +363,6 @@ func (c *ChainConfig) Rules(num *big.Int) Rules {
 		IsByzantium:      c.IsByzantium(num),
 		IsConstantinople: c.IsConstantinople(num),
 		IsPetersburg:     c.IsPetersburg(num),
-		IsDarvaza:        c.IsDarvaza(num),
 		IsHafthor:        c.IsHafthor(num),
 		IsEWASM:          c.IsEWASM(num),
 	}
