@@ -29,7 +29,6 @@ import (
 	"github.com/gochain/gochain/v4/core/types"
 	"github.com/gochain/gochain/v4/core/vm"
 	"github.com/gochain/gochain/v4/crypto"
-	"github.com/gochain/gochain/v4/eth/gasprice"
 	"github.com/gochain/gochain/v4/ethdb"
 	"github.com/gochain/gochain/v4/params"
 )
@@ -90,7 +89,7 @@ func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine 
 	genesis := gspec.MustCommit(db)
 
 	chain, _ := core.NewBlockChain(db, nil, gspec.Config, engine, vm.Config{})
-	txpool := core.NewTxPool(testTxPoolConfig, chainConfig, chain, &gasprice.DefaultPricer{})
+	txpool := core.NewTxPool(testTxPoolConfig, chainConfig, chain, &core.DefaultPricer{})
 
 	// Generate a small n-block chain and an uncle block for it
 	if n > 0 {

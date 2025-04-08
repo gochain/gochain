@@ -53,18 +53,6 @@ const abiDeclaration = `[
   }
 ]`
 
-// For testing purposes
-type DefaultPricer struct {
-}
-
-func (d *DefaultPricer) GasPrice(ctx context.Context) (*big.Int, error) {
-	return Default, nil
-}
-
-func (d *DefaultPricer) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
-	return Default, nil
-}
-
 type Config struct {
 	Blocks      int
 	Percentile  int
