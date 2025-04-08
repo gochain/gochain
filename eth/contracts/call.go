@@ -1,0 +1,84 @@
+package contracts
+
+import (
+	"fmt"
+	"math/big"
+	"strings"
+
+	"github.com/gochain/gochain/v4/accounts/abi"
+	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/core"
+	"github.com/gochain/gochain/v4/core/types"
+	"github.com/gochain/gochain/v4/core/vm"
+	"github.com/gochain/gochain/v4/log"
+)
+
+type ContractData struct {
+	abi     abi.ABI
+	address common.Address
+}
+
+type Caller struct {
+	address common.Address
+}
+
+var contracts map[string]ContractData = make(map[string]ContractData)
+var viewCaller Caller = Caller{
+	address: common.Address{},
+}
+
+func (c Caller) Address() common.Address {
+	return c.address
+}
+
+func InitContract(contract string, abiDeclaration string, address string) error {
+	abiData, err := abi.JSON(strings.NewReader(abiDeclaration))
+	if err != nil {
+		log.Error("Failed to parse contract abi", "contract", contract, "err", err)
+		return fmt.Errorf("failed to parse contact %s", contract)
+	}
+	contracts[contract] = ContractData{
+		abi:     abiData,
+		address: common.HexToAddress(address),
+	}
+	return nil
+}
+
+func CallStaticContract(gc *core.BlockChain, contract string, function string, args ...interface{}) ([]interface{}, error) {
+	header := gc.CurrentHeader()
+	statedb, err := gc.StateAt(header.Root)
+	if err != nil {
+		return nil, fmt.Errorf("failed to access state: %w", err)
+	}
+
+	contractData := contracts[contract]
+	data, err := contractData.abi.Pack(function, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to pack arguments: %w", err)
+	}
+
+	msg := types.NewMessage(
+		viewCaller.Address(),
+		&contractData.address,
+		0,
+		big.NewInt(0),
+		0,
+		big.NewInt(0),
+		data,
+		false,
+	)
+
+	evmContext := core.NewEVMContext(msg, header, gc, nil)
+	evm := vm.NewEVM(evmContext, statedb, gc.Config(), vm.Config{})
+
+	result, _, err := evm.StaticCall(viewCaller, contractData.address, data, 10000)
+	if err != nil {
+		return nil, fmt.Errorf("vm call error: %w", err)
+	}
+	unpackedResult, err := contractData.abi.Unpack(function, result)
+	if err != nil {
+		return nil, fmt.Errorf("can't unpack: %w", err)
+	}
+
+	return unpackedResult, nil
+}

@@ -17,6 +17,7 @@
 package core
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -25,11 +26,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gochain/gochain/v4"
 	"github.com/gochain/gochain/v4/common"
 	"github.com/gochain/gochain/v4/common/prque"
 	"github.com/gochain/gochain/v4/core/state"
 	"github.com/gochain/gochain/v4/core/types"
-	"github.com/gochain/gochain/v4/eth/gasprice"
 	"github.com/gochain/gochain/v4/log"
 	"github.com/gochain/gochain/v4/metrics"
 	"github.com/gochain/gochain/v4/params"
@@ -215,6 +216,7 @@ type TxPool struct {
 	chainconfig *params.ChainConfig
 
 	chain    blockChain
+	pricer   gochain.GasPricer
 	gasPrice *big.Int
 
 	txFeedBuf chan *types.Transaction
@@ -248,7 +250,8 @@ type TxPool struct {
 
 // NewTxPool creates a new transaction pool to gather, sort and filter inbound
 // transactions from the network.
-func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain blockChain) *TxPool {
+func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain blockChain, pricer gochain.GasPricer) *TxPool {
+
 	// Sanitize the input to ensure no vulnerable gas prices are set
 	config = (&config).sanitize()
 
@@ -257,6 +260,7 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 		config:      config,
 		chainconfig: chainconfig,
 		chain:       chain,
+		pricer:      pricer,
 		signer:      types.NewEIP155Signer(chainconfig.ChainId),
 		pending:     make(map[common.Address]*txList),
 		queue:       make(map[common.Address]*txList),
@@ -535,7 +539,7 @@ func (pool *TxPool) reset(oldBlock, newBlock *types.Block) {
 		pool.homestead = true
 	}
 	if pool.config.PriceLimit < 1 {
-		pool.gasPrice = gasprice.DefaultFn(pool.chainconfig)(pool.currentNum)
+		pool.gasPrice, _ = pool.pricer.GasPrice(context.Background())
 	}
 	statedb, err := pool.chain.StateAt(newBlock.Root())
 	if err != nil {
@@ -613,7 +617,7 @@ func (pool *TxPool) SetGasPrice(price *big.Int) {
 
 	if price == nil {
 		pool.config.PriceLimit = 0
-		pool.gasPrice = gasprice.DefaultFn(pool.chainconfig)(pool.currentNum)
+		pool.gasPrice, _ = pool.pricer.GasPrice(context.Background())
 	} else {
 		pool.config.PriceLimit = price.Uint64()
 		pool.gasPrice = price

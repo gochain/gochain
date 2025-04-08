@@ -20,6 +20,7 @@ import (
 	"context"
 	"math/big"
 
+	"github.com/gochain/gochain/v4"
 	"github.com/gochain/gochain/v4/accounts"
 	"github.com/gochain/gochain/v4/common"
 	"github.com/gochain/gochain/v4/common/math"
@@ -210,8 +211,12 @@ func (b *LesApiBackend) ProtocolVersion() int {
 	return b.eth.LesVersion() + 10000
 }
 
-func (b *LesApiBackend) SuggestPrice(ctx context.Context) (*big.Int, error) {
-	return b.gpo.SuggestPrice(ctx)
+func (b *LesApiBackend) GasPrice(ctx context.Context) (*big.Int, error) {
+	return b.gpo.SuggestGasPrice(ctx)
+}
+
+func (b *LesApiBackend) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
+	return b.gpo.SuggestGasPrice(ctx)
 }
 
 func (b *LesApiBackend) ChainDb() common.Database {
@@ -234,4 +239,12 @@ func (b *LesApiBackend) ServiceFilter(ctx context.Context, session *bloombits.Ma
 	for i := 0; i < bloomFilterThreads; i++ {
 		go session.Multiplex(bloomRetrievalBatch, bloomRetrievalWait, b.eth.bloomRequests)
 	}
+}
+
+func (b *LesApiBackend) CodeAt(ctx context.Context, contract common.Address, blockNumber *big.Int) ([]byte, error) {
+	return nil, nil
+}
+
+func (b *LesApiBackend) CallContract(ctx context.Context, call gochain.CallMsg, blockNumber *big.Int) ([]byte, error) {
+	return nil, nil
 }

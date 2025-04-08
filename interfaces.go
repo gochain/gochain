@@ -121,12 +121,25 @@ type CallMsg struct {
 	Data     []byte          // input data, usually an ABI-encoded contract method invocation
 }
 
-// A ContractCaller provides contract calls, essentially transactions that are executed by
-// the EVM but not mined into the blockchain. ContractCall is a low-level method to
-// execute such calls. For applications which are structured around specific contracts,
-// the abigen tool provides a nicer, properly typed way to perform calls.
+// ContractCaller defines the methods needed to allow operating with a contract on a read
+// only basis.
 type ContractCaller interface {
+	// CodeAt returns the code of the given account. This is needed to differentiate
+	// between contract internal errors and the local chain being out of sync.
+	CodeAt(ctx context.Context, contract common.Address, blockNumber *big.Int) ([]byte, error)
+	// ContractCall executes an GoChain contract call with the specified data as the
+	// input.
 	CallContract(ctx context.Context, call CallMsg, blockNumber *big.Int) ([]byte, error)
+}
+
+// PendingContractCaller defines methods to perform contract calls on the pending state.
+// Call will try to discover this interface when access to the pending state is requested.
+// If the backend does not support the pending state, Call returns ErrNoPendingState.
+type PendingContractCaller interface {
+	// PendingCodeAt returns the code of the given account in the pending state.
+	PendingCodeAt(ctx context.Context, contract common.Address) ([]byte, error)
+	// PendingCallContract executes an GoChain contract call against the pending state.
+	PendingCallContract(ctx context.Context, call CallMsg) ([]byte, error)
 }
 
 // FilterQuery contains options for contract log filtering.
@@ -175,7 +188,8 @@ type TransactionSender interface {
 // GasPricer wraps the gas price oracle, which monitors the blockchain to determine the
 // optimal gas price given current fee market conditions.
 type GasPricer interface {
-	SuggestGasPrice(ctx context.Context) (*big.Int, error)
+	GasPrice(ctx context.Context) (*big.Int, error)        // returns minimum / normal price
+	SuggestGasPrice(ctx context.Context) (*big.Int, error) // returns optimal price based on current status to get included in next block
 }
 
 // A PendingStateReader provides access to the pending state, which is the result of all
@@ -189,11 +203,6 @@ type PendingStateReader interface {
 	PendingCodeAt(ctx context.Context, account common.Address) ([]byte, error)
 	PendingNonceAt(ctx context.Context, account common.Address) (uint64, error)
 	PendingTransactionCount(ctx context.Context) (uint, error)
-}
-
-// PendingContractCaller can be used to perform calls against the pending state.
-type PendingContractCaller interface {
-	PendingCallContract(ctx context.Context, call CallMsg) ([]byte, error)
 }
 
 // GasEstimator wraps EstimateGas, which tries to estimate the gas needed to execute a

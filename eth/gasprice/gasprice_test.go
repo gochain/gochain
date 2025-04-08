@@ -192,35 +192,6 @@ func TestOracle_SuggestPrice(t *testing.T) {
 				txs:  []tx{{price: 20, local: true}},
 			}),
 		},
-		{
-			name: "darvaza-before",
-			exp:  Default.Uint64(),
-			params: Config{
-				Blocks:     5,
-				Percentile: 50,
-				Default:    nil,
-			},
-			backend: newTestBackend(&params.ChainConfig{
-				DarvazaBlock:      big.NewInt(140000),
-				DarvazaDefaultGas: new(big.Int).Mul(Default, bigInt(2))},
-				block{},
-			),
-		},
-		{
-			name: "darvaza-after",
-			exp:  2 * Default.Uint64(),
-			params: Config{
-				Blocks:     5,
-				Percentile: 50,
-				Default:    nil,
-			},
-			backend: newTestBackend(&params.ChainConfig{
-				DarvazaBlock:      big.NewInt(14),
-				DarvazaDefaultGas: new(big.Int).Mul(Default, bigInt(2))},
-				block{},
-				block{},
-			),
-		},
 	} {
 		t.Run(test.name, test.run)
 	}
@@ -236,7 +207,7 @@ type suggestPriceTest struct {
 
 func (test *suggestPriceTest) run(t *testing.T) {
 	o := NewOracle(test.backend, test.params)
-	got, err := o.SuggestPrice(context.Background())
+	got, err := o.SuggestGasPrice(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

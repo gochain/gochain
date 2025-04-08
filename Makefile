@@ -26,6 +26,11 @@ gochain:
 	@echo "Done building."
 	@echo "Run \"bin/gochain\" to launch gochain."
 
+build: gochain
+
+run: gochain
+	./bin/gochain --local
+
 bootnode:
 	cd cmd/bootnode; go build -o ../../bin/gochain-bootnode
 	@echo "Done building."

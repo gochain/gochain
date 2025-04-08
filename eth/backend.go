@@ -176,19 +176,6 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 	}
 	eth.bloomIndexer.Start(eth.blockchain)
 
-	if config.TxPool.Journal != "" {
-		config.TxPool.Journal = sctx.ResolvePath(config.TxPool.Journal)
-	}
-	eth.txPool = core.NewTxPool(config.TxPool, eth.chainConfig, eth.blockchain)
-
-	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.SyncMode, config.NetworkId, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb); err != nil {
-		return nil, err
-	}
-	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine, config.MinerRecommit, config.MinerGasFloor, config.MinerGasCeil, eth.isLocalBlock)
-	if err := eth.miner.SetExtra(makeExtraData(config.MinerExtraData)); err != nil {
-		log.Error("Cannot set extra chain data", "err", err)
-	}
-
 	eth.ApiBackend = &EthApiBackend{eth: eth}
 	if g := eth.config.Genesis; g != nil {
 		eth.ApiBackend.initialSupply = g.Alloc.Total()
@@ -198,6 +185,20 @@ func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 		gpoParams.Default = config.MinerGasPrice
 	}
 	eth.ApiBackend.gpo = gasprice.NewOracle(eth.ApiBackend, gpoParams)
+	eth.ApiBackend.gpo.SetBlockchain(eth.blockchain)
+
+	if config.TxPool.Journal != "" {
+		config.TxPool.Journal = sctx.ResolvePath(config.TxPool.Journal)
+	}
+	eth.txPool = core.NewTxPool(config.TxPool, eth.chainConfig, eth.blockchain, eth.ApiBackend)
+
+	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.SyncMode, config.NetworkId, eth.eventMux, eth.txPool, eth.engine, eth.blockchain, chainDb); err != nil {
+		return nil, err
+	}
+	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.engine, config.MinerRecommit, config.MinerGasFloor, config.MinerGasCeil, eth.isLocalBlock)
+	if err := eth.miner.SetExtra(makeExtraData(config.MinerExtraData)); err != nil {
+		log.Error("Cannot set extra chain data", "err", err)
+	}
 
 	return eth, nil
 }

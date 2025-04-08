@@ -1,0 +1,110 @@
+{
+    "abi": [
+        {
+            "inputs": [],
+            "stateMutability": "nonpayable",
+            "type": "constructor"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "owner",
+                    "type": "address"
+                }
+            ],
+            "name": "OwnableInvalidOwner",
+            "type": "error"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "account",
+                    "type": "address"
+                }
+            ],
+            "name": "OwnableUnauthorizedAccount",
+            "type": "error"
+        },
+        {
+            "anonymous": false,
+            "inputs": [
+                {
+                    "indexed": true,
+                    "internalType": "address",
+                    "name": "previousOwner",
+                    "type": "address"
+                },
+                {
+                    "indexed": true,
+                    "internalType": "address",
+                    "name": "newOwner",
+                    "type": "address"
+                }
+            ],
+            "name": "OwnershipTransferred",
+            "type": "event"
+        },
+        {
+            "inputs": [],
+            "name": "gasPrice",
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [],
+            "name": "owner",
+            "outputs": [
+                {
+                    "internalType": "address",
+                    "name": "",
+                    "type": "address"
+                }
+            ],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [],
+            "name": "renounceOwnership",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "_gasPrice",
+                    "type": "uint256"
+                }
+            ],
+            "name": "setGasPrice",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        },
+        {
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "newOwner",
+                    "type": "address"
+                }
+            ],
+            "name": "transferOwnership",
+            "outputs": [],
+            "stateMutability": "nonpayable",
+            "type": "function"
+        }
+    ],
+    "bytecode": "608060405234801561000f575f80fd5b50335f73ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1603610081575f6040517f1e4fbdf700000000000000000000000000000000000000000000000000000000815260040161007891906101a3565b60405180910390fd5b610090816100a360201b60201c565b50655af3107a40006001819055506101bc565b5f805f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050815f806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508173ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e060405160405180910390a35050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61018d82610164565b9050919050565b61019d81610183565b82525050565b5f6020820190506101b65f830184610194565b92915050565b610469806101c95f395ff3fe608060405234801561000f575f80fd5b5060043610610055575f3560e01c8063715018a6146100595780638da5cb5b14610063578063bf1fe42014610081578063f2fde38b1461009d578063fe173b97146100b9575b5f80fd5b6100616100d7565b005b61006b6100ea565b604051610078919061033b565b60405180910390f35b61009b6004803603810190610096919061038b565b610111565b005b6100b760048036038101906100b291906103e0565b610123565b005b6100c16101a7565b6040516100ce919061041a565b60405180910390f35b6100df6101ad565b6100e85f610234565b565b5f805f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b6101196101ad565b8060018190555050565b61012b6101ad565b5f73ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff160361019b575f6040517f1e4fbdf7000000000000000000000000000000000000000000000000000000008152600401610192919061033b565b60405180910390fd5b6101a481610234565b50565b60015481565b6101b56102f5565b73ffffffffffffffffffffffffffffffffffffffff166101d36100ea565b73ffffffffffffffffffffffffffffffffffffffff1614610232576101f66102f5565b6040517f118cdaa7000000000000000000000000000000000000000000000000000000008152600401610229919061033b565b60405180910390fd5b565b5f805f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050815f806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508173ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e060405160405180910390a35050565b5f33905090565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f610325826102fc565b9050919050565b6103358161031b565b82525050565b5f60208201905061034e5f83018461032c565b92915050565b5f80fd5b5f819050919050565b61036a81610358565b8114610374575f80fd5b50565b5f8135905061038581610361565b92915050565b5f602082840312156103a05761039f610354565b5b5f6103ad84828501610377565b91505092915050565b6103bf8161031b565b81146103c9575f80fd5b50565b5f813590506103da816103b6565b92915050565b5f602082840312156103f5576103f4610354565b5b5f610402848285016103cc565b91505092915050565b61041481610358565b82525050565b5f60208201905061042d5f83018461040b565b9291505056fea26469706673582212206eec930d41255d1ca0098e6d09ffa8dab83bae95703bb06874344fbcca527f1064736f6c634300081a0033"
+}
