@@ -34,7 +34,7 @@ import (
 var (
 	// Deprecated: GasPricer.GasPrice()
 	Default            = new(big.Int).SetUint64(2 * params.Shannon)
-	maxPriceMultiplier = big.NewInt(1000)
+	maxPriceMultiplier = big.NewInt(10000)
 )
 
 const abiDeclaration = `[
