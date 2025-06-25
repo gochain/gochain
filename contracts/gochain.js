@@ -11,7 +11,7 @@ export const gochain = defineChain({
     },
     rpcUrls: {
         default: {
-            http: ['http://localhost:8545'], // need to set to https for prod 
+            http: ['https://rpc.gochain.io'], // need to set to https for prod 
         },
     },
     blockExplorers: {
