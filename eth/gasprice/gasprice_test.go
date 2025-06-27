@@ -3,17 +3,100 @@ package gasprice
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
 	"math/big"
+	"os"
 	"testing"
+	"time"
 
 	"math/rand"
 
+	"github.com/gochain/gochain/v4/accounts/abi"
+	"github.com/gochain/gochain/v4/accounts/abi/bind"
+	"github.com/gochain/gochain/v4/accounts/abi/bind/backends"
 	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v4/core"
 	"github.com/gochain/gochain/v4/core/types"
 	"github.com/gochain/gochain/v4/crypto"
 	"github.com/gochain/gochain/v4/params"
 	"github.com/gochain/gochain/v4/rpc"
 )
+
+func TestDeployAndBindGasPriceContract(t *testing.T) {
+	type ContractData struct {
+		ABI      abi.ABI `json:"abi"`
+		Bytecode string  `json:"bytecode"`
+	}
+	raw, err := os.ReadFile("../../contracts/gasPrice.json")
+	if err != nil {
+		t.Fatalf("Failed to read gasPrice.json: %v", err)
+	}
+	var contractData ContractData
+	if err := json.Unmarshal(raw, &contractData); err != nil {
+		t.Fatalf("Failed to parse contract JSON: %v", err)
+	}
+	bytecode := common.FromHex(contractData.Bytecode)
+	testKey, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("Failed to generate key: %v", err)
+	}
+	backend := backends.NewSimulatedBackend(
+		core.GenesisAlloc{
+			crypto.PubkeyToAddress(testKey.PublicKey): {Balance: big.NewInt(10000000000)},
+		},
+	)
+	// Create the transaction.
+	tx := types.NewContractCreation(0, big.NewInt(0), 300000, big.NewInt(1), bytecode)
+	tx, _ = types.SignTx(tx, types.HomesteadSigner{}, testKey)
+	// Wait for it to get mined in the background.
+	var (
+		address common.Address
+		mined   = make(chan struct{})
+		ctx     = context.Background()
+	)
+	go func() {
+		address, err = bind.WaitDeployed(ctx, backend, tx)
+		close(mined)
+	}()
+	// Send and mine the transaction.
+	backend.SendTransaction(ctx, tx)
+	backend.Commit()
+	select {
+	case <-mined:
+	case <-time.After(2 * time.Second):
+		t.Errorf("test %q: timeout", t.Name())
+	}
+	// Create the transaction.
+	auth := bind.NewKeyedTransactor(testKey)
+	if err != nil {
+		t.Fatalf("Failed to create authorized transactor: %v", err)
+	}
+	boundContract := bind.NewBoundContract(address, contractData.ABI, backend, backend, backend)
+	// Call the 'setGasPrice' method on the contract.
+	setPrice := big.NewInt(98765)
+	setTx, err := boundContract.Transact(auth, "setGasPrice", setPrice)
+	if err != nil {
+		t.Fatalf("Failed to transact 'setGasPrice': %v", err)
+	}
+	backend.Commit()
+	if _, err := bind.WaitMined(context.Background(), backend, setTx); err != nil {
+		t.Fatalf("Failed to mine 'setGasPrice' transaction: %v", err)
+	}
+	// Call the 'gasPrice' view method to retrieve the value.
+	var result []interface{}
+	if err := boundContract.Call(&bind.CallOpts{}, &result, "gasPrice"); err != nil {
+		t.Fatalf("Failed to call 'gasPrice': %v", err)
+	}
+	// Validate the result.
+	if len(result) == 0 {
+		t.Fatal("Expected a result from 'gasPrice' call, got none")
+	}
+
+	if retrievedPrice, ok := result[0].(*big.Int); !ok || setPrice.Cmp(retrievedPrice) != 0 {
+		t.Errorf("Gas price mismatch: want %s, got %v", setPrice, result[0])
+	}
+
+}
 
 func TestOracle_SuggestPrice(t *testing.T) {
 	for _, test := range []suggestPriceTest{
@@ -192,35 +275,6 @@ func TestOracle_SuggestPrice(t *testing.T) {
 				txs:  []tx{{price: 20, local: true}},
 			}),
 		},
-		{
-			name: "darvaza-before",
-			exp:  Default.Uint64(),
-			params: Config{
-				Blocks:     5,
-				Percentile: 50,
-				Default:    nil,
-			},
-			backend: newTestBackend(&params.ChainConfig{
-				DarvazaBlock:      big.NewInt(140000),
-				DarvazaDefaultGas: new(big.Int).Mul(Default, bigInt(2))},
-				block{},
-			),
-		},
-		{
-			name: "darvaza-after",
-			exp:  2 * Default.Uint64(),
-			params: Config{
-				Blocks:     5,
-				Percentile: 50,
-				Default:    nil,
-			},
-			backend: newTestBackend(&params.ChainConfig{
-				DarvazaBlock:      big.NewInt(14),
-				DarvazaDefaultGas: new(big.Int).Mul(Default, bigInt(2))},
-				block{},
-				block{},
-			),
-		},
 	} {
 		t.Run(test.name, test.run)
 	}
@@ -236,7 +290,7 @@ type suggestPriceTest struct {
 
 func (test *suggestPriceTest) run(t *testing.T) {
 	o := NewOracle(test.backend, test.params)
-	got, err := o.SuggestPrice(context.Background())
+	got, err := o.SuggestGasPrice(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

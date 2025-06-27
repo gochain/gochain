@@ -36,3 +36,5 @@ profile.cov
 
 vendor/
 bin/
+
+node_modules/

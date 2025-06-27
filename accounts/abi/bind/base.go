@@ -78,16 +78,16 @@ type WatchOpts struct {
 // Ethereum network. It contains a collection of methods that are used by the
 // higher level contract bindings to operate.
 type BoundContract struct {
-	address    common.Address     // Deployment address of the contract on the Ethereum blockchain
-	abi        abi.ABI            // Reflect based ABI to access the correct Ethereum methods
-	caller     ContractCaller     // Read interface to interact with the blockchain
-	transactor ContractTransactor // Write interface to interact with the blockchain
-	filterer   ContractFilterer   // Event filtering to interact with the blockchain
+	address    common.Address         // Deployment address of the contract on the Ethereum blockchain
+	abi        abi.ABI                // Reflect based ABI to access the correct Ethereum methods
+	caller     gochain.ContractCaller // Read interface to interact with the blockchain
+	transactor ContractTransactor     // Write interface to interact with the blockchain
+	filterer   ContractFilterer       // Event filtering to interact with the blockchain
 }
 
 // NewBoundContract creates a low level contract interface through which calls
 // and transactions may be made through.
-func NewBoundContract(address common.Address, abi abi.ABI, caller ContractCaller, transactor ContractTransactor, filterer ContractFilterer) *BoundContract {
+func NewBoundContract(address common.Address, abi abi.ABI, caller gochain.ContractCaller, transactor ContractTransactor, filterer ContractFilterer) *BoundContract {
 	return &BoundContract{
 		address:    address,
 		abi:        abi,
@@ -139,7 +139,7 @@ func (c *BoundContract) Call(opts *CallOpts, results *[]interface{}, method stri
 		output []byte
 	)
 	if opts.Pending {
-		pb, ok := c.caller.(PendingContractCaller)
+		pb, ok := c.caller.(gochain.PendingContractCaller)
 		if !ok {
 			return ErrNoPendingState
 		}

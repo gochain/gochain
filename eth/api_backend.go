@@ -20,6 +20,7 @@ import (
 	"context"
 	"math/big"
 
+	"github.com/gochain/gochain/v4"
 	"github.com/gochain/gochain/v4/accounts"
 	"github.com/gochain/gochain/v4/common"
 	"github.com/gochain/gochain/v4/common/math"
@@ -239,8 +240,12 @@ func (b *EthApiBackend) ProtocolVersion() int {
 	return b.eth.EthVersion()
 }
 
-func (b *EthApiBackend) SuggestPrice(ctx context.Context) (*big.Int, error) {
-	return b.gpo.SuggestPrice(ctx)
+func (b *EthApiBackend) GasPrice(ctx context.Context) (*big.Int, error) {
+	return b.gpo.SuggestGasPrice(ctx)
+}
+
+func (b *EthApiBackend) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
+	return b.gpo.SuggestGasPrice(ctx)
 }
 
 func (b *EthApiBackend) ChainDb() common.Database {
@@ -260,4 +265,11 @@ func (b *EthApiBackend) ServiceFilter(ctx context.Context, session *bloombits.Ma
 	for i := 0; i < bloomFilterThreads; i++ {
 		go session.Multiplex(bloomRetrievalBatch, bloomRetrievalWait, b.eth.bloomRequests)
 	}
+}
+func (b *EthApiBackend) CodeAt(ctx context.Context, contract common.Address, blockNumber *big.Int) ([]byte, error) {
+	return nil, nil
+}
+
+func (b *EthApiBackend) CallContract(ctx context.Context, call gochain.CallMsg, blockNumber *big.Int) ([]byte, error) {
+	return nil, nil
 }

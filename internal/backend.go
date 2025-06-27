@@ -15,12 +15,13 @@
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 // Package ethapi implements the general Ethereum API functions.
-package ethapi
+package internal
 
 import (
 	"context"
 	"math/big"
 
+	"github.com/gochain/gochain/v4"
 	"github.com/gochain/gochain/v4/accounts"
 	"github.com/gochain/gochain/v4/common"
 	"github.com/gochain/gochain/v4/core"
@@ -38,7 +39,7 @@ type Backend interface {
 	// General Ethereum API
 	Downloader() *downloader.Downloader
 	ProtocolVersion() int
-	SuggestPrice(ctx context.Context) (*big.Int, error)
+	gochain.GasPricer
 	ChainDb() common.Database
 	AccountManager() *accounts.Manager
 
@@ -58,6 +59,9 @@ type Backend interface {
 	SubscribeChainSideEvent(ch chan<- core.ChainSideEvent, name string)
 	UnsubscribeChainSideEvent(ch chan<- core.ChainSideEvent)
 
+	// Contract API
+	gochain.ContractCaller
+
 	// TxPool API
 	SendTx(ctx context.Context, signedTx *types.Transaction) error
 	GetPoolTransactions() types.Transactions
@@ -75,50 +79,4 @@ type Backend interface {
 	InitialSupply() *big.Int
 	// GenesisAlloc returns the initial genesis allocation, or nil if a custom genesis is not available.
 	GenesisAlloc() core.GenesisAlloc
-}
-
-func GetAPIs(apiBackend Backend) []rpc.API {
-	nonceLock := newAddrLocker()
-	return []rpc.API{
-		{
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   NewPublicEthereumAPI(apiBackend),
-			Public:    true,
-		}, {
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   NewPublicBlockChainAPI(apiBackend),
-			Public:    true,
-		}, {
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   NewPublicTransactionPoolAPI(apiBackend, nonceLock),
-			Public:    true,
-		}, {
-			Namespace: "txpool",
-			Version:   "1.0",
-			Service:   NewPublicTxPoolAPI(apiBackend),
-			Public:    true,
-		}, {
-			Namespace: "debug",
-			Version:   "1.0",
-			Service:   NewPublicDebugAPI(apiBackend),
-			Public:    true,
-		}, {
-			Namespace: "debug",
-			Version:   "1.0",
-			Service:   NewPrivateDebugAPI(apiBackend),
-		}, {
-			Namespace: "eth",
-			Version:   "1.0",
-			Service:   NewPublicAccountAPI(apiBackend.AccountManager()),
-			Public:    true,
-		}, {
-			Namespace: "personal",
-			Version:   "1.0",
-			Service:   NewPrivateAccountAPI(apiBackend, nonceLock),
-			Public:    false,
-		},
-	}
 }
