@@ -19,11 +19,13 @@ package eth
 import (
 	"context"
 	"math/big"
+	"time"
 
 	"github.com/gochain/gochain/v4/accounts"
 	"github.com/gochain/gochain/v4/common"
 	"github.com/gochain/gochain/v4/common/math"
 	"github.com/gochain/gochain/v4/core"
+	gochain "github.com/gochain/gochain/v4"
 	"github.com/gochain/gochain/v4/core/bloombits"
 	"github.com/gochain/gochain/v4/core/state"
 	"github.com/gochain/gochain/v4/core/types"
@@ -241,6 +243,64 @@ func (b *EthApiBackend) ProtocolVersion() int {
 
 func (b *EthApiBackend) SuggestPrice(ctx context.Context) (*big.Int, error) {
 	return b.gpo.SuggestPrice(ctx)
+}
+
+func (b *EthApiBackend) CallContract(ctx context.Context, msg gochain.CallMsg, blockNumber *big.Int) ([]byte, error) {
+	// Convert blockNumber to rpc.BlockNumber
+	var blockNr rpc.BlockNumber
+	if blockNumber == nil {
+		blockNr = rpc.LatestBlockNumber
+	} else {
+		blockNr = rpc.BlockNumber(blockNumber.Int64())
+	}
+
+	// Get state and header
+	state, header, err := b.StateAndHeaderByNumber(ctx, blockNr)
+	if state == nil || err != nil {
+		return nil, err
+	}
+
+	// Set default gas if not specified
+	gas := msg.Gas
+	if gas == 0 {
+		gas = uint64(math.MaxUint64 / 2)
+	}
+
+	// Set default gas price if not specified
+	gasPrice := msg.GasPrice
+	if gasPrice == nil {
+		gasPrice = gasprice.DefaultFn(b.ChainConfig())(header.Number)
+	}
+
+	// Set default value if not specified
+	value := msg.Value
+	if value == nil {
+		value = new(big.Int)
+	}
+
+	// Create new call message
+	callMsg := types.NewMessage(msg.From, msg.To, 0, value, gas, gasPrice, msg.Data, false)
+
+	// Setup context with timeout
+	callCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	// Get a new instance of the EVM
+	evm, err := b.GetEVM(callCtx, callMsg, state, header, vm.Config{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Wait for the context to be done and cancel the evm
+	go func() {
+		<-callCtx.Done()
+		evm.Cancel()
+	}()
+
+	// Setup the gas pool and apply the message
+	gp := new(core.GasPool).AddGas(math.MaxUint64)
+	ret, _, _, err := core.ApplyMessage(evm, callMsg, gp)
+	return ret, err
 }
 
 func (b *EthApiBackend) ChainDb() common.Database {

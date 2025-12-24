@@ -18,6 +18,7 @@ package gasprice
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"sort"
 	"sync"
@@ -26,6 +27,8 @@ import (
 
 	"github.com/gochain/gochain/v4/common"
 	"github.com/gochain/gochain/v4/core/types"
+	gochain "github.com/gochain/gochain/v4"
+	"github.com/gochain/gochain/v4/crypto"
 	"github.com/gochain/gochain/v4/params"
 	"github.com/gochain/gochain/v4/rpc"
 )
@@ -60,6 +63,7 @@ type OracleBackend interface {
 	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error)
 	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
 	ChainConfig() *params.ChainConfig
+	CallContract(ctx context.Context, msg gochain.CallMsg, blockNumber *big.Int) ([]byte, error)
 }
 
 // Oracle recommends gas prices based on the content of recent
@@ -116,6 +120,9 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 	}
 }
 
+// gasPriceMethodID is the first 4 bytes of keccak256("gasPrice()")
+var gasPriceMethodID = crypto.Keccak256([]byte("gasPrice()"))[:4]
+
 // SuggestPrice returns a gasprice so that newly created transaction can
 // have a very high chance to be included in the following blocks.
 func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
@@ -138,6 +145,27 @@ func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 	gpo.cacheLock.RUnlock()
 	if headHash == lastHead {
 		return lastPrice, nil
+	}
+
+	// Check if gas price contract is configured and active
+	config := gpo.backend.ChainConfig()
+	if config.GasPriceContractAddress != (common.Address{}) && config.IsGasPriceContract(head.Number) {
+		// Try to get gas price from contract
+		contractPrice, err := gpo.fetchContractGasPrice(ctx, head.Number)
+		if err == nil && contractPrice != nil && contractPrice.Sign() > 0 {
+			// Contract call succeeded, use the contract price
+			price := contractPrice
+			if price.Cmp(gpo.maxPrice) > 0 {
+				price = new(big.Int).Set(gpo.maxPrice)
+			}
+			gpo.cacheLock.Lock()
+			gpo.lastHead = headHash
+			gpo.lastPrice = price
+			gpo.cacheLock.Unlock()
+			return price, nil
+		}
+		// Contract call failed, fall through to block-based calculation
+		log.Debug("Gas price contract call failed, falling back to block-based calculation", "err", err)
 	}
 
 	// Calculate block prices concurrently.
@@ -174,6 +202,38 @@ func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 	gpo.lastHead = headHash
 	gpo.lastPrice = price
 	gpo.cacheLock.Unlock()
+	return price, nil
+}
+
+// fetchContractGasPrice calls the gas price contract to get the current gas price.
+func (gpo *Oracle) fetchContractGasPrice(ctx context.Context, blockNumber *big.Int) (*big.Int, error) {
+	config := gpo.backend.ChainConfig()
+	contractAddr := config.GasPriceContractAddress
+
+	// Create call message with gasPrice() method call
+	// Method signature: gasPrice() returns (uint256)
+	// Method ID: first 4 bytes of keccak256("gasPrice()")
+	callData := make([]byte, 4)
+	copy(callData, gasPriceMethodID)
+
+	msg := gochain.CallMsg{
+		To:   &contractAddr,
+		Data: callData,
+	}
+
+	// Call the contract
+	result, err := gpo.backend.CallContract(ctx, msg, blockNumber)
+	if err != nil {
+		return nil, err
+	}
+
+	// Decode the result (32-byte uint256)
+	if len(result) < 32 {
+		return nil, fmt.Errorf("invalid contract response length: %d", len(result))
+	}
+
+	// Extract the uint256 value from the result
+	price := new(big.Int).SetBytes(result[:32])
 	return price, nil
 }
 

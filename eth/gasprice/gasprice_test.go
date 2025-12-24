@@ -3,6 +3,7 @@ package gasprice
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"math/big"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/gochain/gochain/v4/common"
 	"github.com/gochain/gochain/v4/core/types"
 	"github.com/gochain/gochain/v4/crypto"
+	gochain "github.com/gochain/gochain/v4"
 	"github.com/gochain/gochain/v4/params"
 	"github.com/gochain/gochain/v4/rpc"
 )
@@ -316,6 +318,11 @@ func (b *testBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber
 		}
 	}
 	return nil, nil
+}
+
+func (b *testBackend) CallContract(ctx context.Context, msg gochain.CallMsg, blockNumber *big.Int) ([]byte, error) {
+	// Test backend doesn't support contract calls - return error to trigger fallback
+	return nil, errors.New("contract calls not supported in test backend")
 }
 
 func bigInt(i uint64) *big.Int {
