@@ -154,7 +154,6 @@ func NewProtocolManager(chainConfig *params.ChainConfig, lightSync bool, protoco
 	manager.SubProtocols = make([]p2p.Protocol, 0, len(protocolVersions))
 	for _, version := range protocolVersions {
 		// Compatible, initialize the sub-protocol
-		version := version // Closure for the run
 		manager.SubProtocols = append(manager.SubProtocols, p2p.Protocol{
 			Name:    "les",
 			Version: version,

@@ -123,7 +123,6 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 			continue
 		}
 		// Compatible; initialise the sub-protocol
-		version := version // Closure for the run
 		manager.SubProtocols = append(manager.SubProtocols, p2p.Protocol{
 			Name:    ProtocolName,
 			Version: version,
