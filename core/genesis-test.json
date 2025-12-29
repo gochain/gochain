@@ -12,6 +12,7 @@
     "darvazaDefaultGas": 2000000000000,
     "hafthorBlock": 22400000,
     "hafthorStakeAddress": "0x2fe70f1df222c85ad6dd24a3376eb5ac32136978",
+    "gasPriceContractAddress": "0x0000000000000000000000000000000000000000",
     "clique": {
       "period": 5,
       "epoch": 3000
