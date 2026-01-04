@@ -21,6 +21,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/gochain/gochain/v5"
 	"github.com/gochain/gochain/v5/accounts"
 	"github.com/gochain/gochain/v5/common"
 	"github.com/gochain/gochain/v5/common/math"
