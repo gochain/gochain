@@ -19,7 +19,7 @@ package abi
 import (
 	"math/big"
 
-	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v5/common"
 )
 
 type packUnpackTest struct {

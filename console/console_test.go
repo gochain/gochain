@@ -26,12 +26,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/console/prompt"
-	"github.com/gochain/gochain/v4/core"
-	"github.com/gochain/gochain/v4/eth"
-	"github.com/gochain/gochain/v4/internal/jsre"
-	"github.com/gochain/gochain/v4/node"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/console/prompt"
+	"github.com/gochain/gochain/v5/core"
+	"github.com/gochain/gochain/v5/eth"
+	"github.com/gochain/gochain/v5/internal/jsre"
+	"github.com/gochain/gochain/v5/node"
 )
 
 const (

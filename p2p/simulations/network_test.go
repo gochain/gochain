@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v4/p2p/discover"
-	"github.com/gochain/gochain/v4/p2p/simulations/adapters"
+	"github.com/gochain/gochain/v5/p2p/discover"
+	"github.com/gochain/gochain/v5/p2p/simulations/adapters"
 )
 
 // TestNetworkSimulation creates a multi-node simulation network with each node

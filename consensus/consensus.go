@@ -20,12 +20,12 @@ package consensus
 import (
 	"time"
 
-	"github.com/gochain/gochain/v4/accounts"
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/core/state"
-	"github.com/gochain/gochain/v4/core/types"
-	"github.com/gochain/gochain/v4/params"
-	"github.com/gochain/gochain/v4/rpc"
+	"github.com/gochain/gochain/v5/accounts"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/core/state"
+	"github.com/gochain/gochain/v5/core/types"
+	"github.com/gochain/gochain/v5/params"
+	"github.com/gochain/gochain/v5/rpc"
 )
 
 // ChainReader defines a small collection of methods needed to access the local

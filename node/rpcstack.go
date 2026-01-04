@@ -25,7 +25,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gochain/gochain/v4/log"
+	"github.com/gochain/gochain/v5/log"
 	"github.com/rs/cors"
 	"go.opencensus.io/plugin/ochttp"
 )

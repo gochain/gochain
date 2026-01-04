@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/trie"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/trie"
 	lru "github.com/hashicorp/golang-lru"
 )
 

@@ -3,7 +3,7 @@ package mock
 import (
 	"context"
 
-	"github.com/gochain/gochain/v4/ethdb"
+	"github.com/gochain/gochain/v5/ethdb"
 )
 
 var _ ethdb.Segment = (*Segment)(nil)

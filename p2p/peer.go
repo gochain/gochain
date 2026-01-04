@@ -30,10 +30,10 @@ import (
 
 	"go.opencensus.io/trace"
 
-	"github.com/gochain/gochain/v4/common/mclock"
-	"github.com/gochain/gochain/v4/log"
-	"github.com/gochain/gochain/v4/p2p/discover"
-	"github.com/gochain/gochain/v4/rlp"
+	"github.com/gochain/gochain/v5/common/mclock"
+	"github.com/gochain/gochain/v5/log"
+	"github.com/gochain/gochain/v5/p2p/discover"
+	"github.com/gochain/gochain/v5/rlp"
 )
 
 const (

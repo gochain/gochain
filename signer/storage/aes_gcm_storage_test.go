@@ -23,8 +23,8 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/log"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/log"
 	colorable "github.com/mattn/go-colorable"
 )
 

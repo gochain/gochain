@@ -7,8 +7,8 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/common/hexutil"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/common/hexutil"
 )
 
 var _ = (*receiptMarshaling)(nil)

@@ -21,7 +21,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v5/common"
 )
 
 // Config contains the settings of the global account manager.

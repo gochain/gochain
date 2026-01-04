@@ -22,7 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v5/common"
 )
 
 type keyStorePlain struct {

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/gochain/gochain/v4/ethdb"
+	"github.com/gochain/gochain/v5/ethdb"
 )
 
 var (

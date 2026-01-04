@@ -28,7 +28,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
-	"github.com/gochain/gochain/v4/log"
+	"github.com/gochain/gochain/v5/log"
 	"github.com/gorilla/websocket"
 )
 

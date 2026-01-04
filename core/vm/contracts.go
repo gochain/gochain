@@ -21,11 +21,11 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/common/math"
-	"github.com/gochain/gochain/v4/crypto"
-	"github.com/gochain/gochain/v4/crypto/bn256"
-	"github.com/gochain/gochain/v4/params"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/common/math"
+	"github.com/gochain/gochain/v5/crypto"
+	"github.com/gochain/gochain/v5/crypto/bn256"
+	"github.com/gochain/gochain/v5/params"
 	"golang.org/x/crypto/ripemd160"
 )
 

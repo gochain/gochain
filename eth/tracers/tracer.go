@@ -25,11 +25,11 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/common/hexutil"
-	"github.com/gochain/gochain/v4/core/vm"
-	"github.com/gochain/gochain/v4/crypto"
-	"github.com/gochain/gochain/v4/log"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/common/hexutil"
+	"github.com/gochain/gochain/v5/core/vm"
+	"github.com/gochain/gochain/v5/crypto"
+	"github.com/gochain/gochain/v5/log"
 	duktape "gopkg.in/olebedev/go-duktape.v3"
 )
 

@@ -25,7 +25,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/gochain/gochain/v4/log"
+	"github.com/gochain/gochain/v5/log"
 )
 
 type storedCredential struct {

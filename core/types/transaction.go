@@ -23,10 +23,10 @@ import (
 	"math/big"
 	"sync/atomic"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/common/hexutil"
-	"github.com/gochain/gochain/v4/crypto"
-	"github.com/gochain/gochain/v4/rlp"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/common/hexutil"
+	"github.com/gochain/gochain/v5/crypto"
+	"github.com/gochain/gochain/v5/rlp"
 )
 
 //go:generate gencodec -type txdata -field-override txdataMarshaling -out gen_tx_json.go

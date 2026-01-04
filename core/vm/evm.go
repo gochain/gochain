@@ -21,9 +21,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/crypto"
-	"github.com/gochain/gochain/v4/params"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/crypto"
+	"github.com/gochain/gochain/v5/params"
 )
 
 // emptyCodeHash is used by create to ensure deployment is disallowed to already

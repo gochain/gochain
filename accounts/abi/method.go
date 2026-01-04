@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gochain/gochain/v4/crypto"
+	"github.com/gochain/gochain/v5/crypto"
 )
 
 // FunctionType represents different types of functions a contract might have.

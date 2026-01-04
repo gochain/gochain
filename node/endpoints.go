@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gochain/gochain/v4/log"
-	"github.com/gochain/gochain/v4/rpc"
+	"github.com/gochain/gochain/v5/log"
+	"github.com/gochain/gochain/v5/rpc"
 )
 
 // StartHTTPEndpoint starts the HTTP RPC endpoint.

@@ -23,13 +23,13 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/gochain/gochain/v4/consensus/clique"
-	"github.com/gochain/gochain/v4/core"
-	"github.com/gochain/gochain/v4/core/state"
-	"github.com/gochain/gochain/v4/core/vm"
-	"github.com/gochain/gochain/v4/ethdb"
-	"github.com/gochain/gochain/v4/params"
-	"github.com/gochain/gochain/v4/trie"
+	"github.com/gochain/gochain/v5/consensus/clique"
+	"github.com/gochain/gochain/v5/core"
+	"github.com/gochain/gochain/v5/core/state"
+	"github.com/gochain/gochain/v5/core/vm"
+	"github.com/gochain/gochain/v5/ethdb"
+	"github.com/gochain/gochain/v5/params"
+	"github.com/gochain/gochain/v5/trie"
 )
 
 func TestNodeIterator(t *testing.T) {

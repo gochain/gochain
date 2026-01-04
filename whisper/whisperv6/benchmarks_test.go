@@ -20,7 +20,7 @@ import (
 	"crypto/sha256"
 	"testing"
 
-	"github.com/gochain/gochain/v4/crypto"
+	"github.com/gochain/gochain/v5/crypto"
 	"golang.org/x/crypto/pbkdf2"
 )
 

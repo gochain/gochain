@@ -21,12 +21,12 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/core/state"
-	"github.com/gochain/gochain/v4/core/vm"
-	"github.com/gochain/gochain/v4/crypto"
-	"github.com/gochain/gochain/v4/ethdb"
-	"github.com/gochain/gochain/v4/params"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/core/state"
+	"github.com/gochain/gochain/v5/core/vm"
+	"github.com/gochain/gochain/v5/crypto"
+	"github.com/gochain/gochain/v5/ethdb"
+	"github.com/gochain/gochain/v5/params"
 )
 
 // Config is a basic type specifying certain configuration flags for running

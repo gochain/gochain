@@ -30,9 +30,9 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/common/math"
-	"github.com/gochain/gochain/v4/rlp"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/common/math"
+	"github.com/gochain/gochain/v5/rlp"
 	"golang.org/x/crypto/sha3"
 )
 

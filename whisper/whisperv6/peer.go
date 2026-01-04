@@ -26,10 +26,10 @@ import (
 
 	"sync"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/log"
-	"github.com/gochain/gochain/v4/p2p"
-	"github.com/gochain/gochain/v4/rlp"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/log"
+	"github.com/gochain/gochain/v5/p2p"
+	"github.com/gochain/gochain/v5/rlp"
 )
 
 // Peer represents a whisper protocol peer connection.
