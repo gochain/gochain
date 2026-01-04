@@ -8,6 +8,9 @@ on:
 
 permissions:
   contents: write
+  packages: write
+  attestations: write
+  id-token: write
 
 jobs:
 

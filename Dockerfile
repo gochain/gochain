@@ -1,7 +1,7 @@
 # Build GoChain in a stock Go builder container
-FROM golang:1.24-alpine as builder
+FROM golang:1.24-trixie AS builder
 
-RUN apk --no-cache add build-base git gcc linux-headers
+RUN apt-get update && apt-get install -y build-essential git gcc
 ENV D=/gochain
 WORKDIR $D
 # cache dependencies
@@ -13,9 +13,10 @@ ADD . $D
 RUN cd $D && make all && mkdir -p /tmp/gochain && cp $D/bin/* /tmp/gochain/
 
 # Pull all binaries into a second stage deploy alpine container
-FROM alpine:latest
+FROM debian:trixie
 
-RUN apk add --no-cache ca-certificates
+# RUN apk add --no-cache ca-certificates
+RUN apt-get update && apt-get install -y git
 COPY --from=builder /tmp/gochain/* /usr/local/bin/
 EXPOSE 6060 8545 8546 30303 30303/udp 30304/udp
 CMD [ "gochain" ]
