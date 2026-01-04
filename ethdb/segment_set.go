@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/gochain/gochain/v4/log"
+	"github.com/gochain/gochain/v5/log"
 	lru "github.com/hashicorp/golang-lru"
 	"golang.org/x/sync/semaphore"
 )

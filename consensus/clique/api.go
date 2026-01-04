@@ -19,10 +19,10 @@ package clique
 import (
 	"context"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/consensus"
-	"github.com/gochain/gochain/v4/core/types"
-	"github.com/gochain/gochain/v4/rpc"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/consensus"
+	"github.com/gochain/gochain/v5/core/types"
+	"github.com/gochain/gochain/v5/rpc"
 )
 
 // API is a user facing RPC API to allow controlling the signer and voting

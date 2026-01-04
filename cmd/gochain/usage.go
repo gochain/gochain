@@ -22,8 +22,8 @@ import (
 	"io"
 	"sort"
 
-	"github.com/gochain/gochain/v4/cmd/utils"
-	"github.com/gochain/gochain/v4/internal/debug"
+	"github.com/gochain/gochain/v5/cmd/utils"
+	"github.com/gochain/gochain/v5/internal/debug"
 	"github.com/urfave/cli"
 )
 

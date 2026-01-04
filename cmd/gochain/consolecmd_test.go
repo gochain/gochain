@@ -27,8 +27,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v4/core"
-	"github.com/gochain/gochain/v4/params"
+	"github.com/gochain/gochain/v5/core"
+	"github.com/gochain/gochain/v5/params"
 )
 
 const (

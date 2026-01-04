@@ -23,14 +23,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gochain/gochain/v4"
-	"github.com/gochain/gochain/v4/accounts/abi"
-	"github.com/gochain/gochain/v4/accounts/abi/bind"
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/common/hexutil"
-	"github.com/gochain/gochain/v4/core/types"
-	"github.com/gochain/gochain/v4/crypto"
-	"github.com/gochain/gochain/v4/rlp"
+	"github.com/gochain/gochain/v5"
+	"github.com/gochain/gochain/v5/accounts/abi"
+	"github.com/gochain/gochain/v5/accounts/abi/bind"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/common/hexutil"
+	"github.com/gochain/gochain/v5/core/types"
+	"github.com/gochain/gochain/v5/crypto"
+	"github.com/gochain/gochain/v5/rlp"
 )
 
 type mockCaller struct {

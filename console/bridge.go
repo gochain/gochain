@@ -25,10 +25,10 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/gochain/gochain/v4/common/hexutil"
-	"github.com/gochain/gochain/v4/console/prompt"
-	"github.com/gochain/gochain/v4/internal/jsre"
-	"github.com/gochain/gochain/v4/rpc"
+	"github.com/gochain/gochain/v5/common/hexutil"
+	"github.com/gochain/gochain/v5/console/prompt"
+	"github.com/gochain/gochain/v5/internal/jsre"
+	"github.com/gochain/gochain/v5/rpc"
 )
 
 // bridge is a collection of JavaScript utility methods to bride the .js runtime

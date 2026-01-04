@@ -28,9 +28,9 @@ import (
 	"strings"
 
 	"github.com/docker/docker/pkg/reexec"
-	"github.com/gochain/gochain/v4/log"
-	"github.com/gochain/gochain/v4/node"
-	"github.com/gochain/gochain/v4/p2p/discover"
+	"github.com/gochain/gochain/v5/log"
+	"github.com/gochain/gochain/v5/node"
+	"github.com/gochain/gochain/v5/p2p/discover"
 )
 
 // DockerAdapter is a NodeAdapter which runs simulation nodes inside Docker

@@ -24,10 +24,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gochain/gochain/v4/common/hexutil"
-	"github.com/gochain/gochain/v4/console/prompt"
-	"github.com/gochain/gochain/v4/internal/ethapi"
-	"github.com/gochain/gochain/v4/log"
+	"github.com/gochain/gochain/v5/common/hexutil"
+	"github.com/gochain/gochain/v5/console/prompt"
+	"github.com/gochain/gochain/v5/internal/ethapi"
+	"github.com/gochain/gochain/v5/log"
 )
 
 type CommandlineUI struct {

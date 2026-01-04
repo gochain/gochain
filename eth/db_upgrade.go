@@ -22,11 +22,11 @@ import (
 	"bytes"
 	"time"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/core"
-	"github.com/gochain/gochain/v4/ethdb"
-	"github.com/gochain/gochain/v4/log"
-	"github.com/gochain/gochain/v4/rlp"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/core"
+	"github.com/gochain/gochain/v5/ethdb"
+	"github.com/gochain/gochain/v5/log"
+	"github.com/gochain/gochain/v5/rlp"
 )
 
 var deduplicateData = []byte("dbUpgrade_20170714deduplicateData")

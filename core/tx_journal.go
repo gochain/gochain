@@ -21,9 +21,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/gochain/gochain/v4/core/types"
-	"github.com/gochain/gochain/v4/log"
-	"github.com/gochain/gochain/v4/rlp"
+	"github.com/gochain/gochain/v5/core/types"
+	"github.com/gochain/gochain/v5/log"
+	"github.com/gochain/gochain/v5/rlp"
 )
 
 // errNoActiveJournal is returned if a transaction is attempted to be inserted

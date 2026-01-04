@@ -19,7 +19,7 @@ package ethapi
 import (
 	"sync"
 
-	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v5/common"
 )
 
 // AddrLocker stores locks per account. This is used to prevent another tx getting the

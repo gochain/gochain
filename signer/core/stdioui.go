@@ -19,9 +19,9 @@ package core
 import (
 	"context"
 
-	"github.com/gochain/gochain/v4/internal/ethapi"
-	"github.com/gochain/gochain/v4/log"
-	"github.com/gochain/gochain/v4/rpc"
+	"github.com/gochain/gochain/v5/internal/ethapi"
+	"github.com/gochain/gochain/v5/log"
+	"github.com/gochain/gochain/v5/rpc"
 )
 
 type StdIOUI struct {

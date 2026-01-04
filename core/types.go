@@ -17,9 +17,9 @@
 package core
 
 import (
-	"github.com/gochain/gochain/v4/core/state"
-	"github.com/gochain/gochain/v4/core/types"
-	"github.com/gochain/gochain/v4/core/vm"
+	"github.com/gochain/gochain/v5/core/state"
+	"github.com/gochain/gochain/v5/core/types"
+	"github.com/gochain/gochain/v5/core/vm"
 )
 
 // Validator is an interface which defines the standard for block validation. It

@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/gochain/gochain/v4/node"
-	"github.com/gochain/gochain/v4/p2p"
-	"github.com/gochain/gochain/v4/rpc"
+	"github.com/gochain/gochain/v5/node"
+	"github.com/gochain/gochain/v5/p2p"
+	"github.com/gochain/gochain/v5/rpc"
 )
 
 // SampleService is a trivial network service that can be attached to a node for

@@ -42,7 +42,7 @@ import (
 	"fmt"
 	"hash"
 
-	ethcrypto "github.com/gochain/gochain/v4/crypto"
+	ethcrypto "github.com/gochain/gochain/v5/crypto"
 )
 
 var (

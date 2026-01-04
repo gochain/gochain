@@ -21,8 +21,8 @@ import (
 	"container/heap"
 	"errors"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/rlp"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/rlp"
 )
 
 // Iterator is a key-value trie iterator that traverses a Trie.

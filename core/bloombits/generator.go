@@ -19,7 +19,7 @@ package bloombits
 import (
 	"errors"
 
-	"github.com/gochain/gochain/v4/core/types"
+	"github.com/gochain/gochain/v5/core/types"
 )
 
 var (

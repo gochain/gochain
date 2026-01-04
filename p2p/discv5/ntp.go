@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gochain/gochain/v4/log"
+	"github.com/gochain/gochain/v5/log"
 )
 
 const (

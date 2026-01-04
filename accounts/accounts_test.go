@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/gochain/gochain/v4/common/hexutil"
+	"github.com/gochain/gochain/v5/common/hexutil"
 )
 
 func TestTextHash(t *testing.T) {
