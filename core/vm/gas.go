@@ -19,7 +19,7 @@ package vm
 import (
 	"math/big"
 
-	"github.com/gochain/gochain/v4/params"
+	"github.com/gochain/gochain/v5/params"
 )
 
 // Gas costs

@@ -29,12 +29,12 @@ import (
 
 	cli "github.com/urfave/cli"
 
-	"github.com/gochain/gochain/v4/cmd/utils"
-	"github.com/gochain/gochain/v4/eth"
-	"github.com/gochain/gochain/v4/netstats"
-	"github.com/gochain/gochain/v4/node"
-	"github.com/gochain/gochain/v4/params"
-	whisper "github.com/gochain/gochain/v4/whisper/whisperv6"
+	"github.com/gochain/gochain/v5/cmd/utils"
+	"github.com/gochain/gochain/v5/eth"
+	"github.com/gochain/gochain/v5/netstats"
+	"github.com/gochain/gochain/v5/node"
+	"github.com/gochain/gochain/v5/params"
+	whisper "github.com/gochain/gochain/v5/whisper/whisperv6"
 	"github.com/naoina/toml"
 )
 

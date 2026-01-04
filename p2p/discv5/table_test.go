@@ -27,8 +27,8 @@ import (
 	"testing/quick"
 	"time"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/crypto"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/crypto"
 )
 
 type nullTransport struct{}

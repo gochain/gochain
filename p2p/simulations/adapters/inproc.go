@@ -23,11 +23,11 @@ import (
 	"net"
 	"sync"
 
-	"github.com/gochain/gochain/v4/log"
-	"github.com/gochain/gochain/v4/node"
-	"github.com/gochain/gochain/v4/p2p"
-	"github.com/gochain/gochain/v4/p2p/discover"
-	"github.com/gochain/gochain/v4/rpc"
+	"github.com/gochain/gochain/v5/log"
+	"github.com/gochain/gochain/v5/node"
+	"github.com/gochain/gochain/v5/p2p"
+	"github.com/gochain/gochain/v5/p2p/discover"
+	"github.com/gochain/gochain/v5/rpc"
 	"github.com/gorilla/websocket"
 )
 

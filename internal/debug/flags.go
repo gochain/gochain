@@ -24,10 +24,10 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/gochain/gochain/v4/log"
-	"github.com/gochain/gochain/v4/log/term"
-	"github.com/gochain/gochain/v4/metrics"
-	"github.com/gochain/gochain/v4/metrics/exp"
+	"github.com/gochain/gochain/v5/log"
+	"github.com/gochain/gochain/v5/log/term"
+	"github.com/gochain/gochain/v5/metrics"
+	"github.com/gochain/gochain/v5/metrics/exp"
 	"github.com/mattn/go-colorable"
 	"github.com/urfave/cli"
 )

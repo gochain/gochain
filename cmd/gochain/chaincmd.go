@@ -26,16 +26,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gochain/gochain/v4/console/prompt"
+	"github.com/gochain/gochain/v5/console/prompt"
 
-	"github.com/gochain/gochain/v4/cmd/utils"
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/core"
-	"github.com/gochain/gochain/v4/core/state"
-	"github.com/gochain/gochain/v4/core/types"
-	"github.com/gochain/gochain/v4/eth/downloader"
-	"github.com/gochain/gochain/v4/ethdb"
-	"github.com/gochain/gochain/v4/log"
+	"github.com/gochain/gochain/v5/cmd/utils"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/core"
+	"github.com/gochain/gochain/v5/core/state"
+	"github.com/gochain/gochain/v5/core/types"
+	"github.com/gochain/gochain/v5/eth/downloader"
+	"github.com/gochain/gochain/v5/ethdb"
+	"github.com/gochain/gochain/v5/log"
 	"github.com/urfave/cli"
 )
 

@@ -4,13 +4,13 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/common/hexutil"
-	"github.com/gochain/gochain/v4/consensus"
-	"github.com/gochain/gochain/v4/core/state"
-	"github.com/gochain/gochain/v4/core/types"
-	"github.com/gochain/gochain/v4/params"
-	"github.com/gochain/gochain/v4/rpc"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/common/hexutil"
+	"github.com/gochain/gochain/v5/consensus"
+	"github.com/gochain/gochain/v5/core/state"
+	"github.com/gochain/gochain/v5/core/types"
+	"github.com/gochain/gochain/v5/params"
+	"github.com/gochain/gochain/v5/rpc"
 )
 
 // fakeEngine is a fake clique consensus.Engine for testing only.

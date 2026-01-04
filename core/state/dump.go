@@ -20,9 +20,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/rlp"
-	"github.com/gochain/gochain/v4/trie"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/rlp"
+	"github.com/gochain/gochain/v5/trie"
 )
 
 type DumpAccount struct {

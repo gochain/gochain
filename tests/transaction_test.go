@@ -20,7 +20,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/gochain/gochain/v4/params"
+	"github.com/gochain/gochain/v5/params"
 )
 
 func TestTransaction(t *testing.T) {

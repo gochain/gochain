@@ -7,12 +7,13 @@
   # Use https://search.nixos.org/packages to find packages
   packages = [
     pkgs.go
+    pkgs.nodejs_24
     pkgs.gnumake
     pkgs.gcc
   ];
 
   # Sets environment variables in the workspace
-  env = {};
+  env = { };
   idx = {
     # Search for the extensions you want on https://open-vsx.org/ and use "publisher.id"
     extensions = [

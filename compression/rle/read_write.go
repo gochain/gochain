@@ -21,7 +21,7 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/gochain/gochain/v4/crypto"
+	"github.com/gochain/gochain/v5/crypto"
 )
 
 const (

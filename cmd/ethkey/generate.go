@@ -23,9 +23,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gochain/gochain/v4/accounts/keystore"
-	"github.com/gochain/gochain/v4/cmd/utils"
-	"github.com/gochain/gochain/v4/crypto"
+	"github.com/gochain/gochain/v5/accounts/keystore"
+	"github.com/gochain/gochain/v5/cmd/utils"
+	"github.com/gochain/gochain/v5/crypto"
 	"github.com/pborman/uuid"
 	"github.com/urfave/cli"
 )

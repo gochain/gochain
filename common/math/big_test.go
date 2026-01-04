@@ -22,7 +22,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v5/common"
 )
 
 func TestHexOrDecimal256(t *testing.T) {

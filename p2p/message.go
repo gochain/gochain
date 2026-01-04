@@ -25,8 +25,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gochain/gochain/v4/p2p/discover"
-	"github.com/gochain/gochain/v4/rlp"
+	"github.com/gochain/gochain/v5/p2p/discover"
+	"github.com/gochain/gochain/v5/rlp"
 )
 
 // eth protocol message codes

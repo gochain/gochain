@@ -21,7 +21,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/gochain/gochain/v4/core/vm"
+	"github.com/gochain/gochain/v5/core/vm"
 )
 
 // Iterator for disassembled EVM instructions

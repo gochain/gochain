@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gochain/gochain/v4/log"
+	"github.com/gochain/gochain/v5/log"
 )
 
 // handler handles JSON-RPC messages. There is one handler per connection. Note that

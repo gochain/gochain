@@ -19,7 +19,7 @@
 package downloader
 
 import (
-	"github.com/gochain/gochain/v4/metrics"
+	"github.com/gochain/gochain/v5/metrics"
 )
 
 var (

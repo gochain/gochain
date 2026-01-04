@@ -21,12 +21,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v4/common/hexutil"
-	"github.com/gochain/gochain/v4/consensus/clique"
-	"github.com/gochain/gochain/v4/core/types"
-	"github.com/gochain/gochain/v4/core/vm"
-	"github.com/gochain/gochain/v4/ethdb"
-	"github.com/gochain/gochain/v4/params"
+	"github.com/gochain/gochain/v5/common/hexutil"
+	"github.com/gochain/gochain/v5/consensus/clique"
+	"github.com/gochain/gochain/v5/core/types"
+	"github.com/gochain/gochain/v5/core/vm"
+	"github.com/gochain/gochain/v5/ethdb"
+	"github.com/gochain/gochain/v5/params"
 )
 
 // Tests that simple header verification works, for both good and bad blocks.

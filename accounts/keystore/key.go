@@ -29,9 +29,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gochain/gochain/v4/accounts"
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/crypto"
+	"github.com/gochain/gochain/v5/accounts"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/crypto"
 	"github.com/pborman/uuid"
 )
 

@@ -19,8 +19,8 @@ package vm
 import (
 	"math/big"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/common/math"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/common/math"
 )
 
 // calculates the memory size required for a step

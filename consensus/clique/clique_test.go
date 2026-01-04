@@ -5,7 +5,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v5/common"
 )
 
 func TestExtraData(t *testing.T) {

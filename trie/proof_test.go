@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/crypto"
-	"github.com/gochain/gochain/v4/ethdb"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/crypto"
+	"github.com/gochain/gochain/v5/ethdb"
 )
 
 func init() {

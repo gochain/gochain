@@ -9,12 +9,11 @@ import (
 
 	"math/rand"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/core/types"
-	"github.com/gochain/gochain/v4/crypto"
-	gochain "github.com/gochain/gochain/v4"
-	"github.com/gochain/gochain/v4/params"
-	"github.com/gochain/gochain/v4/rpc"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/core/types"
+	"github.com/gochain/gochain/v5/crypto"
+	"github.com/gochain/gochain/v5/params"
+	"github.com/gochain/gochain/v5/rpc"
 )
 
 func TestOracle_SuggestPrice(t *testing.T) {

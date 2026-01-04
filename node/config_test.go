@@ -24,8 +24,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/gochain/gochain/v4/crypto"
-	"github.com/gochain/gochain/v4/p2p"
+	"github.com/gochain/gochain/v5/crypto"
+	"github.com/gochain/gochain/v5/p2p"
 )
 
 // Tests that datadirs can be successfully created, be them manually configured

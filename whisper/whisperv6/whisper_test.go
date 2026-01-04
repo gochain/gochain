@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v4/common"
+	"github.com/gochain/gochain/v5/common"
 	"golang.org/x/crypto/pbkdf2"
 )
 

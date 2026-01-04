@@ -26,18 +26,16 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gochain/gochain/v4/accounts"
-	"github.com/gochain/gochain/v4/accounts/external"
-	"github.com/gochain/gochain/v4/accounts/keystore"
-	"github.com/gochain/gochain/v4/accounts/scwallet"
-	"github.com/gochain/gochain/v4/accounts/usbwallet"
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/crypto"
-	"github.com/gochain/gochain/v4/ethdb"
-	"github.com/gochain/gochain/v4/log"
-	"github.com/gochain/gochain/v4/p2p"
-	"github.com/gochain/gochain/v4/p2p/discover"
-	"github.com/gochain/gochain/v4/rpc"
+	"github.com/gochain/gochain/v5/accounts"
+	"github.com/gochain/gochain/v5/accounts/external"
+	"github.com/gochain/gochain/v5/accounts/keystore"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/crypto"
+	"github.com/gochain/gochain/v5/ethdb"
+	"github.com/gochain/gochain/v5/log"
+	"github.com/gochain/gochain/v5/p2p"
+	"github.com/gochain/gochain/v5/p2p/discover"
+	"github.com/gochain/gochain/v5/rpc"
 )
 
 const (
@@ -455,22 +453,6 @@ func makeAccountManager(conf *Config) (*accounts.Manager, string, error) {
 		// we can have both, but it's very confusing for the user to see the same
 		// accounts in both externally and locally, plus very racey.
 		backends = append(backends, keystore.NewKeyStore(keydir, scryptN, scryptP))
-		if !conf.NoUSB {
-			// Start a USB hub for Ledger hardware wallets
-			if ledgerhub, err := usbwallet.NewLedgerHub(); err != nil {
-				log.Warn(fmt.Sprintf("Failed to start Ledger hub, disabling: %v", err))
-			} else {
-				backends = append(backends, ledgerhub)
-			}
-		}
-		if len(conf.SmartCardDaemonPath) > 0 {
-			// Start a smart card hub
-			if schub, err := scwallet.NewHub(conf.SmartCardDaemonPath, scwallet.Scheme, keydir); err != nil {
-				log.Warn(fmt.Sprintf("Failed to start smart card hub, disabling: %v", err))
-			} else {
-				backends = append(backends, schub)
-			}
-		}
 	}
 
 	return accounts.NewManager(&accounts.Config{InsecureUnlockAllowed: conf.InsecureUnlockAllowed}, backends...), ephemeral, nil

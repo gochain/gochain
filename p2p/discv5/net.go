@@ -26,12 +26,12 @@ import (
 
 	"golang.org/x/crypto/sha3"
 
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/common/mclock"
-	"github.com/gochain/gochain/v4/crypto"
-	"github.com/gochain/gochain/v4/log"
-	"github.com/gochain/gochain/v4/p2p/netutil"
-	"github.com/gochain/gochain/v4/rlp"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/common/mclock"
+	"github.com/gochain/gochain/v5/crypto"
+	"github.com/gochain/gochain/v5/log"
+	"github.com/gochain/gochain/v5/p2p/netutil"
+	"github.com/gochain/gochain/v5/rlp"
 )
 
 var (

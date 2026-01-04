@@ -25,16 +25,14 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/gochain/gochain/v4/accounts"
-	"github.com/gochain/gochain/v4/accounts/keystore"
-	"github.com/gochain/gochain/v4/accounts/scwallet"
-	"github.com/gochain/gochain/v4/accounts/usbwallet"
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/common/hexutil"
-	"github.com/gochain/gochain/v4/internal/ethapi"
-	"github.com/gochain/gochain/v4/log"
-	"github.com/gochain/gochain/v4/rlp"
-	"github.com/gochain/gochain/v4/signer/storage"
+	"github.com/gochain/gochain/v5/accounts"
+	"github.com/gochain/gochain/v5/accounts/keystore"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/common/hexutil"
+	"github.com/gochain/gochain/v5/internal/ethapi"
+	"github.com/gochain/gochain/v5/log"
+	"github.com/gochain/gochain/v5/rlp"
+	"github.com/gochain/gochain/v5/signer/storage"
 )
 
 const (
@@ -137,15 +135,6 @@ func StartClefAccountManager(ksLocation string, nousb, lightKDF bool, scpath str
 	if len(ksLocation) > 0 {
 		backends = append(backends, keystore.NewKeyStore(ksLocation, n, p))
 	}
-	if !nousb {
-		// Start a USB hub for Ledger hardware wallets
-		if ledgerhub, err := usbwallet.NewLedgerHub(); err != nil {
-			log.Warn(fmt.Sprintf("Failed to start Ledger hub, disabling: %v", err))
-		} else {
-			backends = append(backends, ledgerhub)
-			log.Debug("Ledger support enabled")
-		}
-	}
 
 	// Start a smart card hub
 	if len(scpath) > 0 {
@@ -157,11 +146,7 @@ func StartClefAccountManager(ksLocation string, nousb, lightKDF bool, scpath str
 			if fi.Mode()&os.ModeType != os.ModeSocket {
 				log.Error("Invalid smartcard socket file type", "path", scpath, "type", fi.Mode().String())
 			} else {
-				if schub, err := scwallet.NewHub(scpath, scwallet.Scheme, ksLocation); err != nil {
-					log.Warn(fmt.Sprintf("Failed to start smart card hub, disabling: %v", err))
-				} else {
-					backends = append(backends, schub)
-				}
+
 			}
 		}
 	}

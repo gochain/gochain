@@ -22,12 +22,12 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/gochain/gochain/v4/cmd/utils"
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/crypto"
-	"github.com/gochain/gochain/v4/log"
-	"github.com/gochain/gochain/v4/rlp"
-	whisper "github.com/gochain/gochain/v4/whisper/whisperv6"
+	"github.com/gochain/gochain/v5/cmd/utils"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/crypto"
+	"github.com/gochain/gochain/v5/log"
+	"github.com/gochain/gochain/v5/rlp"
+	whisper "github.com/gochain/gochain/v5/whisper/whisperv6"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gochain/gochain/v4/cmd/utils"
+	"github.com/gochain/gochain/v5/cmd/utils"
 	"github.com/urfave/cli"
 )
 

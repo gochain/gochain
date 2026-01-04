@@ -25,16 +25,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gochain/gochain/v4"
-	"github.com/gochain/gochain/v4/common"
-	"github.com/gochain/gochain/v4/consensus/clique"
-	"github.com/gochain/gochain/v4/core"
-	"github.com/gochain/gochain/v4/core/bloombits"
-	"github.com/gochain/gochain/v4/core/rawdb"
-	"github.com/gochain/gochain/v4/core/types"
-	"github.com/gochain/gochain/v4/ethdb"
-	"github.com/gochain/gochain/v4/params"
-	"github.com/gochain/gochain/v4/rpc"
+	"github.com/gochain/gochain/v5"
+	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/consensus/clique"
+	"github.com/gochain/gochain/v5/core"
+	"github.com/gochain/gochain/v5/core/bloombits"
+	"github.com/gochain/gochain/v5/core/rawdb"
+	"github.com/gochain/gochain/v5/core/types"
+	"github.com/gochain/gochain/v5/ethdb"
+	"github.com/gochain/gochain/v5/params"
+	"github.com/gochain/gochain/v5/rpc"
 )
 
 type testBackend struct {
