@@ -1,6 +1,8 @@
 module github.com/gochain/gochain/v4
 
-go 1.24
+go 1.24.0
+
+toolchain go1.24.4
 
 require (
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.14
@@ -15,13 +17,14 @@ require (
 	github.com/dlclark/regexp2 v1.2.1 // indirect
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/dop251/goja v0.0.0-20200721192441-a695b0cdd498
-	github.com/edsrzf/mmap-go v1.1.0
+	github.com/edsrzf/mmap-go v1.2.0
 	github.com/fatih/color v1.13.0
+	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08
 	github.com/gizak/termui v2.2.0+incompatible
 	github.com/go-ini/ini v1.36.0 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/go-stack/stack v1.8.1
-	github.com/golang/snappy v0.0.4
+	github.com/golang/snappy v1.0.0
 	github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e // indirect
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/golang-lru v1.0.2
@@ -59,15 +62,14 @@ require (
 	gopkg.in/urfave/cli.v1 v1.20.0
 )
 
-require github.com/btcsuite/btcd/btcec/v2 v2.3.4
+require github.com/btcsuite/btcd/btcec/v2 v2.3.5
 
 require (
-	cloud.google.com/go/compute v1.19.1 // indirect
-	cloud.google.com/go/compute/metadata v0.2.3 // indirect
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	cloud.google.com/go/monitoring v1.13.0 // indirect
 	cloud.google.com/go/trace v1.9.0 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect

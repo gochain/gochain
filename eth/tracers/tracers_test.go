@@ -208,7 +208,6 @@ func TestCallTracer(t *testing.T) {
 		if !strings.HasPrefix(file.Name(), "call_tracer_") {
 			continue
 		}
-		file := file // capture range variable
 		t.Run(camel(strings.TrimSuffix(strings.TrimPrefix(file.Name(), "call_tracer_"), ".json")), func(t *testing.T) {
 			t.Parallel()
 

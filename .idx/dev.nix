@@ -17,14 +17,13 @@
   idx = {
     # Search for the extensions you want on https://open-vsx.org/ and use "publisher.id"
     extensions = [
-      # "vscodevim.vim"
       "GitHub.vscode-pull-request-github"
       "golang.Go"
     ];
 
     # Enable previews
     previews = {
-      enable = true;
+      enable = false;
       previews = {
         # web = {
         #   # Example: run "npm run dev" with PORT set to IDX's defined port for previews,
