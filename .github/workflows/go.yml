@@ -17,6 +17,21 @@ jobs:
       with:
         go-version: "1.24"
 
+    - name: Bump version
+      run: |
+        git config --global user.email "ci@gochain.io"
+        git config --global user.name "CI"
+        version_file="params/version.go"
+        # Bump version, patch by default - also checks if previous commit message contains `[bump X]`, and if so, bumps the appropriate semver number - https://github.com/treeder/dockers/tree/master/bump
+        docker run --rm -v $PWD:/app -w /app treeder/bump --filename $version_file "$(git log -1 --pretty=%B)"
+        version=$(grep -m1 -Eo "[0-9]+\.[0-9]+\.[0-9]+" $version_file)
+        echo "Version: $version"
+        git add -u
+        git commit -m "$image: $version release [skip ci]"
+        git tag -f -a "v$version" -m "version $version"
+        git push
+        git push origin v$version
+
     - name: Build
       run: go build ./...
 
@@ -39,20 +54,20 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     # below doesn't work due to issue here: https://github.com/gochain/gochain/issues/466#issuecomment-1496805833
-    - name: Bump version
-      run: |
-        git config --global user.email "ci@gochain.io"
-        git config --global user.name "CI"
-        version_file="params/version.go"
-        # Bump version, patch by default - also checks if previous commit message contains `[bump X]`, and if so, bumps the appropriate semver number - https://github.com/treeder/dockers/tree/master/bump
-        docker run --rm -v $PWD:/app -w /app treeder/bump --filename $version_file "$(git log -1 --pretty=%B)"
-        version=$(grep -m1 -Eo "[0-9]+\.[0-9]+\.[0-9]+" $version_file)
-        echo "Version: $version"
-        git add -u
-        git commit -m "$image: $version release [skip ci]"
-        git tag -f -a "v$version" -m "version $version"
-        git push
-        git push origin v$version
+    # - name: Bump version
+    #   run: |
+    #     git config --global user.email "ci@gochain.io"
+    #     git config --global user.name "CI"
+    #     version_file="params/version.go"
+    #     # Bump version, patch by default - also checks if previous commit message contains `[bump X]`, and if so, bumps the appropriate semver number - https://github.com/treeder/dockers/tree/master/bump
+    #     docker run --rm -v $PWD:/app -w /app treeder/bump --filename $version_file "$(git log -1 --pretty=%B)"
+    #     version=$(grep -m1 -Eo "[0-9]+\.[0-9]+\.[0-9]+" $version_file)
+    #     echo "Version: $version"
+    #     git add -u
+    #     git commit -m "$image: $version release [skip ci]"
+    #     git tag -f -a "v$version" -m "version $version"
+    #     git push
+    #     git push origin v$version
     # - name: Build and push
     #   uses: docker/build-push-action@v4
     #   with:
