@@ -20,6 +20,7 @@
     extensions = [
       "GitHub.vscode-pull-request-github"
       "golang.Go"
+      "esbenp.prettier-vscode"
     ];
 
     # Enable previews
