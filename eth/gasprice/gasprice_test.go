@@ -228,6 +228,72 @@ func TestOracle_SuggestPrice(t *testing.T) {
 
 }
 
+func TestOracle_SuggestPriceContract(t *testing.T) {
+	// 1. Test without contract (regular default like it is here)
+	config := &params.ChainConfig{
+		ChainId: big.NewInt(1),
+	}
+	backend := newTestBackend(config, block{
+		txs: []tx{{price: 1}},
+	})
+
+	// Default params
+	p := Config{
+		Blocks:     1,
+		Percentile: 60,
+	}
+
+	o := NewOracle(backend, p)
+	got, err := o.SuggestPrice(context.Background())
+	if err != nil {
+		t.Fatalf("failed to suggest price: %v", err)
+	}
+	// Expect default behavior (median of block prices)
+	if got.Uint64() != Default.Uint64() {
+		t.Errorf("expected default price %d, got %d", Default.Uint64(), got.Uint64())
+	}
+
+	// 2. Set contract address
+	contractAddr := common.HexToAddress("0x0000000000000000000000000000000000000123")
+	config.GasPriceContractAddress = contractAddr
+	// Activate the contract immediately
+	config.GasPriceContractBlock = big.NewInt(0)
+
+	// 3. Test with contract
+	// Set initial price on contract
+	initialPrice := big.NewInt(5000) // 5000 gwei
+	backend.(*testBackend).SetContractGasPrice(initialPrice)
+
+	// Invalidate cache by changing head
+	backend.(*testBackend).lastHeader.Number.Add(backend.(*testBackend).lastHeader.Number, big.NewInt(1))
+
+	got, err = o.SuggestPrice(context.Background())
+	if err != nil {
+		t.Fatalf("failed to suggest price with contract: %v", err)
+	}
+
+	if got.Cmp(initialPrice) != 0 {
+		t.Errorf("expected contract price %d, got %d", initialPrice, got)
+	}
+
+	// 4. Call setGasPrice on contract (simulate by updating backend)
+	newPrice := big.NewInt(10000) // 10000 gwei
+	backend.(*testBackend).SetContractGasPrice(newPrice)
+
+	// Invalidate cache by changing head
+	backend.(*testBackend).lastHeader.Number.Add(backend.(*testBackend).lastHeader.Number, big.NewInt(1))
+
+	// 5. Test for new price
+	got, err = o.SuggestPrice(context.Background())
+	if err != nil {
+		t.Fatalf("failed to suggest new price with contract: %v", err)
+	}
+
+	if got.Cmp(newPrice) != 0 {
+		t.Errorf("expected new contract price %d, got %d", newPrice, got)
+	}
+}
+
 type suggestPriceTest struct {
 	name    string
 	exp     uint64
@@ -250,6 +316,7 @@ type testBackend struct {
 	config     *params.ChainConfig
 	lastHeader *types.Header
 	blocks     []*types.Block
+	contractPrice *big.Int
 }
 
 type block struct {
@@ -320,8 +387,19 @@ func (b *testBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber
 }
 
 func (b *testBackend) CallContract(ctx context.Context, msg gochain.CallMsg, blockNumber *big.Int) ([]byte, error) {
+	if b.config.GasPriceContractAddress != (common.Address{}) && msg.To != nil && *msg.To == b.config.GasPriceContractAddress {
+		if string(msg.Data) == string(gasPriceMethodID) {
+			if b.contractPrice != nil {
+				return common.BigToHash(b.contractPrice).Bytes(), nil
+			}
+		}
+	}
 	// Test backend doesn't support contract calls - return error to trigger fallback
 	return nil, errors.New("contract calls not supported in test backend")
+}
+
+func (b *testBackend) SetContractGasPrice(price *big.Int) {
+	b.contractPrice = price
 }
 
 func bigInt(i uint64) *big.Int {
