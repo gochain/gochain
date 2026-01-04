@@ -10,6 +10,7 @@
     pkgs.nodejs_24
     pkgs.gnumake
     pkgs.gcc
+    pkgs.gh
   ];
 
   # Sets environment variables in the workspace
