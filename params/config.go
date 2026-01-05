@@ -110,9 +110,11 @@ type ChainConfig struct {
 	PetersburgBlock     *big.Int       `json:"petersburgBlock,omitempty"`     // Petersburg switch block (nil = same as Constantinople)
 	DarvazaBlock        *big.Int       `json:"darvazaBlock,omitempty"`        // Darvaza switch block (nil = no fork, 0 = already activated)
 	DarvazaDefaultGas   *big.Int       `json:"darvazaDefaultGas,omitempty"`   // Darvaza default gas value (nil = no change)
-	HafthorBlock        *big.Int       `json:"hafthorBlock,omitempty"`        // Hafthor switch block (nil = no fork, 0 = already activated)
-	HafthorStakeAddress common.Address `json:"hafthorStakeAddress"`           // Hafthor stake address to send rewards
-	EWASMBlock          *big.Int       `json:"ewasmBlock,omitempty"`          // EWASM switch block (nil = no fork, 0 = already activated)
+	HafthorBlock             *big.Int       `json:"hafthorBlock,omitempty"`             // Hafthor switch block (nil = no fork, 0 = already activated)
+	HafthorStakeAddress      common.Address `json:"hafthorStakeAddress"`                // Hafthor stake address to send rewards
+	GasPriceContractBlock    *big.Int       `json:"gasPriceContractBlock,omitempty"`   // Gas price contract activation block (nil = no fork, 0 = already activated)
+	GasPriceContractAddress  common.Address  `json:"gasPriceContractAddress"`           // Gas price contract address
+	EWASMBlock               *big.Int       `json:"ewasmBlock,omitempty"`                // EWASM switch block (nil = no fork, 0 = already activated)
 
 	// Various consensus engines
 	Ethash *EthashConfig `json:"ethash,omitempty"`
@@ -150,7 +152,7 @@ func (c *ChainConfig) String() string {
 		engine = "unknown"
 	}
 	return fmt.Sprintf("{ChainID: %v Homestead: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople:"+
-		" %v ConstantinopleFix: %v Darvaza: %v Hafthor: %v EWASM: %v Engine: %v}",
+		" %v ConstantinopleFix: %v Darvaza: %v Hafthor: %v GasPriceContract: %v EWASM: %v Engine: %v}",
 		c.ChainId,
 		c.HomesteadBlock,
 		c.EIP150Block,
@@ -161,6 +163,7 @@ func (c *ChainConfig) String() string {
 		c.PetersburgBlock,
 		c.DarvazaBlock,
 		c.HafthorBlock,
+		c.GasPriceContractBlock,
 		c.EWASMBlock,
 		engine,
 	)
@@ -211,6 +214,11 @@ func (c *ChainConfig) IsDarvaza(num *big.Int) bool {
 // IsHafthor returns whether num is either equal to the Hafthor fork block or greater.
 func (c *ChainConfig) IsHafthor(num *big.Int) bool {
 	return isForked(c.HafthorBlock, num)
+}
+
+// IsGasPriceContract returns whether num is either equal to the gas price contract activation block or greater.
+func (c *ChainConfig) IsGasPriceContract(num *big.Int) bool {
+	return isForked(c.GasPriceContractBlock, num)
 }
 
 // IsEWASM returns whether num represents a block number after the EWASM fork

@@ -1,0 +1,35 @@
+{
+  "name": "gochain",
+  "version": "5.0.0",
+  "description": "![GoChain Logo](https://user-images.githubusercontent.com/75826/110122817-18cf5100-7d8e-11eb-8094-5fd189516f3d.png)",
+  "homepage": "https://github.com/gochain/gochain#readme",
+  "bugs": {
+    "url": "https://github.com/gochain/gochain/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gochain/gochain.git"
+  },
+  "license": "MIT",
+  "author": "",
+  "type": "module",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "prettier": {
+    "semi": false,
+    "singleQuote": true,
+    "tabWidth": 2,
+    "trailingComma": "all",
+    "printWidth": 120,
+    "bracketSameLine": true
+  },
+  "dependencies": {
+    "prettier": "^3.7.4",
+    "viem": "^2.43.5"
+  }
+}
