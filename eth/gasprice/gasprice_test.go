@@ -292,6 +292,22 @@ func TestOracle_SuggestPriceContract(t *testing.T) {
 	if got.Cmp(newPrice) != 0 {
 		t.Errorf("expected new contract price %d, got %d", newPrice, got)
 	}
+
+	// 6. Test with a price exceeding the default maxPrice cap (e.g., 600,000 gwei/Shannon)
+	highPrice := new(big.Int).SetUint64(600000 * params.Shannon)
+	backend.(*testBackend).SetContractGasPrice(highPrice)
+
+	// Invalidate cache by changing head
+	backend.(*testBackend).lastHeader.Number.Add(backend.(*testBackend).lastHeader.Number, big.NewInt(1))
+
+	got, err = o.SuggestPrice(context.Background())
+	if err != nil {
+		t.Fatalf("failed to suggest high price with contract: %v", err)
+	}
+
+	if got.Cmp(highPrice) != 0 {
+		t.Errorf("expected high contract price %d, got %d (capped at %d?)", highPrice, got, o.maxPrice)
+	}
 }
 
 type suggestPriceTest struct {

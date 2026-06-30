@@ -138,9 +138,6 @@ func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 		if err == nil && contractPrice != nil && contractPrice.Sign() > 0 {
 			// Contract call succeeded, use the contract price
 			price := contractPrice
-			if price.Cmp(gpo.maxPrice) > 0 {
-				price = new(big.Int).Set(gpo.maxPrice)
-			}
 			gpo.cacheLock.Lock()
 			gpo.lastHead = headHash
 			gpo.lastPrice = price
