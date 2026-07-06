@@ -47,8 +47,10 @@ var (
 		PetersburgBlock:     nil,
 		DarvazaBlock:        big.NewInt(17_900_000),
 		DarvazaDefaultGas:   new(big.Int).SetUint64(2_000 * Shannon),
-		HafthorBlock:        big.NewInt(23_817_200), // 2022-02-23
-		HafthorStakeAddress: common.HexToAddress("0x4281Cabd60bB91A6A8B0C60842440669DEA3F541"),
+		HafthorBlock:            big.NewInt(23_817_200), // 2022-02-23
+		HafthorStakeAddress:     common.HexToAddress("0x4281Cabd60bB91A6A8B0C60842440669DEA3F541"),
+		GasPriceContractBlock:   big.NewInt(51315349),
+		GasPriceContractAddress: common.HexToAddress("0xc8de4f1b2dd7f729ed25bc436113286f69ea3930"),
 
 		Clique: DefaultCliqueConfig(),
 	}
