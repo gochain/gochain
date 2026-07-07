@@ -3,6 +3,7 @@ FROM golang:1.26-trixie AS builder
 
 RUN apt-get update && apt-get install -y build-essential git gcc
 ENV D=/gochain
+ENV GOFLAGS="-buildvcs=false"
 WORKDIR $D
 # cache dependencies
 ADD go.mod $D
