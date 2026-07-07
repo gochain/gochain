@@ -1,5 +1,5 @@
 # Build GoChain in a stock Go builder container
-FROM golang:1.24-trixie AS builder
+FROM golang:1.26-trixie AS builder
 
 RUN apt-get update && apt-get install -y build-essential git gcc
 ENV D=/gochain
