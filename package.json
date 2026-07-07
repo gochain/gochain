@@ -30,6 +30,6 @@
   },
   "dependencies": {
     "prettier": "^3.7.4",
-    "viem": "^2.43.5"
+    "viem": "^2.54.6"
   }
 }
