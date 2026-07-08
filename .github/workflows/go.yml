@@ -61,10 +61,14 @@ jobs:
           git push
           git push origin v$version
           echo "version=$version" >> $GITHUB_OUTPUT
+          major=$(echo "$version" | cut -d. -f1)
+          major_minor=$(echo "$version" | cut -d. -f1,2)
+          echo "major=$major" >> $GITHUB_OUTPUT
+          echo "major_minor=$major_minor" >> $GITHUB_OUTPUT
       - name: Build and push
         id: docker
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          tags: ghcr.io/gochain/gochain:${{ github.sha }},ghcr.io/gochain/gochain:${{ steps.bump.outputs.version }},ghcr.io/gochain/gochain:latest,ghcr.io/gochain/gochain:5
+          tags: ghcr.io/gochain/gochain:${{ github.sha }},ghcr.io/gochain/gochain:${{ steps.bump.outputs.version }},ghcr.io/gochain/gochain:latest,ghcr.io/gochain/gochain:${{ steps.bump.outputs.major }},ghcr.io/gochain/gochain:${{ steps.bump.outputs.major_minor }}
