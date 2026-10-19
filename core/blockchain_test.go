@@ -1430,3 +1430,39 @@ func TestLargeReorgTrieGC(t *testing.T) {
 		}
 	}
 }
+
+// Tests that state tries are periodically committed to disk based on wall-clock
+// or block interval even when cumulative block processing CPU time (gcproc) is
+// well below TrieTimeLimit.
+func TestTriePeriodicWallClockCommit(t *testing.T) {
+	db := ethdb.NewMemDatabase()
+	engine := clique.NewFaker()
+	genesis := new(Genesis).MustCommit(db)
+	blocks, _ := GenerateChain(params.TestChainConfig, genesis, engine, db, triesInMemory+5, func(i int, b *BlockGen) { b.SetCoinbase(common.Address{1}) })
+
+	diskdb := ethdb.NewMemDatabase()
+	new(Genesis).MustCommit(diskdb)
+
+	cacheConfig := &CacheConfig{
+		TrieNodeLimit: 256,
+		TrieTimeLimit: 1 * time.Millisecond,
+	}
+	chain, err := NewBlockChain(diskdb, cacheConfig, params.TestChainConfig, engine, vm.Config{})
+	if err != nil {
+		t.Fatalf("failed to create tester chain: %v", err)
+	}
+	// Backdate lastWriteTime so wall-clock commit triggers once current > triesInMemory
+	chain.lastWriteTime = time.Now().Add(-1 * time.Hour)
+
+	if _, err := chain.InsertChain(blocks); err != nil {
+		t.Fatalf("failed to insert chain: %v", err)
+	}
+	if chain.lastWrite == 0 {
+		t.Fatalf("expected periodic state trie commit to update lastWrite, got 0")
+	}
+	committedHeader := chain.GetHeaderByNumber(chain.lastWrite)
+	if _, err := diskdb.GlobalTable().Get(committedHeader.Root.Bytes()); err != nil {
+		t.Fatalf("expected committed state root at block %d to exist on disk: %v", chain.lastWrite, err)
+	}
+}
+

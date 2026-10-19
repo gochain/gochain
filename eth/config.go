@@ -35,7 +35,7 @@ var DefaultConfig = Config{
 	LightPeers:    100,
 	DatabaseCache: 768,
 	TrieCache:     256,
-	TrieTimeout:   60 * time.Minute,
+	TrieTimeout:   15 * time.Minute,
 	MinerGasFloor: params.TargetGasLimit,
 	MinerGasCeil:  params.TargetGasLimit,
 	MinerGasPrice: nil,
