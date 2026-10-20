@@ -61,6 +61,7 @@ const (
 	maxTimeFutureBlocks = 30
 	badBlockLimit       = 10
 	triesInMemory       = 128
+	trieCommitInterval  = 10000
 
 	// BlockChainVersion ensures that an incompatible database forces a resync from scratch.
 	//
@@ -111,9 +112,11 @@ type BlockChain struct {
 	chainConfig *params.ChainConfig // Chain & network configuration
 	cacheConfig *CacheConfig        // Cache configuration for pruning
 
-	db     common.Database // Low level persistent database to store final content in
-	triegc *prque.Prque    // Priority queue mapping block numbers to tries to gc
-	gcproc time.Duration   // Accumulates canonical block processing for trie dumping
+	db            common.Database // Low level persistent database to store final content in
+	triegc        *prque.Prque    // Priority queue mapping block numbers to tries to gc
+	gcproc        time.Duration   // Accumulates canonical block processing for trie dumping
+	lastWrite     uint64          // Block number of the last committed full state trie
+	lastWriteTime time.Time       // Wall-clock time of the last committed full state trie
 
 	hc *HeaderChain
 
@@ -257,6 +260,8 @@ func (bc *BlockChain) loadLastState() error {
 	}
 	// Everything seems to be fine, set as the head block
 	bc.currentBlock.Store(currentBlock)
+	bc.lastWrite = currentBlock.NumberU64()
+	bc.lastWriteTime = time.Now()
 
 	// Restore the last known head header
 	currentHeader := currentBlock.Header()
@@ -358,6 +363,8 @@ func (bc *BlockChain) FastSyncCommitHead(hash common.Hash) error {
 	// If all checks out, manually set the head block
 	bc.mu.Lock()
 	bc.currentBlock.Store(block)
+	bc.lastWrite = block.NumberU64()
+	bc.lastWriteTime = time.Now()
 	bc.mu.Unlock()
 
 	log.Info("Committed new head block", "number", block.Number(), "hash", hash)
@@ -890,8 +897,6 @@ func (bc *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain [
 	return 0, nil
 }
 
-var lastWrite uint64
-
 // WriteBlockWithoutState writes only the block and its metadata to the database,
 // but does not write any state. This is used to construct competing side forks
 // up to the point where they exceed the canonical total difficulty.
@@ -961,18 +966,19 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			header := bc.GetHeaderByNumber(current - triesInMemory)
 			chosen := header.Number.Uint64()
 
-			// If we exceeded out time allowance, flush an entire trie to disk
-			if bc.gcproc > bc.cacheConfig.TrieTimeLimit {
+			// If we exceeded our time or block allowance, flush an entire trie to disk
+			if chosen > bc.lastWrite && (bc.gcproc > bc.cacheConfig.TrieTimeLimit || chosen >= bc.lastWrite+trieCommitInterval || (bc.cacheConfig.TrieTimeLimit > 0 && time.Since(bc.lastWriteTime) >= bc.cacheConfig.TrieTimeLimit)) {
 				// If we're exceeding limits but haven't reached a large enough memory gap,
 				// warn the user that the system is becoming unstable.
-				if chosen < lastWrite+triesInMemory && bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {
-					log.Info("State in memory for too long, committing", "time", bc.gcproc, "allowance", bc.cacheConfig.TrieTimeLimit, "optimum", float64(chosen-lastWrite)/triesInMemory)
+				if chosen < bc.lastWrite+triesInMemory && bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {
+					log.Info("State in memory for too long, committing", "time", bc.gcproc, "allowance", bc.cacheConfig.TrieTimeLimit, "optimum", float64(chosen-bc.lastWrite)/triesInMemory)
 				}
 				// Flush an entire trie and restart the counters
 				if err := triedb.Commit(header.Root, true); err != nil {
 					log.Error("Cannot commit trie db", "err", err)
 				}
-				lastWrite = chosen
+				bc.lastWrite = chosen
+				bc.lastWriteTime = time.Now()
 				bc.gcproc = 0
 			}
 			// Garbage collect anything below our required write retention
