@@ -967,7 +967,7 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 			chosen := header.Number.Uint64()
 
 			// If we exceeded our time or block allowance, flush an entire trie to disk
-			if bc.gcproc > bc.cacheConfig.TrieTimeLimit || chosen >= bc.lastWrite+trieCommitInterval || (bc.cacheConfig.TrieTimeLimit > 0 && time.Since(bc.lastWriteTime) >= bc.cacheConfig.TrieTimeLimit) {
+			if chosen > bc.lastWrite && (bc.gcproc > bc.cacheConfig.TrieTimeLimit || chosen >= bc.lastWrite+trieCommitInterval || (bc.cacheConfig.TrieTimeLimit > 0 && time.Since(bc.lastWriteTime) >= bc.cacheConfig.TrieTimeLimit)) {
 				// If we're exceeding limits but haven't reached a large enough memory gap,
 				// warn the user that the system is becoming unstable.
 				if chosen < bc.lastWrite+triesInMemory && bc.gcproc >= 2*bc.cacheConfig.TrieTimeLimit {

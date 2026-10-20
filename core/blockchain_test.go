@@ -1451,6 +1451,7 @@ func TestTriePeriodicWallClockCommit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create tester chain: %v", err)
 	}
+	defer chain.Stop()
 	// Backdate lastWriteTime so wall-clock commit triggers once current > triesInMemory
 	chain.lastWriteTime = time.Now().Add(-1 * time.Hour)
 
