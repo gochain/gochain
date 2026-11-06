@@ -31,9 +31,34 @@ import (
 	"testing"
 	"text/template"
 	"time"
-
-	"github.com/docker/docker/pkg/reexec"
 )
+
+var registeredInitializers = make(map[string]func())
+
+// Register registers an initializer function under the specified name.
+func Register(name string, initializer func()) {
+	if _, exists := registeredInitializers[name]; exists {
+		panic(fmt.Sprintf("reexec func already registered under name %q", name))
+	}
+	registeredInitializers[name] = initializer
+}
+
+// Init is called as the first part of the exec process and returns true if an
+// initializer function was called.
+func Init() bool {
+	if initializer, ok := registeredInitializers[os.Args[0]]; ok {
+		initializer()
+		return true
+	}
+	return false
+}
+
+func self() string {
+	if exe, err := os.Executable(); err == nil {
+		return exe
+	}
+	return os.Args[0]
+}
 
 func NewTestCmd(t *testing.T, data interface{}) *TestCmd {
 	return &TestCmd{T: t, Data: data}
@@ -60,7 +85,7 @@ type TestCmd struct {
 func (tt *TestCmd) Run(name string, args ...string) {
 	tt.stderr = &testlogger{t: tt.T}
 	tt.cmd = &exec.Cmd{
-		Path:   reexec.Self(),
+		Path:   self(),
 		Args:   append([]string{name}, args...),
 		Stderr: tt.stderr,
 	}

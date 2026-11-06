@@ -38,7 +38,6 @@ import (
 	"github.com/gochain/gochain/v5/core"
 	"github.com/gochain/gochain/v5/core/types"
 	"github.com/gochain/gochain/v5/eth"
-	"github.com/gochain/gochain/v5/les"
 	"github.com/gochain/gochain/v5/log"
 	"github.com/gochain/gochain/v5/p2p"
 	"github.com/gochain/gochain/v5/rpc"
@@ -64,10 +63,9 @@ type blockChain interface {
 // Service implements an GoChain netstats reporting daemon that pushes local
 // chain statistics up to a monitoring server.
 type Service struct {
-	server *p2p.Server       // Peer-to-peer server to retrieve networking infos
-	eth    *eth.GoChain      // Full GoChain service if monitoring a full node
-	les    *les.LightGoChain // Light GoChain service if monitoring a light node
-	engine consensus.Engine  // Consensus engine to retrieve variadic block fields
+	server *p2p.Server      // Peer-to-peer server to retrieve networking infos
+	eth    *eth.GoChain     // Full GoChain service if monitoring a full node
+	engine consensus.Engine // Consensus engine to retrieve variadic block fields
 
 	node string // Name of the node to display on the monitoring page
 	pass string // Password to authorize access to the monitoring page
@@ -98,17 +96,14 @@ func ParseConfig(flag string) (Config, error) {
 }
 
 // New returns a monitoring service ready for stats reporting.
-func New(cfg Config, ethServ *eth.GoChain, lesServ *les.LightGoChain) *Service {
+func New(cfg Config, ethServ *eth.GoChain) *Service {
 	// Assemble and return the stats service
 	var engine consensus.Engine
 	if ethServ != nil {
 		engine = ethServ.Engine()
-	} else {
-		engine = lesServ.Engine()
 	}
 	return &Service{
 		eth:    ethServ,
-		les:    lesServ,
 		engine: engine,
 		node:   cfg.Name,
 		pass:   cfg.Secret,
@@ -145,15 +140,8 @@ func (s *Service) Stop() error {
 // until termination.
 func (s *Service) loop() {
 	// Subscribe to chain events to execute updates on
-	var blockchain blockChain
-	var txpool txPool
-	if s.eth != nil {
-		blockchain = s.eth.BlockChain()
-		txpool = s.eth.TxPool()
-	} else {
-		blockchain = s.les.BlockChain()
-		txpool = s.les.TxPool()
-	}
+	var blockchain blockChain = s.eth.BlockChain()
+	var txpool txPool = s.eth.TxPool()
 
 	// Start a goroutine that exhausts the subscriptions to avoid events piling up
 	var (
@@ -412,9 +400,6 @@ func (s *Service) login(conn *websocket.Conn) error {
 	if info := infos.Protocols["eth"]; info != nil {
 		network = fmt.Sprintf("%d", info.(*eth.NodeInfo).Network)
 		protocol = fmt.Sprintf("eth/%d", eth.ProtocolVersions[0])
-	} else {
-		network = fmt.Sprintf("%d", infos.Protocols["les"].(*les.NodeInfo).Network)
-		protocol = fmt.Sprintf("les/%d", les.ClientProtocolVersions[0])
 	}
 	auth := &authMsg{
 		Id: s.node,
@@ -570,37 +555,19 @@ func (s *Service) assembleBlockStats(ctx context.Context, block *types.Block) *b
 	defer span.End()
 
 	// Gather the block infos from the local blockchain
-	var (
-		header  *types.Header
-		td      *big.Int
-		txs     []txStats
-		txCount int
-		uncles  []*types.Header
-	)
-	if s.eth != nil {
-		// Full nodes have all needed information available
-		if block == nil {
-			block = s.eth.BlockChain().CurrentBlock()
-		}
-		header = block.Header()
-		td = s.eth.BlockChain().GetTd(header.Hash(), header.Number.Uint64())
-
-		txCount = len(block.Transactions())
-		txs = make([]txStats, txCount)
-		for i, tx := range block.Transactions() {
-			txs[i].Hash = tx.Hash()
-		}
-		uncles = block.Uncles()
-	} else {
-		// Light nodes would need on-demand lookups for transactions/uncles, skip
-		if block != nil {
-			header = block.Header()
-		} else {
-			header = s.les.BlockChain().CurrentHeader()
-		}
-		td = s.les.BlockChain().GetTd(header.Hash(), header.Number.Uint64())
-		txs = []txStats{}
+	if block == nil {
+		block = s.eth.BlockChain().CurrentBlock()
 	}
+	header := block.Header()
+	td := s.eth.BlockChain().GetTd(header.Hash(), header.Number.Uint64())
+
+	txCount := len(block.Transactions())
+	txs := make([]txStats, txCount)
+	for i, tx := range block.Transactions() {
+		txs[i].Hash = tx.Hash()
+	}
+	uncles := block.Uncles()
+
 	// Assemble and return the block stats
 	author, _ := s.engine.Author(header)
 
@@ -635,12 +602,7 @@ func (s *Service) reportHistory(ctx context.Context, conn *websocket.Conn, list 
 		indexes = append(indexes, list...)
 	} else {
 		// No indexes requested, send back the top ones
-		var head int64
-		if s.eth != nil {
-			head = s.eth.BlockChain().CurrentHeader().Number.Int64()
-		} else {
-			head = s.les.BlockChain().CurrentHeader().Number.Int64()
-		}
+		head := s.eth.BlockChain().CurrentHeader().Number.Int64()
 		start := head - historyUpdateRange + 1
 		if start < 0 {
 			start = 0
@@ -653,14 +615,7 @@ func (s *Service) reportHistory(ctx context.Context, conn *websocket.Conn, list 
 	history := make([]*blockStats, len(indexes))
 	for i, number := range indexes {
 		// Retrieve the next block if it's known to us
-		var block *types.Block
-		if s.eth != nil {
-			block = s.eth.BlockChain().GetBlockByNumber(number)
-		} else {
-			if header := s.les.BlockChain().GetHeaderByNumber(number); header != nil {
-				block = types.NewBlockWithHeader(header)
-			}
-		}
+		block := s.eth.BlockChain().GetBlockByNumber(number)
 		// If we do have the block, add to the history and continue
 		if block != nil {
 			history[len(history)-1-i] = s.assembleBlockStats(ctx, block)
@@ -698,12 +653,7 @@ func (s *Service) reportPending(ctx context.Context, conn *websocket.Conn) error
 	defer span.End()
 
 	// Retrieve the pending count from the local blockchain
-	var pending int
-	if s.eth != nil {
-		pending, _ = s.eth.TxPool().Stats()
-	} else {
-		pending = s.les.TxPool().Stats()
-	}
+	pending, _ := s.eth.TxPool().Stats()
 	// Assemble the transaction stats and send it to the server
 	log.Trace("Sending pending transactions to netstats", "count", pending)
 
@@ -737,23 +687,13 @@ func (s *Service) reportStats(ctx context.Context, conn *websocket.Conn) error {
 	defer span.End()
 
 	// Gather the syncing and mining infos from the local miner instance
-	var (
-		mining   bool
-		syncing  bool
-		gasprice int
-	)
-	if s.eth != nil {
-		mining = s.eth.Miner().Mining()
+	mining := s.eth.Miner().Mining()
 
-		sync := s.eth.Downloader().Progress()
-		syncing = s.eth.BlockChain().CurrentHeader().Number.Uint64() >= sync.HighestBlock
+	sync := s.eth.Downloader().Progress()
+	syncing := s.eth.BlockChain().CurrentHeader().Number.Uint64() >= sync.HighestBlock
 
-		price, _ := s.eth.ApiBackend.SuggestPrice(context.Background())
-		gasprice = int(price.Uint64())
-	} else {
-		sync := s.les.Downloader().Progress()
-		syncing = s.les.BlockChain().CurrentHeader().Number.Uint64() >= sync.HighestBlock
-	}
+	price, _ := s.eth.ApiBackend.SuggestPrice(context.Background())
+	gasprice := int(price.Uint64())
 	// Assemble the node stats and send it to the server
 	log.Trace("Sending node details to netstats")
 
