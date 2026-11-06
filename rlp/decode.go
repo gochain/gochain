@@ -719,6 +719,42 @@ func NewListStream(r io.Reader, len uint64) *Stream {
 // Bytes reads an RLP string and returns its contents as a byte slice.
 // If the input does not contain an RLP string, the returned
 // error will be ErrExpectedString.
+const maxSingleAlloc = 4 * 1024 * 1024
+
+func (s *Stream) readBytes(size uint64) ([]byte, error) {
+	if s.limited || size <= maxSingleAlloc {
+		b := make([]byte, size)
+		if err := s.readFull(b); err != nil {
+			return nil, err
+		}
+		return b, nil
+	}
+	if err := s.willRead(size); err != nil {
+		return nil, err
+	}
+	var b []byte
+	buf := make([]byte, 64*1024)
+	remaining := size
+	for remaining > 0 {
+		readLen := uint64(len(buf))
+		if remaining < readLen {
+			readLen = remaining
+		}
+		n, err := s.r.Read(buf[:readLen])
+		if n > 0 {
+			b = append(b, buf[:n]...)
+			remaining -= uint64(n)
+		}
+		if err != nil {
+			if err == io.EOF {
+				err = io.ErrUnexpectedEOF
+			}
+			return nil, err
+		}
+	}
+	return b, nil
+}
+
 func (s *Stream) Bytes() ([]byte, error) {
 	kind, size, err := s.Kind()
 	if err != nil {
@@ -729,8 +765,8 @@ func (s *Stream) Bytes() ([]byte, error) {
 		s.kind = -1 // rearm Kind
 		return []byte{s.byteval}, nil
 	case String:
-		b := make([]byte, size)
-		if err = s.readFull(b); err != nil {
+		b, err := s.readBytes(size)
+		if err != nil {
 			return nil, err
 		}
 		if size == 1 && b[0] < 128 {
@@ -755,6 +791,20 @@ func (s *Stream) Raw() ([]byte, error) {
 	// the original header has already been read and is no longer
 	// available. read content and put a new header in front of it.
 	start := headsize(size)
+	if !s.limited && size > maxSingleAlloc {
+		content, err := s.readBytes(size)
+		if err != nil {
+			return nil, err
+		}
+		buf := make([]byte, uint64(start)+size)
+		copy(buf[start:], content)
+		if kind == String {
+			puthead(buf, 0x80, 0xB7, size)
+		} else {
+			puthead(buf, 0xC0, 0xF7, size)
+		}
+		return buf, nil
+	}
 	buf := make([]byte, uint64(start)+size)
 	if err := s.readFull(buf[start:]); err != nil {
 		return nil, err
@@ -906,9 +956,19 @@ func (s *Stream) Reset(r io.Reader, inputLimit uint64) {
 		case *bytes.Reader:
 			s.remaining = uint64(br.Len())
 			s.limited = true
+		case *bytes.Buffer:
+			s.remaining = uint64(br.Len())
+			s.limited = true
 		case *strings.Reader:
 			s.remaining = uint64(br.Len())
 			s.limited = true
+		case *io.LimitedReader:
+			if br.N >= 0 {
+				s.remaining = uint64(br.N)
+				s.limited = true
+			} else {
+				s.limited = false
+			}
 		default:
 			s.limited = false
 		}

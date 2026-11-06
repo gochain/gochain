@@ -365,11 +365,8 @@ func DeleteTd(db DatabaseDeleter, hash common.Hash, number uint64) {
 	})
 }
 
-// ReadRawReceipts retrieves all the transaction receipts belonging to a block.
-// The receipt metadata fields are not guaranteed to be populated, so they
-// should not be used. Use ReadReceipts instead if the metadata is needed.
-func ReadRawReceipts(db DatabaseReader, hash common.Hash, number uint64) types.Receipts {
-	// Retrieve the flattened receipt slice
+// ReadReceiptsRLP retrieves the storage-encoded transaction receipts of a block.
+func ReadReceiptsRLP(db DatabaseReader, hash common.Hash, number uint64) rlp.RawValue {
 	var data []byte
 	Must("get receipts", func() (err error) {
 		data, err = db.Get(numHashKey(blockReceiptsPrefix, number, hash))
@@ -378,6 +375,15 @@ func ReadRawReceipts(db DatabaseReader, hash common.Hash, number uint64) types.R
 		}
 		return
 	})
+	return data
+}
+
+// ReadRawReceipts retrieves all the transaction receipts belonging to a block.
+// The receipt metadata fields are not guaranteed to be populated, so they
+// should not be used. Use ReadReceipts instead if the metadata is needed.
+func ReadRawReceipts(db DatabaseReader, hash common.Hash, number uint64) types.Receipts {
+	// Retrieve the flattened receipt slice
+	data := ReadReceiptsRLP(db, hash, number)
 	if len(data) == 0 {
 		return nil
 	}

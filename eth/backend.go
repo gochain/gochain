@@ -47,13 +47,6 @@ import (
 	"github.com/gochain/gochain/v5/rpc"
 )
 
-type LesServer interface {
-	Start(srvr *p2p.Server)
-	Stop()
-	Protocols() []p2p.Protocol
-	SetBloomBitsIndexer(bbIndexer *core.ChainIndexer)
-}
-
 // GoChain implements the GoChain full node service.
 type GoChain struct {
 	config      *Config
@@ -67,7 +60,6 @@ type GoChain struct {
 	txPool          *core.TxPool
 	blockchain      *core.BlockChain
 	protocolManager *ProtocolManager
-	lesServer       LesServer
 
 	// DB interfaces
 	chainDb common.Database // Block chain database
@@ -91,16 +83,11 @@ type GoChain struct {
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
 }
 
-func (gc *GoChain) AddLesServer(ls LesServer) {
-	gc.lesServer = ls
-	ls.SetBloomBitsIndexer(gc.bloomIndexer)
-}
-
 // New creates a new GoChain object (including the
 // initialisation of the common GoChain object)
 func New(sctx *node.ServiceContext, config *Config) (*GoChain, error) {
 	if config.SyncMode == downloader.LightSync {
-		return nil, errors.New("can't run eth.GoChain in light sync mode, use les.LightGoChain")
+		return nil, errors.New("can't run eth.GoChain in light sync mode")
 	}
 	if !config.SyncMode.IsValid() {
 		return nil, fmt.Errorf("invalid sync mode %d", config.SyncMode)
@@ -356,21 +343,9 @@ func (gc *GoChain) SetEtherbase(etherbase common.Address) {
 	gc.miner.SetEtherbase(etherbase)
 }
 
-// StartMining starts the miner with the given number of CPU threads. If mining
-// is already running, this method adjust the number of threads allowed to use
-// and updates the minimum price required by the transaction pool.
-func (gc *GoChain) StartMining(threads int) error {
-	// Update the thread count within the consensus engine
-	type threaded interface {
-		SetThreads(threads int)
-	}
-	if th, ok := gc.engine.(threaded); ok {
-		log.Info("Updated mining threads", "threads", threads)
-		if threads == 0 {
-			threads = -1 // Disable the miner from within
-		}
-		th.SetThreads(threads)
-	}
+// StartMining starts the miner. If mining is already running, this method
+// updates the minimum price required by the transaction pool.
+func (gc *GoChain) StartMining() error {
 	// If the miner was not running, initialize it
 	if !gc.IsMining() {
 		// Propagate the initial price point to the transaction pool
@@ -402,17 +377,8 @@ func (gc *GoChain) StartMining(threads int) error {
 	return nil
 }
 
-// StopMining terminates the miner, both at the consensus engine level as well as
-// at the block creation level.
+// StopMining terminates the miner at the block creation level.
 func (gc *GoChain) StopMining() {
-	// Update the thread count within the consensus engine
-	type threaded interface {
-		SetThreads(threads int)
-	}
-	if th, ok := gc.engine.(threaded); ok {
-		th.SetThreads(-1)
-	}
-	// Stop the block creating itself
 	gc.miner.Stop()
 }
 
@@ -433,10 +399,7 @@ func (gc *GoChain) Downloader() *downloader.Downloader { return gc.protocolManag
 // Protocols implements node.Service, returning all the currently configured
 // network protocols to start.
 func (gc *GoChain) Protocols() []p2p.Protocol {
-	if gc.lesServer == nil {
-		return gc.protocolManager.SubProtocols
-	}
-	return append(gc.protocolManager.SubProtocols, gc.lesServer.Protocols()...)
+	return gc.protocolManager.SubProtocols
 }
 
 // Start implements node.Service, starting all internal goroutines needed by the
@@ -448,19 +411,8 @@ func (gc *GoChain) Start(srvr *p2p.Server) error {
 	// Start the RPC service
 	gc.netRPCService = ethapi.NewPublicNetAPI(srvr, gc.NetVersion())
 
-	// Figure out a max peers count based on the server limits
-	maxPeers := srvr.MaxPeers
-	if gc.config.LightServ > 0 {
-		if gc.config.LightPeers >= srvr.MaxPeers {
-			return fmt.Errorf("invalid peer config: light peer count (%d) >= total peer count (%d)", gc.config.LightPeers, srvr.MaxPeers)
-		}
-		maxPeers -= gc.config.LightPeers
-	}
-	// Start the networking layer and the light server if requested
-	gc.protocolManager.Start(maxPeers)
-	if gc.lesServer != nil {
-		gc.lesServer.Start(srvr)
-	}
+	// Start the networking layer
+	gc.protocolManager.Start(srvr.MaxPeers)
 	return nil
 }
 
@@ -470,9 +422,6 @@ func (gc *GoChain) Stop() error {
 	gc.bloomIndexer.Close()
 	gc.blockchain.Stop()
 	gc.protocolManager.Stop()
-	if gc.lesServer != nil {
-		gc.lesServer.Stop()
-	}
 	gc.txPool.Stop()
 	gc.miner.Stop()
 	gc.eventMux.Close()

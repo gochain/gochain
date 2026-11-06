@@ -32,7 +32,6 @@ import (
 var DefaultConfig = Config{
 	SyncMode:      downloader.FastSync,
 	NetworkId:     params.MainnetChainID,
-	LightPeers:    100,
 	DatabaseCache: 768,
 	TrieCache:     256,
 	TrieTimeout:   15 * time.Minute,
@@ -47,6 +46,10 @@ var DefaultConfig = Config{
 		Percentile: 60,
 		MaxPrice:   gasprice.DefaultMaxPrice,
 	},
+
+	RPCGasCap:     50000000,
+	RPCEVMTimeout: 5 * time.Second,
+	RPCTxFeeCap:   100, // 100 GO
 }
 
 //go:generate gencodec -type Config -field-override configMarshaling -formats toml -out gen_config.go
@@ -61,10 +64,6 @@ type Config struct {
 	SyncMode  downloader.SyncMode
 	NoPruning bool
 
-	// Light client options
-	LightServ  int `toml:",omitempty"` // Maximum percentage of time allowed for serving LES requests
-	LightPeers int `toml:",omitempty"` // Maximum number of LES client peers
-
 	// Database options
 	SkipBcVersionCheck bool `toml:"-"`
 	DatabaseHandles    int  `toml:"-"`
@@ -74,13 +73,11 @@ type Config struct {
 
 	// Mining-related options
 	Etherbase      common.Address `toml:",omitempty"`
-	MinerNotify    []string       `toml:",omitempty"`
 	MinerExtraData []byte         `toml:",omitempty"`
 	MinerGasFloor  uint64
 	MinerGasCeil   uint64
 	MinerGasPrice  *big.Int // nil for default/dynamic
 	MinerRecommit  time.Duration
-	MinerNoverify  bool
 
 	// Transaction pool options
 	TxPool core.TxPoolConfig
@@ -94,11 +91,15 @@ type Config struct {
 	// Miscellaneous options
 	DocRoot string `toml:"-"`
 
-	// Type of the EWASM interpreter ("" for default)
-	EWASMInterpreter string
+	// RPCGasCap is the global gas cap for eth-call variants.
+	RPCGasCap uint64
 
-	// Type of the EVM interpreter ("" for default)
-	EVMInterpreter string
+	// RPCEVMTimeout is the global timeout for eth-call.
+	RPCEVMTimeout time.Duration
+
+	// RPCTxFeeCap is the global transaction fee(price * gaslimit) cap for
+	// send-transaction variants. The unit is ether.
+	RPCTxFeeCap float64
 
 	// Constantinople block override (TODO: remove after the fork)
 	ConstantinopleOverride *big.Int

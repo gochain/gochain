@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -28,6 +29,7 @@ import (
 	"github.com/gochain/gochain/v5/common"
 	"github.com/gochain/gochain/v5/consensus"
 	"github.com/gochain/gochain/v5/core"
+	"github.com/gochain/gochain/v5/core/rawdb"
 	"github.com/gochain/gochain/v5/core/types"
 	"github.com/gochain/gochain/v5/eth/downloader"
 	"github.com/gochain/gochain/v5/eth/fetcher"
@@ -48,6 +50,9 @@ const (
 
 	// The smallest subset of peers to broadcast to.
 	minBroadcastPeers = 4
+
+	// Maximum number of block announcements allowed in a single NewBlockHashesMsg packet.
+	maxBlockAnnouncement = 256
 )
 
 // errIncompatibleConfig is returned if the requested protocols and configs are
@@ -66,6 +71,7 @@ type ProtocolManager struct {
 
 	txpool      txPool
 	blockchain  *core.BlockChain
+	chaindb     common.Database
 	chainconfig *params.ChainConfig
 	maxPeers    int
 
@@ -99,6 +105,7 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 		eventMux:     mux,
 		txpool:       txpool,
 		blockchain:   blockchain,
+		chaindb:      chaindb,
 		chainconfig:  config,
 		peers:        newPeerSet(),
 		newPeerCh:    make(chan *peer),
@@ -142,7 +149,7 @@ func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, ne
 				return manager.NodeInfo()
 			},
 			PeerInfo: func(id discover.NodeID) interface{} {
-				if p := manager.peers.Peer(fmt.Sprintf("%x", id[:8])); p != nil {
+				if p := manager.peers.Peer(fmt.Sprintf("%x", id[:])); p != nil {
 					return p.Info()
 				}
 				return nil
@@ -520,7 +527,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			bytes    int
 			receipts []rlp.RawValue
 		)
-		for bytes < softResponseLimit && len(receipts) < downloader.MaxReceiptFetch {
+		for lookups := 0; bytes < softResponseLimit && len(receipts) < downloader.MaxReceiptFetch && lookups < 2*downloader.MaxReceiptFetch; lookups++ {
 			// Retrieve the hash of the next block
 			if err := msgStream.Decode(&hash); err == rlp.EOL {
 				break
@@ -528,10 +535,24 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 				return errResp(ErrDecode, "msg %v: %v", msg, err)
 			}
 			// Retrieve the requested block's receipts, skipping if unknown to us
-			results := pm.blockchain.GetReceiptsByHash(hash)
-			if results == nil {
-				if header := pm.blockchain.GetHeaderByHash(hash); header == nil || header.ReceiptHash != types.EmptyRootHash {
+			var results types.Receipts
+			if pm.chaindb != nil {
+				header := pm.blockchain.GetHeaderByHash(hash)
+				if header == nil {
 					continue
+				}
+				if header.ReceiptHash != types.EmptyRootHash {
+					results = rawdb.ReadRawReceipts(pm.chaindb.ReceiptTable(), hash, header.Number.Uint64())
+					if len(results) == 0 {
+						continue
+					}
+				}
+			} else {
+				results = pm.blockchain.GetReceiptsByHash(hash)
+				if results == nil {
+					if header := pm.blockchain.GetHeaderByHash(hash); header == nil || header.ReceiptHash != types.EmptyRootHash {
+						continue
+					}
 				}
 			}
 			// If known, encode and queue for response packet
@@ -559,6 +580,9 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		var announces newBlockHashesData
 		if err := msg.Decode(&announces); err != nil {
 			return errResp(ErrDecode, "%v: %v", msg, err)
+		}
+		if len(announces) > maxBlockAnnouncement {
+			return errResp(ErrMsgTooLarge, "%d > %d", len(announces), maxBlockAnnouncement)
 		}
 		// Mark the hashes as present at the remote node
 		for _, block := range announces {
@@ -647,7 +671,7 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 	hash := block.Hash()
 	peers := pm.peers.PeersWithoutBlock(hash)
 
-	// If propagation is requested, send to all peers.
+	// If propagation is requested, send to a subset of the peer
 	if propagate {
 		// Calculate the TD of the block (it's not imported yet, so block.Td is not valid)
 		var td *big.Int
@@ -657,7 +681,14 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 			log.Error("Propagating dangling block", "number", block.Number(), "hash", hash)
 			return
 		}
-		for _, p := range peers {
+		transferLen := int(math.Sqrt(float64(len(peers))))
+		if transferLen < minBroadcastPeers {
+			transferLen = minBroadcastPeers
+		}
+		if transferLen > len(peers) {
+			transferLen = len(peers)
+		}
+		for _, p := range peers[:transferLen] {
 			p.SendNewBlockAsync(block, td)
 		}
 		return

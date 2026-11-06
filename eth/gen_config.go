@@ -22,8 +22,6 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		NetworkId               uint64
 		SyncMode                downloader.SyncMode
 		NoPruning               bool
-		LightServ               int  `toml:",omitempty"`
-		LightPeers              int  `toml:",omitempty"`
 		SkipBcVersionCheck      bool `toml:"-"`
 		DatabaseHandles         int  `toml:"-"`
 		DatabaseCache           int
@@ -36,14 +34,15 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		GPO                     gasprice.Config
 		EnablePreimageRecording bool
 		DocRoot                 string `toml:"-"`
+		RPCGasCap               uint64
+		RPCEVMTimeout           time.Duration
+		RPCTxFeeCap             float64
 	}
 	var enc Config
 	enc.Genesis = c.Genesis
 	enc.NetworkId = c.NetworkId
 	enc.SyncMode = c.SyncMode
 	enc.NoPruning = c.NoPruning
-	enc.LightServ = c.LightServ
-	enc.LightPeers = c.LightPeers
 	enc.SkipBcVersionCheck = c.SkipBcVersionCheck
 	enc.DatabaseHandles = c.DatabaseHandles
 	enc.DatabaseCache = c.DatabaseCache
@@ -56,6 +55,9 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.GPO = c.GPO
 	enc.EnablePreimageRecording = c.EnablePreimageRecording
 	enc.DocRoot = c.DocRoot
+	enc.RPCGasCap = c.RPCGasCap
+	enc.RPCEVMTimeout = c.RPCEVMTimeout
+	enc.RPCTxFeeCap = c.RPCTxFeeCap
 	// enc.Archive = c.Archive
 	return &enc, nil
 }
@@ -67,8 +69,6 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		NetworkId               *uint64
 		SyncMode                *downloader.SyncMode
 		NoPruning               *bool
-		LightServ               *int  `toml:",omitempty"`
-		LightPeers              *int  `toml:",omitempty"`
 		SkipBcVersionCheck      *bool `toml:"-"`
 		DatabaseHandles         *int  `toml:"-"`
 		DatabaseCache           *int
@@ -81,6 +81,9 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		GPO                     *gasprice.Config
 		EnablePreimageRecording *bool
 		DocRoot                 *string `toml:"-"`
+		RPCGasCap               *uint64
+		RPCEVMTimeout           *time.Duration
+		RPCTxFeeCap             *float64
 		// Archive                 *archive.Config `toml:",omitempty"`
 	}
 	var dec Config
@@ -98,12 +101,6 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.NoPruning != nil {
 		c.NoPruning = *dec.NoPruning
-	}
-	if dec.LightServ != nil {
-		c.LightServ = *dec.LightServ
-	}
-	if dec.LightPeers != nil {
-		c.LightPeers = *dec.LightPeers
 	}
 	if dec.SkipBcVersionCheck != nil {
 		c.SkipBcVersionCheck = *dec.SkipBcVersionCheck
@@ -140,6 +137,15 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	}
 	if dec.DocRoot != nil {
 		c.DocRoot = *dec.DocRoot
+	}
+	if dec.RPCGasCap != nil {
+		c.RPCGasCap = *dec.RPCGasCap
+	}
+	if dec.RPCEVMTimeout != nil {
+		c.RPCEVMTimeout = *dec.RPCEVMTimeout
+	}
+	if dec.RPCTxFeeCap != nil {
+		c.RPCTxFeeCap = *dec.RPCTxFeeCap
 	}
 	// if dec.Archive != nil {
 	// 	c.Archive = *dec.Archive

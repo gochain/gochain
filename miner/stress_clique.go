@@ -104,11 +104,11 @@ func main() {
 	time.Sleep(3 * time.Second)
 
 	for _, node := range nodes {
-		var gochain *eth.Gochain
+		var gochain *eth.GoChain
 		if err := node.Service(&gochain); err != nil {
 			panic(err)
 		}
-		if err := gochain.StartMining(1); err != nil {
+		if err := gochain.StartMining(); err != nil {
 			panic(err)
 		}
 	}
@@ -191,7 +191,6 @@ func makeSealer(genesis *core.Genesis, nodes []string) (*node.Node, error) {
 			NoDiscovery: true,
 			MaxPeers:    25,
 		},
-		NoUSB: true,
 	}
 	// Start the node and configure a full GoChain node on it
 	stack, err := node.New(config)

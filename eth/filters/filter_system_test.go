@@ -244,7 +244,10 @@ func TestPendingTxFilter(t *testing.T) {
 		hashes []common.Hash
 	)
 
-	fid0 := api.NewPendingTransactionFilter()
+	fid0, err := api.NewPendingTransactionFilter()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	time.Sleep(1 * time.Second)
 	backend.txFeed.Send(core.NewTxsEvent{Txs: transactions})

@@ -35,8 +35,6 @@ import (
 	"github.com/gochain/gochain/v5/internal/ethapi"
 	"github.com/gochain/gochain/v5/rlp"
 	"github.com/gochain/gochain/v5/signer/core"
-	"github.com/gochain/gochain/v5/signer/fourbyte"
-	"github.com/gochain/gochain/v5/signer/storage"
 )
 
 //Used for testing
@@ -119,14 +117,16 @@ func tmpDirName(t *testing.T) string {
 	return d
 }
 
+type dummyValidator struct{}
+
+func (v *dummyValidator) ValidateTransaction(selector *string, tx *core.SendTxArgs) (*core.ValidationMessages, error) {
+	return &core.ValidationMessages{}, nil
+}
+
 func setup(t *testing.T) (*core.SignerAPI, *headlessUi) {
-	db, err := fourbyte.New()
-	if err != nil {
-		t.Fatal(err.Error())
-	}
 	ui := &headlessUi{make(chan string, 20), make(chan string, 20)}
 	am := core.StartClefAccountManager(tmpDirName(t), true, true, "")
-	api := core.NewSignerAPI(am, 1337, true, ui, db, true, &storage.NoStorage{})
+	api := core.NewSignerAPI(am, 1337, true, ui, &dummyValidator{}, true)
 	return api, ui
 
 }
