@@ -1,4 +1,4 @@
-.PHONY: gochain gochain-cross evm all test clean
+.PHONY: gochain gochain-cross all test clean
 .PHONY: gochain-linux gochain-linux-386 gochain-linux-amd64 gochain-linux-mips64 gochain-linux-mips64le
 .PHONY: gochain-linux-arm gochain-linux-arm-5 gochain-linux-arm-6 gochain-linux-arm-7 gochain-linux-arm64
 .PHONY: gochain-darwin gochain-darwin-386 gochain-darwin-amd64

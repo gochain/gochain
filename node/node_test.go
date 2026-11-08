@@ -29,6 +29,7 @@ import (
 	"github.com/gochain/gochain/v5/p2p"
 	"github.com/gochain/gochain/v5/rpc"
 
+	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -576,16 +577,11 @@ func TestWebsocketHTTPOnSamePort_WebsocketRequest(t *testing.T) {
 	node := startHTTP(t)
 	defer node.stopHTTP()
 
-	wsReq, err := http.NewRequest(http.MethodGet, "http://127.0.0.1:7453", nil)
+	conn, resp, err := websocket.DefaultDialer.Dial("ws://127.0.0.1:7453", nil)
 	if err != nil {
-		t.Error("could not issue new http request ", err)
+		t.Fatalf("could not dial websocket endpoint: %v", err)
 	}
-	wsReq.Header.Set("Connection", "upgrade")
-	wsReq.Header.Set("Upgrade", "websocket")
-	wsReq.Header.Set("Sec-WebSocket-Version", "13")
-	wsReq.Header.Set("Sec-Websocket-Key", "SGVsbG8sIHdvcmxkIQ==")
-
-	resp := doHTTPRequest(t, wsReq)
+	defer conn.Close()
 	assert.Equal(t, "websocket", resp.Header.Get("Upgrade"))
 }
 

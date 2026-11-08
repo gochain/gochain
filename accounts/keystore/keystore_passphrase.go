@@ -363,16 +363,25 @@ func aesCTRXOR(key, inText, iv []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(iv) != aesBlock.BlockSize() {
+		return nil, fmt.Errorf("invalid IV length: %d", len(iv))
+	}
 	stream := cipher.NewCTR(aesBlock, iv)
 	outText := make([]byte, len(inText))
 	stream.XORKeyStream(outText, inText)
-	return outText, err
+	return outText, nil
 }
 
 func aesCBCDecrypt(key, cipherText, iv []byte) ([]byte, error) {
 	aesBlock, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
+	}
+	if len(iv) != aes.BlockSize {
+		return nil, fmt.Errorf("invalid IV length: %d", len(iv))
+	}
+	if len(cipherText) == 0 || len(cipherText)%aes.BlockSize != 0 {
+		return nil, ErrDecrypt
 	}
 	decrypter := cipher.NewCBCDecrypter(aesBlock, iv)
 	paddedPlaintext := make([]byte, len(cipherText))
@@ -381,7 +390,7 @@ func aesCBCDecrypt(key, cipherText, iv []byte) ([]byte, error) {
 	if plaintext == nil {
 		return nil, ErrDecrypt
 	}
-	return plaintext, err
+	return plaintext, nil
 }
 
 // From https://leanpub.com/gocrypto/read#leanpub-auto-block-cipher-modes
