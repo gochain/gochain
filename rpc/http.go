@@ -207,7 +207,12 @@ type httpServerConn struct {
 }
 
 func newHTTPServerConn(r *http.Request, w http.ResponseWriter) ServerCodec {
-	body := io.LimitReader(r.Body, maxRequestContentLength)
+	var body io.Reader
+	if w != nil {
+		body = http.MaxBytesReader(w, r.Body, maxRequestContentLength)
+	} else {
+		body = io.LimitReader(r.Body, maxRequestContentLength)
+	}
 	conn := &httpServerConn{Reader: body, Writer: w, r: r}
 	return NewCodec(conn)
 }

@@ -33,7 +33,9 @@ import (
 )
 
 var (
-	deadline = 5 * time.Minute // consider a filter inactive if it has not been polled for within deadline
+	deadline   = 5 * time.Minute // consider a filter inactive if it has not been polled for within deadline
+	maxFilters = 1024            // maximum number of active filters
+	errMaxFilters = errors.New("max filters reached")
 )
 
 // filter is a helper struct that holds meta information over the filter type
@@ -98,13 +100,25 @@ func (api *PublicFilterAPI) timeoutLoop() {
 // `eth_getFilterChanges` polling method that is also used for log filters.
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_newpendingtransactionfilter
-func (api *PublicFilterAPI) NewPendingTransactionFilter() rpc.ID {
+func (api *PublicFilterAPI) NewPendingTransactionFilter() (rpc.ID, error) {
+	api.filtersMu.Lock()
+	if len(api.filters) >= maxFilters {
+		api.filtersMu.Unlock()
+		return rpc.ID(""), errMaxFilters
+	}
+	api.filtersMu.Unlock()
+
 	var (
 		pendingTxs   = make(chan []common.Hash)
 		pendingTxSub = api.events.SubscribePendingTxs(pendingTxs)
 	)
 
 	api.filtersMu.Lock()
+	if len(api.filters) >= maxFilters {
+		api.filtersMu.Unlock()
+		pendingTxSub.Unsubscribe()
+		return rpc.ID(""), errMaxFilters
+	}
 	api.filters[pendingTxSub.ID] = &filter{typ: PendingTransactionsSubscription, deadline: time.NewTimer(deadline), hashes: make([]common.Hash, 0), s: pendingTxSub}
 	api.filtersMu.Unlock()
 
@@ -126,7 +140,7 @@ func (api *PublicFilterAPI) NewPendingTransactionFilter() rpc.ID {
 		}
 	}()
 
-	return pendingTxSub.ID
+	return pendingTxSub.ID, nil
 }
 
 // NewPendingTransactions creates a subscription that is triggered each time a transaction
@@ -168,13 +182,25 @@ func (api *PublicFilterAPI) NewPendingTransactions(ctx context.Context) (*rpc.Su
 // It is part of the filter package since polling goes with eth_getFilterChanges.
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_newblockfilter
-func (api *PublicFilterAPI) NewBlockFilter() rpc.ID {
+func (api *PublicFilterAPI) NewBlockFilter() (rpc.ID, error) {
+	api.filtersMu.Lock()
+	if len(api.filters) >= maxFilters {
+		api.filtersMu.Unlock()
+		return rpc.ID(""), errMaxFilters
+	}
+	api.filtersMu.Unlock()
+
 	var (
 		headers   = make(chan *types.Header)
 		headerSub = api.events.SubscribeNewHeads(headers)
 	)
 
 	api.filtersMu.Lock()
+	if len(api.filters) >= maxFilters {
+		api.filtersMu.Unlock()
+		headerSub.Unsubscribe()
+		return rpc.ID(""), errMaxFilters
+	}
 	api.filters[headerSub.ID] = &filter{typ: BlocksSubscription, deadline: time.NewTimer(deadline), hashes: make([]common.Hash, 0), s: headerSub}
 	api.filtersMu.Unlock()
 
@@ -196,7 +222,7 @@ func (api *PublicFilterAPI) NewBlockFilter() rpc.ID {
 		}
 	}()
 
-	return headerSub.ID
+	return headerSub.ID, nil
 }
 
 // NewHeads send a notification each time a new (header) block is appended to the chain.
@@ -285,6 +311,13 @@ type FilterCriteria gochain.FilterQuery
 //
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_newfilter
 func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
+	api.filtersMu.Lock()
+	if len(api.filters) >= maxFilters {
+		api.filtersMu.Unlock()
+		return rpc.ID(""), errMaxFilters
+	}
+	api.filtersMu.Unlock()
+
 	logs := make(chan []*types.Log)
 	logsSub, err := api.events.SubscribeLogs(gochain.FilterQuery(crit), logs)
 	if err != nil {
@@ -292,6 +325,11 @@ func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 	}
 
 	api.filtersMu.Lock()
+	if len(api.filters) >= maxFilters {
+		api.filtersMu.Unlock()
+		logsSub.Unsubscribe()
+		return rpc.ID(""), errMaxFilters
+	}
 	api.filters[logsSub.ID] = &filter{typ: LogsSubscription, crit: crit, deadline: time.NewTimer(deadline), logs: make([]*types.Log, 0), s: logsSub}
 	api.filtersMu.Unlock()
 
@@ -333,6 +371,24 @@ func (api *PublicFilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([
 		end := rpc.LatestBlockNumber.Int64()
 		if crit.ToBlock != nil {
 			end = crit.ToBlock.Int64()
+		}
+		if begin < 0 || end < 0 {
+			header, err := api.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+			if err != nil {
+				return nil, err
+			}
+			if header != nil {
+				head := header.Number.Int64()
+				if begin < 0 {
+					begin = head
+				}
+				if end < 0 {
+					end = head
+				}
+			}
+		}
+		if begin > 0 && end > 0 && begin > end {
+			return returnLogs(nil), nil
 		}
 		// Construct the range filter
 		filter = NewRangeFilter(api.backend, begin, end, crit.Addresses, crit.Topics)

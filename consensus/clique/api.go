@@ -110,6 +110,88 @@ func (api *API) GetSignersAtHash(ctx context.Context, hash common.Hash) ([]commo
 	return snap.signers(), nil
 }
 
+// GetVotersAtHash retrieves the list of authorized voters at the specified block hash.
+func (api *API) GetVotersAtHash(ctx context.Context, hash common.Hash) ([]common.Address, error) {
+	header := api.chain.GetHeaderByHash(hash)
+	if header == nil {
+		return nil, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return snap.voters(), nil
+}
+
+// Status is the status of a clique node's signing activity over the latest epoch (or last 64 blocks).
+type Status struct {
+	InturnPercent float64                `json:"inturnPercent"`
+	SigningStatus map[common.Address]int `json:"sealerActivity"`
+	NumBlocks     uint64                 `json:"numBlocks"`
+	Signers       []common.Address       `json:"signers"`
+	Stakers       []common.Address       `json:"stakers"`
+}
+
+// Status returns the status of the clique consensus over the latest epoch (or last 64 blocks).
+func (api *API) Status(ctx context.Context) (*Status, error) {
+	var (
+		numBlocks = uint64(64)
+		header    = api.chain.CurrentHeader()
+		diff      = uint64(0)
+		optimals  = 0
+	)
+	if header == nil {
+		return nil, errUnknownBlock
+	}
+	snap, err := api.clique.snapshot(api.chain, header.Number.Uint64(), header.Hash(), nil)
+	if err != nil {
+		return nil, err
+	}
+	var (
+		signers = snap.signers()
+		end     = header.Number.Uint64()
+		start   = uint64(1)
+	)
+	if end == 0 {
+		numBlocks = 0
+	} else if numBlocks > end {
+		numBlocks = end
+		start = 1
+	} else {
+		start = end - numBlocks + 1
+	}
+	signStatus := make(map[common.Address]int)
+	for _, s := range signers {
+		signStatus[s] = 0
+	}
+	for n := start; n <= end; n++ {
+		h := api.chain.GetHeaderByNumber(n)
+		if h == nil {
+			continue
+		}
+		if h.Difficulty.Uint64() == uint64(len(signers)) {
+			optimals++
+		}
+		diff += h.Difficulty.Uint64()
+		sealer, err := api.clique.Author(h)
+		if err != nil {
+			return nil, err
+		}
+		signStatus[sealer]++
+	}
+	var inturnPercent float64
+	if numBlocks > 0 {
+		inturnPercent = float64(100*optimals) / float64(numBlocks)
+	}
+	return &Status{
+		InturnPercent: inturnPercent,
+		SigningStatus: signStatus,
+		NumBlocks:     numBlocks,
+		Signers:       signers,
+		Stakers:       signers,
+	}, nil
+}
+
 // Proposals returns the current proposals the node tries to uphold and vote on.
 func (api *API) Proposals() map[common.Address]propose {
 	api.clique.lock.RLock()
@@ -148,3 +230,4 @@ func (api *API) Discard(address common.Address) {
 
 	delete(api.clique.proposals, address)
 }
+
