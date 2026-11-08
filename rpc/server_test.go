@@ -150,3 +150,73 @@ func TestServerShortLivedConn(t *testing.T) {
 		}
 	}
 }
+
+func TestServerBatchLimit(t *testing.T) {
+	server := newTestServer()
+	defer server.Stop()
+
+	clientConn, serverConn := net.Pipe()
+	defer clientConn.Close()
+	go server.ServeCodec(NewCodec(serverConn), 0)
+
+	var batch strings.Builder
+	batch.WriteByte('[')
+	for i := 0; i <= defaultBatchRequestLimit; i++ {
+		if i > 0 {
+			batch.WriteByte(',')
+		}
+		batch.WriteString(`{"jsonrpc":"2.0","id":1,"method":"test_noArgsRets"}`)
+	}
+	batch.WriteString("]\n")
+
+	clientConn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+	if _, err := io.WriteString(clientConn, batch.String()); err != nil {
+		t.Fatalf("write error: %v", err)
+	}
+
+	readbuf := bufio.NewReader(clientConn)
+	clientConn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	sent, err := readbuf.ReadString('\n')
+	if err != nil {
+		t.Fatalf("read error: %v", err)
+	}
+	sent = strings.TrimRight(sent, "\r\n")
+	want := `{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"batch too large"}}`
+	if sent != want {
+		t.Fatalf("wrong response from server\ngot:  %s\nwant: %s", sent, want)
+	}
+}
+
+func TestServerBatchResponseMaxSize(t *testing.T) {
+	server := NewServer()
+	defer server.Stop()
+	// Each response is ~10MB, so 3 responses exceed 25MB defaultBatchResponseMaxSize
+	server.RegisterName("test", largeRespService{10 * 1024 * 1024})
+
+	clientConn, serverConn := net.Pipe()
+	defer clientConn.Close()
+	go server.ServeCodec(NewCodec(serverConn), 0)
+
+	batch := `[` +
+		`{"jsonrpc":"2.0","id":1,"method":"test_largeResp"},` +
+		`{"jsonrpc":"2.0","id":2,"method":"test_largeResp"},` +
+		`{"jsonrpc":"2.0","id":3,"method":"test_largeResp"},` +
+		`{"jsonrpc":"2.0","id":4,"method":"test_largeResp"}` +
+		`]` + "\n"
+
+	clientConn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+	if _, err := io.WriteString(clientConn, batch); err != nil {
+		t.Fatalf("write error: %v", err)
+	}
+
+	readbuf := bufio.NewReader(clientConn)
+	clientConn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	sent, err := readbuf.ReadString('\n')
+	if err != nil {
+		t.Fatalf("read error: %v", err)
+	}
+	if !strings.Contains(sent, "batch response too large") {
+		t.Fatalf("expected 'batch response too large' error in response, got len=%d", len(sent))
+	}
+}
+

@@ -31,6 +31,7 @@ import (
 	"github.com/gochain/gochain/v5/crypto"
 	"github.com/gochain/gochain/v5/ethdb"
 	"github.com/gochain/gochain/v5/params"
+	"github.com/gochain/gochain/v5/rpc"
 )
 
 func makeReceipt(addr common.Address) *types.Receipt {
@@ -228,4 +229,32 @@ func TestFilters(t *testing.T) {
 	if len(logs) != 0 {
 		t.Error("expected 0 log, got", len(logs))
 	}
+
+	// Test GetLogs with FromBlock: PendingBlockNumber and ToBlock: 0xffffffff
+	api := NewPublicFilterAPI(backend, false)
+	logs, err = api.GetLogs(context.Background(), FilterCriteria{
+		FromBlock: big.NewInt(rpc.PendingBlockNumber.Int64()),
+		ToBlock:   big.NewInt(0xffffffff),
+		Addresses: []common.Address{addr},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error from GetLogs with PendingBlockNumber and 0xffffffff: %v", err)
+	}
+	if len(logs) != 1 {
+		t.Errorf("expected 1 log at head block, got %d", len(logs))
+	}
+
+	// Test GetLogs with FromBlock: SafeBlockNumber and ToBlock: FinalizedBlockNumber
+	logs, err = api.GetLogs(context.Background(), FilterCriteria{
+		FromBlock: big.NewInt(rpc.SafeBlockNumber.Int64()),
+		ToBlock:   big.NewInt(rpc.FinalizedBlockNumber.Int64()),
+		Addresses: []common.Address{addr},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error from GetLogs with SafeBlockNumber and FinalizedBlockNumber: %v", err)
+	}
+	if len(logs) != 1 {
+		t.Errorf("expected 1 log at head block, got %d", len(logs))
+	}
 }
+

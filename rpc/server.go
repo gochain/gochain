@@ -38,6 +38,9 @@ const (
 
 	// OptionSubscriptions is an indication that the codec supports RPC notifications
 	OptionSubscriptions = 1 << iota // support pub sub
+
+	defaultBatchRequestLimit    = 1000
+	defaultBatchResponseMaxSize = 25 * 1024 * 1024
 )
 
 // Server is an RPC server.
