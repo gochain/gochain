@@ -59,6 +59,7 @@ var (
 		utils.IdentityFlag,
 		utils.UnlockedAccountFlag,
 		utils.PasswordFileFlag,
+		utils.AllowInsecureUnlockFlag,
 		utils.BootnodesFlag,
 		utils.BootnodesV4Flag,
 		utils.BootnodesV5Flag,
@@ -141,6 +142,9 @@ var (
 		utils.RPCListenAddrFlag,
 		utils.RPCPortFlag,
 		utils.RPCApiFlag,
+		utils.RPCGasCapFlag,
+		utils.RPCEVMTimeoutFlag,
+		utils.RPCTxFeeCapFlag,
 		utils.WSEnabledFlag,
 		utils.WSListenAddrFlag,
 		utils.WSPortFlag,
@@ -263,6 +267,9 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 	unlocks := strings.Split(ctx.GlobalString(utils.UnlockedAccountFlag.Name), ",")
 	for i, account := range unlocks {
 		if trimmed := strings.TrimSpace(account); trimmed != "" {
+			if (stack.HTTPEndpoint() != "" || stack.WSEndpoint() != "") && !stack.AccountManager().Config().InsecureUnlockAllowed {
+				utils.Fatalf("Account unlock with HTTP access is forbidden! Use --allow-insecure-unlock to override.")
+			}
 			unlockAccount(ctx, ks, trimmed, i, passwords)
 		}
 	}

@@ -47,6 +47,10 @@ var DefaultConfig = Config{
 		Percentile: 60,
 		MaxPrice:   gasprice.DefaultMaxPrice,
 	},
+
+	RPCGasCap:     50000000,
+	RPCEVMTimeout: 5 * time.Second,
+	RPCTxFeeCap:   100, // 100 GO
 }
 
 //go:generate gencodec -type Config -field-override configMarshaling -formats toml -out gen_config.go
@@ -93,6 +97,16 @@ type Config struct {
 
 	// Miscellaneous options
 	DocRoot string `toml:"-"`
+
+	// RPCGasCap is the global gas cap for eth-call variants.
+	RPCGasCap uint64
+
+	// RPCEVMTimeout is the global timeout for eth-call.
+	RPCEVMTimeout time.Duration
+
+	// RPCTxFeeCap is the global transaction fee(price * gaslimit) cap for
+	// send-transaction variants. The unit is ether.
+	RPCTxFeeCap float64
 
 	// Type of the EWASM interpreter ("" for default)
 	EWASMInterpreter string
