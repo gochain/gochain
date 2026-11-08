@@ -29,7 +29,6 @@ import (
 	"github.com/gochain/gochain/v5/common/mclock"
 	"github.com/gochain/gochain/v5/log"
 	"github.com/gochain/gochain/v5/p2p/discover"
-	"github.com/gochain/gochain/v5/p2p/discv5"
 	"github.com/gochain/gochain/v5/p2p/nat"
 	"github.com/gochain/gochain/v5/p2p/netutil"
 )
@@ -75,10 +74,6 @@ type Config struct {
 	// Disabling is useful for protocol debugging (manual topology).
 	NoDiscovery bool `toml:",omitempty"`
 
-	// DiscoveryV5 specifies whether the the new topic-discovery based V5 discovery
-	// protocol should be started or not.
-	DiscoveryV5 bool `toml:",omitempty"`
-
 	// Name sets the node name of this server.
 	// Use common.MakeName to create a name that follows existing conventions.
 	Name string `toml:"-"`
@@ -86,11 +81,6 @@ type Config struct {
 	// BootstrapNodes are used to establish connectivity
 	// with the rest of the network.
 	BootstrapNodes []*discover.Node `toml:",omitempty"`
-
-	// BootstrapNodesV5 are used to establish connectivity
-	// with the rest of the network using the V5 discovery
-	// protocol.
-	BootstrapNodesV5 []*discv5.Node `toml:",omitempty"`
 
 	// Static nodes are used as pre-configured connections which are always
 	// maintained and re-connected on disconnects.
@@ -159,7 +149,6 @@ type Server struct {
 	listener     net.Listener
 	ourHandshake *protoHandshake
 	lastLookup   time.Time
-	DiscV5       *discv5.Network
 
 	// These are for Peers, PeerCount (and nothing else).
 	peerOp     chan peerOpFunc
@@ -359,32 +348,6 @@ func (srv *Server) Stop() {
 	srv.loopWG.Wait()
 }
 
-// sharedUDPConn implements a shared connection. Write sends messages to the underlying connection while read returns
-// messages that were found unprocessable and sent to the unhandled channel by the primary listener.
-type sharedUDPConn struct {
-	*net.UDPConn
-	unhandled chan discover.ReadPacket
-}
-
-// ReadFromUDP implements discv5.conn
-func (s *sharedUDPConn) ReadFromUDP(b []byte) (n int, addr *net.UDPAddr, err error) {
-	packet, ok := <-s.unhandled
-	if !ok {
-		return 0, nil, fmt.Errorf("Connection was closed")
-	}
-	l := len(packet.Data)
-	if l > len(b) {
-		l = len(b)
-	}
-	copy(b[:l], packet.Data[:l])
-	return l, packet.Addr, nil
-}
-
-// Close implements discv5.conn
-func (s *sharedUDPConn) Close() error {
-	return nil
-}
-
 // Start starts running the server.
 // Servers can not be re-used after stopping.
 func (srv *Server) Start() (err error) {
@@ -419,23 +382,17 @@ func (srv *Server) Start() (err error) {
 	srv.peerOp = make(chan peerOpFunc)
 	srv.peerOpDone = make(chan struct{})
 
-	var (
-		conn      *net.UDPConn
-		sconn     *sharedUDPConn
-		realaddr  *net.UDPAddr
-		unhandled chan discover.ReadPacket
-	)
-
-	if !srv.NoDiscovery || srv.DiscoveryV5 {
+	// node table
+	if !srv.NoDiscovery {
 		addr, err := net.ResolveUDPAddr("udp", srv.ListenAddr)
 		if err != nil {
 			return err
 		}
-		conn, err = net.ListenUDP("udp", addr)
+		conn, err := net.ListenUDP("udp", addr)
 		if err != nil {
 			return err
 		}
-		realaddr = conn.LocalAddr().(*net.UDPAddr)
+		realaddr := conn.LocalAddr().(*net.UDPAddr)
 		if srv.NAT != nil {
 			if !realaddr.IP.IsLoopback() {
 				go nat.Map(srv.NAT, srv.quit, "udp", realaddr.Port, realaddr.Port, "ethereum discovery")
@@ -445,47 +402,18 @@ func (srv *Server) Start() (err error) {
 				realaddr = &net.UDPAddr{IP: ext, Port: realaddr.Port}
 			}
 		}
-	}
-
-	if !srv.NoDiscovery && srv.DiscoveryV5 {
-		unhandled = make(chan discover.ReadPacket, 100)
-		sconn = &sharedUDPConn{conn, unhandled}
-	}
-
-	// node table
-	if !srv.NoDiscovery {
 		cfg := discover.Config{
 			PrivateKey:   srv.PrivateKey,
 			AnnounceAddr: realaddr,
 			NodeDBPath:   srv.NodeDatabase,
 			NetRestrict:  srv.NetRestrict,
 			Bootnodes:    srv.BootstrapNodes,
-			Unhandled:    unhandled,
 		}
 		ntab, err := discover.ListenUDP(conn, cfg)
 		if err != nil {
 			return err
 		}
 		srv.ntab = ntab
-	}
-
-	if srv.DiscoveryV5 {
-		var (
-			ntab *discv5.Network
-			err  error
-		)
-		if sconn != nil {
-			ntab, err = discv5.ListenUDP(srv.PrivateKey, sconn, realaddr, "", srv.NetRestrict) //srv.NodeDatabase)
-		} else {
-			ntab, err = discv5.ListenUDP(srv.PrivateKey, conn, realaddr, "", srv.NetRestrict) //srv.NodeDatabase)
-		}
-		if err != nil {
-			return err
-		}
-		if err := ntab.SetFallbackNodes(srv.BootstrapNodesV5); err != nil {
-			return err
-		}
-		srv.DiscV5 = ntab
 	}
 
 	dynPeers := srv.maxDialedConns()
@@ -679,9 +607,6 @@ running:
 	// Terminate discovery. If there is a running lookup it will terminate soon.
 	if srv.ntab != nil {
 		srv.ntab.Close()
-	}
-	if srv.DiscV5 != nil {
-		srv.DiscV5.Close()
 	}
 	// Disconnect all peers.
 	for _, p := range peers {

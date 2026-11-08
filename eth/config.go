@@ -32,7 +32,6 @@ import (
 var DefaultConfig = Config{
 	SyncMode:      downloader.FastSync,
 	NetworkId:     params.MainnetChainID,
-	LightPeers:    100,
 	DatabaseCache: 768,
 	TrieCache:     256,
 	TrieTimeout:   15 * time.Minute,
@@ -61,10 +60,6 @@ type Config struct {
 	SyncMode  downloader.SyncMode
 	NoPruning bool
 
-	// Light client options
-	LightServ  int `toml:",omitempty"` // Maximum percentage of time allowed for serving LES requests
-	LightPeers int `toml:",omitempty"` // Maximum number of LES client peers
-
 	// Database options
 	SkipBcVersionCheck bool `toml:"-"`
 	DatabaseHandles    int  `toml:"-"`
@@ -74,13 +69,11 @@ type Config struct {
 
 	// Mining-related options
 	Etherbase      common.Address `toml:",omitempty"`
-	MinerNotify    []string       `toml:",omitempty"`
 	MinerExtraData []byte         `toml:",omitempty"`
 	MinerGasFloor  uint64
 	MinerGasCeil   uint64
 	MinerGasPrice  *big.Int // nil for default/dynamic
 	MinerRecommit  time.Duration
-	MinerNoverify  bool
 
 	// Transaction pool options
 	TxPool core.TxPoolConfig
@@ -93,12 +86,6 @@ type Config struct {
 
 	// Miscellaneous options
 	DocRoot string `toml:"-"`
-
-	// Type of the EWASM interpreter ("" for default)
-	EWASMInterpreter string
-
-	// Type of the EVM interpreter ("" for default)
-	EVMInterpreter string
 
 	// Constantinople block override (TODO: remove after the fork)
 	ConstantinopleOverride *big.Int

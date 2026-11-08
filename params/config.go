@@ -112,23 +112,13 @@ type ChainConfig struct {
 	PetersburgBlock     *big.Int       `json:"petersburgBlock,omitempty"`     // Petersburg switch block (nil = same as Constantinople)
 	DarvazaBlock        *big.Int       `json:"darvazaBlock,omitempty"`        // Darvaza switch block (nil = no fork, 0 = already activated)
 	DarvazaDefaultGas   *big.Int       `json:"darvazaDefaultGas,omitempty"`   // Darvaza default gas value (nil = no change)
-	HafthorBlock             *big.Int       `json:"hafthorBlock,omitempty"`             // Hafthor switch block (nil = no fork, 0 = already activated)
-	HafthorStakeAddress      common.Address `json:"hafthorStakeAddress"`                // Hafthor stake address to send rewards
-	GasPriceContractBlock    *big.Int       `json:"gasPriceContractBlock,omitempty"`   // Gas price contract activation block (nil = no fork, 0 = already activated)
-	GasPriceContractAddress  common.Address  `json:"gasPriceContractAddress"`           // Gas price contract address
-	EWASMBlock               *big.Int       `json:"ewasmBlock,omitempty"`                // EWASM switch block (nil = no fork, 0 = already activated)
+	HafthorBlock            *big.Int       `json:"hafthorBlock,omitempty"`           // Hafthor switch block (nil = no fork, 0 = already activated)
+	HafthorStakeAddress     common.Address `json:"hafthorStakeAddress"`              // Hafthor stake address to send rewards
+	GasPriceContractBlock   *big.Int       `json:"gasPriceContractBlock,omitempty"`  // Gas price contract activation block (nil = no fork, 0 = already activated)
+	GasPriceContractAddress common.Address `json:"gasPriceContractAddress"`          // Gas price contract address
 
 	// Various consensus engines
-	Ethash *EthashConfig `json:"ethash,omitempty"`
 	Clique *CliqueConfig `json:"clique,omitempty"`
-}
-
-// EthashConfig is the consensus engine configs for proof-of-work based sealing.
-type EthashConfig struct{}
-
-// String implements the stringer interface, returning the consensus engine details.
-func (c *EthashConfig) String() string {
-	return "ethash"
 }
 
 // CliqueConfig is the consensus engine configs for proof-of-authority based sealing.
@@ -146,15 +136,13 @@ func (c *CliqueConfig) String() string {
 func (c *ChainConfig) String() string {
 	var engine interface{}
 	switch {
-	case c.Ethash != nil:
-		engine = c.Ethash
 	case c.Clique != nil:
 		engine = c.Clique
 	default:
 		engine = "unknown"
 	}
 	return fmt.Sprintf("{ChainID: %v Homestead: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople:"+
-		" %v ConstantinopleFix: %v Darvaza: %v Hafthor: %v GasPriceContract: %v EWASM: %v Engine: %v}",
+		" %v ConstantinopleFix: %v Darvaza: %v Hafthor: %v GasPriceContract: %v Engine: %v}",
 		c.ChainId,
 		c.HomesteadBlock,
 		c.EIP150Block,
@@ -166,7 +154,6 @@ func (c *ChainConfig) String() string {
 		c.DarvazaBlock,
 		c.HafthorBlock,
 		c.GasPriceContractBlock,
-		c.EWASMBlock,
 		engine,
 	)
 }
@@ -221,11 +208,6 @@ func (c *ChainConfig) IsHafthor(num *big.Int) bool {
 // IsGasPriceContract returns whether num is either equal to the gas price contract activation block or greater.
 func (c *ChainConfig) IsGasPriceContract(num *big.Int) bool {
 	return isForked(c.GasPriceContractBlock, num)
-}
-
-// IsEWASM returns whether num represents a block number after the EWASM fork
-func (c *ChainConfig) IsEWASM(num *big.Int) bool {
-	return isForked(c.EWASMBlock, num)
 }
 
 // GasTable returns the gas table corresponding to the current phase (homestead or homestead reprice).
@@ -292,9 +274,6 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 	}
 	if isForkIncompatible(c.DarvazaBlock, newcfg.DarvazaBlock, head) {
 		return newCompatError("Darvaza fork block", c.DarvazaBlock, newcfg.DarvazaBlock)
-	}
-	if isForkIncompatible(c.EWASMBlock, newcfg.EWASMBlock, head) {
-		return newCompatError("ewasm fork block", c.EWASMBlock, newcfg.EWASMBlock)
 	}
 	return nil
 }
@@ -364,7 +343,6 @@ type Rules struct {
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158   bool
 	IsByzantium, IsConstantinople, IsPetersburg bool
 	IsDarvaza, IsHafthor                        bool
-	IsEWASM                                     bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -384,6 +362,5 @@ func (c *ChainConfig) Rules(num *big.Int) Rules {
 		IsPetersburg:     c.IsPetersburg(num),
 		IsDarvaza:        c.IsDarvaza(num),
 		IsHafthor:        c.IsHafthor(num),
-		IsEWASM:          c.IsEWASM(num),
 	}
 }

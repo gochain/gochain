@@ -1,4 +1,4 @@
-.PHONY: gochain android ios gochain-cross swarm evm all test clean
+.PHONY: gochain gochain-cross all test clean
 .PHONY: gochain-linux gochain-linux-386 gochain-linux-amd64 gochain-linux-mips64 gochain-linux-mips64le
 .PHONY: gochain-linux-arm gochain-linux-arm-5 gochain-linux-arm-6 gochain-linux-arm-7 gochain-linux-arm64
 .PHONY: gochain-darwin gochain-darwin-386 gochain-darwin-amd64
@@ -46,16 +46,6 @@ install: all
 	cp bin/gochain-bootnode $(GOPATH)/bin/gochain-bootnode
 	cp bin/gochain $(GOPATH)/bin/gochain
 
-android:
-	build/env.sh go run build/ci.go aar --local
-	@echo "Done building."
-	@echo "Import \"$(GOBIN)/gochain.aar\" to use the library."
-
-ios:
-	build/env.sh go run build/ci.go xcode --local
-	@echo "Done building."
-	@echo "Import \"$(GOBIN)/gochain.framework\" to use the library."
-
 test:
 	go test ./...
 
@@ -77,7 +67,7 @@ devtools:
 
 # Cross Compilation Targets (xgo)
 
-gochain-cross: gochain-linux gochain-darwin gochain-windows gochain-android gochain-ios
+gochain-cross: gochain-linux gochain-darwin gochain-windows
 	@echo "Full cross compilation done:"
 	@ls -ld $(GOBIN)/gochain-*
 
