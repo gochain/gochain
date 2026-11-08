@@ -24,7 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/pkg/reexec"
 	"github.com/gochain/gochain/v5/internal/cmdtest"
 	"github.com/gochain/gochain/v5/rpc"
 )
@@ -47,7 +46,7 @@ type testgeth struct {
 
 func init() {
 	// Run the app if we've been exec'd as "geth-test" in runGoChain.
-	reexec.Register("geth-test", func() {
+	cmdtest.Register("geth-test", func() {
 		if err := app.Run(os.Args); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
@@ -58,7 +57,7 @@ func init() {
 
 func TestMain(m *testing.M) {
 	// check if we have been reexec'd
-	if reexec.Init() {
+	if cmdtest.Init() {
 		return
 	}
 	os.Exit(m.Run())

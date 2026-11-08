@@ -843,3 +843,22 @@ func BenchmarkStreamPool(b *testing.B) {
 		}
 	})
 }
+
+func TestDecodeHugeLengthHeader(t *testing.T) {
+	malicious := unhex("bfffffffffffffffff")
+
+	var out []byte
+	if err := Decode(newPlainReader(malicious), &out); err != io.ErrUnexpectedEOF {
+		t.Fatalf("expected io.ErrUnexpectedEOF from unlimited reader, got %v", err)
+	}
+
+	var raw RawValue
+	if err := Decode(newPlainReader(malicious), &raw); err != io.ErrUnexpectedEOF {
+		t.Fatalf("expected io.ErrUnexpectedEOF for RawValue from unlimited reader, got %v", err)
+	}
+
+	if err := Decode(bytes.NewBuffer(malicious), &out); err != ErrValueTooLarge {
+		t.Fatalf("expected ErrValueTooLarge from bytes.Buffer, got %v", err)
+	}
+}
+
