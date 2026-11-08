@@ -80,7 +80,7 @@ func (b *EthApiBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNum
 		return block.Header(), nil
 	}
 	// Otherwise resolve and return the block
-	if blockNr == rpc.LatestBlockNumber {
+	if blockNr == rpc.LatestBlockNumber || blockNr == rpc.SafeBlockNumber || blockNr == rpc.FinalizedBlockNumber {
 		return b.eth.blockchain.CurrentBlock().Header(), nil
 	}
 	return b.eth.blockchain.GetHeaderByNumber(uint64(blockNr)), nil
@@ -97,7 +97,7 @@ func (b *EthApiBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumb
 		return block, nil
 	}
 	// Otherwise resolve and return the block
-	if blockNr == rpc.LatestBlockNumber {
+	if blockNr == rpc.LatestBlockNumber || blockNr == rpc.SafeBlockNumber || blockNr == rpc.FinalizedBlockNumber {
 		return b.eth.blockchain.CurrentBlock(), nil
 	}
 	return b.eth.blockchain.GetBlockByNumber(uint64(blockNr)), nil

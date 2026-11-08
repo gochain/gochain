@@ -310,5 +310,11 @@ func TestAPI_GetVotersAtHashAndStatus(t *testing.T) {
 	if status.InturnPercent != 100 {
 		t.Fatalf("expected InturnPercent=100, got %v", status.InturnPercent)
 	}
+	if len(status.Signers) != 1 {
+		t.Fatalf("expected 1 signer, got %d", len(status.Signers))
+	}
+	if len(status.Stakers) != 2 {
+		t.Fatalf("expected 2 stakers, got %d", len(status.Stakers))
+	}
 }
 
