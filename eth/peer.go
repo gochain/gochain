@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"sync"
 	"time"
@@ -165,7 +166,7 @@ func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
 		Peer:        p,
 		rw:          rw,
 		version:     version,
-		id:          fmt.Sprintf("%x", p.ID().Bytes()[:8]),
+		id:          fmt.Sprintf("%x", p.ID().Bytes()),
 		knownTxs:    knownHashes{cap: maxKnownTxs, forgetInterval: forgetTxsInterval},
 		knownBlocks: knownHashes{cap: maxKnownBlocks},
 		queuedTxs:   make(chan types.Transactions, maxQueuedTxs),
@@ -570,6 +571,11 @@ func (ps *peerSet) PeersWithoutTxs(txs types.Transactions) map[*peer]types.Trans
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
 
+	max := int(math.Sqrt(float64(len(ps.peers))))
+	if max < minBroadcastPeers {
+		max = minBroadcastPeers
+	}
+
 	for _, tx := range txs {
 		hash := tx.Hash()
 		var count int
@@ -579,6 +585,9 @@ func (ps *peerSet) PeersWithoutTxs(txs types.Transactions) map[*peer]types.Trans
 			}
 			peerTxs[p] = append(peerTxs[p], tx)
 			count++
+			if count >= max {
+				break
+			}
 		}
 		if tracing && count > 0 {
 			log.Trace("Broadcast transaction", "hash", hash, "recipients", count)

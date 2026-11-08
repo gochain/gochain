@@ -40,7 +40,6 @@ import (
 
 	"github.com/gochain/gochain/v5/crypto"
 	"github.com/gochain/gochain/v5/crypto/ecies"
-	"github.com/gochain/gochain/v5/crypto/secp256k1"
 	"github.com/gochain/gochain/v5/p2p/discover"
 	"github.com/gochain/gochain/v5/rlp"
 )
@@ -409,7 +408,7 @@ func (h *encHandshake) handleAuthMsg(msg *authMsgV4, prv *ecdsa.PrivateKey) erro
 		return err
 	}
 	signedMsg := xor(token, h.initNonce)
-	remoteRandomPub, err := secp256k1.RecoverPubkey(signedMsg, msg.Signature[:])
+	remoteRandomPub, err := crypto.Ecrecover(signedMsg, msg.Signature[:])
 	if err != nil {
 		return err
 	}
@@ -708,7 +707,7 @@ func (rw *rlpxFrameRW) ReadMsg() (msg Msg, err error) {
 		if err != nil {
 			return msg, err
 		}
-		if size > int(maxUint24) {
+		if size < 0 || size > int(maxUint24) {
 			return msg, errPlainMessageTooLarge
 		}
 		payload, err = snappy.Decode(nil, payload)
