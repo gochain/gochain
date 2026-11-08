@@ -270,6 +270,30 @@ func TestCallTracer(t *testing.T) {
 			if !reflect.DeepEqual(ret, test.Result) {
 				t.Fatalf("trace mismatch: \nhave %+v\nwant %+v", ret, test.Result)
 			}
+
+			// Also verify the Goja JS tracer produces identical results on the bundled call_tracer.js
+			statedbJs := tests.MakePreState(ethdb.NewMemDatabase(), test.Genesis.Alloc)
+			jsTracer, err := NewJsTracer(all["callTracer"], nil, nil)
+			if err != nil {
+				t.Fatalf("failed to create js call tracer: %v", err)
+			}
+			evmJs := vm.NewEVM(context, statedbJs, test.Genesis.Config, vm.Config{Debug: true, Tracer: jsTracer})
+			stJs := core.NewStateTransition(evmJs, msg, new(core.GasPool).AddGas(tx.Gas()))
+			if _, _, _, err = stJs.TransitionDb(); err != nil {
+				t.Fatalf("failed to execute transaction with js tracer: %v", err)
+			}
+			resJs, err := jsTracer.GetResult()
+			if err != nil {
+				t.Fatalf("failed to retrieve js trace result: %v", err)
+			}
+			retJs := new(callTrace)
+			if err := json.Unmarshal(resJs, retJs); err != nil {
+				t.Fatalf("failed to unmarshal js trace result: %v", err)
+			}
+			if !reflect.DeepEqual(retJs, test.Result) {
+				t.Fatalf("js trace mismatch: \nhave %+v\nwant %+v", retJs, test.Result)
+			}
 		})
 	}
 }
+

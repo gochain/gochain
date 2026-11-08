@@ -71,31 +71,28 @@ func (m *Memory) Resize(size uint64) {
 
 // Get returns offset + size as a new slice
 func (m *Memory) Get(offset, size int64) (cpy []byte) {
-	if size == 0 {
+	if offset < 0 || size <= 0 {
+		return nil
+	}
+	if uint64(offset)+uint64(size) > uint64(len(m.store)) {
 		return nil
 	}
 
-	if len(m.store) > int(offset) {
-		cpy = make([]byte, size)
-		copy(cpy, m.store[offset:offset+size])
-
-		return
-	}
-
+	cpy = make([]byte, size)
+	copy(cpy, m.store[offset:offset+size])
 	return
 }
 
 // GetPtr returns the offset + size
 func (m *Memory) GetPtr(offset, size int64) []byte {
-	if size == 0 {
+	if offset < 0 || size <= 0 {
+		return nil
+	}
+	if uint64(offset)+uint64(size) > uint64(len(m.store)) {
 		return nil
 	}
 
-	if len(m.store) > int(offset) {
-		return m.store[offset : offset+size]
-	}
-
-	return nil
+	return m.store[offset : offset+size]
 }
 
 // Len returns the length of the backing slice
