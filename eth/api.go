@@ -24,7 +24,6 @@ import (
 	"io"
 	"math/big"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
@@ -98,16 +97,9 @@ func NewPrivateMinerAPI(e *GoChain) *PrivateMinerAPI {
 	return &PrivateMinerAPI{e: e}
 }
 
-// Start starts the miner with the given number of threads. If threads is nil,
-// the number of workers started is equal to the number of logical CPUs that are
-// usable by this process. If mining is already running, this method adjust the
-// number of threads allowed to use and updates the minimum price required by the
-// transaction pool.
+// Start starts the miner.
 func (api *PrivateMinerAPI) Start(threads *int) error {
-	if threads == nil {
-		return api.e.StartMining(runtime.NumCPU())
-	}
-	return api.e.StartMining(*threads)
+	return api.e.StartMining()
 }
 
 // Stop terminates the miner, both at the consensus engine level as well as at

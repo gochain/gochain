@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 
 	"github.com/gochain/gochain/v5/params"
-	cli "gopkg.in/urfave/cli.v1"
+	"github.com/urfave/cli"
 )
 
 var (

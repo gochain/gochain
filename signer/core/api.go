@@ -32,7 +32,6 @@ import (
 	"github.com/gochain/gochain/v5/internal/ethapi"
 	"github.com/gochain/gochain/v5/log"
 	"github.com/gochain/gochain/v5/rlp"
-	"github.com/gochain/gochain/v5/signer/storage"
 )
 
 const (
@@ -106,12 +105,11 @@ type Validator interface {
 
 // SignerAPI defines the actual implementation of ExternalAPI
 type SignerAPI struct {
-	chainID     *big.Int
-	am          *accounts.Manager
-	UI          UIClientAPI
-	validator   Validator
-	rejectMode  bool
-	credentials storage.Storage
+	chainID    *big.Int
+	am         *accounts.Manager
+	UI         UIClientAPI
+	validator  Validator
+	rejectMode bool
 }
 
 // Metadata about a request
@@ -248,11 +246,11 @@ var ErrRequestDenied = errors.New("request denied")
 // key that is generated when a new Account is created.
 // noUSB disables USB support that is required to support hardware devices such as
 // ledger and trezor.
-func NewSignerAPI(am *accounts.Manager, chainID int64, noUSB bool, ui UIClientAPI, validator Validator, advancedMode bool, credentials storage.Storage) *SignerAPI {
+func NewSignerAPI(am *accounts.Manager, chainID int64, noUSB bool, ui UIClientAPI, validator Validator, advancedMode bool) *SignerAPI {
 	if advancedMode {
 		log.Info("Clef is in advanced mode: will warn instead of reject")
 	}
-	signer := &SignerAPI{big.NewInt(chainID), am, ui, validator, !advancedMode, credentials}
+	signer := &SignerAPI{big.NewInt(chainID), am, ui, validator, !advancedMode}
 	if !noUSB {
 		signer.startUSBListener()
 	}
@@ -460,15 +458,7 @@ func logDiff(original *SignTxRequest, new *SignTxResponse) bool {
 	return modified
 }
 
-func (api *SignerAPI) lookupPassword(address common.Address) (string, error) {
-	return api.credentials.Get(address.Hex())
-}
-
 func (api *SignerAPI) lookupOrQueryPassword(address common.Address, title, prompt string) (string, error) {
-	// Look up the password and return if available
-	if pw, err := api.lookupPassword(address); err == nil {
-		return pw, nil
-	}
 	// Password unavailable, request it from the user
 	pwResp, err := api.UI.OnInputRequired(UserInputRequest{title, prompt, true})
 	if err != nil {

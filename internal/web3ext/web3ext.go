@@ -27,7 +27,6 @@ var Modules = map[string]string{
 	"net":        Net_JS,
 	"personal":   Personal_JS,
 	"rpc":        RPC_JS,
-	"shh":        Shh_JS,
 	"swarmfs":    SWARMFS_JS,
 	"txpool":     TxPool_JS,
 }
@@ -577,26 +576,6 @@ web3._extend({
 		new web3._extend.Property({
 			name: 'modules',
 			getter: 'rpc_modules'
-		}),
-	]
-});
-`
-
-const Shh_JS = `
-web3._extend({
-	property: 'shh',
-	methods: [
-	],
-	properties:
-	[
-		new web3._extend.Property({
-			name: 'version',
-			getter: 'shh_version',
-			outputFormatter: web3._extend.utils.toDecimal
-		}),
-		new web3._extend.Property({
-			name: 'info',
-			getter: 'shh_info'
 		}),
 	]
 });
