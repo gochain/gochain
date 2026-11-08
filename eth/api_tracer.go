@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -391,7 +392,12 @@ func (api *PrivateDebugAPI) TraceBlock(ctx context.Context, blob []byte, config 
 // TraceBlockFromFile returns the structured logs created during the execution of
 // EVM and returns them as a JSON object.
 func (api *PrivateDebugAPI) TraceBlockFromFile(ctx context.Context, file string, config *TraceConfig) ([]*txTraceResult, error) {
-	info, err := os.Stat(file)
+	fh, err := os.Open(file)
+	if err != nil {
+		return nil, fmt.Errorf("could not open file: %v", err)
+	}
+	defer fh.Close()
+	info, err := fh.Stat()
 	if err != nil {
 		return nil, fmt.Errorf("could not stat file: %v", err)
 	}
@@ -401,9 +407,12 @@ func (api *PrivateDebugAPI) TraceBlockFromFile(ctx context.Context, file string,
 	if info.Size() > maxTraceBlockFileSize {
 		return nil, fmt.Errorf("file too large: %d > %d", info.Size(), maxTraceBlockFileSize)
 	}
-	blob, err := ioutil.ReadFile(file)
+	blob, err := ioutil.ReadAll(io.LimitReader(fh, maxTraceBlockFileSize+1))
 	if err != nil {
 		return nil, fmt.Errorf("could not read file: %v", err)
+	}
+	if int64(len(blob)) > maxTraceBlockFileSize {
+		return nil, fmt.Errorf("file exceeded maximum allowed size: %d", maxTraceBlockFileSize)
 	}
 	return api.TraceBlock(ctx, blob, config)
 }

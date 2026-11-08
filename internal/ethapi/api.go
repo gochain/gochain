@@ -1035,7 +1035,11 @@ func applyMessage(evm *vm.EVM, msg core.Message, gp *core.GasPool) (ret []byte, 
 	}
 	mgval := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas()), msg.GasPrice())
 	if st.GetBalance(msg.From()).Cmp(mgval) < 0 {
-		return nil, 0, nil, errors.New("insufficient balance to pay for gas")
+		if !msg.CheckNonce() {
+			st.AddBalance(msg.From(), mgval)
+		} else {
+			return nil, 0, nil, errors.New("insufficient balance to pay for gas")
+		}
 	}
 	if err := gp.SubGas(msg.Gas()); err != nil {
 		return nil, 0, nil, err
