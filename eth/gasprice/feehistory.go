@@ -176,6 +176,13 @@ func computeBlockRewards(block *types.Block, rewardPercentiles []float64) []*big
 	for _, tx := range sortedTxs {
 		totalGas += tx.Gas()
 	}
+	if totalGas == 0 {
+		for i, p := range rewardPercentiles {
+			txIndex := int(float64(len(sortedTxs)-1) * p / 100)
+			rewards[i] = new(big.Int).Set(sortedTxs[txIndex].GasPrice())
+		}
+		return rewards
+	}
 
 	var (
 		txIndex int

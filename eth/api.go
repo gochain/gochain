@@ -322,7 +322,11 @@ func (api *PublicDebugAPI) GetRawHeader(ctx context.Context, blockNrOrHash rpc.B
 	if err != nil || hash == (common.Hash{}) {
 		return nil, err
 	}
-	return hexutil.Bytes(rawdb.ReadHeaderRLP(api.eth.ChainDb().HeaderTable(), hash, number)), nil
+	header := rawdb.ReadHeaderRLP(api.eth.ChainDb().HeaderTable(), hash, number)
+	if len(header) == 0 {
+		return nil, nil
+	}
+	return hexutil.Bytes(header), nil
 }
 
 // GetRawBlock retrieves the RLP encoded for a single block.
