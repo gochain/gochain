@@ -692,8 +692,10 @@ func (s *Service) reportStats(ctx context.Context, conn *websocket.Conn) error {
 	sync := s.eth.Downloader().Progress()
 	syncing := s.eth.BlockChain().CurrentHeader().Number.Uint64() >= sync.HighestBlock
 
-	price, _ := s.eth.ApiBackend.SuggestPrice(context.Background())
-	gasprice := int(price.Uint64())
+	var gasprice int
+	if price, err := s.eth.ApiBackend.SuggestPrice(ctx); err == nil && price != nil {
+		gasprice = int(price.Uint64())
+	}
 	// Assemble the node stats and send it to the server
 	log.Trace("Sending node details to netstats")
 
