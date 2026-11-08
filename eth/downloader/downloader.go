@@ -1412,14 +1412,19 @@ func (d *Downloader) processFastSyncContent(latest *types.Header) error {
 	// Start syncing state of the reported head block. This should get us most of
 	// the state of the pivot block.
 	stateSync := d.syncState(latest.Root)
-	defer stateSync.Cancel()
-	done := make(chan struct{})
-	go func() {
-		if err := stateSync.Wait(); err != nil && err != errCancelStateFetch {
-			d.queue.Close() // wake up WaitResults
-		}
-		close(done)
+	defer func() {
+		stateSync.Cancel()
 	}()
+	done := make(chan struct{})
+	{
+		s, dch := stateSync, done
+		go func() {
+			if err := s.Wait(); err != nil && err != errCancelStateFetch {
+				d.queue.Close() // wake up WaitResults
+			}
+			close(dch)
+		}()
+	}
 	// Figure out the ideal pivot block. Note, that this goalpost may move if the
 	// sync takes long enough for the chain head to move significantly.
 	pivot := uint64(0)
@@ -1472,11 +1477,13 @@ func (d *Downloader) processFastSyncContent(latest *types.Header) error {
 				stateSync.Cancel()
 				<-done // Wait for cancel to be received.
 				stateSync = d.syncState(P.Header.Root)
-				defer stateSync.Cancel()
+				done = make(chan struct{})
+				s, dch := stateSync, done
 				go func() {
-					if err := stateSync.Wait(); err != nil && err != errCancelStateFetch {
+					if err := s.Wait(); err != nil && err != errCancelStateFetch {
 						d.queue.Close() // wake up WaitResults
 					}
+					close(dch)
 				}()
 				oldPivot = P
 			}

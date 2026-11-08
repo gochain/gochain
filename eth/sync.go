@@ -116,7 +116,7 @@ func (pm *ProtocolManager) txsyncLoop() {
 			size += s.txs[i].Size()
 		}
 		// Remove the transactions that will be sent.
-		s.txs = s.txs[:copy(s.txs, s.txs[len(pack.txs):])]
+		s.txs = s.txs[len(pack.txs):]
 		if len(s.txs) == 0 {
 			delete(pending, s.p.ID())
 		}

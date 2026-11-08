@@ -157,13 +157,13 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	Journal:   "transactions.rlp",
 	Rejournal: time.Hour,
 
-	PriceLimit: 0,
+	PriceLimit: 1,
 	PriceBump:  10,
 
-	AccountSlots: 8192,
-	GlobalSlots:  131072,
-	AccountQueue: 4096,
-	GlobalQueue:  32768,
+	AccountSlots: 64,
+	GlobalSlots:  16384,
+	AccountQueue: 128,
+	GlobalQueue:  4096,
 
 	Lifetime: 3 * time.Hour,
 }
@@ -175,6 +175,10 @@ func (config *TxPoolConfig) sanitize() TxPoolConfig {
 	if conf.Rejournal < time.Second {
 		log.Warn("Sanitizing invalid txpool journal time", "provided", conf.Rejournal, "updated", time.Second)
 		conf.Rejournal = time.Second
+	}
+	if conf.PriceLimit < 1 {
+		log.Warn("Sanitizing invalid txpool price limit", "provided", conf.PriceLimit, "updated", DefaultTxPoolConfig.PriceLimit)
+		conf.PriceLimit = DefaultTxPoolConfig.PriceLimit
 	}
 	if conf.PriceBump < 1 {
 		log.Warn("Sanitizing invalid txpool price bump", "provided", conf.PriceBump, "updated", DefaultTxPoolConfig.PriceBump)
@@ -252,6 +256,11 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 	// Sanitize the input to ensure no vulnerable gas prices are set
 	config = (&config).sanitize()
 
+	feedBufSize := int(config.GlobalSlots)
+	if feedBufSize < 1024 {
+		feedBufSize = 1024
+	}
+
 	// Create the transaction pool with its initial settings
 	pool := &TxPool{
 		config:      config,
@@ -264,7 +273,7 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 		all:         newTxLookup(int(config.GlobalSlots / 2)),
 		chainHeadCh: make(chan ChainHeadEvent, chainHeadChanSize),
 		gasPrice:    new(big.Int).SetUint64(config.PriceLimit),
-		txFeedBuf:   make(chan *types.Transaction, config.GlobalSlots/4),
+		txFeedBuf:   make(chan *types.Transaction, feedBufSize),
 	}
 	pool.locals = newAccountSet(pool.signer)
 	pool.reset(nil, chain.CurrentBlock())
@@ -392,13 +401,7 @@ func (pool *TxPool) queueFeedSend(tx *types.Transaction) {
 	case pool.txFeedBuf <- tx:
 		return
 	default:
-		go func() {
-			select {
-			case <-pool.stop:
-				return
-			case pool.txFeedBuf <- tx:
-			}
-		}()
+		log.Trace("Dropping tx feed event: buffer full", "hash", tx.Hash())
 	}
 }
 

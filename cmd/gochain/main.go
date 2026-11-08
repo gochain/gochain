@@ -31,14 +31,11 @@ import (
 	"github.com/urfave/cli"
 	"go.opencensus.io/trace"
 
-	"github.com/gochain/gochain/v5/accounts"
 	"github.com/gochain/gochain/v5/accounts/keystore"
 	"github.com/gochain/gochain/v5/cmd/utils"
 	"github.com/gochain/gochain/v5/common"
 	"github.com/gochain/gochain/v5/eth"
-	"github.com/gochain/gochain/v5/goclient"
 	"github.com/gochain/gochain/v5/internal/debug"
-	"github.com/gochain/gochain/v5/log"
 	"github.com/gochain/gochain/v5/metrics"
 	"github.com/gochain/gochain/v5/node"
 )
@@ -62,10 +59,8 @@ var (
 		utils.AllowInsecureUnlockFlag,
 		utils.BootnodesFlag,
 		utils.BootnodesV4Flag,
-		utils.BootnodesV5Flag,
 		utils.DataDirFlag,
 		utils.KeyStoreDirFlag,
-		utils.NoUSBFlag,
 		utils.TxPoolNoLocalsFlag,
 		utils.TxPoolJournalFlag,
 		utils.TxPoolRejournalFlag,
@@ -77,11 +72,8 @@ var (
 		utils.TxPoolGlobalQueueFlag,
 		utils.TxPoolLifetimeFlag,
 		utils.FastSyncFlag,
-		utils.LightModeFlag,
 		utils.SyncModeFlag,
 		utils.GCModeFlag,
-		utils.LightServFlag,
-		utils.LightPeersFlag,
 		utils.LightKDFFlag,
 		utils.CacheFlag,
 		utils.CacheDatabaseFlag,
@@ -91,9 +83,6 @@ var (
 		utils.MaxPeersFlag,
 		utils.MaxPendingPeersFlag,
 		utils.MiningEnabledFlag,
-		utils.MinerThreadsFlag,
-		utils.MinerLegacyThreadsFlag,
-		utils.MinerNotifyFlag,
 		utils.MinerGasTargetFlag,
 		utils.MinerLegacyGasTargetFlag,
 		utils.MinerGasLimitFlag,
@@ -104,10 +93,8 @@ var (
 		utils.MinerExtraDataFlag,
 		utils.MinerLegacyExtraDataFlag,
 		utils.MinerRecommitIntervalFlag,
-		utils.MinerNoVerfiyFlag,
 		utils.NATFlag,
 		utils.NoDiscoverFlag,
-		utils.DiscoveryV5Flag,
 		utils.NetrestrictFlag,
 		utils.NodeKeyFileFlag,
 		utils.NodeKeyHexFlag,
@@ -125,7 +112,6 @@ var (
 		utils.MetricsEnabledFlag,
 		utils.TracingStackdriverFlag,
 		utils.TracingSampleRateFlag,
-		utils.FakePoWFlag,
 		utils.NoCompactionFlag,
 		utils.GpoBlocksFlag,
 		utils.GpoPercentileFlag,
@@ -153,12 +139,6 @@ var (
 		utils.IPCDisabledFlag,
 		utils.IPCPathFlag,
 	}
-
-	whisperFlags = []cli.Flag{
-		utils.WhisperEnabledFlag,
-		utils.WhisperMaxMessageSizeFlag,
-		utils.WhisperMinPOWFlag,
-	}
 )
 
 func init() {
@@ -174,11 +154,8 @@ func init() {
 		copydbCommand,
 		removedbCommand,
 		dumpCommand,
-		// See monitorcmd.go:
-		monitorCommand,
 		// See accountcmd.go:
 		accountCommand,
-		walletCommand,
 		// See consolecmd.go:
 		consoleCommand,
 		attachCommand,
@@ -196,7 +173,6 @@ func init() {
 	app.Flags = append(app.Flags, rpcFlags...)
 	app.Flags = append(app.Flags, consoleFlags...)
 	app.Flags = append(app.Flags, debug.Flags...)
-	app.Flags = append(app.Flags, whisperFlags...)
 
 	app.Before = func(ctx *cli.Context) error {
 		runtime.GOMAXPROCS(runtime.NumCPU())
@@ -273,55 +249,8 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 			unlockAccount(ctx, ks, trimmed, i, passwords)
 		}
 	}
-	// Register wallet event handlers to open and auto-derive wallets
-	events := make(chan accounts.WalletEvent, 16)
-	stack.AccountManager().Subscribe(events, "gochain-startNode")
-
-	go func() {
-		// Create an chain state reader for self-derivation
-		rpcClient, err := stack.Attach()
-		if err != nil {
-			utils.Fatalf("Failed to attach to self: %v", err)
-		}
-		stateReader := goclient.NewClient(rpcClient)
-
-		// Open any wallets already attached
-		for _, wallet := range stack.AccountManager().Wallets() {
-			if err := wallet.Open(""); err != nil {
-				log.Warn("Failed to open wallet", "url", wallet.URL(), "err", err)
-			}
-		}
-		// Listen for wallet event till termination
-		for event := range events {
-			switch event.Kind {
-			case accounts.WalletArrived:
-				if err := event.Wallet.Open(""); err != nil {
-					log.Warn("New wallet appeared, failed to open", "url", event.Wallet.URL(), "err", err)
-				}
-			case accounts.WalletOpened:
-				status, _ := event.Wallet.Status()
-				log.Info("New wallet appeared", "url", event.Wallet.URL(), "status", status)
-
-				var derivationPaths []accounts.DerivationPath
-				if event.Wallet.URL().Scheme == "ledger" {
-					derivationPaths = append(derivationPaths, accounts.LegacyLedgerBaseDerivationPath)
-				}
-				derivationPaths = append(derivationPaths, accounts.DefaultBaseDerivationPath)
-
-				event.Wallet.SelfDerive(derivationPaths, stateReader)
-
-			case accounts.WalletDropped:
-				log.Info("Old wallet dropped", "url", event.Wallet.URL())
-				event.Wallet.Close()
-			}
-		}
-	}()
 	// Start auxiliary services if enabled
 	if ctx.GlobalBool(utils.MiningEnabledFlag.Name) || ctx.GlobalBool(utils.DeveloperFlag.Name) || ctx.GlobalBool(utils.LocalFlag.Name) {
-		// Mining only makes sense if a full GoChain node is running
-		if ctx.GlobalBool(utils.LightModeFlag.Name) || ctx.GlobalString(utils.SyncModeFlag.Name) == "light" {
-			utils.Fatalf("Light clients do not support mining")
-		}
 		var gochain *eth.GoChain
 		if err := stack.Service(&gochain); err != nil {
 			utils.Fatalf("GoChain service not running: %v", err)
@@ -333,11 +262,7 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 		}
 		gochain.TxPool().SetGasPrice(gasprice)
 
-		threads := ctx.GlobalInt(utils.MinerLegacyThreadsFlag.Name)
-		if ctx.GlobalIsSet(utils.MinerThreadsFlag.Name) {
-			threads = ctx.GlobalInt(utils.MinerThreadsFlag.Name)
-		}
-		if err := gochain.StartMining(threads); err != nil {
+		if err := gochain.StartMining(); err != nil {
 			utils.Fatalf("Failed to start mining: %v", err)
 		}
 	}
