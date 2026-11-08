@@ -137,7 +137,6 @@ func (api *API) Status(ctx context.Context) (*Status, error) {
 	var (
 		numBlocks = uint64(64)
 		header    = api.chain.CurrentHeader()
-		diff      = uint64(0)
 		optimals  = 0
 	)
 	if header == nil {
@@ -174,7 +173,6 @@ func (api *API) Status(ctx context.Context) (*Status, error) {
 		if h.Difficulty.Uint64() == uint64(len(signers)) {
 			optimals++
 		}
-		diff += h.Difficulty.Uint64()
 		sealer, err := api.clique.Author(h)
 		if err != nil {
 			return nil, err
@@ -190,7 +188,7 @@ func (api *API) Status(ctx context.Context) (*Status, error) {
 		SigningStatus: signStatus,
 		NumBlocks:     processedBlocks,
 		Signers:       signers,
-		Stakers:       signers,
+		Stakers:       snap.voters(),
 	}, nil
 }
 

@@ -387,7 +387,7 @@ func (api *PublicFilterAPI) GetLogs(ctx context.Context, crit FilterCriteria) ([
 				}
 			}
 		}
-		if begin > 0 && end > 0 && begin > end {
+		if begin >= 0 && end >= 0 && begin > end {
 			return returnLogs(nil), nil
 		}
 		// Construct the range filter
