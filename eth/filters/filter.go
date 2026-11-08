@@ -138,6 +138,11 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 	}
 	head := header.Number.Uint64()
 
+	origBegin, origEnd := f.begin, f.end
+	defer func() {
+		f.begin, f.end = origBegin, origEnd
+	}()
+
 	if f.begin < 0 {
 		f.begin = header.Number.Int64()
 	}

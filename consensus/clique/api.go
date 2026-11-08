@@ -164,11 +164,13 @@ func (api *API) Status(ctx context.Context) (*Status, error) {
 	for _, s := range signers {
 		signStatus[s] = 0
 	}
+	var processedBlocks uint64
 	for n := start; n <= end; n++ {
 		h := api.chain.GetHeaderByNumber(n)
 		if h == nil {
 			continue
 		}
+		processedBlocks++
 		if h.Difficulty.Uint64() == uint64(len(signers)) {
 			optimals++
 		}
@@ -180,13 +182,13 @@ func (api *API) Status(ctx context.Context) (*Status, error) {
 		signStatus[sealer]++
 	}
 	var inturnPercent float64
-	if numBlocks > 0 {
-		inturnPercent = float64(100*optimals) / float64(numBlocks)
+	if processedBlocks > 0 {
+		inturnPercent = float64(100*optimals) / float64(processedBlocks)
 	}
 	return &Status{
 		InturnPercent: inturnPercent,
 		SigningStatus: signStatus,
-		NumBlocks:     numBlocks,
+		NumBlocks:     processedBlocks,
 		Signers:       signers,
 		Stakers:       signers,
 	}, nil

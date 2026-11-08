@@ -129,6 +129,11 @@ func (h *handler) handleBatch(msgs []*jsonrpcMessage) {
 				responseBytes += len(answer.Result)
 				if answer.Error != nil {
 					responseBytes += len(answer.Error.Message)
+					if data, ok := answer.Error.Data.(string); ok {
+						responseBytes += len(data)
+					} else if data, ok := answer.Error.Data.([]byte); ok {
+						responseBytes += len(data)
+					}
 				}
 				if responseBytes > defaultBatchResponseMaxSize {
 					answers = append(answers, msg.errorResponse(&invalidRequestError{"batch response too large"}))
