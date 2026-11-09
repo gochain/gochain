@@ -253,7 +253,7 @@ func (api *PublicDebugAPI) DumpBlock(ctx context.Context, blockNr rpc.BlockNumbe
 		return stateDb.RawDump(), nil
 	}
 	var block *types.Block
-	if blockNr == rpc.LatestBlockNumber {
+	if blockNr == rpc.LatestBlockNumber || blockNr == rpc.SafeBlockNumber || blockNr == rpc.FinalizedBlockNumber {
 		block = api.eth.blockchain.CurrentBlock()
 	} else {
 		block = api.eth.blockchain.GetBlockByNumber(uint64(blockNr))
@@ -266,6 +266,108 @@ func (api *PublicDebugAPI) DumpBlock(ctx context.Context, blockNr rpc.BlockNumbe
 		return state.Dump{}, err
 	}
 	return stateDb.RawDump(), nil
+}
+
+func (api *PublicDebugAPI) resolveHashAndNumber(blockNrOrHash rpc.BlockNumberOrHash) (common.Hash, uint64, error) {
+	if blockNr, ok := blockNrOrHash.Number(); ok {
+		if blockNr == rpc.PendingBlockNumber {
+			block := api.eth.miner.PendingBlock()
+			if block == nil {
+				return common.Hash{}, 0, nil
+			}
+			return block.Hash(), block.NumberU64(), nil
+		}
+		if blockNr == rpc.LatestBlockNumber || blockNr == rpc.SafeBlockNumber || blockNr == rpc.FinalizedBlockNumber || blockNr < 0 {
+			header := api.eth.blockchain.CurrentHeader()
+			if header == nil {
+				return common.Hash{}, 0, nil
+			}
+			return header.Hash(), header.Number.Uint64(), nil
+		}
+		number := uint64(blockNr)
+		hash := rawdb.ReadCanonicalHash(api.eth.ChainDb(), number)
+		return hash, number, nil
+	}
+	if hash, ok := blockNrOrHash.Hash(); ok {
+		number := rawdb.ReadHeaderNumber(api.eth.ChainDb().GlobalTable(), hash)
+		if number == nil {
+			return common.Hash{}, 0, nil
+		}
+		if blockNrOrHash.RequireCanonical && rawdb.ReadCanonicalHash(api.eth.ChainDb(), *number) != hash {
+			return common.Hash{}, 0, errors.New("hash is not currently canonical")
+		}
+		return hash, *number, nil
+	}
+	return common.Hash{}, 0, errors.New("invalid arguments; neither block nor hash specified")
+}
+
+// GetRawHeader retrieves the RLP encoding for a single header.
+func (api *PublicDebugAPI) GetRawHeader(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (hexutil.Bytes, error) {
+	if blockNr, ok := blockNrOrHash.Number(); ok && blockNr == rpc.PendingBlockNumber {
+		block := api.eth.miner.PendingBlock()
+		if block == nil {
+			return nil, nil
+		}
+		return rlp.EncodeToBytes(block.Header())
+	}
+	hash, number, err := api.resolveHashAndNumber(blockNrOrHash)
+	if err != nil || hash == (common.Hash{}) {
+		return nil, err
+	}
+	header := rawdb.ReadHeaderRLP(api.eth.ChainDb().HeaderTable(), hash, number)
+	if len(header) == 0 {
+		return nil, nil
+	}
+	return hexutil.Bytes(header), nil
+}
+
+// GetRawBlock retrieves the RLP encoded for a single block.
+func (api *PublicDebugAPI) GetRawBlock(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (hexutil.Bytes, error) {
+	if blockNr, ok := blockNrOrHash.Number(); ok && blockNr == rpc.PendingBlockNumber {
+		block := api.eth.miner.PendingBlock()
+		if block == nil {
+			return nil, nil
+		}
+		return rlp.EncodeToBytes(block)
+	}
+	hash, number, err := api.resolveHashAndNumber(blockNrOrHash)
+	if err != nil || hash == (common.Hash{}) {
+		return nil, err
+	}
+	block := api.eth.blockchain.GetBlock(hash, number)
+	if block == nil {
+		return nil, nil
+	}
+	return rlp.EncodeToBytes(block)
+}
+
+// GetRawReceipts retrieves the binary-encoded receipts of a single block.
+func (api *PublicDebugAPI) GetRawReceipts(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) ([]hexutil.Bytes, error) {
+	hash, number, err := api.resolveHashAndNumber(blockNrOrHash)
+	if err != nil || hash == (common.Hash{}) {
+		return nil, err
+	}
+	receipts := rawdb.ReadRawReceipts(api.eth.ChainDb().ReceiptTable(), hash, number)
+	result := make([]hexutil.Bytes, len(receipts))
+	for i, receipt := range receipts {
+		b, err := rlp.EncodeToBytes(receipt)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = b
+	}
+	return result, nil
+}
+
+// GetRawTransaction returns the bytes of the transaction for the given hash.
+func (api *PublicDebugAPI) GetRawTransaction(ctx context.Context, hash common.Hash) (hexutil.Bytes, error) {
+	tx, _, _, _ := rawdb.ReadTransaction(api.eth.ChainDb(), hash)
+	if tx == nil {
+		if tx = api.eth.txPool.Get(hash); tx == nil {
+			return nil, nil
+		}
+	}
+	return rlp.EncodeToBytes(tx)
 }
 
 // PrivateDebugAPI is the collection of GoChain full node APIs exposed over

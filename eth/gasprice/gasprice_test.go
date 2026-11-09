@@ -387,13 +387,24 @@ func (b *testBackend) ChainConfig() *params.ChainConfig {
 }
 
 func (b *testBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error) {
-	if blockNr == rpc.LatestBlockNumber {
+	if blockNr == rpc.LatestBlockNumber || blockNr == rpc.SafeBlockNumber || blockNr == rpc.FinalizedBlockNumber {
 		return b.lastHeader, nil
+	}
+	for _, block := range b.blocks {
+		if block.Number().Int64() == int64(blockNr) {
+			return block.Header(), nil
+		}
 	}
 	return nil, nil
 }
 
 func (b *testBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error) {
+	if blockNr == rpc.LatestBlockNumber || blockNr == rpc.SafeBlockNumber || blockNr == rpc.FinalizedBlockNumber {
+		if len(b.blocks) > 0 {
+			return b.blocks[len(b.blocks)-1], nil
+		}
+		return nil, nil
+	}
 	for _, block := range b.blocks {
 		if block.Number().Int64() == int64(blockNr) {
 			return block, nil
@@ -426,3 +437,36 @@ func transaction(nonce uint64, gasPrice uint64, key *ecdsa.PrivateKey) *types.Tr
 	tx, _ := types.SignTx(types.NewTransaction(nonce, common.Address{}, big.NewInt(100), 100, bigInt(gasPrice), nil), types.HomesteadSigner{}, key)
 	return tx
 }
+
+func TestOracle_FeeHistory(t *testing.T) {
+	backend := newTestBackend(params.TestChainConfig,
+		block{txs: []tx{{price: 1 * params.Shannon}, {price: 3 * params.Shannon}}},
+		block{txs: []tx{{price: 2 * params.Shannon}, {price: 4 * params.Shannon}}},
+	)
+	gpo := NewOracle(backend, Config{Blocks: 5, Percentile: 50})
+
+	oldest, reward, baseFee, gasUsedRatio, err := gpo.FeeHistory(context.Background(), 2, rpc.LatestBlockNumber, []float64{25, 75})
+	if err != nil {
+		t.Fatalf("FeeHistory failed: %v", err)
+	}
+	lastHeader, _ := backend.HeaderByNumber(context.Background(), rpc.LatestBlockNumber)
+	wantOldest := lastHeader.Number.Uint64() - 1
+	if oldest.Uint64() != wantOldest {
+		t.Fatalf("oldest block = %d, want %d", oldest.Uint64(), wantOldest)
+	}
+	if len(reward) != 2 || len(baseFee) != 3 || len(gasUsedRatio) != 2 {
+		t.Fatalf("unexpected lengths: reward=%d, baseFee=%d, gasUsedRatio=%d", len(reward), len(baseFee), len(gasUsedRatio))
+	}
+	if reward[0][0].Uint64() != 1*params.Shannon || reward[0][1].Uint64() != 3*params.Shannon {
+		t.Fatalf("unexpected block 0 rewards: %v", reward[0])
+	}
+	if reward[1][0].Uint64() != 2*params.Shannon || reward[1][1].Uint64() != 4*params.Shannon {
+		t.Fatalf("unexpected block 1 rewards: %v", reward[1])
+	}
+
+	// Invalid percentiles (unsorted or out of range) should return an error
+	if _, _, _, _, err := gpo.FeeHistory(context.Background(), 2, rpc.LatestBlockNumber, []float64{80, 20}); err == nil {
+		t.Fatalf("expected error for unsorted rewardPercentiles")
+	}
+}
+

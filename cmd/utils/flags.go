@@ -317,6 +317,10 @@ var (
 		Usage: "Password file to use for non-interactive password input",
 		Value: "",
 	}
+	AllowInsecureUnlockFlag = cli.BoolFlag{
+		Name:  "allow-insecure-unlock",
+		Usage: "Allow insecure account unlocking when account-related RPCs are exposed by http",
+	}
 
 	VMEnableDebugFlag = cli.BoolFlag{
 		Name:  "vmdebug",
@@ -372,6 +376,21 @@ var (
 		Name:  "rpcapi",
 		Usage: "API's offered over the HTTP-RPC interface",
 		Value: "",
+	}
+	RPCGasCapFlag = cli.Uint64Flag{
+		Name:  "rpc.gascap",
+		Usage: "Sets a cap on gas that can be used in eth_call/estimateGas (0=infinite)",
+		Value: eth.DefaultConfig.RPCGasCap,
+	}
+	RPCEVMTimeoutFlag = cli.DurationFlag{
+		Name:  "rpc.evmtimeout",
+		Usage: "Sets a timeout used for eth_call (0=infinite)",
+		Value: eth.DefaultConfig.RPCEVMTimeout,
+	}
+	RPCTxFeeCapFlag = cli.Float64Flag{
+		Name:  "rpc.txfeecap",
+		Usage: "Sets a cap on transaction fee (in ether) that can be sent via the RPC APIs (0 = no cap)",
+		Value: eth.DefaultConfig.RPCTxFeeCap,
 	}
 	IPCDisabledFlag = cli.BoolFlag{
 		Name:  "ipcdisable",
@@ -814,6 +833,9 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	if ctx.GlobalIsSet(LightKDFFlag.Name) {
 		cfg.UseLightweightKDF = ctx.GlobalBool(LightKDFFlag.Name)
 	}
+	if ctx.GlobalIsSet(AllowInsecureUnlockFlag.Name) {
+		cfg.InsecureUnlockAllowed = ctx.GlobalBool(AllowInsecureUnlockFlag.Name)
+	}
 }
 
 func setGPO(ctx *cli.Context, cfg *gasprice.Config) {
@@ -994,6 +1016,15 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 	if ctx.GlobalIsSet(VMEnableDebugFlag.Name) {
 		// TODO(fjl): force-enable this in --dev mode
 		cfg.EnablePreimageRecording = ctx.GlobalBool(VMEnableDebugFlag.Name)
+	}
+	if ctx.GlobalIsSet(RPCGasCapFlag.Name) {
+		cfg.RPCGasCap = ctx.GlobalUint64(RPCGasCapFlag.Name)
+	}
+	if ctx.GlobalIsSet(RPCEVMTimeoutFlag.Name) {
+		cfg.RPCEVMTimeout = ctx.GlobalDuration(RPCEVMTimeoutFlag.Name)
+	}
+	if ctx.GlobalIsSet(RPCTxFeeCapFlag.Name) {
+		cfg.RPCTxFeeCap = ctx.GlobalFloat64(RPCTxFeeCapFlag.Name)
 	}
 
 	// Override any default configs for hard coded networks.

@@ -19,15 +19,20 @@ package eth
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"math/big"
+	"os"
 	"runtime"
 	"sync"
 	"time"
 
 	"github.com/gochain/gochain/v5/common"
 	"github.com/gochain/gochain/v5/common/hexutil"
+	"github.com/gochain/gochain/v5/common/math"
 	"github.com/gochain/gochain/v5/core"
 	"github.com/gochain/gochain/v5/core/rawdb"
 	"github.com/gochain/gochain/v5/core/state"
@@ -50,14 +55,20 @@ const (
 	// and reexecute to produce missing historical state necessary to run a specific
 	// trace.
 	defaultTraceReexec = uint64(128)
+
+	// maxTraceBlockFileSize is the maximum file size allowed in TraceBlockFromFile (64 MB).
+	maxTraceBlockFileSize = 64 * 1024 * 1024
 )
 
 // TraceConfig holds extra parameters to trace functions.
 type TraceConfig struct {
 	*vm.LogConfig
-	Tracer  *string
-	Timeout *string
-	Reexec  *uint64
+	Tracer         *string
+	Timeout        *string
+	Reexec         *uint64
+	TracerConfig   json.RawMessage
+	StateOverrides *ethapi.StateOverride  `json:"stateOverrides,omitempty"`
+	BlockOverrides *ethapi.BlockOverrides `json:"blockOverrides,omitempty"`
 }
 
 // txTraceResult is the result of a single transaction trace.
@@ -381,9 +392,27 @@ func (api *PrivateDebugAPI) TraceBlock(ctx context.Context, blob []byte, config 
 // TraceBlockFromFile returns the structured logs created during the execution of
 // EVM and returns them as a JSON object.
 func (api *PrivateDebugAPI) TraceBlockFromFile(ctx context.Context, file string, config *TraceConfig) ([]*txTraceResult, error) {
-	blob, err := ioutil.ReadFile(file)
+	fh, err := os.Open(file)
+	if err != nil {
+		return nil, fmt.Errorf("could not open file: %v", err)
+	}
+	defer fh.Close()
+	info, err := fh.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("could not stat file: %v", err)
+	}
+	if !info.Mode().IsRegular() {
+		return nil, errors.New("not a regular file")
+	}
+	if info.Size() > maxTraceBlockFileSize {
+		return nil, fmt.Errorf("file too large: %d > %d", info.Size(), maxTraceBlockFileSize)
+	}
+	blob, err := ioutil.ReadAll(io.LimitReader(fh, maxTraceBlockFileSize+1))
 	if err != nil {
 		return nil, fmt.Errorf("could not read file: %v", err)
+	}
+	if int64(len(blob)) > maxTraceBlockFileSize {
+		return nil, fmt.Errorf("file exceeded maximum allowed size: %d", maxTraceBlockFileSize)
 	}
 	return api.TraceBlock(ctx, blob, config)
 }
@@ -556,6 +585,90 @@ func (api *PrivateDebugAPI) TraceTransaction(ctx context.Context, hash common.Ha
 	return api.traceTx(ctx, msg, vmctx, statedb, config)
 }
 
+// TraceCall lets you trace a given eth_call. It collects the structured logs
+// created during the execution of EVM if the given transaction was added on
+// top of the provided block and returns them as a JSON object.
+func (api *PrivateDebugAPI) TraceCall(ctx context.Context, args ethapi.CallArgs, blockNrOrHash rpc.BlockNumberOrHash, config *TraceConfig) (interface{}, error) {
+	var (
+		block   *types.Block
+		statedb *state.StateDB
+		err     error
+	)
+	if number, ok := blockNrOrHash.Number(); ok {
+		if number == rpc.PendingBlockNumber {
+			block, statedb = api.eth.miner.Pending()
+		} else if number == rpc.LatestBlockNumber || number == rpc.SafeBlockNumber || number == rpc.FinalizedBlockNumber {
+			block = api.eth.blockchain.CurrentBlock()
+		} else {
+			block = api.eth.blockchain.GetBlockByNumber(uint64(number))
+		}
+	} else if hash, ok := blockNrOrHash.Hash(); ok {
+		block = api.eth.blockchain.GetBlockByHash(hash)
+		if block != nil && blockNrOrHash.RequireCanonical {
+			if rawdb.ReadCanonicalHash(api.eth.ChainDb(), block.NumberU64()) != hash {
+				return nil, fmt.Errorf("hash %x is not currently canonical", hash)
+			}
+		}
+	} else {
+		return nil, errors.New("invalid arguments; neither block nor hash specified")
+	}
+	if block == nil {
+		return nil, fmt.Errorf("block %v not found", blockNrOrHash)
+	}
+	if statedb == nil {
+		reexec := defaultTraceReexec
+		if config != nil && config.Reexec != nil {
+			reexec = *config.Reexec
+		}
+		statedb, err = api.computeStateDB(ctx, block, reexec)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	statedb = statedb.Copy()
+	if config != nil && config.StateOverrides != nil {
+		if err := config.StateOverrides.Apply(statedb); err != nil {
+			return nil, err
+		}
+	}
+	header := types.CopyHeader(block.Header())
+	if config != nil && config.BlockOverrides != nil {
+		config.BlockOverrides.Apply(header)
+	}
+
+	var addr common.Address
+	if args.From != nil {
+		addr = *args.From
+	}
+	gas := uint64(math.MaxUint64 / 2)
+	if args.Gas != nil && *args.Gas != 0 {
+		gas = uint64(*args.Gas)
+	}
+	if globalGasCap := api.eth.ApiBackend.RPCGasCap(); globalGasCap != 0 && globalGasCap < gas {
+		gas = globalGasCap
+	}
+	gasPrice := new(big.Int)
+	if args.GasPrice != nil {
+		gasPrice = args.GasPrice.ToInt()
+	} else if args.MaxFeePerGas != nil {
+		gasPrice = args.MaxFeePerGas.ToInt()
+	}
+	value := new(big.Int)
+	if args.Value != nil {
+		value = args.Value.ToInt()
+	}
+	var data []byte
+	if args.Input != nil {
+		data = []byte(*args.Input)
+	} else if args.Data != nil {
+		data = []byte(*args.Data)
+	}
+	msg := types.NewMessage(addr, args.To, 0, value, gas, gasPrice, data, false)
+	vmctx := core.NewEVMContext(msg, header, api.eth.blockchain, nil)
+	return api.traceTx(ctx, msg, vmctx, statedb, config)
+}
+
 // traceTx configures a new tracer according to the provided configuration, and
 // executes the given message in the provided environment. The return value will
 // be tracer dependent.
@@ -574,7 +687,7 @@ func (api *PrivateDebugAPI) traceTx(ctx context.Context, message core.Message, v
 				return nil, err
 			}
 		}
-		// Constuct the JavaScript tracer to execute with
+		// Construct the JavaScript tracer to execute with
 		if tracer, err = tracers.New(*config.Tracer); err != nil {
 			return nil, err
 		}
