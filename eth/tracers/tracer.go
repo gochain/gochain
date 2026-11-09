@@ -52,10 +52,10 @@ func (mw *memoryWrapper) slice(begin, end int64) []byte {
 	if mw.memory == nil {
 		return []byte{}
 	}
-	if begin == end && begin >= 0 && int(begin) <= mw.memory.Len() {
+	if begin == end && begin >= 0 && begin <= int64(mw.memory.Len()) {
 		return []byte{}
 	}
-	if begin < 0 || end < 0 || begin > end || int(end) > mw.memory.Len() {
+	if begin < 0 || end < 0 || begin > end || end > int64(mw.memory.Len()) {
 		log.Warn("Tracer accessed out of bound memory", "available", mw.memory.Len(), "offset", begin, "size", end-begin)
 		return []byte{}
 	}
@@ -64,7 +64,7 @@ func (mw *memoryWrapper) slice(begin, end int64) []byte {
 
 // getUint returns the 32 bytes at the specified address interpreted as a uint.
 func (mw *memoryWrapper) getUint(addr int64) *big.Int {
-	if mw.memory == nil || addr < 0 || int(addr) > mw.memory.Len()-32 {
+	if mw.memory == nil || addr < 0 || addr > int64(mw.memory.Len()-32) {
 		var avail int
 		if mw.memory != nil {
 			avail = mw.memory.Len()
