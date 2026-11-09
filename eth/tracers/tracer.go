@@ -136,7 +136,6 @@ type jsTracer struct {
 	vm            *goja.Runtime
 	bigIntFn      goja.Callable
 	jsonStringify goja.Callable
-	uint8ArrayCtor *goja.Object
 
 	tracerObject *goja.Object
 	stepFn       goja.Callable

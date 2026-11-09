@@ -283,6 +283,9 @@ func (t *callTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cos
 
 	if !t.config.OnlyTopCall {
 		if syscall && (op == vm.CREATE || op == vm.CREATE2) {
+			if stack == nil || len(stack.Data()) < 3 {
+				return nil
+			}
 			inOff := stack.Back(1).Int64()
 			inSize := stack.Back(2).Int64()
 			var inSlice []byte
@@ -314,13 +317,16 @@ func (t *callTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cos
 		}
 
 		if syscall && (op == vm.CALL || op == vm.CALLCODE || op == vm.DELEGATECALL || op == vm.STATICCALL) {
-			to := common.BigToAddress(stack.Back(1))
-			if _, ok := vm.PrecompiledContractsByzantium[to]; ok {
-				return nil
-			}
 			off := 1
 			if op == vm.DELEGATECALL || op == vm.STATICCALL {
 				off = 0
+			}
+			if stack == nil || len(stack.Data()) < 6+off {
+				return nil
+			}
+			to := common.BigToAddress(stack.Back(1))
+			if _, ok := vm.PrecompiledContractsByzantium[to]; ok {
+				return nil
 			}
 			inOff := stack.Back(2 + off).Int64()
 			inSize := stack.Back(3 + off).Int64()
@@ -364,7 +370,7 @@ func (t *callTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cos
 		return nil
 	}
 
-	if !t.config.OnlyTopCall && depth == len(t.callstack)-1 {
+	if !t.config.OnlyTopCall && len(t.callstack) > 1 && depth == len(t.callstack)-1 {
 		call := t.callstack[len(t.callstack)-1]
 		t.callstack = t.callstack[:len(t.callstack)-1]
 
@@ -372,36 +378,40 @@ func (t *callTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cos
 			gu := hexutil.Uint64(call.gasIn - call.gasCost - gas)
 			call.GasUsed = &gu
 
-			ret := stack.Back(0)
-			if ret.Sign() != 0 {
-				toAddr := common.BigToAddress(ret)
-				call.To = &toAddr
-				var code []byte
-				if env != nil && env.StateDB != nil {
-					code = common.CopyBytes(env.StateDB.GetCode(toAddr))
+			if stack != nil && len(stack.Data()) > 0 {
+				ret := stack.Back(0)
+				if ret.Sign() != 0 {
+					toAddr := common.BigToAddress(ret)
+					call.To = &toAddr
+					var code []byte
+					if env != nil && env.StateDB != nil {
+						code = common.CopyBytes(env.StateDB.GetCode(toAddr))
+					}
+					outBytes := hexutil.Bytes(emptyBytesIfNil(code))
+					call.Output = &outBytes
+				} else if call.Error == "" {
+					call.Error = "internal failure"
+					call.Logs = nil
 				}
-				outBytes := hexutil.Bytes(emptyBytesIfNil(code))
-				call.Output = &outBytes
-			} else if call.Error == "" {
-				call.Error = "internal failure"
-				call.Logs = nil
 			}
 		} else {
 			if call.Gas != nil {
 				gu := hexutil.Uint64(call.gasIn - call.gasCost + uint64(*call.Gas) - gas)
 				call.GasUsed = &gu
 
-				ret := stack.Back(0)
-				if ret.Sign() != 0 {
-					var outSlice []byte
-					if memory != nil {
-						outSlice = memory.Get(call.outOff, call.outLen)
+				if stack != nil && len(stack.Data()) > 0 {
+					ret := stack.Back(0)
+					if ret.Sign() != 0 {
+						var outSlice []byte
+						if memory != nil {
+							outSlice = memory.Get(call.outOff, call.outLen)
+						}
+						outBytes := hexutil.Bytes(emptyBytesIfNil(outSlice))
+						call.Output = &outBytes
+					} else if call.Error == "" {
+						call.Error = "internal failure"
+						call.Logs = nil
 					}
-					outBytes := hexutil.Bytes(emptyBytesIfNil(outSlice))
-					call.Output = &outBytes
-				} else if call.Error == "" {
-					call.Error = "internal failure"
-					call.Logs = nil
 				}
 			}
 		}
