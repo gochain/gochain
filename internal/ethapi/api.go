@@ -1102,6 +1102,9 @@ func doCall(ctx context.Context, b Backend, args CallArgs, blockNrOrHash rpc.Blo
 		}
 	}
 	if state == nil || err != nil {
+		if err == nil {
+			err = errors.New("header not found")
+		}
 		return nil, 0, nil, err
 	}
 	state = state.Copy()
@@ -1224,6 +1227,9 @@ func (s *PublicBlockChainAPI) Call(ctx context.Context, args CallArgs, blockNrOr
 	if isRevertErr(vmerr) {
 		return nil, newRevertError(result)
 	}
+	if vmerr != nil {
+		return nil, vmerr
+	}
 	return (hexutil.Bytes)(result), nil
 }
 
@@ -1288,8 +1294,8 @@ func DoEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrHash 
 	// Execute the binary search and hone in on an executable gas limit
 	for lo+1 < hi {
 		mid := (hi + lo) / 2
-		failed, _, _ := executable(mid)
-		if !failed {
+		ok, _, _ := executable(mid)
+		if !ok {
 			lo = mid
 		} else {
 			hi = mid
@@ -1297,8 +1303,8 @@ func DoEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNrOrHash 
 	}
 	// Reject the transaction as invalid if it still fails at the highest allowance
 	if hi == cap {
-		failed, result, err := executable(hi)
-		if !failed {
+		ok, result, err := executable(hi)
+		if !ok {
 			if err != nil {
 				if isRevertErr(err) {
 					return 0, newRevertError(result)
