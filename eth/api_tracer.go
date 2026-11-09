@@ -626,8 +626,8 @@ func (api *PrivateDebugAPI) TraceCall(ctx context.Context, args ethapi.CallArgs,
 		}
 	}
 
+	statedb = statedb.Copy()
 	if config != nil && config.StateOverrides != nil {
-		statedb = statedb.Copy()
 		if err := config.StateOverrides.Apply(statedb); err != nil {
 			return nil, err
 		}

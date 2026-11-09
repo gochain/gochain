@@ -1914,8 +1914,8 @@ func (args *SendTxArgs) toTransaction() *types.Transaction {
 // checkTxFee is an internal function used to check whether the fee of
 // the given transaction is _reasonable_(under the cap).
 func checkTxFee(gasPrice *big.Int, gas uint64, cap float64) error {
-	// Short circuit if there is no cap for transaction fee at all.
-	if cap == 0 {
+	// Short circuit if there is no cap for transaction fee at all or gasPrice is not set.
+	if cap == 0 || gasPrice == nil {
 		return nil
 	}
 	feeEth := new(big.Float).Quo(new(big.Float).SetInt(new(big.Int).Mul(gasPrice, new(big.Int).SetUint64(gas))), new(big.Float).SetInt(big.NewInt(params.Ether)))
