@@ -101,6 +101,12 @@ func (h *handler) handleBatch(msgs []*jsonrpcMessage) {
 		})
 		return
 	}
+	if len(msgs) > defaultBatchRequestLimit {
+		h.startCallProc(func(cp *callProc) {
+			h.conn.writeJSON(cp.ctx, errorMessage(&invalidRequestError{"batch too large"}))
+		})
+		return
+	}
 
 	// Handle non-call messages first:
 	calls := make([]*jsonrpcMessage, 0, len(msgs))
@@ -114,9 +120,25 @@ func (h *handler) handleBatch(msgs []*jsonrpcMessage) {
 	}
 	// Process calls on a goroutine because they may block indefinitely:
 	h.startCallProc(func(cp *callProc) {
-		answers := make([]*jsonrpcMessage, 0, len(msgs))
+		var (
+			answers       = make([]*jsonrpcMessage, 0, len(msgs))
+			responseBytes int
+		)
 		for _, msg := range calls {
 			if answer := h.handleCallMsg(cp, msg); answer != nil {
+				responseBytes += len(answer.Result)
+				if answer.Error != nil {
+					responseBytes += len(answer.Error.Message)
+					if data, ok := answer.Error.Data.(string); ok {
+						responseBytes += len(data)
+					} else if data, ok := answer.Error.Data.([]byte); ok {
+						responseBytes += len(data)
+					}
+				}
+				if responseBytes > defaultBatchResponseMaxSize {
+					answers = append(answers, msg.errorResponse(&invalidRequestError{"batch response too large"}))
+					break
+				}
 				answers = append(answers, answer)
 			}
 		}

@@ -21,7 +21,7 @@ require (
 	github.com/go-stack/stack v1.8.1
 	github.com/golang/snappy v1.0.0
 	github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e // indirect
-	github.com/gorilla/websocket v1.4.2
+	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/golang-lru v1.0.2
 	github.com/huin/goupnp v1.0.1-0.20200620063722-49508fba0031
 	github.com/influxdata/influxdb v1.8.3
@@ -48,7 +48,6 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
-	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20200619000410-60c24ae608a6
 )
 
 require github.com/btcsuite/btcd/btcec/v2 v2.5.0

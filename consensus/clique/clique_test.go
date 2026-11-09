@@ -2,10 +2,16 @@ package clique
 
 import (
 	"bytes"
+	"context"
+	"math/big"
 	"sort"
 	"testing"
 
 	"github.com/gochain/gochain/v5/common"
+	"github.com/gochain/gochain/v5/core"
+	"github.com/gochain/gochain/v5/core/types"
+	"github.com/gochain/gochain/v5/ethdb"
+	"github.com/gochain/gochain/v5/params"
 )
 
 func TestExtraData(t *testing.T) {
@@ -221,3 +227,94 @@ func (test *testCalcDifficulty) run(t *testing.T) {
 		}
 	}
 }
+
+type mockAPIChainReader struct {
+	headers []*types.Header
+}
+
+func (m *mockAPIChainReader) Config() *params.ChainConfig {
+	return params.AllCliqueProtocolChanges
+}
+func (m *mockAPIChainReader) CurrentHeader() *types.Header {
+	return m.headers[len(m.headers)-1]
+}
+func (m *mockAPIChainReader) GetHeader(hash common.Hash, number uint64) *types.Header {
+	if int(number) < len(m.headers) && m.headers[number].Hash() == hash {
+		return m.headers[number]
+	}
+	return nil
+}
+func (m *mockAPIChainReader) GetHeaderByNumber(number uint64) *types.Header {
+	if int(number) < len(m.headers) {
+		return m.headers[number]
+	}
+	return nil
+}
+func (m *mockAPIChainReader) GetHeaderByHash(hash common.Hash) *types.Header {
+	for _, h := range m.headers {
+		if h.Hash() == hash {
+			return h
+		}
+	}
+	return nil
+}
+func (m *mockAPIChainReader) GetBlock(hash common.Hash, number uint64) *types.Block {
+	return nil
+}
+
+func TestAPI_GetVotersAtHashAndStatus(t *testing.T) {
+	accounts := newTesterAccountPool()
+	signerA := accounts.address("A")
+	voterB := accounts.address("B")
+
+	db := ethdb.NewMemDatabase()
+	gspec := &core.Genesis{
+		ExtraData: ExtraEnsureVanity(nil),
+		Signers:   []common.Address{signerA},
+		Voters:    []common.Address{signerA, voterB},
+		Signer:    make([]byte, signatureLength),
+	}
+	genesis := gspec.MustCommit(db).Header()
+	block1 := &types.Header{
+		Number:     big.NewInt(1),
+		ParentHash: genesis.Hash(),
+		UncleHash:  types.EmptyUncleHash,
+		Difficulty: big.NewInt(1),
+		Time:       big.NewInt(1),
+		Extra:      ExtraEnsureVanity(nil),
+	}
+	accounts.sign(block1, "A")
+
+	engine := New(params.AllCliqueProtocolChanges.Clique, db)
+	chain := &mockAPIChainReader{headers: []*types.Header{genesis, block1}}
+	api := &API{chain: chain, clique: engine}
+
+	voters, err := api.GetVotersAtHash(context.Background(), block1.Hash())
+	if err != nil {
+		t.Fatalf("GetVotersAtHash failed: %v", err)
+	}
+	if len(voters) != 2 {
+		t.Fatalf("expected 2 voters, got %d", len(voters))
+	}
+
+	status, err := api.Status(context.Background())
+	if err != nil {
+		t.Fatalf("Status failed: %v", err)
+	}
+	if status.NumBlocks != 1 {
+		t.Fatalf("expected NumBlocks=1, got %d", status.NumBlocks)
+	}
+	if status.SigningStatus[signerA] != 1 {
+		t.Fatalf("expected signerA activity=1, got %d", status.SigningStatus[signerA])
+	}
+	if status.InturnPercent != 100 {
+		t.Fatalf("expected InturnPercent=100, got %v", status.InturnPercent)
+	}
+	if len(status.Signers) != 1 {
+		t.Fatalf("expected 1 signer, got %d", len(status.Signers))
+	}
+	if len(status.Stakers) != 2 {
+		t.Fatalf("expected 2 stakers, got %d", len(status.Stakers))
+	}
+}
+
