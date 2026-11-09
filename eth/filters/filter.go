@@ -138,13 +138,27 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 	}
 	head := header.Number.Uint64()
 
-	if f.begin == -1 {
-		f.begin = int64(head)
+	origBegin, origEnd := f.begin, f.end
+	defer func() {
+		f.begin, f.end = origBegin, origEnd
+	}()
+
+	if f.begin < 0 {
+		f.begin = header.Number.Int64()
+	}
+	if f.end < 0 {
+		f.end = header.Number.Int64()
+	}
+	if f.begin < 0 || f.end < 0 || f.begin > f.end {
+		return nil, nil
+	}
+	if uint64(f.end) > head {
+		f.end = header.Number.Int64()
+	}
+	if f.begin > f.end {
+		return nil, nil
 	}
 	end := uint64(f.end)
-	if f.end == -1 {
-		end = head
-	}
 	// Gather all indexed logs, and finish with non indexed ones
 	var (
 		logs []*types.Log
@@ -219,6 +233,11 @@ func (f *Filter) unindexedLogs(ctx context.Context, end uint64) ([]*types.Log, e
 	var logs []*types.Log
 
 	for ; f.begin <= int64(end); f.begin++ {
+		select {
+		case <-ctx.Done():
+			return logs, ctx.Err()
+		default:
+		}
 		header, err := f.backend.HeaderByNumber(ctx, rpc.BlockNumber(f.begin))
 		if header == nil || err != nil {
 			return logs, err
